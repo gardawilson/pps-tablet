@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../constants/api_constants.dart';
+import '../../../../constants/api_constants.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 class SocketManager extends ChangeNotifier {

@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:smb_connect/smb_connect.dart';
 import 'package:path_provider/path_provider.dart';
-import '../models/update_model.dart';
+import '../model/update_model.dart';
 import 'dart:math';
 
 class UpdateViewModel {

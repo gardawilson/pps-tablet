@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../models/update_model.dart';
-import '../widgets/update_progress.dart';
+import '../../model/update_model.dart';
+import '../../../../widgets/update_progress.dart';
 
 class UpdateDialog extends StatefulWidget {
   final UpdateInfo updateInfo;

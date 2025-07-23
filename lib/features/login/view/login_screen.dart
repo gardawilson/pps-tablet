@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../view_models/login_view_model.dart';
-import '../models/user_model.dart';
-import '../view_models/update_view_model.dart';
-import '../models/update_model.dart';
+import '../view_model/login_view_model.dart';
+import '../model/user_model.dart';
+import '../view_model/update_view_model.dart';
+import '../model/update_model.dart';
 import 'package:open_file/open_file.dart';
 import 'package:permission_handler/permission_handler.dart';
 

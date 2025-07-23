@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../view_models/user_profile_view_model.dart';
-import '../models/user_profile_model.dart';
+import '../../view_model/user_profile_view_model.dart';
+import '../../model/user_profile_model.dart';
 
 class UserProfileDialog extends StatefulWidget {
   const UserProfileDialog({Key? key}) : super(key: key);
@@ -154,7 +154,7 @@ class _UserProfileDialogState extends State<UserProfileDialog> {
                   const SizedBox(width: 12),
                   FilledButton(
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF755330), // Warna coklat tua
+                      backgroundColor: const Color(0xFF0D47A1), // Warna coklat tua
                     ),
                     onPressed: _validateForm,
                     child: const Text('Simpan'),

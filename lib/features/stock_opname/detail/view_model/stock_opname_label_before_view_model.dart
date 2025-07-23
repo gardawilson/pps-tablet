@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/stock_opname_label_before_model.dart';
-import '../constants/api_constants.dart';
+import '../model/stock_opname_label_before_model.dart';
+import '../../../../constants/api_constants.dart';
 import 'socket_manager.dart'; // Import SocketManager
 
 class StockOpnameLabelBeforeViewModel extends ChangeNotifier {

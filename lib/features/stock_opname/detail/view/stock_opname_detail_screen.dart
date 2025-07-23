@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../view_models/stock_opname_detail_view_model.dart';
-import '../view_models/stock_opname_label_before_view_model.dart';
-import '../view_models/lokasi_view_model.dart';
-import '../view_models/socket_manager.dart';
-import '../widgets/loading_skeleton.dart';
+import '../view_model/stock_opname_detail_view_model.dart';
+import '../view_model/stock_opname_label_before_view_model.dart';
+import '../view_model/lokasi_view_model.dart';
+import '../view_model/socket_manager.dart';
+import '../../../../widgets/loading_skeleton.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'dart:async';
 

@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/user_profile_model.dart';
-import '../constants/api_constants.dart';
+import '../../home/model/user_profile_model.dart';
+import '../../../constants/api_constants.dart';
 
 
 class UserProfileViewModel extends ChangeNotifier {

@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart'; // Import SharedPreferences
-import '../models/user_model.dart';
-import '../constants/api_constants.dart';
+import '../model/user_model.dart';
+import '../../../constants/api_constants.dart';
 
 
 

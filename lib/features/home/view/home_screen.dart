@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart'; // Tambahkan dependency ini di pubspec.yaml
-import '../view_models/user_profile_view_model.dart';
-import '../widgets/user_profile_dialog.dart';
+import '../view_model/user_profile_view_model.dart';
+import '../../home/view/widgets/user_profile_dialog.dart';
 
 class HomeScreen extends StatelessWidget {
 

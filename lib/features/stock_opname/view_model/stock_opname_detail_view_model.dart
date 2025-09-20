@@ -18,6 +18,9 @@ class StockOpnameDetailViewModel extends ChangeNotifier {
   int page = 1;
   int pageSize = 50;
   int totalData = 0;
+  int totalSak = 0;
+  double totalBerat = 0;
+
   bool hasMoreData = true;
 
   bool isInitialLoading = false;
@@ -179,11 +182,15 @@ class StockOpnameDetailViewModel extends ChangeNotifier {
         final data = json.decode(response.body);
         final List<dynamic> labelData = data['data'];
         final int total = data['totalData'];
+        final int sumSak = data['totalSak'];
+        final double sumBerat = (data['totalBerat'] as num?)?.toDouble() ?? 0.0;
 
         final fetched = labelData.map((e) => StockOpnameLabel.fromJson(e)).toList();
 
         labels.addAll(fetched);
         totalData = total;
+        totalSak = sumSak;
+        totalBerat = sumBerat;
         hasMoreData = labels.length < total;
         hasError = false;
         errorMessage = '';

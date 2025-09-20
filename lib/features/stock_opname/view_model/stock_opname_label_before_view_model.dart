@@ -18,6 +18,11 @@ class StockOpnameLabelBeforeViewModel extends ChangeNotifier {
   int page = 1;
   int pageSize = 50;
   int totalData = 0;
+  int totalSak = 0;
+  double totalBerat = 0;
+  int totalSakGlobal = 0;
+  int totalGlobal = 0;
+  double totalBeratGlobal = 0;
   bool hasMoreData = true;
 
   bool isInitialLoading = false;
@@ -184,7 +189,12 @@ class StockOpnameLabelBeforeViewModel extends ChangeNotifier {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final List<dynamic> labelData = data['data'] ?? [];
-        final int total = data['totalData'] ?? data['total'] ?? 0;
+        final int total = data['totalData'] ?? 0;
+        final int sumSak = data['totalSak'] ?? 0;
+        final double sumBerat = (data['totalBerat'] as num?)?.toDouble() ?? 0.0;
+        final int sumTotalGlobal = data['totalLabelGlobal'] ?? 0;
+        final int sumSakGlobal = data['totalSakGlobal'] ?? 0;
+        final double sumBeratGlobal = (data['totalBeratGlobal'] as num?)?.toDouble() ?? 0.0;
 
         final fetched = labelData.map((e) => StockOpnameLabelBeforeModel.fromJson(e)).toList();
 
@@ -195,6 +205,13 @@ class StockOpnameLabelBeforeViewModel extends ChangeNotifier {
         }
 
         totalData = total;
+        totalSak = sumSak;
+        totalBerat = sumBerat;
+
+        totalGlobal = sumTotalGlobal;
+        totalSakGlobal = sumSakGlobal;
+        totalBeratGlobal = sumBeratGlobal;
+
         hasMoreData = items.length < total;
         hasError = false;
         errorMessage = '';

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../view_model/stock_opname_list_view_model.dart';
-import '../../../../widgets/loading_skeleton.dart';
-import '../../detail/view/stock_opname_detail_screen.dart';
+import '../../../widgets/loading_skeleton.dart';
+import 'stock_opname_detail_screen.dart';
+import 'stock_opname_ascend_detail_screen.dart';
 
 class StockOpnameListScreen extends StatelessWidget {
   @override
@@ -86,15 +87,27 @@ class StockOpnameListScreen extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => StockOpnameDetailScreen(
-                  noSO: stockOpname.noSO,
-                  tgl: stockOpname.tanggal,
+            if (stockOpname.isAscend == true) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => StockOpnameAscendDetailScreen(
+                    noSO: stockOpname.noSO,
+                    tgl: stockOpname.tanggal,
+                  ),
                 ),
-              ),
-            );
+              );
+            } else {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => StockOpnameDetailScreen(
+                    noSO: stockOpname.noSO,
+                    tgl: stockOpname.tanggal,
+                  ),
+                ),
+              );
+            }
           },
           child: Padding(
             padding: const EdgeInsets.all(20),
@@ -264,6 +277,10 @@ class StockOpnameListScreen extends StatelessWidget {
     if (stockOpname.isBroker) processes.add('Broker');
     if (stockOpname.isGilingan) processes.add('Gilingan');
     if (stockOpname.isMixer) processes.add('Mixer');
+    if (stockOpname.isFurnitureWIP) processes.add('Furniture WIP');
+    if (stockOpname.isBarangJadi) processes.add('Barang Jadi');
+    if (stockOpname.isReject) processes.add('Reject');
+    if (stockOpname.isAscend) processes.add('Ascend');
 
     return processes;
   }
@@ -271,19 +288,17 @@ class StockOpnameListScreen extends StatelessWidget {
   Color _getProcessColor(String process) {
     switch (process) {
       case 'Bahan Baku':
-        return Colors.green[600]!;
       case 'Washing':
-        return Colors.blue[600]!;
       case 'Bonggolan':
-        return Colors.orange[600]!;
       case 'Crusher':
-        return Colors.red[600]!;
       case 'Broker':
-        return Colors.purple[600]!;
       case 'Gilingan':
-        return Colors.teal[600]!;
       case 'Mixer':
-        return Colors.indigo[600]!;
+      case 'Furniture WIP':
+      case 'Barang Jadi':
+      case 'Reject':
+      case 'Ascend':
+        return Colors.blue[600]!;
       default:
         return Colors.grey[600]!;
     }

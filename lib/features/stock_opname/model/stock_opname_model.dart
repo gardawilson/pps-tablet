@@ -1,7 +1,7 @@
 class StockOpname {
   final String noSO;
   final String tanggal;
-  final String namaWarehouse; // ⬅️ ubah dari int? idWarehouse menjadi String
+  final String namaWarehouse;
   final bool isBahanBaku;
   final bool isWashing;
   final bool isBonggolan;
@@ -9,6 +9,10 @@ class StockOpname {
   final bool isBroker;
   final bool isGilingan;
   final bool isMixer;
+  final bool isFurnitureWIP;
+  final bool isBarangJadi;
+  final bool isReject;
+  final bool isAscend;
 
   StockOpname({
     required this.noSO,
@@ -21,13 +25,17 @@ class StockOpname {
     required this.isBroker,
     required this.isGilingan,
     required this.isMixer,
+    required this.isFurnitureWIP,
+    required this.isBarangJadi,
+    required this.isReject,
+    required this.isAscend,
   });
 
   factory StockOpname.fromJson(Map<String, dynamic> json) {
     return StockOpname(
       noSO: json['NoSO'] ?? '',
       tanggal: json['Tanggal']?.toString() ?? '',
-      namaWarehouse: json['NamaWarehouse'] ?? '-', // ⬅️ ambil nama dari API
+      namaWarehouse: json['NamaWarehouse'] ?? '-',
       isBahanBaku: json['IsBahanBaku'] ?? false,
       isWashing: json['IsWashing'] ?? false,
       isBonggolan: json['IsBonggolan'] ?? false,
@@ -35,6 +43,10 @@ class StockOpname {
       isBroker: json['IsBroker'] ?? false,
       isGilingan: json['IsGilingan'] ?? false,
       isMixer: json['IsMixer'] ?? false,
+      isFurnitureWIP: json['IsFurnitureWIP'] ?? false,
+      isBarangJadi: json['IsBarangJadi'] ?? false,
+      isReject: json['IsReject'] ?? false,
+      isAscend: json['IsAscend'] ?? false,
     );
   }
 }

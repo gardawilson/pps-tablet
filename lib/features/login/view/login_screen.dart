@@ -214,7 +214,7 @@ class _LoginScreenState extends State<LoginScreen> {
             left: 0,
             right: 0,
             child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 300),
+              duration: const Duration(milliseconds: 50),
               // Sembunyikan welcome text ketika keyboard muncul (opsional)
               opacity: isKeyboardVisible ? 0.0 : 1.0,
               child: Text(
@@ -231,7 +231,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
           // Centered login card dengan animasi untuk keyboard
           AnimatedPadding(
-            duration: const Duration(milliseconds: 300),
+            duration: const Duration(milliseconds: 50),
             curve: Curves.easeInOut,
             // Geser ke atas ketika keyboard muncul
             padding: EdgeInsets.only(
@@ -339,7 +339,7 @@ class _LoginScreenState extends State<LoginScreen> {
             left: 0,
             right: 0,
             child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 300),
+              duration: const Duration(milliseconds: 50),
               // Sembunyikan copyright ketika keyboard muncul (opsional)
               opacity: isKeyboardVisible ? 0.0 : 1.0,
               child: Text(

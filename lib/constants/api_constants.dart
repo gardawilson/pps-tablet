@@ -34,7 +34,6 @@ class ApiConstants {
     return '$baseUrl/api/no-stock-opname/$selectedNoSO/hasil?page=$page&pageSize=$pageSize&filterBy=$filter&idlokasi=$lokasi$searchQuery';
   }
 
-
   static String stockOpnameAcuanList({
     required String noSO,
     required int page,
@@ -57,9 +56,6 @@ class ApiConstants {
     return '$baseUrl/api/no-stock-opname/$noSO/acuan?$queryString';
   }
 
-
-
-
   static String labelList({
     required int page,
     required int pageSize,
@@ -81,5 +77,23 @@ class ApiConstants {
     final currentLocation = idLokasi ?? 'all';
     return '$baseUrl/api/label-list?page=$page&pageSize=$loadMoreSize&filterBy=$currentFilter&idlokasi=$currentLocation';
   }
+
+
+  // 🔹 No Stock Opname (Ascend)
+  static String noStockOpnameAscendItems(String noSO, int familyID, {String keyword = ''}) =>
+      '$baseUrl/api/no-stock-opname/$noSO/families/$familyID/ascend?keyword=$keyword';
+
+  static String noStockOpnameUsage(int itemID, String tglSO) =>
+      '$baseUrl/api/no-stock-opname/$itemID/usage?tglSO=$tglSO';
+
+  static String noStockOpnameSave(String noSO) =>
+      '$baseUrl/api/no-stock-opname/$noSO/ascend/hasil';
+
+  static String noStockOpnameDelete(String noSO, int itemID) =>
+      '$baseUrl/api/no-stock-opname/$noSO/ascend/hasil/$itemID';
+
+  // 🔹 No Stock Opname (Family)
+  static String noStockOpnameFamilies(String noSO) =>
+      '$baseUrl/api/no-stock-opname/$noSO/families';
 
 }

@@ -154,17 +154,17 @@ class HomeScreen extends StatelessWidget {
             color: Colors.blue[900], // ganti warna judul agar sesuai tema
           ),
         ),
-        // const SizedBox(height: 16),
-        // _buildMenuCard(
-        //   context,
-        //   title: 'Input Label',
-        //   subtitle: 'Buat label untuk item',
-        //   icon: Icons.label,
-        //   color: const Color(0xFF0D47A1), // BLUE PRIMARY
-        //   onTap: () {
-        //     Navigator.pushNamed(context, '/label');
-        //   },
-        // ),
+        const SizedBox(height: 16),
+        _buildMenuCard(
+          context,
+          title: 'Input Label',
+          subtitle: 'Buat label untuk item',
+          icon: Icons.label,
+          color: const Color(0xFF0D47A1), // BLUE PRIMARY
+          onTap: () {
+            Navigator.pushNamed(context, '/label');
+          },
+        ),
         const SizedBox(height: 16),
         _buildMenuCard(
           context,

@@ -63,13 +63,20 @@ class AscendItemSection extends StatelessWidget {
                     ]),
                   );
                 }
-                if (vm.hasError) {
+                if (vm.errorMessage.isNotEmpty) {
                   return Center(
-                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
-                      SizedBox(height: 8),
-                      Text(vm.errorMessage, style: const TextStyle(color: Colors.red, fontSize: 14), textAlign: TextAlign.center),
-                    ]),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
+                        const SizedBox(height: 8),
+                        Text(
+                          vm.errorMessage,
+                          style: const TextStyle(color: Colors.red, fontSize: 14),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
                   );
                 }
                 if (vm.items.isEmpty) {

@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:pps_tablet/features/label/selection/view/label_selection_screen.dart';
-import 'package:pps_tablet/features/label/washing/view/label_washing_screen.dart';
+import 'package:pps_tablet/features/label/washing/repository/washing_repository.dart';
+import 'package:pps_tablet/features/label/washing/view/washing_screen.dart';
+import 'package:pps_tablet/features/label/washing/view_model/washing_view_model.dart';
+import 'package:pps_tablet/features/stock_opname/repository/stock_opname_ascend_repository.dart';
+import 'package:pps_tablet/features/stock_opname/repository/stock_opname_family_repository.dart';
+import 'package:pps_tablet/features/stock_opname/repository/stock_opname_repository.dart';
 import 'package:pps_tablet/features/stock_opname/view_model/stock_opname_ascend_view_model.dart';
 import 'package:pps_tablet/features/stock_opname/view_model/stock_opname_family_view_model.dart';
 import 'package:provider/provider.dart';
@@ -28,15 +33,16 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(  // Menggunakan MultiProvider untuk mengelola lebih dari satu provider
       providers: [
-        ChangeNotifierProvider(create: (_) => StockOpnameViewModel()),  // Memberikan StockOpnameViewModel ke seluruh aplikasi
+        ChangeNotifierProvider(create: (_) => StockOpnameViewModel(repository: StockOpnameRepository())),  // Memberikan StockOpnameViewModel ke seluruh aplikasi
         ChangeNotifierProvider(create: (_) => StockOpnameLabelBeforeViewModel()),  // Memberikan StockOpnameViewModel ke seluruh aplikasi
         ChangeNotifierProvider(create: (_) => StockOpnameDetailViewModel()),  // Menambahkan StockOpnameInputViewModel
         ChangeNotifierProvider(create: (_) => UserProfileViewModel()), // Menambahkan UserProfileViewModel
         ChangeNotifierProvider(create: (_) => LokasiViewModel()),
         ChangeNotifierProvider(create: (_) => SocketManager()),
         ChangeNotifierProvider(create: (_) => LabelDetailViewModel()),
-        ChangeNotifierProvider(create: (_) => StockOpnameAscendViewModel()),
-        ChangeNotifierProvider(create: (_) => StockOpnameFamilyViewModel()),
+        ChangeNotifierProvider(create: (_) => StockOpnameAscendViewModel(repository: StockOpnameAscendRepository())),
+        ChangeNotifierProvider(create: (_) => StockOpnameFamilyViewModel(repository: StockOpnameFamilyRepository())),
+        ChangeNotifierProvider(create: (_) => WashingViewModel(repository: WashingRepository())),
       ],
       child: MaterialApp(
         title: 'PPS Tablet',
@@ -49,7 +55,7 @@ class MyApp extends StatelessWidget {
           '/home': (context) => HomeScreen(),
           '/stockopname': (context) => StockOpnameListScreen(),
           '/label': (context) => LabelSelectionScreen(),
-          '/label/washing': (context) => WashingFormScreen(),
+          '/label/washing': (context) => WashingListScreen(),
         },
       ),
     );

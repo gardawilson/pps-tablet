@@ -240,16 +240,30 @@ class AscendItemSection extends StatelessWidget {
                                           color: const Color(0xFF3B82F6).withOpacity(0.1),
                                           borderRadius: BorderRadius.circular(4),
                                         ),
-                                        child: Text(
-                                          (item.qtyUsage == null || item.qtyUsage == -1) ? "?" : "${item.qtyUsage}",
-                                          textAlign: TextAlign.center,
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                            color: Color(0xFF1E3A8A),
-                                          ),
+                                        child: Builder(
+                                          builder: (_) {
+                                            String displayText;
+                                            if (!item.isUpdateUsage) {
+                                              displayText = "?";
+                                              debugPrint("QtyUsage LOG → itemID=${item.itemID}, qtyUsage=${item.qtyUsage}, isUpdateUsage=${item.isUpdateUsage} → tampil '?'");
+                                            } else {
+                                              displayText = "${item.qtyUsage}";
+                                              debugPrint("QtyUsage LOG → itemID=${item.itemID}, qtyUsage=${item.qtyUsage}, isUpdateUsage=${item.isUpdateUsage} → tampil nilai");
+                                            }
+
+                                            return Text(
+                                              displayText,
+                                              textAlign: TextAlign.center,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: Color(0xFF1E3A8A),
+                                              ),
+                                            );
+                                          },
                                         ),
                                       ),
+
                                     );
                                   },
                                 ),
@@ -284,17 +298,22 @@ class AscendItemSection extends StatelessWidget {
                                       final parsed = double.tryParse(val) ?? 0;
                                       vm.updateQtyFisik(item.itemID, parsed);
 
-                                      if (val.isEmpty && !item.isUpdateUsage) {
+                                      if (val.isEmpty) {
+                                        debugPrint("QtyUsage LOG → kondisi reset karena val kosong");
                                         vm.resetQtyUsage(item.itemID);
                                       } else {
-                                        if (!vm.hasFetchedUsage(item.itemID) && !item.isUpdateUsage ) {
+                                        if (!item.isUpdateUsage) {
+                                          debugPrint("QtyUsage LOG → fetch dipanggil, itemID=${item.itemID}, tgl=$tgl");
                                           await vm.fetchQtyUsage(item.itemID, tgl);
                                         }
                                       }
                                     },
+
+
                                   ),
                                 ),
                               ),
+
                               // Remark
                               Expanded(
                                 flex: 3,

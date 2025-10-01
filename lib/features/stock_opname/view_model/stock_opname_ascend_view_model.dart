@@ -43,12 +43,15 @@ class StockOpnameAscendViewModel extends ChangeNotifier {
 
     try {
       final usage = await repository.fetchQtyUsage(itemID, tglSO);
+      debugPrint("QtyUsage LOG → hasil fetch itemID=$itemID, usage=$usage");
       final index = items.indexWhere((e) => e.itemID == itemID);
       if (index != -1) {
         items[index].qtyUsage = usage;
-        _fetchedUsageItems.add(itemID);
+        items[index].isUpdateUsage = true;
+        debugPrint("QtyUsage LOG → update state: qtyUsage=${items[index].qtyUsage}, isUpdateUsage=${items[index].isUpdateUsage}");
       }
-    } finally {
+    }
+ finally {
       _loadingUsageItems.remove(itemID);
       notifyListeners();
     }
@@ -57,8 +60,19 @@ class StockOpnameAscendViewModel extends ChangeNotifier {
   // Save
   Future<bool> saveAscendItems(String noSO) async {
     if (items.isEmpty) return false;
-    return repository.saveAscendItems(noSO, items);
+
+    // ambil hanya item yang isUpdateUsage == true
+    final updatedItems = items.where((e) => e.isUpdateUsage).toList();
+
+    if (updatedItems.isEmpty) {
+      debugPrint("SaveAscendItems LOG → tidak ada item yang diupdate, skip save.");
+      return false;
+    }
+
+    debugPrint("SaveAscendItems LOG → menyimpan ${updatedItems.length} item yang diupdate");
+    return repository.saveAscendItems(noSO, updatedItems);
   }
+
 
   // Delete
   Future<bool> deleteAscendItem(String noSO, int itemID, {TextEditingController? qtyCtrl}) async {
@@ -67,7 +81,7 @@ class StockOpnameAscendViewModel extends ChangeNotifier {
       final index = items.indexWhere((e) => e.itemID == itemID);
       if (index != -1) {
         items[index].qtyFisik = null;
-        items[index].qtyUsage = -1.0;
+        items[index].qtyUsage = null;
         items[index].isUpdateUsage = false;
       }
       if (qtyCtrl != null) qtyCtrl.text = '';
@@ -98,10 +112,16 @@ class StockOpnameAscendViewModel extends ChangeNotifier {
 
   void resetQtyUsage(int itemID) {
     final index = items.indexWhere((e) => e.itemID == itemID);
-    if (index != -1) items[index].qtyUsage = -1.0;
-    _fetchedUsageItems.remove(itemID);
+    if (index != -1) {
+      items[index].qtyUsage = -1;
+      items[index].isUpdateUsage = false; // <- supaya fetch bisa jalan lagi
+      _fetchedUsageItems.remove(itemID);  // <- reset cache
+      debugPrint("QtyUsage LOG → reset itemID=$itemID, qtyUsage=-1, isUpdateUsage=false (cache dihapus)");
+    }
     notifyListeners();
   }
+
+
 
   void reset() {
     items.clear();

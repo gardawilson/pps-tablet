@@ -5,11 +5,11 @@ class WashingHeader {
   final int idWarehouse;
   final String namaWarehouse;
   final String dateCreate;
-  final int idStatus;
+  final bool idStatus;          // ✅ boolean
   final String createBy;
   final String dateTimeCreate;
-  final double density;
-  final double moisture;
+  final double? density;        // ✅ nullable
+  final double? moisture;       // ✅ nullable
 
   WashingHeader({
     required this.noWashing,
@@ -21,8 +21,8 @@ class WashingHeader {
     required this.idStatus,
     required this.createBy,
     required this.dateTimeCreate,
-    required this.density,
-    required this.moisture,
+    this.density,
+    this.moisture,
   });
 
   factory WashingHeader.fromJson(Map<String, dynamic> json) {
@@ -33,11 +33,12 @@ class WashingHeader {
       idWarehouse: json['IdWarehouse'] ?? 0,
       namaWarehouse: json['NamaWarehouse'] ?? '',
       dateCreate: json['DateCreate'] ?? '',
-      idStatus: json['IdStatus'] ?? 0,
+      idStatus: json['IdStatus'] == true,   // ✅ aman walau bool/null
       createBy: json['CreateBy'] ?? '',
       dateTimeCreate: json['DateTimeCreate'] ?? '',
       density: (json['Density'] as num?)?.toDouble() ?? 0.0,
       moisture: (json['Moisture'] as num?)?.toDouble() ?? 0.0,
+
     );
   }
 }

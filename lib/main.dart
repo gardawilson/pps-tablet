@@ -55,7 +55,7 @@ class MyApp extends StatelessWidget {
           '/home': (context) => HomeScreen(),
           '/stockopname': (context) => StockOpnameListScreen(),
           '/label': (context) => LabelSelectionScreen(),
-          '/label/washing': (context) => WashingListScreen(),
+          '/label/washing': (context) => WashingTableScreen(),
         },
       ),
     );

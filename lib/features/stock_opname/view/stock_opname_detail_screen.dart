@@ -13,7 +13,7 @@ import 'widgets/list_sections/stock_data_list_widget.dart';
 import 'widgets/list_sections/scan_result_list_widget.dart';
 import 'widgets/list_sections/section_header_widget.dart';
 import 'widgets/dialogs/summary_dialog_widget.dart'; // Import dialog widget
-import '../../../widgets/loading_dialog.dart';
+import '../../../common/widgets/loading_dialog.dart';
 
 class StockOpnameDetailScreen extends StatefulWidget {
   final String noSO;

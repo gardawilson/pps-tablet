@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../view_model/stock_opname_list_view_model.dart';
-import '../../../widgets/loading_skeleton.dart';
+import '../../../common/widgets/loading_skeleton.dart';
 import 'stock_opname_detail_screen.dart';
 import 'stock_opname_ascend_detail_screen.dart';
 

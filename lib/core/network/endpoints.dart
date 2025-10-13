@@ -6,7 +6,7 @@ class ApiConstants {
 
 
   static String get changePassword => '$baseUrl/api/change-password';
-  static String get login => '$baseUrl/api/login';
+  static String get login => '$baseUrl/api/auth/login';
   static String get checkLabel => '$baseUrl/api/label-list/check';
   static String get saveChanges => '$baseUrl/api/label-list/save-changes';
   static String get listNoSO => '$baseUrl/api/no-stock-opname';

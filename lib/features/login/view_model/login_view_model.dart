@@ -1,40 +1,47 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart'; // Import SharedPreferences
+import 'package:shared_preferences/shared_preferences.dart';
 import '../model/user_model.dart';
-import '../../../constants/api_constants.dart';
-
-
+import '../../../core/network/endpoints.dart';
+import '../../../core/services/permission_storage.dart'; // tambahkan ini
 
 class LoginViewModel {
   Future<bool> validateLogin(User user) async {
-
     try {
-      // Kirim request dengan header Content-Type: application/json
       final response = await http.post(
         Uri.parse(ApiConstants.login),
-        headers: {
-          'Content-Type': 'application/json',  // Pastikan Content-Type JSON
-        },
-        body: jsonEncode(user.toJson()),  // Mengirim data dalam format JSON
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(user.toJson()),
       );
 
-      // Log status code dan body response untuk debugging
       print('Response status: ${response.statusCode}');
       print('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         var data = jsonDecode(response.body);
-        print('Login success: ${data['message']}');
 
-        // Jika login berhasil, kita bisa mendapatkan token dari response
-        String token = data['token'];
+        if (data['success'] == true) {
+          print('Login success: ${data['message']}');
 
-        // Simpan token menggunakan SharedPreferences
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('token', token); // Simpan token di SharedPreferences
+          String token = data['token'];
+          var userData = data['user'];
+          List<String> permissions = [];
 
-        return true;
+          if (userData['permissions'] != null) {
+            permissions = List<String>.from(userData['permissions']);
+          }
+
+          // Simpan token dan permissions
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('token', token);
+          await PermissionStorage.savePermissions(permissions);
+
+          print('✅ Token dan permissions disimpan');
+          return true;
+        } else {
+          print('Login gagal: ${data['message']}');
+          return false;
+        }
       } else {
         print('Login failed: ${response.body}');
         return false;

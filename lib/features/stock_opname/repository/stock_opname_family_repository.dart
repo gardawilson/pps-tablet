@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart'; // biar bisa pakai debugPrint
 import 'package:http/http.dart' as http;
 
-import '../../../../constants/api_constants.dart';
-import '../../../../utils/token_storage.dart';
+import '../../../core/network/endpoints.dart';
+import '../../../../core/services/token_storage.dart';
 import '../model/stock_opname_family_model.dart';
 
 class StockOpnameFamilyRepository {

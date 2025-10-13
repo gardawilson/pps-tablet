@@ -31,7 +31,7 @@ class AscendFamilySection extends StatelessWidget {
                 child: const Icon(Icons.category_outlined, color: Colors.white, size: 16),
               ),
               const SizedBox(width: 8),
-              const Text('Familie Produk',
+              const Text('Family',
                   style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Color(0xFF1F2937))),
             ]),
           ),

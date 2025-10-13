@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../view_model/stock_opname_family_view_model.dart';
 import '../view_model/stock_opname_ascend_view_model.dart';
-import '../../../widgets/loading_dialog.dart';
+import '../../../common/widgets/loading_dialog.dart';
 
 import 'widgets/list_sections/ascend_appbar.dart';
 import 'widgets/list_sections/ascend_filter_section.dart';

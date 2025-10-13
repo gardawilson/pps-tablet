@@ -7,7 +7,7 @@ import '../cards/compact_label_card_widget.dart';
 import '../common/error_state_widget.dart';
 import '../common/empty_state_widget.dart';
 import '../dialogs/bubble_tooltip.dart';
-import '../../../../../../widgets/loading_skeleton.dart';
+import '../../../../../../common/widgets/loading_skeleton.dart';
 
 class StockDataListWidget extends StatefulWidget {
   final String noSO;

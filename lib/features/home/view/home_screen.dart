@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart'; // Tambahkan dependency ini di pubspec.yaml
 import '../view_model/user_profile_view_model.dart';
+import 'package:provider/provider.dart'; // ⬅️ wajib agar context.read bisa digunakan
 import '../../home/view/widgets/user_profile_dialog.dart';
+import '../../../core/services/token_storage.dart';
+import '../../../core/services/permission_storage.dart';
+import '../../../core/view_model/permission_view_model.dart';
 
 class HomeScreen extends StatelessWidget {
 
@@ -38,11 +42,43 @@ class HomeScreen extends StatelessWidget {
             IconButton(
               icon: const Icon(Icons.logout),
               color: Colors.white,
-              onPressed: () {
-                Navigator.pushReplacementNamed(context, '/');
+              onPressed: () async {
+                final shouldLogout = await showDialog<bool>(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: const Text('Konfirmasi Logout'),
+                    content: const Text('Apakah Anda yakin ingin keluar dari aplikasi?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('Batal'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text('Logout'),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (shouldLogout != true) return;
+
+                // 🔹 1. Bersihkan token dan permissions di local storage
+                await TokenStorage.clear();
+                await PermissionStorage.clear();
+
+                // 🔹 2. Reset PermissionViewModel (biar permission lama tidak nyangkut)
+                if (context.mounted) {
+                  final permVm = context.read<PermissionViewModel>();
+                  permVm.clear();
+
+                  // 🔹 3. Arahkan kembali ke login page
+                  Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+                }
               },
             ),
           ],
+
         ),
         body: Container(
           decoration: BoxDecoration(

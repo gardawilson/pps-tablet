@@ -5,6 +5,8 @@ import '../view_model/update_view_model.dart';
 import '../model/update_model.dart';
 import 'package:open_file/open_file.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:provider/provider.dart';
+import '../../../core/view_model/permission_view_model.dart';
 
 
 class LoginScreen extends StatefulWidget {
@@ -136,13 +138,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
 
   void _login() async {
-    // Clear previous errors
     _clearErrorMessage();
 
     final username = _usernameController.text.trim();
     final password = _passwordController.text.trim();
-
-    // Validate empty fields
     if (username.isEmpty || password.isEmpty) {
       setState(() => _errorMessage = 'Username dan password harus diisi');
       return;
@@ -151,24 +150,27 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      User user = User(
-        username: username,
-        password: password,
-      );
-
-      bool isValid = await _viewModel.validateLogin(user);
+      final user = User(username: username, password: password);
+      final isValid = await _viewModel.validateLogin(user);
 
       if (isValid) {
+        // ⬇️ refresh PermissionViewModel dari SharedPreferences
+        if (!mounted) return;
+        final permVm = context.read<PermissionViewModel>();
+        await permVm.loadPermissions();  // penting: await sebelum navigate
+
+        if (!mounted) return;
         Navigator.pushReplacementNamed(context, '/home');
       } else {
         setState(() => _errorMessage = 'Username atau password salah!');
       }
     } catch (e) {
-      setState(() => _errorMessage = 'Terjadi kesalahan: ${e.toString()}');
+      setState(() => _errorMessage = 'Terjadi kesalahan: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
+
 
   void _clearErrorMessage() {
     if (_errorMessage.isNotEmpty) {

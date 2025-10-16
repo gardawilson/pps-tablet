@@ -3,11 +3,13 @@ import 'package:http/http.dart' as http;
 import 'package:pps_tablet/core/utils/date_formatter.dart';
 import '../../../../core/network/endpoints.dart';
 import '../../../../core/services/token_storage.dart';
-import '../model/washing_header_model.dart';
-import '../model/washing_detail_model.dart';
+import '../model/broker_header_model.dart';
+import '../model/broker_detail_model.dart';
+import '../model/broker_partial_model.dart';
 
-class WashingRepository {
-  /// Ambil daftar washing dengan pagination & search
+class BrokerRepository {
+
+  /// Ambil daftar broker header dengan pagination & search
   Future<Map<String, dynamic>> fetchHeaders({
     int page = 1,
     int limit = 20,
@@ -16,10 +18,10 @@ class WashingRepository {
     final token = await TokenStorage.getToken();
 
     final url = Uri.parse(
-      "${ApiConstants.baseUrl}/api/labels/washing?page=$page&limit=$limit&search=$search",
+      "${ApiConstants.baseUrl}/api/labels/broker?page=$page&limit=$limit&search=$search",
     );
 
-    print("➡️ Fetching Washing Headers: $url");
+    print("➡️ Fetching Broker Headers: $url");
 
     final response = await http.get(
       url,
@@ -31,37 +33,47 @@ class WashingRepository {
     if (response.statusCode == 200) {
       final body = json.decode(response.body);
 
+      // BE service you shared returns { data: [...], total: n }
       final List<dynamic> data = body['data'] ?? [];
-      final List<WashingHeader> items =
-      data.map((e) => WashingHeader.fromJson(e)).toList();
 
-      // meta bisa beda tergantung API kamu, cek apakah body sudah ada
-      final meta = body['meta'] ?? {};
+      final List<BrokerHeader> items =
+      data.map((e) => BrokerHeader.fromJson(e as Map<String, dynamic>)).toList();
+
+      final int total = (body['total'] is num)
+          ? (body['total'] as num).toInt()
+          : (body['meta']?['total'] ?? items.length);
+
+      final int pageOut = body['meta']?['page'] ?? page;
+      final int limitOut = body['meta']?['limit'] ?? limit;
+      final int totalPages = (limitOut is int && limitOut > 0)
+          ? ((total + limitOut - 1) ~/ limitOut)
+          : 1;
 
       return {
         "items": items,
-        "page": meta['page'] ?? page,
-        "limit": meta['limit'] ?? limit,
-        "total": meta['total'] ?? items.length,
-        "totalPages": meta['totalPages'] ?? 1,
+        "page": pageOut,
+        "limit": limitOut,
+        "total": total,
+        "totalPages": totalPages,
       };
     } else {
       throw Exception(
-        'Gagal fetch data washing (status: ${response.statusCode})',
+        'Gagal fetch data broker (status: ${response.statusCode})',
       );
     }
   }
 
 
-  /// Ambil detail washing berdasarkan NoWashing
-  Future<List<WashingDetail>> fetchDetails(String noWashing) async {
+
+  /// Ambil detail broker berdasarkan NoBroker
+  Future<List<BrokerDetail>> fetchDetails(String noBroker) async {
     final token = await TokenStorage.getToken();
 
     final url = Uri.parse(
-      "${ApiConstants.baseUrl}/api/labels/washing/$noWashing",
+      "${ApiConstants.baseUrl}/api/labels/broker/$noBroker",
     );
 
-    print("➡️ Fetching Washing Details: $url");
+    print("➡️ Fetching Broker Details: $url");
 
     final response = await http.get(
       url,
@@ -73,22 +85,23 @@ class WashingRepository {
     if (response.statusCode == 200) {
       final body = json.decode(response.body);
       final List<dynamic> details = body['data']?['details'] ?? [];
-      return details.map((e) => WashingDetail.fromJson(e)).toList();
+      return details.map((e) => BrokerDetail.fromJson(e as Map<String, dynamic>)).toList();
     } else {
       throw Exception(
-        'Gagal fetch detail washing (status: ${response.statusCode})',
+        'Gagal fetch detail broker (status: ${response.statusCode})',
       );
     }
   }
 
 
+
   /// Create washing (header + details)
-  Future<Map<String, dynamic>> createWashing({
-    required WashingHeader header,
-    required List<WashingDetail> details,
+  Future<Map<String, dynamic>> createBroker({
+    required BrokerHeader header,
+    required List<BrokerDetail> details,
   }) async {
     final token = await TokenStorage.getToken();
-    final url = Uri.parse("${ApiConstants.baseUrl}/api/labels/washing");
+    final url = Uri.parse("${ApiConstants.baseUrl}/api/labels/broker");
 
     // 🔎 Validasi NoProduksi / NoBongkarSusun: salah satu wajib ada
     final hasNoProduksi = (header.noProduksi != null && header.noProduksi!.trim().isNotEmpty);
@@ -107,7 +120,7 @@ class WashingRepository {
       "header": {
         "IdJenisPlastik": header.idJenisPlastik,
         "DateCreate": toDbDateString(header.dateCreate),
-        "IdWarehouse": 2,          // pastikan form kamu mengisi ini
+        "IdWarehouse": 3,          // pastikan form kamu mengisi ini
         // "CreateBy": header.createBy ?? "mobile",     // fallback
         // "IdStatus": header.idStatus ?? 1,            // fallback
         // "Blok": header.blok ?? "A",                  // jika model punya; jika tidak, sesuaikan
@@ -133,7 +146,7 @@ class WashingRepository {
     );
 
     // Log biar enak debug
-    print("➡️ POST Create Washing: $url");
+    print("➡️ POST Create Broker: $url");
     print("📦 Body: ${json.encode(body)}");
     print("⬅️ Response [${resp.statusCode}]: ${resp.body}");
 
@@ -144,14 +157,14 @@ class WashingRepository {
   }
 
 
-  /// Update washing (header + details) by NoWashing
-  Future<Map<String, dynamic>> updateWashing({
-    required String noWashing,            // contoh: "B.0000031886"
-    required WashingHeader header,
-    required List<WashingDetail> details,
+  /// Update washing (header + details) by NoBroker
+  Future<Map<String, dynamic>> updateBroker({
+    required String noBroker,            // contoh: "D.0000031886"
+    required BrokerHeader header,
+    required List<BrokerDetail> details,
   }) async {
     final token = await TokenStorage.getToken();
-    final url = Uri.parse("${ApiConstants.baseUrl}/api/labels/washing/$noWashing");
+    final url = Uri.parse("${ApiConstants.baseUrl}/api/labels/broker/$noBroker");
 
     // ➕ Validasi referensi (opsional, sesuai BE kamu)
     final hasNoProduksi = (header.noProduksi != null && header.noProduksi!.trim().isNotEmpty);
@@ -168,7 +181,7 @@ class WashingRepository {
     // Hanya kirim field yang tidak null (biar aman).
     final headerMap = <String, dynamic>{
       "IdJenisPlastik": header.idJenisPlastik,
-      "IdWarehouse": 2,      // atau isi defaultmu
+      "IdWarehouse": 3,      // atau isi defaultmu
       // "CreateBy": (header.createBy?.isNotEmpty ?? false) ? header.createBy : "mobile",
       // "IdStatus": header.idStatus,                 // boleh null -> akan dihapus di bawah
       // Optional:
@@ -198,7 +211,7 @@ class WashingRepository {
     );
 
     // Log buat debug
-    print("➡️ PUT Update Washing: $url");
+    print("➡️ PUT Update Broker: $url");
     print("📦 Body: ${json.encode(body)}");
     print("⬅️ Response [${resp.statusCode}]: ${resp.body}");
 
@@ -209,10 +222,10 @@ class WashingRepository {
   }
 
 
-  /// Delete washing by NoWashing
-  Future<void> deleteWashing(String noWashing) async {
+  /// Delete washing by NoBroker
+  Future<void> deleteBroker(String noBroker) async {
     final token = await TokenStorage.getToken();
-    final url = Uri.parse("${ApiConstants.baseUrl}/api/labels/washing/$noWashing");
+    final url = Uri.parse("${ApiConstants.baseUrl}/api/labels/broker/$noBroker");
 
     final resp = await http.delete(
       url,
@@ -222,7 +235,7 @@ class WashingRepository {
       },
     );
 
-    print("🗑️ DELETE Washing: $url");
+    print("🗑️ DELETE Broker: $url");
     print("⬅️ Response [${resp.statusCode}]: ${resp.body}");
 
     // banyak API mengembalikan 200/202/204 untuk delete yang sukses
@@ -232,6 +245,26 @@ class WashingRepository {
     // kalau BE kirim pesan error, naikkan biar bisa ditampilkan
     final msg = (resp.body.isNotEmpty) ? resp.body : 'Gagal delete (status: ${resp.statusCode})';
     throw Exception(msg);
+  }
+
+
+
+  Future<BrokerPartialInfo> fetchPartialInfo({
+    required String noBroker,
+    required int noSak,
+  }) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse(
+      "${ApiConstants.baseUrl}/api/labels/broker/partials/$noBroker/$noSak",
+    );
+
+    final resp = await http.get(url, headers: {'Authorization': 'Bearer $token'});
+    if (resp.statusCode != 200) {
+      throw Exception("Failed to fetch partial info (${resp.statusCode})");
+    }
+
+    final body = json.decode(resp.body) as Map<String, dynamic>;
+    return BrokerPartialInfo.fromEnvelope(body);
   }
 
 

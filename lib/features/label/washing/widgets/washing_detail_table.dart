@@ -1,4 +1,4 @@
-  // lib/view/widgets/washing_detail_table.dart
+  // lib/view/widgets/broker_detail_table.dart
 
   import 'package:flutter/material.dart';
   import 'package:provider/provider.dart';
@@ -96,7 +96,7 @@
         child: Row(
           children: const [
             SizedBox(
-              width: 100,
+              width: 80,
               child: Text(
                 'SAK',
                 style: TextStyle(
@@ -140,7 +140,7 @@
             child: Row(
               children: [
                 SizedBox(
-                  width: 120,
+                  width: 80,
                   child: Text(
                     d.noSak.toString(),
                     style: const TextStyle(

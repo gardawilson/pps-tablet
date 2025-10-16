@@ -1,8 +1,8 @@
-// lib/view/widgets/washing_text_field.dart
+// lib/view/widgets/broker_text_field.dart
 
 import 'package:flutter/material.dart';
 
-class WashingTextField extends StatelessWidget {
+class BrokerTextField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
   final IconData icon;
@@ -10,7 +10,7 @@ class WashingTextField extends StatelessWidget {
   final bool readOnly;
   final bool asText;
 
-  const WashingTextField({
+  const BrokerTextField({
     super.key,
     required this.controller,
     required this.label,
@@ -36,7 +36,7 @@ class WashingTextField extends StatelessWidget {
           ),
         ),
         child: Text(
-          (controller.text.isNotEmpty) ? controller.text : "B.XXXXXXXXXX",
+          (controller.text.isNotEmpty) ? controller.text : "D.XXXXXXXXXX",
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
       );

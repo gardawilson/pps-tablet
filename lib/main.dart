@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:pps_tablet/core/view_model/permission_view_model.dart';
+import 'package:pps_tablet/features/label/broker/repository/broker_repository.dart';
+import 'package:pps_tablet/features/label/broker/view/broker_screen.dart';
+import 'package:pps_tablet/features/label/broker/view_model/broker_view_model.dart';
 import 'package:pps_tablet/features/shared/bongkar_susun/bongkar_susun_repository.dart';
 import 'package:pps_tablet/features/shared/bongkar_susun/bongkar_susun_view_model.dart';
+import 'package:pps_tablet/features/shared/broker_production/broker_production_repository.dart';
+import 'package:pps_tablet/features/shared/broker_production/broker_production_view_model.dart';
 import 'package:pps_tablet/features/shared/max_sak/max_sak_repository.dart';
 import 'package:pps_tablet/features/shared/max_sak/max_sak_service.dart';
 import 'package:pps_tablet/features/shared/washing_production/washing_production_repository.dart';
@@ -71,6 +76,10 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => BongkarSusunViewModel(repository: BongkarSusunRepository())),
         Provider<MaxSakService>(create: (_) => MaxSakService(MaxSakRepository())),
         ChangeNotifierProvider(create: (_) => PermissionViewModel()..loadPermissions()),
+        ChangeNotifierProvider(create: (_) => BrokerViewModel(repository: BrokerRepository())),
+        ChangeNotifierProvider(create: (_) => BrokerProductionViewModel(repository: BrokerProductionRepository())),
+
+
 
       ],
       child: MaterialApp(
@@ -98,6 +107,7 @@ class MyApp extends StatelessWidget {
           '/stockopname': (context) => StockOpnameListScreen(),
           '/label': (context) => LabelSelectionScreen(),
           '/label/washing': (context) => WashingTableScreen(),
+          '/label/broker': (context) => BrokerScreen(),
         },
       ),
     );

@@ -1,4 +1,4 @@
-// lib/view/widgets/washing_form_dialog.dart
+// lib/view/widgets/broker_form_dialog.dart
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -10,24 +10,25 @@ import '../../../../common/widgets/app_date_field.dart';
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
 import '../../../shared/bongkar_susun/bongkar_susun_dropdown.dart';
+import '../../../shared/broker_production/broker_production_dropdown.dart';
 import '../../../shared/washing_production/washing_production_dropdown.dart';
-import '../model/washing_header_model.dart';
-import '../model/washing_detail_model.dart';
-import 'washing_text_field.dart';
+import '../model/broker_header_model.dart';
+import '../model/broker_detail_model.dart';
+import 'broker_text_field.dart';
 import 'package:provider/provider.dart';
-import '../view_model/washing_view_model.dart';
+import '../view_model/broker_view_model.dart';
 import '../../../shared/plastic_type/jenis_plastik_model.dart';
 import '../../../shared/plastic_type/jenis_plastik_dropdown.dart';
 import '../../../shared/max_sak/max_sak_service.dart';
 
 
 
-class WashingFormDialog extends StatefulWidget {
-  final WashingHeader? header;
-  final List<WashingDetail>? details;
-  final Function(WashingHeader, List<WashingDetail>)? onSave;
+class BrokerFormDialog extends StatefulWidget {
+  final BrokerHeader? header;
+  final List<BrokerDetail>? details;
+  final Function(BrokerHeader, List<BrokerDetail>)? onSave;
 
-  const WashingFormDialog({
+  const BrokerFormDialog({
     super.key,
     this.header,
     this.details,
@@ -35,20 +36,20 @@ class WashingFormDialog extends StatefulWidget {
   });
 
   @override
-  State<WashingFormDialog> createState() => _WashingFormDialogState();
+  State<BrokerFormDialog> createState() => _BrokerFormDialogState();
 }
 
 enum InputMode { production, bongkar }
 
-class _WashingFormDialogState extends State<WashingFormDialog> {
-  late final TextEditingController noWashingCtrl;
+class _BrokerFormDialogState extends State<BrokerFormDialog> {
+  late final TextEditingController noBrokerCtrl;
   late final TextEditingController dateCreatedCtrl;
   late final TextEditingController jenisCtrl;
   late final TextEditingController warehouseCtrl;
   late final TextEditingController noProduksiCtrl;
   late final TextEditingController noBongkarSusunCtrl;
 
-  late List<WashingDetail> detailList;
+  late List<BrokerDetail> detailList;
 
   JenisPlastik? _selectedJenis; // <- simpan pilihan dropdown di sini
 
@@ -62,7 +63,7 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
   @override
   void initState() {
     super.initState();
-    noWashingCtrl = TextEditingController(text: widget.header?.noWashing ?? '');
+    noBrokerCtrl = TextEditingController(text: widget.header?.noBroker ?? '');
 
     // ✅ seed _selectedDate + controller DARI HEADER kalau edit; else dari now
     final DateTime seededDate = widget.header != null
@@ -95,7 +96,7 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
 
   @override
   void dispose() {
-    noWashingCtrl.dispose();
+    noBrokerCtrl.dispose();
     dateCreatedCtrl.dispose();
     jenisCtrl.dispose();
     warehouseCtrl.dispose();
@@ -211,9 +212,9 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
               ],
             ),
             const SizedBox(height: 16),
-            WashingTextField(
-              controller: noWashingCtrl,
-              label: 'No Washing',
+            BrokerTextField(
+              controller: noBrokerCtrl,
+              label: 'No Broker',
               icon: Icons.label,
               asText: true, // 🔑 tampil readonly (hanya text)
             ),
@@ -247,8 +248,8 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
               onChanged: (jp) {
                 _selectedJenis = jp;
                 jenisCtrl.text = jp?.jenis ?? '';          // tetap sinkron untuk tampilan teks
-                // (opsional) kalau kamu masih ingin menyimpan di WashingViewModel:
-                // context.read<WashingViewModel>().selectedJenisPlastik = jp;
+                // (opsional) kalau kamu masih ingin menyimpan di BrokerViewModel:
+                // context.read<BrokerViewModel>().selectedJenisPlastik = jp;
               },
             ),
 
@@ -270,7 +271,7 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
                     ignoring: !isProductionEnabled,
                     child: Opacity(
                       opacity: isProductionEnabled ? 1 : 0.6, // feedback visual
-                      child: WashingProductionDropdown(
+                      child: BrokerProductionDropdown(
                         preselectNoProduksi: widget.header?.noProduksi,
                         preselectNamaMesin: widget.header?.namaMesin,
                         date: _selectedDate,
@@ -366,7 +367,7 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
                   ),
                 ),
                 ElevatedButton.icon(
-                  onPressed: () => _addNewDetail(idBagian: 7),
+                  onPressed: () => _addNewDetail(idBagian: 2),
                   icon: const Icon(Icons.add, size: 18),
                   label: const Text('Tambah'),
                   style: ElevatedButton.styleFrom(
@@ -892,12 +893,13 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
                     setState(() {
                       final startNoSak = _getNextSakNumber();
                       for (int i = 0; i < jumlahBaru!; i++) {
-                        detailList.add(WashingDetail(
-                          noWashing: noWashingCtrl.text,
+                        detailList.add(BrokerDetail(
+                          noBroker: noBrokerCtrl.text,
                           noSak: startNoSak + i,
                           berat: berat,
                           dateUsage: DateTime.now().toString(),
                           idLokasi: '-',
+                          isPartial: false,
                         ));
                       }
                     });
@@ -923,7 +925,7 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
     return maxSak + 1;
   }
 
-  void _editDetail(WashingDetail detail, int index) {
+  void _editDetail(BrokerDetail detail, int index) {
     final noSakCtrl = TextEditingController(text: detail.noSak.toString());
     final beratCtrl = TextEditingController(text: detail.berat?.toString() ?? '');
 
@@ -1052,12 +1054,13 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
 
                 if (noSak != null && berat != null) {
                   setState(() {
-                    detailList[index] = WashingDetail(
-                      noWashing: detail.noWashing,
+                    detailList[index] = BrokerDetail(
+                      noBroker: detail.noBroker,
                       noSak: noSak,
                       berat: berat,
                       dateUsage: detail.dateUsage,
                       idLokasi: detail.idLokasi,
+                      isPartial: detail.isPartial,
                     );
                   });
                   Navigator.pop(ctx);
@@ -1118,7 +1121,7 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
         const SizedBox(width: 12),
         ElevatedButton(
           onPressed: () async {
-            final vm = context.read<WashingViewModel>();
+            final vm = context.read<BrokerViewModel>();
 
             // Validasi
             final selected = _selectedJenis;
@@ -1139,31 +1142,41 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
 
             // Build header
             final headerToSave = widget.header == null
-                ? WashingHeader(
-              noWashing: noWashingCtrl.text,
+                ? BrokerHeader(
+              noBroker: noBrokerCtrl.text.trim(),
               idJenisPlastik: selected.idJenisPlastik,
               namaJenisPlastik: selected.jenis,
               idWarehouse: 5,
-              namaWarehouse: warehouseCtrl.text,
-              dateCreate: dateCreatedCtrl.text,
-              idStatus: null,
-              createBy: '',
-              dateTimeCreate: '',
+              namaWarehouse: warehouseCtrl.text.trim(),
+              dateCreate: dateCreatedCtrl.text.trim(),
+              statusText: '',           // ga dikirim, server yang nentuin; biarkan kosong di client
+              idStatus: null,           // derived di model; tidak perlu diisi
+              createBy: '',             // optional
+              dateTimeCreate: '',       // optional
+              // kirim salah satu sesuai mode
               noProduksi: _selectedMode == InputMode.production
                   ? (noProduksiCtrl.text.trim().isEmpty ? null : noProduksiCtrl.text.trim())
                   : null,
               noBongkarSusun: _selectedMode == InputMode.bongkar
                   ? (noBongkarSusunCtrl.text.trim().isEmpty ? null : noBongkarSusunCtrl.text.trim())
                   : null,
+              // opsional:
+              // blok: blokCtrl.text.trim().isEmpty ? null : blokCtrl.text.trim(),
+              // idLokasi: idLokasiCtrl.text.trim().isEmpty ? null : idLokasiCtrl.text.trim(),
             )
                 : widget.header!.copyWith(
               idJenisPlastik: selected.idJenisPlastik,
               namaJenisPlastik: selected.jenis,
-              namaWarehouse: warehouseCtrl.text,
-              dateCreate: dateCreatedCtrl.text,
-              noProduksi: noProduksiCtrl.text.trim().isEmpty ? null : noProduksiCtrl.text.trim(),
-              noBongkarSusun: noBongkarSusunCtrl.text.trim().isEmpty ? null : noBongkarSusunCtrl.text.trim(),
+              namaWarehouse: warehouseCtrl.text.trim(),
+              dateCreate: dateCreatedCtrl.text.trim(),
+              noProduksi: _selectedMode == InputMode.production
+                  ? (noProduksiCtrl.text.trim().isEmpty ? null : noProduksiCtrl.text.trim())
+                  : null,
+              noBongkarSusun: _selectedMode == InputMode.bongkar
+                  ? (noBongkarSusunCtrl.text.trim().isEmpty ? null : noBongkarSusunCtrl.text.trim())
+                  : null,
             );
+
 
             // Minimal salah satu terisi
             final hasNoProduksi = (headerToSave.noProduksi ?? '').trim().isNotEmpty;
@@ -1193,13 +1206,13 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
 
               if (widget.header == null) {
                 // CREATE
-                final res = await vm.createWashing(headerToSave, detailList);
+                final res = await vm.createBroker(headerToSave, detailList);
 
                 // TUTUP LOADING
                 DialogService.instance.hideLoading();
 
                 final noWashing = res?['data']?['header']?['NoWashing']?.toString()
-                    ?? vm.lastCreatedNoWashing
+                    ?? vm.lastCreatedNoBroker
                     ?? '-';
 
                 // SUCCESS DIALOG
@@ -1249,7 +1262,7 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
                 if (context.mounted) Navigator.pop(context); // tutup form
               } else {
                 // EDIT
-                final noWashing = widget.header!.noWashing; // pastikan model header punya ini
+                final noWashing = widget.header!.noBroker; // pastikan model header punya ini
                 if (noWashing == null || noWashing.isEmpty) {
                   DialogService.instance.hideLoading();
                   await DialogService.instance.showError(
@@ -1259,7 +1272,7 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
                   return;
                 }
 
-                final res = await vm.updateWashing(noWashing, headerToSave, detailList);
+                final res = await vm.updateBroker(noWashing, headerToSave, detailList);
 
                 // TUTUP LOADING
                 DialogService.instance.hideLoading();

@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../view_model/washing_view_model.dart';
-import '../model/washing_header_model.dart';
+import '../view_model/broker_view_model.dart';
+import '../model/broker_header_model.dart';
 import '../../../../core/utils/date_formatter.dart';
 
-class WashingHeaderTable extends StatelessWidget {
+class BrokerHeaderTable extends StatelessWidget {
   final ScrollController scrollController;
-  final ValueChanged<WashingHeader> onItemTap;
+  final ValueChanged<BrokerHeader> onItemTap;
 
   /// Kirim header + posisi global saat long-press (untuk popover)
-  final void Function(WashingHeader header, Offset globalPosition) onItemLongPress;
+  final void Function(BrokerHeader header, Offset globalPosition) onItemLongPress;
 
-  const WashingHeaderTable({
+  const BrokerHeaderTable({
     super.key,
     required this.scrollController,
     required this.onItemTap,
@@ -24,7 +24,7 @@ class WashingHeaderTable extends StatelessWidget {
       children: [
         _buildTableHeader(),
         Expanded(
-          child: Consumer<WashingViewModel>(
+          child: Consumer<BrokerViewModel>(
             builder: (context, vm, _) {
               if (vm.isLoading && vm.items.isEmpty) {
                 return const Center(child: CircularProgressIndicator());
@@ -46,7 +46,7 @@ class WashingHeaderTable extends StatelessWidget {
                   }
 
                   final item = vm.items[index];
-                  final isSelected = vm.selectedNoWashing == item.noWashing;
+                  final isSelected = vm.selectedNoBroker == item.noBroker;
                   final isEven = index % 2 == 0;
 
                   return _buildTableRow(
@@ -78,7 +78,7 @@ class WashingHeaderTable extends StatelessWidget {
           SizedBox(
             width: 150,
             child: Text(
-              'NO WASHING',
+              'NO BROKER',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
@@ -140,7 +140,7 @@ class WashingHeaderTable extends StatelessWidget {
 
   Widget _buildTableRow({
     required BuildContext context,
-    required WashingHeader item,
+    required BrokerHeader item,
     required bool isSelected,
     required bool isEven,
   }) {
@@ -176,7 +176,7 @@ class WashingHeaderTable extends StatelessWidget {
               SizedBox(
                 width: 150,
                 child: Text(
-                  item.noWashing,
+                  item.noBroker,
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight:

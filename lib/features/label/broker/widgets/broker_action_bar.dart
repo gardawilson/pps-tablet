@@ -3,13 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 
-class WashingActionBar extends StatefulWidget {
+class BrokerActionBar extends StatefulWidget {
   final TextEditingController controller;
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onClear;
   final VoidCallback onAddPressed;
 
-  const WashingActionBar({
+  const BrokerActionBar({
     super.key,
     required this.controller,
     required this.onSearchChanged,
@@ -18,10 +18,10 @@ class WashingActionBar extends StatefulWidget {
   });
 
   @override
-  State<WashingActionBar> createState() => _WashingActionBarState();
+  State<BrokerActionBar> createState() => _BrokerActionBarState();
 }
 
-class _WashingActionBarState extends State<WashingActionBar> {
+class _BrokerActionBarState extends State<BrokerActionBar> {
   final FocusNode _searchFocus = FocusNode();
   bool _focused = false;
 
@@ -140,7 +140,7 @@ class _WashingActionBarState extends State<WashingActionBar> {
                               textInputAction: TextInputAction.search,
                               decoration: InputDecoration(
                                 hintText:
-                                'Cari No Washing / Jenis / Warehouse…',
+                                'Cari No Broker / Jenis / Warehouse…',
                                 hintStyle:
                                 TextStyle(color: Colors.grey.shade500),
                                 isCollapsed: true,

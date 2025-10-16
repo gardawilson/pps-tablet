@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/view_model/permission_view_model.dart';
-import '../model/washing_header_model.dart';
+import '../model/broker_header_model.dart';
 
-class WashingRowPopover extends StatelessWidget {
-  final WashingHeader header;
+class BrokerRowPopover extends StatelessWidget {
+  final BrokerHeader header;
   final VoidCallback onClose;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onPrint;
 
-  const WashingRowPopover({
+  const BrokerRowPopover({
     super.key,
     required this.header,
     required this.onClose,
@@ -26,11 +26,11 @@ class WashingRowPopover extends StatelessWidget {
   }
 
   Future<void> _copyOnly(BuildContext context) async {
-    await Clipboard.setData(ClipboardData(text: header.noWashing));
+    await Clipboard.setData(ClipboardData(text: header.noBroker));
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('NoWashing "${header.noWashing}" disalin'),
+        content: Text('NoBroker "${header.noBroker}" disalin'),
         duration: const Duration(milliseconds: 1200),
         behavior: SnackBarBehavior.floating,
       ),
@@ -39,15 +39,12 @@ class WashingRowPopover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final divider = Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
 
     // ⬇️ ambil izin sekali
     final perm = context.watch<PermissionViewModel>();
-    final canEdit   = perm.can('label_washing:update');
-    final canDelete = perm.can('label_washing:delete');
-    // (opsional) print selalu boleh → tidak dibatasi permission
-    // final canPrint  = perm.can('label_washing:print');
+    final canEdit   = perm.can('label_broker:update');
+    final canDelete = perm.can('label_broker:delete');
 
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 220, maxWidth: 280),
@@ -56,23 +53,74 @@ class WashingRowPopover extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header info + copy
-            ListTile(
-              dense: true,
-              title: Text(
-                header.noWashing,
-                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-                overflow: TextOverflow.ellipsis,
+            // Header info - Blue Gradient Design
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.blue.shade400, Colors.blue.shade600],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
               ),
-              subtitle: Text(
-                header.namaJenisPlastik,
-                overflow: TextOverflow.ellipsis,
-              ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              trailing: IconButton(
-                tooltip: 'Salin NoWashing',
-                icon: const Icon(Icons.copy_outlined),
-                onPressed: () => _copyOnly(context),
+              child: Row(
+                children: [
+                  // Icon Box
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.25),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
+                    ),
+                    child: const Icon(
+                      Icons.label,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Title & Subtitle
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          header.noBroker,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          header.namaJenisPlastik,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withOpacity(0.95),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Copy Button
+                  IconButton(
+                    tooltip: 'Salin NoBroker',
+                    icon: Icon(Icons.copy_outlined, color: Colors.white.withOpacity(0.9)),
+                    onPressed: () => _copyOnly(context),
+                    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    padding: EdgeInsets.zero,
+                  ),
+                ],
               ),
             ),
             divider,
@@ -102,9 +150,9 @@ class WashingRowPopover extends StatelessWidget {
               label: 'Delete',
               enabled: canDelete,
               tooltipWhenDisabled: 'Tidak punya izin hapus',
-              iconColor: canDelete ? theme.colorScheme.error : null,
+              iconColor: canDelete ? Colors.red.shade600 : null,
               textStyle: TextStyle(
-                color: canDelete ? theme.colorScheme.error : Colors.grey,
+                color: canDelete ? Colors.red.shade600 : Colors.grey,
               ),
               onTap: () => _runAndClose(onDelete),
             ),

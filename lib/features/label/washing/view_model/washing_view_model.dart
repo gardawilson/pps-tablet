@@ -18,7 +18,11 @@ class WashingViewModel extends ChangeNotifier {
 
   int _page = 1;
   int _totalPages = 1;
+  int _total = 0;
   String _search = '';
+
+  /// Public getter for total rows from the API
+  int get totalCount => _total;
 
   // === DETAIL STATE ===
   String? selectedNoWashing; // ⬅️ satu-satunya sumber highlight
@@ -101,6 +105,7 @@ class WashingViewModel extends ChangeNotifier {
 
       items = result['items'] as List<WashingHeader>;
       _totalPages = result['totalPages'] ?? 1;
+      _total = result['total'] ?? 0;
 
       debugPrint("✅ Page $_page loaded, total items: ${items.length}");
     } catch (e) {

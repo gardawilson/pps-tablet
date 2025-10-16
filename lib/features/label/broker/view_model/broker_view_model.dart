@@ -1,28 +1,33 @@
 import 'package:flutter/material.dart';
-import '../model/washing_header_model.dart';
-import '../model/washing_detail_model.dart';
-import '../repository/washing_repository.dart';
+import '../model/broker_header_model.dart';
+import '../model/broker_detail_model.dart';
+import '../model/broker_partial_model.dart';
+import '../repository/broker_repository.dart';
 import '../../../shared/plastic_type/jenis_plastik_model.dart';
 import '../../../shared/plastic_type/jenis_plastik_repository.dart';
 
-class WashingViewModel extends ChangeNotifier {
-  final WashingRepository repository;
+class BrokerViewModel extends ChangeNotifier {
+  final BrokerRepository repository;
 
-  WashingViewModel({required this.repository});
+  BrokerViewModel({required this.repository});
 
   // === HEADER STATE ===
-  List<WashingHeader> items = [];
+  List<BrokerHeader> items = [];
   bool isLoading = false;
   bool isFetchingMore = false;
   String errorMessage = '';
 
   int _page = 1;
   int _totalPages = 1;
+  int _total = 0;
   String _search = '';
 
+  /// Public getter for total rows from the API
+  int get totalCount => _total;
+
   // === DETAIL STATE ===
-  String? selectedNoWashing; // ⬅️ satu-satunya sumber highlight
-  List<WashingDetail> details = [];
+  String? selectedNoBroker; // ⬅️ satu-satunya sumber highlight
+  List<BrokerDetail> details = [];
   bool isDetailLoading = false;
   String detailError = '';
 
@@ -33,20 +38,28 @@ class WashingViewModel extends ChangeNotifier {
   bool isJenisLoading = false;
   String jenisError = '';
 
-  String? lastCreatedNoWashing;
+  String? lastCreatedNoBroker;
+
+  // === PARTIAL INFO STATE ===
+  BrokerPartialInfo? partialInfo;
+  bool isPartialLoading = false;
+  String? partialError;
+
+  // Helper: current selected broker code (you already store it)
+  String? get currentNoBroker => selectedNoBroker;
 
   // =============================
   //  Highlight helpers
   // =============================
 
   /// Set / pindahkan highlight ke [no] (atau null untuk clear) tanpa memuat detail.
-  void setSelectedNoWashing(String? no) { // ⬅️ baru
-    if (selectedNoWashing == no) return;
-    selectedNoWashing = no;
+  void setSelectedNoBroker(String? no) { // ⬅️ baru
+    if (selectedNoBroker == no) return;
+    selectedNoBroker = no;
     notifyListeners();
   }
 
-  // WashingViewModel
+  // BrokerViewModel
   Future<void> loadJenisPlastik({int? preselectId}) async {
     isJenisLoading = true;
     jenisError = '';
@@ -82,14 +95,14 @@ class WashingViewModel extends ChangeNotifier {
   }
 
   // === FETCH HEADER (RESET) ===
-  Future<void> fetchWashingHeaders({String search = ''}) async {
+  Future<void> fetchBrokerHeaders({String search = ''}) async {
     _page = 1;
     _search = search;
     items = [];
     errorMessage = '';
     isLoading = true;
     // ⬅️ reset selection saat daftar di-refresh supaya warna kembali default
-    selectedNoWashing = null;
+    selectedNoBroker = null;
     notifyListeners();
 
     try {
@@ -99,13 +112,15 @@ class WashingViewModel extends ChangeNotifier {
         search: _search,
       );
 
-      items = result['items'] as List<WashingHeader>;
+      items = result['items'] as List<BrokerHeader>;
       _totalPages = result['totalPages'] ?? 1;
+      _total = result['total'] ?? 0;
+
 
       debugPrint("✅ Page $_page loaded, total items: ${items.length}");
     } catch (e) {
       errorMessage = e.toString();
-      debugPrint("❌ Error fetchWashingHeaders: $errorMessage");
+      debugPrint("❌ Error fetchBrokerHeaders: $errorMessage");
     } finally {
       isLoading = false;
       notifyListeners();
@@ -127,7 +142,7 @@ class WashingViewModel extends ChangeNotifier {
         search: _search,
       );
 
-      final moreItems = result['items'] as List<WashingHeader>;
+      final moreItems = result['items'] as List<BrokerHeader>;
       items.addAll(moreItems);
 
       debugPrint("📥 Load more page $_page, total items: ${items.length}");
@@ -144,9 +159,9 @@ class WashingViewModel extends ChangeNotifier {
 
 
   // === FETCH DETAIL ===
-  Future<void> fetchDetails(String noWashing) async {
+  Future<void> fetchDetails(String noBroker) async {
     // ⬅️ pastikan highlight pindah ke item yang dimuat detailnya
-    setSelectedNoWashing(noWashing);
+    setSelectedNoBroker(noBroker);
 
     details = [];
     detailError = '';
@@ -154,40 +169,40 @@ class WashingViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      details = await repository.fetchDetails(noWashing);
-      debugPrint("✅ Details loaded for $noWashing, count: ${details.length}");
+      details = await repository.fetchDetails(noBroker);
+      debugPrint("✅ Details loaded for $noBroker, count: ${details.length}");
     } catch (e) {
       detailError = e.toString();
-      debugPrint("❌ Error fetchDetails($noWashing): $detailError");
+      debugPrint("❌ Error fetchDetails($noBroker): $detailError");
     } finally {
       isDetailLoading = false;
       notifyListeners();
     }
   }
 
-  Future<Map<String, dynamic>?> createWashing(
-      WashingHeader header,
-      List<WashingDetail> details,
+  Future<Map<String, dynamic>?> createBroker(
+      BrokerHeader header,
+      List<BrokerDetail> details,
       ) async {
     try {
       isLoading = true;
       notifyListeners();
 
-      final res = await repository.createWashing(header: header, details: details);
+      final res = await repository.createBroker(header: header, details: details);
 
-      lastCreatedNoWashing = res['data']?['header']?['NoWashing'] as String?;
+      lastCreatedNoBroker = res['data']?['header']?['NoBroker'] as String?;
 
       // refresh list
-      await fetchWashingHeaders(search: _search);
+      await fetchBrokerHeaders(search: _search);
 
       // ⬅️ opsional: auto-highlight hasil create
-      if (lastCreatedNoWashing != null) {
-        setSelectedNoWashing(lastCreatedNoWashing);
+      if (lastCreatedNoBroker != null) {
+        setSelectedNoBroker(lastCreatedNoBroker);
       }
       return res;
     } catch (e) {
       errorMessage = e.toString();
-      debugPrint("❌ Error createWashing: $errorMessage");
+      debugPrint("❌ Error createBroker: $errorMessage");
       return null;
     } finally {
       isLoading = false;
@@ -196,31 +211,31 @@ class WashingViewModel extends ChangeNotifier {
   }
 
 
-  Future<Map<String, dynamic>?> updateWashing(
-      String noWashing,
-      WashingHeader header,
-      List<WashingDetail> details,
+  Future<Map<String, dynamic>?> updateBroker(
+      String noBroker,
+      BrokerHeader header,
+      List<BrokerDetail> details,
       ) async {
     try {
       isLoading = true;
       notifyListeners();
 
-      final res = await repository.updateWashing(
-        noWashing: noWashing,
+      final res = await repository.updateBroker(
+        noBroker: noBroker,
         header: header,
         details: details,
       );
 
       // Refresh list agar data terbaru tampil
-      await fetchWashingHeaders(search: _search);
+      await fetchBrokerHeaders(search: _search);
 
       // Auto highlight yang barusan diupdate
-      setSelectedNoWashing(noWashing);
+      setSelectedNoBroker(noBroker);
 
       return res;
     } catch (e) {
       errorMessage = e.toString();
-      debugPrint("❌ Error updateWashing: $errorMessage");
+      debugPrint("❌ Error updateBroker: $errorMessage");
       return null;
     } finally {
       isLoading = false;
@@ -229,19 +244,19 @@ class WashingViewModel extends ChangeNotifier {
   }
 
 
-  Future<bool> deleteWashing(String noWashing) async {
+  Future<bool> deleteWashing(String noBroker) async {
     try {
       isLoading = true;
       notifyListeners();
 
-      await repository.deleteWashing(noWashing);
+      await repository.deleteBroker(noBroker);
 
-      await fetchWashingHeaders(search: _search);
+      await fetchBrokerHeaders(search: _search);
 
       // ⬇️ pastikan detail dibersihkan setelah delete
       details = [];
       detailError = '';
-      selectedNoWashing = null;
+      selectedNoBroker = null;
       notifyListeners();
 
       return true;
@@ -255,12 +270,37 @@ class WashingViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> loadPartialInfo({required int noSak}) async {
+    final nb = currentNoBroker;
+    if (nb == null || nb.isEmpty) {
+      partialError = "NoBroker not selected";
+      partialInfo = null;
+      notifyListeners();
+      return;
+    }
+
+    try {
+      isPartialLoading = true;
+      partialError = null;
+      notifyListeners();
+
+      partialInfo = await repository.fetchPartialInfo(noBroker: nb, noSak: noSak);
+    } catch (e) {
+      partialError = e.toString();
+      partialInfo = null;
+    } finally {
+      isPartialLoading = false;
+      notifyListeners();
+    }
+  }
+
 
   void resetForScreen() {
     // panggil ini saat masuk/keluar screen
-    selectedNoWashing = null;
+    selectedNoBroker = null;
     details = [];
     detailError = '';
-    // items tetap dibiarkan; akan diisi fetchWashingHeaders
+    // items tetap dibiarkan; akan diisi fetchBrokerHeaders
   }
+
 }

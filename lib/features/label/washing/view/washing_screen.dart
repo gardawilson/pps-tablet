@@ -168,16 +168,22 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
         elevation: 2,
-        title: const Text(
-          'LABEL WASHING',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.5,
-          ),
+        title: Consumer<WashingViewModel>(
+          builder: (_, vm, __) {
+            final label = vm.isLoading && vm.items.isEmpty
+                ? 'LABEL WASHING (…)'
+                : 'LABEL WASHING (${vm.totalCount})';
+            return Text(
+              label,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+            );
+          },
         ),
         backgroundColor: const Color(0xFF1565C0),
         foregroundColor: Colors.white,

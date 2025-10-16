@@ -1,24 +1,24 @@
-// lib/view/widgets/washing_delete_dialog.dart
+// lib/view/widgets/broker_delete_dialog.dart
 import 'package:flutter/material.dart';
 import 'package:pps_tablet/core/utils/date_formatter.dart';
-import '../model/washing_header_model.dart';
+import '../model/broker_header_model.dart';
 
-class WashingDeleteDialog extends StatefulWidget {
-  final WashingHeader header;
+class BrokerDeleteDialog extends StatefulWidget {
+  final BrokerHeader header;
   /// Parent yang menutup dialog; komponen ini tidak memanggil Navigator.pop.
   final Future<void> Function() onConfirm;
 
-  const WashingDeleteDialog({
+  const BrokerDeleteDialog({
     super.key,
     required this.header,
     required this.onConfirm,
   });
 
   @override
-  State<WashingDeleteDialog> createState() => _WashingDeleteDialogState();
+  State<BrokerDeleteDialog> createState() => _BrokerDeleteDialogState();
 }
 
-class _WashingDeleteDialogState extends State<WashingDeleteDialog> {
+class _BrokerDeleteDialogState extends State<BrokerDeleteDialog> {
   bool _agree = false;
   bool _submitting = false;
 
@@ -49,7 +49,7 @@ class _WashingDeleteDialogState extends State<WashingDeleteDialog> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _InfoRow(label: 'NoWashing', value: widget.header.noWashing),
+                _InfoRow(label: 'NoBroker', value: widget.header.noBroker),
                 const SizedBox(height: 6),
                 _InfoRow(label: 'Jenis', value: widget.header.namaJenisPlastik),
                 if ((widget.header.dateCreate ?? '').isNotEmpty) ...[

@@ -2,25 +2,25 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/services/dialog_service.dart';
-import '../view_model/washing_view_model.dart';
-import '../model/washing_header_model.dart';
-import '../model/washing_detail_model.dart';
+import '../view_model/broker_view_model.dart';
+import '../model/broker_header_model.dart';
+import '../model/broker_detail_model.dart';
 import '../widgets/interactive_popover.dart';
-import '../widgets/washing_row_popover.dart';
-import '../widgets/washing_action_bar.dart';
-import '../widgets/washing_header_table.dart';
-import '../widgets/washing_detail_table.dart';
-import '../widgets/washing_form_dialog.dart';
-import '../widgets/washing_delete_dialog.dart';
+import '../widgets/broker_row_popover.dart';
+import '../widgets/broker_action_bar.dart';
+import '../widgets/broker_header_table.dart';
+import '../widgets/broker_detail_table.dart';
+import '../widgets/broker_form_dialog.dart';
+import '../widgets/broker_delete_dialog.dart';
 
-class WashingTableScreen extends StatefulWidget {
-  const WashingTableScreen({super.key});
+class BrokerScreen extends StatefulWidget {
+  const BrokerScreen({super.key});
 
   @override
-  State<WashingTableScreen> createState() => _WashingTableScreenState();
+  State<BrokerScreen> createState() => _BrokerScreenState();
 }
 
-class _WashingTableScreenState extends State<WashingTableScreen> {
+class _BrokerScreenState extends State<BrokerScreen> {
   final TextEditingController searchCtrl = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final ScrollController _detailScrollController = ScrollController();
@@ -34,8 +34,8 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<WashingViewModel>().fetchWashingHeaders();
-      context.read<WashingViewModel>().resetForScreen();
+      context.read<BrokerViewModel>().fetchBrokerHeaders();
+      context.read<BrokerViewModel>().resetForScreen();
     });
     _scrollController.addListener(_onScroll);
   }
@@ -56,7 +56,7 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
       _popover.hide();
     }
 
-    final vm = context.read<WashingViewModel>();
+    final vm = context.read<BrokerViewModel>();
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 100) {
       if (!_isLoadingMore && vm.hasMore) {
@@ -75,23 +75,23 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
   void _onSearchChanged(String query) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 500), () {
-      context.read<WashingViewModel>().fetchWashingHeaders(search: query);
+      context.read<BrokerViewModel>().fetchBrokerHeaders(search: query);
       if (_scrollController.hasClients) {
         _scrollController.jumpTo(0);
       }
     });
   }
 
-  void _showFormDialog({WashingHeader? header, List<WashingDetail>? details}) {
+  void _showFormDialog({BrokerHeader? header, List<BrokerDetail>? details}) {
     showDialog(
       context: context,
       barrierDismissible: false,
       useSafeArea: false,
-      builder: (_) => WashingFormDialog(
+      builder: (_) => BrokerFormDialog(
         header: header,
         details: details,
         onSave: (headerData, detailsData) {
-          final vm = context.read<WashingViewModel>();
+          final vm = context.read<BrokerViewModel>();
           if (header != null) {
             // vm.updateWashing(headerData, detailsData);
           } else {
@@ -102,10 +102,10 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
     );
   }
 
-  void _confirmDelete(WashingHeader header) {
+  void _confirmDelete(BrokerHeader header) {
     showDialog(
       context: context,
-      builder: (_) => WashingDeleteDialog(
+      builder: (_) => BrokerDeleteDialog(
         header: header,
         onConfirm: () async {
           // Tutup dialog dahulu
@@ -127,18 +127,18 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
 
   /// Long-press handler: pindahkan highlight ke item & tampilkan popover.
   Future<void> _onItemLongPress(
-      WashingHeader header,
+      BrokerHeader header,
       Offset globalPosition,
       ) async {
-    final vm = context.read<WashingViewModel>();
+    final vm = context.read<BrokerViewModel>();
 
     // Pindahkan highlight saat long-press
-    vm.setSelectedNoWashing(header.noWashing);
+    vm.setSelectedNoBroker(header.noBroker);
 
     _popover.show(
       context: context,
       globalPosition: globalPosition,
-      child: WashingRowPopover(
+      child: BrokerRowPopover(
         header: header,
         onClose: _closeContextMenu,
         onEdit: () {
@@ -146,7 +146,7 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
           _showFormDialog(header: header, details: vm.details);
         },
         onDelete: () {
-          if (context.read<WashingViewModel>().isLoading) return;
+          if (context.read<BrokerViewModel>().isLoading) return;
           _closeContextMenu();
           _confirmDelete(header);
         },
@@ -171,13 +171,20 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
         elevation: 2,
-        title: const Text(
-          'LABEL WASHING',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.5,
-          ),
+        title: Consumer<BrokerViewModel>(
+          builder: (_, vm, __) {
+            final label = vm.isLoading && vm.items.isEmpty
+                ? 'LABEL BROKER (…)'
+                : 'LABEL BROKER (${vm.totalCount})';
+            return Text(
+              label,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+            );
+          },
         ),
         backgroundColor: const Color(0xFF1565C0),
         foregroundColor: Colors.white,
@@ -191,25 +198,25 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
               color: Colors.white,
               child: Column(
                 children: [
-                  WashingActionBar(
+                  BrokerActionBar(
                     controller: searchCtrl,
                     onSearchChanged: _onSearchChanged,
                     onClear: () {
                       searchCtrl.clear();
                       context
-                          .read<WashingViewModel>()
-                          .fetchWashingHeaders(search: "");
+                          .read<BrokerViewModel>()
+                          .fetchBrokerHeaders(search: "");
                     },
                     onAddPressed: _showFormDialog,
                   ),
                   Expanded(
-                    child: WashingHeaderTable(
+                    child: BrokerHeaderTable(
                       scrollController: _scrollController,
                       onItemTap: (header) {
-                        final vm = context.read<WashingViewModel>();
+                        final vm = context.read<BrokerViewModel>();
                         // Klik: pindahkan highlight & (opsional) load detail
-                        vm.setSelectedNoWashing(header.noWashing);
-                        vm.fetchDetails(header.noWashing);
+                        vm.setSelectedNoBroker(header.noBroker);
+                        vm.fetchDetails(header.noBroker);
                       },
                       // Long-press: pindahkan highlight & tampilkan popover
                       onItemLongPress: _onItemLongPress,
@@ -227,7 +234,7 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
           // Detail Panel
           Expanded(
             flex: 1,
-            child: WashingDetailTable(
+            child: BrokerDetailTable(
               scrollController: _detailScrollController,
             ),
           ),
@@ -236,22 +243,22 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
     );
   }
 
-  Future<void> _handleDelete(WashingHeader header) async {
-    final vm = context.read<WashingViewModel>();
-    final noWashing = header.noWashing;
+  Future<void> _handleDelete(BrokerHeader header) async {
+    final vm = context.read<BrokerViewModel>();
+    final noBroker = header.noBroker;
 
-    DialogService.instance.showLoading(message: 'Menghapus $noWashing...');
-    final ok = await vm.deleteWashing(noWashing);
+    DialogService.instance.showLoading(message: 'Menghapus $noBroker...');
+    final ok = await vm.deleteWashing(noBroker);
     DialogService.instance.hideLoading();
 
     if (ok) {
       await DialogService.instance.showSuccess(
         title: 'Terhapus',
-        message: 'Label $noWashing berhasil dihapus.',
+        message: 'Label $noBroker berhasil dihapus.',
       );
 
       // Selalu bersihkan panel detail & selection
-      vm.setSelectedNoWashing(null);
+      vm.setSelectedNoBroker(null);
 
       // (Opsional) scroll panel detail ke atas
       // _detailScrollController.jumpTo(0);

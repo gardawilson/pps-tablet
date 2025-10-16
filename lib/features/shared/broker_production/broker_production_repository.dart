@@ -6,17 +6,17 @@ import 'package:pps_tablet/core/utils/date_formatter.dart';
 
 import '../../../core/network/endpoints.dart';
 import '../../../core/services/token_storage.dart';
-import 'washing_production_model.dart';
+import 'broker_production_model.dart';
 
-class WashingProductionRepository {
-  Future<List<WashingProduction>> fetchByDate(DateTime date) async {
+class BrokerProductionRepository {
+  Future<List<BrokerProduction>> fetchByDate(DateTime date) async {
     final token = await TokenStorage.getToken();
 
     // ⬅️ Pastikan hanya tanggal (tanpa jam)
     final dateDb = toDbDateString(date);
 
     // Opsi A: tetap pakai path segment
-    final url = Uri.parse('${ApiConstants.baseUrl}/api/production/washing/$dateDb');
+    final url = Uri.parse('${ApiConstants.baseUrl}/api/production/broker/$dateDb');
 
     // Opsi B (lebih aman untuk karakter): pakai query param
     // final url = Uri.parse('${ApiConstants.baseUrl}/api/production/washing')
@@ -56,7 +56,7 @@ class WashingProductionRepository {
     final List list = (body['data'] ?? []) as List;
 
     return list
-        .map((e) => WashingProduction.fromJson(e as Map<String, dynamic>))
+        .map((e) => BrokerProduction.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 }

@@ -204,6 +204,17 @@ class HomeScreen extends StatelessWidget {
         const SizedBox(height: 16),
         _buildMenuCard(
           context,
+          title: 'Proses Produksi',
+          subtitle: 'Input data produksi',
+          icon: Icons.production_quantity_limits_outlined,
+          color: const Color(0xFF0D47A1), // BLUE PRIMARY
+          onTap: () {
+            Navigator.pushNamed(context, '/production');
+          },
+        ),
+        const SizedBox(height: 16),
+        _buildMenuCard(
+          context,
           title: 'Stock Opname',
           subtitle: 'Kelola stok item',
           icon: Icons.checklist_rtl_rounded,

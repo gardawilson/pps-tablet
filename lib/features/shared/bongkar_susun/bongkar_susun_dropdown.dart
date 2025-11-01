@@ -18,7 +18,7 @@ class BongkarSusunDropdown extends StatefulWidget {
     super.key,
     this.preselectNoBongkarSusun,
     this.onChanged,
-    this.label = 'No Bongkar Susun',
+    this.label = 'Bongkar Susun',
     this.icon = Icons.local_shipping_outlined,
     this.hintText,
     this.date,

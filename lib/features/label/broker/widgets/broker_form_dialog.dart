@@ -10,8 +10,8 @@ import '../../../../common/widgets/app_date_field.dart';
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
 import '../../../shared/bongkar_susun/bongkar_susun_dropdown.dart';
-import '../../../shared/broker_production/broker_production_dropdown.dart';
-import '../../../shared/washing_production/washing_production_dropdown.dart';
+import '../../../production/broker/widgets/broker_production_dropdown.dart';
+import '../../../production/washing/widgets/washing_production_dropdown.dart';
 import '../model/broker_header_model.dart';
 import '../model/broker_detail_model.dart';
 import 'broker_text_field.dart';
@@ -20,7 +20,6 @@ import '../view_model/broker_view_model.dart';
 import '../../../shared/plastic_type/jenis_plastik_model.dart';
 import '../../../shared/plastic_type/jenis_plastik_dropdown.dart';
 import '../../../shared/max_sak/max_sak_service.dart';
-
 
 
 class BrokerFormDialog extends StatefulWidget {

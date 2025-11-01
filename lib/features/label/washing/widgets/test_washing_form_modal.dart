@@ -10,7 +10,7 @@ import '../../../../common/widgets/app_date_field.dart';
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
 import '../../../shared/bongkar_susun/bongkar_susun_dropdown.dart';
-import '../../../shared/washing_production/washing_production_dropdown.dart';
+import '../../../production/washing/widgets/washing_production_dropdown.dart';
 import '../model/washing_header_model.dart';
 import '../model/washing_detail_model.dart';
 import 'washing_text_field.dart';

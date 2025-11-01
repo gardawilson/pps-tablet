@@ -97,6 +97,7 @@ class AscendItemSection extends StatelessWidget {
                       child: const Row(children: [
                         Expanded(flex: 1, child: Text("No", style: _th)),
                         Expanded(flex: 2, child: Text("Item Code", style: _th)),
+                        Expanded(flex: 2, child: Text("Shelf Code", style: _th)),
                         Expanded(flex: 4, child: Text("Nama Item", style: _th)),
                         Expanded(flex: 1, child: Text("PCS", style: _th, textAlign: TextAlign.center)),
                         Expanded(flex: 2, child: Text("Qty Usage", style: _th, textAlign: TextAlign.center)),
@@ -129,6 +130,11 @@ class AscendItemSection extends StatelessWidget {
                               Expanded(
                                 flex: 2,
                                 child: Text(item.itemCode,
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF1F2937))),
+                              ),
+                              Expanded(
+                                flex: 2,
+                                child: Text(item.shelfCode!,
                                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF1F2937))),
                               ),
                               Expanded(

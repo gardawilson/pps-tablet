@@ -1,15 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:pdf/widgets.dart' as pw;
 import 'package:provider/provider.dart';
+
+import '../../../../core/utils/pdf_print_service.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../model/washing_header_model.dart';
-import 'package:path_provider/path_provider.dart';
-import 'dart:io';
-import 'package:http/http.dart' as http;
-import 'package:pdf/pdf.dart'; // PdfPageFormat
-import 'package:printing/printing.dart';
-
 
 class WashingRowPopover extends StatelessWidget {
   final WashingHeader header;
@@ -34,8 +29,9 @@ class WashingRowPopover extends StatelessWidget {
 
   Future<void> _copyOnly(BuildContext context) async {
     await Clipboard.setData(ClipboardData(text: header.noWashing));
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
+    final m = ScaffoldMessenger.maybeOf(context);
+    m?.hideCurrentSnackBar();
+    m?.showSnackBar(
       SnackBar(
         content: Text('NoWashing "${header.noWashing}" disalin'),
         duration: const Duration(milliseconds: 1200),
@@ -48,7 +44,7 @@ class WashingRowPopover extends StatelessWidget {
   Widget build(BuildContext context) {
     final divider = Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
 
-    // ⬇️ ambil izin sekali
+    // ambil izin sekali
     final perm = context.watch<PermissionViewModel>();
     final canEdit   = perm.can('label_washing:update');
     final canDelete = perm.can('label_washing:delete');
@@ -60,7 +56,7 @@ class WashingRowPopover extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header info - Blue Gradient Design
+            // Header
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
@@ -72,54 +68,35 @@ class WashingRowPopover extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  // Icon Box
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: 40, height: 40,
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.25),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
                     ),
-                    child: const Icon(
-                      Icons.label,
-                      color: Colors.white,
-                      size: 20,
-                    ),
+                    child: const Icon(Icons.label, color: Colors.white, size: 20),
                   ),
                   const SizedBox(width: 12),
-
-                  // Title & Subtitle
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           header.noWashing,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 3),
                         Text(
                           header.namaJenisPlastik,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white.withOpacity(0.95),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.white.withOpacity(0.95)),
+                          overflow: TextOverflow.ellipsis, maxLines: 1,
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(width: 8),
-
-                  // Copy Button
                   IconButton(
                     tooltip: 'Salin NoWashing',
                     icon: Icon(Icons.copy_outlined, color: Colors.white.withOpacity(0.9)),
@@ -132,7 +109,7 @@ class WashingRowPopover extends StatelessWidget {
             ),
             divider,
 
-            // Edit (dikunci oleh permission)
+            // Edit
             _MenuTile(
               icon: Icons.edit_outlined,
               label: 'Edit',
@@ -142,32 +119,40 @@ class WashingRowPopover extends StatelessWidget {
             ),
             divider,
 
-            // Print (contoh tanpa izin)
+            // Print
             _MenuTile(
               icon: Icons.print_outlined,
-              label: 'Print (80mm)',
+              label: 'Print',
               enabled: true,
               onTap: () => _runAndClose(() async {
                 final rootCtx = Navigator.of(context, rootNavigator: true).context;
-                await _printPdfNative80mm(
-                  rootCtx,
-                  noWashing: header.noWashing,
+
+                final pdfService = PdfPrintService(
+                  baseUrl: 'http://192.168.10.100:3000',
+                  defaultSystem: 'pps',
                 );
+
+                // klik Print:
+                await pdfService.printReport80mm(
+                  context: rootCtx,
+                  reportName: 'CrLabelPalletWashing',
+                  query: {'NoWashing': header.noWashing},
+                  // system: 'pps', // opsional kalau mau override
+                  // saveNameHint: 'Label_${header.noWashing}.pdf', // opsional; kalau kosong akan di-infer
+                );
+
               }),
             ),
-
             divider,
 
-            // Hapus (destruktif, dikunci permission)
+            // Delete
             _MenuTile(
               icon: Icons.delete_outline,
               label: 'Delete',
               enabled: canDelete,
               tooltipWhenDisabled: 'Tidak punya izin hapus',
               iconColor: canDelete ? Colors.red.shade600 : null,
-              textStyle: TextStyle(
-                color: canDelete ? Colors.red.shade600 : Colors.grey,
-              ),
+              textStyle: TextStyle(color: canDelete ? Colors.red.shade600 : Colors.grey),
               onTap: () => _runAndClose(onDelete),
             ),
           ],
@@ -177,7 +162,7 @@ class WashingRowPopover extends StatelessWidget {
   }
 }
 
-/// Tile menu dengan state enabled/disabled yang jelas
+/// Tile menu
 class _MenuTile extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -214,108 +199,16 @@ class _MenuTile extends StatelessWidget {
             Icon(icon, color: effectiveIconColor),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                label,
-                style: effectiveTextStyle,
-                overflow: TextOverflow.ellipsis,
-              ),
+              child: Text(label, style: effectiveTextStyle, overflow: TextOverflow.ellipsis),
             ),
           ],
         ),
       ),
     );
 
-    // Tooltip saat disabled (opsional)
     if (!enabled && (tooltipWhenDisabled?.isNotEmpty ?? false)) {
       return Tooltip(message: tooltipWhenDisabled!, child: Opacity(opacity: 0.55, child: tile));
     }
     return tile;
-  }
-}
-
-
-// URL builder (same as yours)
-Uri _buildPdfUri(String noWashing) {
-  return Uri.parse('http://192.168.10.100:3000/api/crystalreport/pps/export-pdf')
-      .replace(queryParameters: {
-    'reportName': 'CrLabelPalletWashing',
-    'NoWashing': noWashing,
-  });
-}
-
-void _showSnack(BuildContext ctx, String msg) {
-  final m = ScaffoldMessenger.maybeOf(ctx);
-  m?.hideCurrentSnackBar();
-  m?.showSnackBar(SnackBar(content: Text(msg)));
-}
-
-String _filenameFromHeaders(http.Response resp, String fallback) {
-  final cd = resp.headers['content-disposition'] ?? '';
-  final match = RegExp(r'filename\*?=([^;]+)', caseSensitive: false).firstMatch(cd);
-  if (match != null) {
-    var v = match.group(1)!.trim();
-    v = v.replaceAll(RegExp(r"^UTF-8''"), '');
-    v = v.replaceAll('"', '');
-    return Uri.decodeFull(v);
-  }
-  return fallback;
-}
-
-// Rebuild any incoming PDF as 80mm wide, height per page auto (roll-friendly)
-Future<Uint8List> _remapPdfTo80mm(Uint8List srcBytes) async {
-  final doc = pw.Document();
-  final pageWidthPt = 80 * PdfPageFormat.mm;
-
-  // Render each source page -> raster (bitmap)
-  final rasters = Printing.raster(srcBytes, dpi: 150); // thermal-friendly DPI
-  await for (final r in rasters) {
-    final pageHeightPt = pageWidthPt * (r.height / r.width); // preserve aspect
-    final png = await r.toPng();
-
-    doc.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat(pageWidthPt, pageHeightPt),
-        margin: pw.EdgeInsets.zero,
-        build: (ctx) => pw.Center(
-          child: pw.Image(pw.MemoryImage(png), fit: pw.BoxFit.contain),
-        ),
-      ),
-    );
-  }
-  return doc.save();
-}
-
-// Download -> rebuild to 80mm -> open native print dialog
-Future<void> _printPdfNative80mm(
-    BuildContext safeContext, {
-      required String noWashing,
-    }) async {
-  final url = _buildPdfUri(noWashing);
-  try {
-    // 1) download
-    final resp = await http.get(url);
-    if (resp.statusCode != 200 || resp.bodyBytes.isEmpty) {
-      throw Exception('PDF tidak ditemukan (status ${resp.statusCode})');
-    }
-
-    // (optional) simpan original utk inspeksi
-    final safeName = noWashing.replaceAll(RegExp(r'[^\w\-.]+'), '_');
-    final suggested = _filenameFromHeaders(resp, 'Label_$safeName.pdf');
-    final dir = await getTemporaryDirectory();
-    final original = File('${dir.path}/$suggested');
-    await original.writeAsBytes(resp.bodyBytes, flush: true);
-
-    // 2) rebuild as 80mm
-    final rebuiltBytes = await _remapPdfTo80mm(resp.bodyBytes);
-
-    // 3) native print preview; format hint set to 80mm x tall
-    await Printing.layoutPdf(
-      name: '80mm_$suggested',
-      format: PdfPageFormat(80 * PdfPageFormat.mm, 200 * PdfPageFormat.mm),
-      usePrinterSettings: true,
-      onLayout: (PdfPageFormat _) async => rebuiltBytes,
-    );
-  } catch (e) {
-    _showSnack(safeContext, 'Error: $e');
   }
 }

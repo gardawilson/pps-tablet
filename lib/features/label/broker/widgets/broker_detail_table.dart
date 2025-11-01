@@ -5,7 +5,7 @@ import '../view_model/broker_view_model.dart';
 
 // ⬇️ interactive popover + our new partial-info popover
 import './interactive_popover.dart';                 // adjust path if needed
-import 'broker_partial_info_sheet.dart';           // <-- use this (not the sheet)
+import 'broker_partial_info_popover.dart';           // <-- use this (not the sheet)
 
 class BrokerDetailTable extends StatefulWidget {
   final ScrollController scrollController;

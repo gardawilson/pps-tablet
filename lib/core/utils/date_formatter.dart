@@ -1,25 +1,18 @@
 import 'package:intl/intl.dart';
 
 /// "2025-10-03T00:00:00.000Z" -> "Jumat, 03 Okt 2025"
-String formatDateToFullId(String? isoString) {
-  if (isoString == null || isoString.isEmpty) return '';
-  try {
-    return DateFormat('EEEE, dd MMM yyyy', 'id_ID')
-        .format(DateTime.parse(isoString).toLocal());
-  } catch (_) {
-    return isoString;
-  }
+String formatDateToFullId(dynamic value) {
+  final dt = parseAnyToDateTime(value);
+  if (dt == null) return value is String ? value : '';
+  return DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(dt.toLocal());
 }
 
+
 /// "2025-10-03T00:00:00.000Z" -> "03 Okt 2025"
-String formatDateToShortId(String? isoString) {
-  if (isoString == null || isoString.isEmpty) return '';
-  try {
-    return DateFormat('dd MMM yyyy', 'id_ID')
-        .format(DateTime.parse(isoString).toLocal());
-  } catch (_) {
-    return isoString;
-  }
+String formatDateToShortId(dynamic value) {
+  final dt = parseAnyToDateTime(value);
+  if (dt == null) return value is String ? value : '';
+  return DateFormat('dd MMM yyyy', 'id_ID').format(dt.toLocal());
 }
 
 /// "2025-10-03T00:00:00.000Z" -> "14:35"

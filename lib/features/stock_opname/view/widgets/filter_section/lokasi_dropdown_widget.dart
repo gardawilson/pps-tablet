@@ -1,248 +1,152 @@
-// features/stock_opname/detail/widgets/filter_section/lokasi_dropdown_widget.dart
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:dropdown_search/dropdown_search.dart';
-import '../../../view_model/lokasi_view_model.dart';
+import '../../../../../common/widgets/search_dropdown_field.dart';
+import '../../../../shared/lokasi/lokasi_view_model.dart';
+import '../../../../shared/lokasi/lokasi_model.dart';
 
 class LokasiDropdownWidget extends StatefulWidget {
-  final String? selectedIdLokasi;
-  final ValueChanged<String?> onChanged;
+  final String? selectedBlok;
+  final int? selectedIdLokasi;
+  final void Function(String? blok, int? idLokasi) onChanged;
+  final bool enabled;
+  final String label;
+  final IconData icon;
+  final bool includeAllOption;
 
   const LokasiDropdownWidget({
     Key? key,
+    required this.selectedBlok,
     required this.selectedIdLokasi,
     required this.onChanged,
+    this.enabled = true,
+    this.label = 'Lokasi',
+    this.icon = Icons.location_on_outlined,
+    this.includeAllOption = true,
   }) : super(key: key);
 
   @override
   State<LokasiDropdownWidget> createState() => _LokasiDropdownWidgetState();
 }
 
-class _LokasiDropdownWidgetState extends State<LokasiDropdownWidget>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _animController;
-  late Animation<double> _rotationAnimation;
-  bool _isOpen = false;
+class _LokasiDropdownWidgetState extends State<LokasiDropdownWidget> {
+  static const String _allLabel = 'Semua Lokasi';
+  _LokasiOption? _selectedOption;
 
   @override
   void initState() {
     super.initState();
-    _animController = AnimationController(
-      duration: const Duration(milliseconds: 200),
-      vsync: this,
-    );
-    _rotationAnimation = Tween<double>(
-      begin: 0.0,
-      end: 0.5,
-    ).animate(CurvedAnimation(
-      parent: _animController,
-      curve: Curves.easeInOut,
-    ));
+    // Ambil daftar lokasi saat pertama kali tampil
+    Future.microtask(() => context.read<LokasiViewModel>().fetchLokasiList());
   }
 
   @override
-  void dispose() {
-    _animController.dispose();
-    super.dispose();
+  void didUpdateWidget(covariant LokasiDropdownWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // Jika selectedBlok atau selectedIdLokasi berubah dari luar (parent)
+    if (oldWidget.selectedBlok != widget.selectedBlok ||
+        oldWidget.selectedIdLokasi != widget.selectedIdLokasi) {
+      _selectedOption = _LokasiOption(
+        blok: widget.selectedBlok,
+        idLokasi: widget.selectedIdLokasi,
+        label: _composeLabel(widget.selectedBlok, widget.selectedIdLokasi),
+      );
+    }
+  }
+
+  /// Menyusun teks label seperti “A01”, “B”, atau “Semua Lokasi”
+  String _composeLabel(String? blok, int? idLokasi) {
+    if ((blok == null || blok.isEmpty) && (idLokasi == null)) return _allLabel;
+    if (blok != null && idLokasi != null) return '$blok$idLokasi';
+    if (blok != null) return blok;
+    return idLokasi?.toString() ?? '-';
   }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<LokasiViewModel>(
-      builder: (context, lokasiVM, child) {
-        if (lokasiVM.isLoading) {
-          return _buildLoadingContainer();
-        }
+      builder: (context, vm, _) {
+        final list = vm.lokasiList;
 
-        final lokasiItems = [
-          const MapEntry('all', 'Semua'),
-          ...lokasiVM.lokasiList.map((e) => MapEntry(e.idLokasi, e.idLokasi)),
+        // Konversi data Lokasi menjadi opsi dropdown
+        final List<_LokasiOption> options = [
+          if (widget.includeAllOption)
+            const _LokasiOption(blok: null, idLokasi: null, label: _allLabel),
+          ...list.map((Lokasi e) {
+            final int? parsedId =
+            e.idLokasi.isEmpty ? null : int.tryParse(e.idLokasi);
+
+            return _LokasiOption(
+              blok: e.blok.isEmpty ? null : e.blok,
+              idLokasi: parsedId,
+              label: _composeLabel(e.blok, parsedId),
+            );
+          }),
         ];
 
-        final selectedEntry = lokasiItems.firstWhere(
-              (item) => item.key == (widget.selectedIdLokasi ?? 'all'),
-          orElse: () => lokasiItems.first,
-        );
+        // Tentukan selected berdasarkan state saat ini
+        final selected = _selectedOption == null
+            ? options.firstWhere(
+              (o) =>
+          o.blok == widget.selectedBlok &&
+              o.idLokasi == widget.selectedIdLokasi,
+          orElse: () => options.first,
+        )
+            : _selectedOption!;
 
-        return Container(
-          height: 53,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey.shade300),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: DropdownSearch<MapEntry<String, String>>(
-            items: lokasiItems,
-            selectedItem: selectedEntry,
-            itemAsString: (item) => item.value,
-
-            popupProps: PopupProps.menu(
-              showSearchBox: true,
-              fit: FlexFit.loose,
-              menuProps: MenuProps(
-                backgroundColor: Colors.white,
-                elevation: 8,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              searchFieldProps: TextFieldProps(
-                decoration: InputDecoration(
-                  hintText: "Cari lokasi...",
-                  hintStyle: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
-                  prefixIcon: Icon(
-                    Icons.search,
-                    color: Colors.grey.shade600,
-                    size: 20,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.blue.shade400, width: 1.5),
-                  ),
-                  filled: true,
-                  fillColor: Colors.grey.shade50,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                ),
-                style: const TextStyle(fontSize: 14),
-              ),
-              itemBuilder: (context, item, isSelected) => _buildDropdownItem(item, isSelected),
-            ),
-            dropdownButtonProps: DropdownButtonProps(
-              icon: GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _isOpen = !_isOpen;
-                  });
-                  if (_isOpen) {
-                    _animController.forward();
-                  } else {
-                    _animController.reverse();
-                  }
-                },
-                child: AnimatedBuilder(
-                  animation: _rotationAnimation,
-                  builder: (context, child) {
-                    return Transform.rotate(
-                      angle: _rotationAnimation.value * 3.14159,
-                      child: Icon(
-                        Icons.keyboard_arrow_down,
-                        color: Colors.grey.shade600,
-                        size: 24,
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-            dropdownDecoratorProps: DropDownDecoratorProps(
-              dropdownSearchDecoration: InputDecoration(
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                isDense: true,
-                hintText: "Lokasi",
-                hintStyle: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-            ),
-            onBeforePopupOpening: (selectedItem) {
-              setState(() {
-                _isOpen = true;
-              });
-              _animController.forward();
-              return Future.value(true);
-            },
-            onChanged: (selectedEntry) {
-              setState(() {
-                _isOpen = false;
-              });
-              _animController.reverse();
-              widget.onChanged(selectedEntry?.key);
-            },
-          ),
+        return SearchDropdownField<_LokasiOption>(
+          items: options,
+          value: selected,
+          onChanged: widget.enabled
+              ? (opt) {
+            setState(() => _selectedOption = opt);
+            widget.onChanged(opt?.blok, opt?.idLokasi);
+          }
+              : null,
+          itemAsString: (opt) => opt.label,
+          label: widget.label,
+          hint: vm.isLoading
+              ? 'Memuat...'
+              : (vm.errorMessage.isNotEmpty
+              ? 'Terjadi error'
+              : (options.isEmpty ? 'Tidak ada data' : 'Pilih lokasi')),
+          prefixIcon: widget.icon,
+          enabled: widget.enabled,
+          fieldHeight: 40,
+          isExpanded: true,
+          showSearchBox: true,
+          searchHint: 'Cari lokasi…',
+          popupMaxHeight: 480,
+          isLoading: vm.isLoading,
+          fetchError: vm.errorMessage.isNotEmpty,
+          fetchErrorText: vm.errorMessage,
+          onRetry: vm.fetchLokasiList,
+          filterFn: (opt, filter) {
+            final q =
+            filter.toLowerCase().replaceAll(RegExp(r'[\s\-_\.]'), '');
+            final k =
+            opt.label.toLowerCase().replaceAll(RegExp(r'[\s\-_\.]'), '');
+            return k.contains(q);
+          },
+          compareFn: (a, b) =>
+          a.idLokasi == b.idLokasi && a.blok == b.blok,
         );
       },
     );
   }
+}
 
-  Widget _buildDropdownItem(MapEntry<String, String> item, bool isSelected) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-      decoration: BoxDecoration(
-        color: isSelected ? Colors.grey.shade100 : Colors.transparent,
-        border: Border(
-          bottom: BorderSide(
-            color: Colors.grey.shade200,
-            width: 0.5,
-          ),
-        ),
-      ),
-      child: Text(
-        item.value,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
-          color: isSelected ? Colors.blue.shade700 : Colors.black87,
-        ),
-      ),
-    );
-  }
+class _LokasiOption {
+  final String? blok;
+  final int? idLokasi;
+  final String label;
 
-  Widget _buildLoadingContainer() {
-    return Container(
-      height: 53,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade300),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          const SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            "Memuat lokasi...",
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  const _LokasiOption({
+    required this.blok,
+    required this.idLokasi,
+    required this.label,
+  });
+
+  @override
+  String toString() => label;
 }

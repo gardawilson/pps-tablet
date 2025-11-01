@@ -4,14 +4,14 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/network/endpoints.dart';
 import '../model/stock_opname_label_model.dart';
-import 'socket_manager.dart'; // Import SocketManager
+import 'socket_manager.dart';
 
 class StockOpnameDetailViewModel extends ChangeNotifier {
   String noSO = '';
   String? currentFilter;
-  String? currentIdLokasi;
+  String? currentBlok;       // ✅ pisah blok
+  int? currentIdLokasi;      // ✅ pisah id lokasi
   String? searchKeyword;
-
 
   List<StockOpnameLabel> labels = [];
 
@@ -28,35 +28,10 @@ class StockOpnameDetailViewModel extends ChangeNotifier {
   bool hasError = false;
   String errorMessage = '';
 
-  Future<void> search(String keyword) async {
-    searchKeyword = keyword;
-    page = 1;
-    hasMoreData = true;
-    labels.clear();
-    isInitialLoading = true;
-    notifyListeners();
-
-    await _fetchData();
-  }
-
-  void clearSearch() {
-    searchKeyword = null;
-    page = 1;
-    hasMoreData = true;
-    labels.clear();
-    isInitialLoading = true;
-    notifyListeners();
-
-    _fetchData();
-  }
-
-
-  // ✅ Use SocketManager instead of direct socket
   final SocketManager _socketManager = SocketManager();
   late Function(Map<String, dynamic>) _socketCallback;
 
   StockOpnameDetailViewModel() {
-    // Initialize socket callback
     _socketCallback = _handleSocketData;
   }
 
@@ -66,75 +41,63 @@ class StockOpnameDetailViewModel extends ChangeNotifier {
   }
 
   void initSocket() {
-    // Initialize socket manager
     _socketManager.initSocket();
-
-    // Register our callback
     _socketManager.registerLabelInsertedCallback(_socketCallback);
   }
 
   void _handleSocketData(Map<String, dynamic> labelData) {
-    print('📦 Processing socket data in StockOpnameDetailViewModel: $labelData');
-    print('🔍 Current NoSO: $noSO');
-    print('🔍 Current Location Filter: $currentIdLokasi');
+    print('📦 Socket data received in StockOpnameDetailViewModel: $labelData');
 
-    // Debug all available keys
-    print('🔑 Available keys: ${labelData.keys.toList()}');
-
-    // 🔐 Jika sedang search, abaikan update socket
+    // Kalau sedang search, abaikan update socket
     if (searchKeyword != null && searchKeyword!.isNotEmpty) {
-      print('⏸️ Ignored socket update because search is active: "$searchKeyword"');
+      print('⏸️ Ignored socket update (search active)');
       return;
     }
 
-    // Check filter conditions
     final receivedNoSO = labelData['noso'];
-    final receivedLocation = labelData['idlokasi'];
-    final receivedLabelTypeCode = labelData['labelTypeCode'];
+    final receivedLabelType = labelData['labelTypeCode'];
+    final receivedBlok = labelData['blok'];
+    final receivedIdLokasi = labelData['idlokasi'];
 
-    print('📋 Received NoSO: $receivedNoSO (match: ${receivedNoSO == noSO})');
-    print('📍 Received Location: $receivedLocation (current filter: $currentIdLokasi)');
-    print('📍 Received LabelTypeCode: $receivedLabelTypeCode (current filter: $currentFilter)');
+    print('🔍 Received => NoSO: $receivedNoSO | Blok: $receivedBlok | IdLokasi: $receivedIdLokasi | Type: $receivedLabelType');
 
-    if (receivedNoSO == noSO) {
-      if (receivedLabelTypeCode == currentFilter || currentFilter == 'all' && currentIdLokasi == null || receivedLocation == currentIdLokasi || currentIdLokasi == 'all') {
-        try {
-          // Check if label already exists in current list
-          final existingIndex = labels.indexWhere((label) =>
-          label.nomorLabel == labelData['nomorLabel']);
+    // Filter: NoSO harus cocok
+    if (receivedNoSO != noSO) return;
 
-          if (existingIndex != -1) {
-            print('🚫 Label already exists in list: ${labelData['nomorLabel']}');
-            return;
-          }
+    // Filter by kategori dan lokasi/blok
+    final matchKategori = currentFilter == 'all' || currentFilter == receivedLabelType;
+    final matchBlok = currentBlok == null || currentBlok == 'all' || currentBlok == receivedBlok;
+    final matchIdLokasi = currentIdLokasi == null ||
+        currentIdLokasi == 0 ||
+        receivedIdLokasi == currentIdLokasi;
 
-          final newLabel = StockOpnameLabel.fromJson(labelData);
-          labels.insert(0, newLabel);
-          totalData++;
+    if (matchKategori && matchBlok && matchIdLokasi) {
+      try {
+        // Hindari duplikasi label
+        if (labels.any((l) => l.nomorLabel == labelData['nomorLabel'])) return;
 
-          print('✅ Label successfully added: ${newLabel.nomorLabel}');
-          notifyListeners();
-        } catch (e, stackTrace) {
-          print('❌ Error parsing label data: $e');
-          print('📋 Stack trace: $stackTrace');
-          print('📋 Raw data: $labelData');
-        }
-      } else {
-        print('🚫 Label filtered by location');
+        final newLabel = StockOpnameLabel.fromJson(labelData);
+        labels.insert(0, newLabel);
+        totalData++;
+        notifyListeners();
+        print('✅ Label added: ${newLabel.nomorLabel}');
+      } catch (e, st) {
+        print('❌ Error parsing socket data: $e');
+        print(st);
       }
-    } else {
-      print('🚫 Label filtered by NoSO');
     }
   }
 
   Future<void> fetchInitialData(
       String selectedNoSO, {
         String filterBy = 'all',
-        String? idLokasi,
+        String? blok,
+        int? idLokasi,
         String? search,
       }) async {
     noSO = selectedNoSO;
     currentFilter = filterBy;
+    currentBlok = blok;
     currentIdLokasi = idLokasi;
     searchKeyword = search;
     page = 1;
@@ -149,13 +112,31 @@ class StockOpnameDetailViewModel extends ChangeNotifier {
     await _fetchData();
   }
 
+  Future<void> search(String keyword) async {
+    searchKeyword = keyword;
+    page = 1;
+    hasMoreData = true;
+    labels.clear();
+    isInitialLoading = true;
+    notifyListeners();
+    await _fetchData();
+  }
+
+  void clearSearch() {
+    searchKeyword = null;
+    page = 1;
+    hasMoreData = true;
+    labels.clear();
+    isInitialLoading = true;
+    notifyListeners();
+    _fetchData();
+  }
 
   Future<void> loadMoreData() async {
     if (isLoadingMore || !hasMoreData) return;
     page++;
     isLoadingMore = true;
     notifyListeners();
-
     await _fetchData();
   }
 
@@ -169,10 +150,13 @@ class StockOpnameDetailViewModel extends ChangeNotifier {
           page: page,
           pageSize: pageSize,
           filterBy: currentFilter,
-          idLokasi: currentIdLokasi,
+          blok: currentBlok,          // String?
+          idLokasi: currentIdLokasi,  // int?
           search: searchKeyword,
         ),
       );
+
+      print('🌐 GET: $url');
 
       final response = await http.get(url, headers: {
         'Authorization': 'Bearer $token',
@@ -213,7 +197,6 @@ class StockOpnameDetailViewModel extends ChangeNotifier {
   Future<bool> deleteLabel(String nomorLabel) async {
     try {
       final token = await _getToken();
-
       final url = Uri.parse('${ApiConstants.baseUrl}/api/no-stock-opname/$noSO/hasil');
 
       final response = await http.delete(
@@ -222,13 +205,10 @@ class StockOpnameDetailViewModel extends ChangeNotifier {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
-        body: json.encode({
-          'nomorLabel': nomorLabel,
-        }),
+        body: json.encode({'nomorLabel': nomorLabel}),
       );
 
       if (response.statusCode == 200) {
-        // Successfully deleted, remove from local list
         labels.removeWhere((label) => label.nomorLabel == nomorLabel);
         totalData--;
         notifyListeners();
@@ -249,6 +229,7 @@ class StockOpnameDetailViewModel extends ChangeNotifier {
     totalData = 0;
     hasMoreData = true;
     errorMessage = '';
+    currentBlok = null;
     currentIdLokasi = null;
     _socketManager.clearProcessedLabels();
     notifyListeners();
@@ -256,7 +237,6 @@ class StockOpnameDetailViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
-    // Unregister callback when disposing
     _socketManager.unregisterLabelInsertedCallback(_socketCallback);
     super.dispose();
   }

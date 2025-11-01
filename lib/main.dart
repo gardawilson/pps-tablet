@@ -1,17 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:pps_tablet/core/view_model/permission_view_model.dart';
+import 'package:pps_tablet/features/crusher_type/model/crusher_type_model.dart';
+import 'package:pps_tablet/features/crusher_type/repository/crusher_type_repository.dart';
+import 'package:pps_tablet/features/crusher_type/view_model/crusher_type_view_model.dart';
+import 'package:pps_tablet/features/jenis_bonggolan/repository/jenis_bonggolan_repository.dart';
+import 'package:pps_tablet/features/jenis_bonggolan/view_model/jenis_bonggolan_view_model.dart';
+import 'package:pps_tablet/features/label/bonggolan/repository/bonggolan_repository.dart';
+import 'package:pps_tablet/features/label/bonggolan/view/bonggolan_screen.dart';
+import 'package:pps_tablet/features/label/bonggolan/view_model/bonggolan_view_model.dart';
 import 'package:pps_tablet/features/label/broker/repository/broker_repository.dart';
 import 'package:pps_tablet/features/label/broker/view/broker_screen.dart';
 import 'package:pps_tablet/features/label/broker/view_model/broker_view_model.dart';
+import 'package:pps_tablet/features/production/crusher/repository/crusher_production_repository.dart';
+import 'package:pps_tablet/features/production/crusher/view_model/crusher_production_view_model.dart';
+import 'package:pps_tablet/features/production/inject/repository/inject_production_repository.dart';
+import 'package:pps_tablet/features/production/inject/view_model/inject_production_view_model.dart';
+import 'package:pps_tablet/features/production/selection/view/production_selection_screen.dart';
+import 'package:pps_tablet/features/production/washing/view/washing_production_screen.dart';
 import 'package:pps_tablet/features/shared/bongkar_susun/bongkar_susun_repository.dart';
 import 'package:pps_tablet/features/shared/bongkar_susun/bongkar_susun_view_model.dart';
-import 'package:pps_tablet/features/shared/broker_production/broker_production_repository.dart';
-import 'package:pps_tablet/features/shared/broker_production/broker_production_view_model.dart';
+import 'package:pps_tablet/features/production/broker/repository/broker_production_repository.dart';
+import 'package:pps_tablet/features/production/broker/view_model/broker_production_view_model.dart';
+import 'package:pps_tablet/features/shared/lokasi/lokasi_repository.dart';
 import 'package:pps_tablet/features/shared/max_sak/max_sak_repository.dart';
 import 'package:pps_tablet/features/shared/max_sak/max_sak_service.dart';
-import 'package:pps_tablet/features/shared/washing_production/washing_production_repository.dart';
-import 'package:pps_tablet/features/shared/washing_production/washing_production_view_model.dart';
+import 'package:pps_tablet/features/production/washing/repository/washing_production_repository.dart';
+import 'package:pps_tablet/features/production/washing/view_model/washing_production_view_model.dart';
 import 'package:provider/provider.dart';
 
 // ⬇️ Tambahan untuk locale & tanggal Indonesia
@@ -32,14 +47,18 @@ import 'package:pps_tablet/features/stock_opname/repository/stock_opname_reposit
 import 'package:pps_tablet/features/stock_opname/view_model/stock_opname_ascend_view_model.dart';
 import 'package:pps_tablet/features/stock_opname/view_model/stock_opname_family_view_model.dart';
 import 'core/navigation/app_nav.dart';
+import 'features/label/crusher/repository/crusher_repository.dart';
+import 'features/label/crusher/view/crusher_screen.dart';
+import 'features/label/crusher/view_model/crusher_view_model.dart';
 import 'features/login/view/login_screen.dart';
+import 'features/production/broker/view/broker_production_screen.dart';
+import 'features/shared/lokasi/lokasi_view_model.dart';
 import 'features/stock_opname/view/stock_opname_list_screen.dart';
 import 'features/home/view/home_screen.dart';
 import 'features/stock_opname/view_model/stock_opname_list_view_model.dart';
 import 'features/stock_opname/view_model/stock_opname_detail_view_model.dart';
 import 'features/stock_opname/view_model/stock_opname_label_before_view_model.dart';
 import 'features/home/view_model/user_profile_view_model.dart';
-import 'features/stock_opname/view_model/lokasi_view_model.dart';
 import 'features/stock_opname/view_model/socket_manager.dart';
 import 'features/stock_opname/view_model/label_detail_view_model.dart';
 
@@ -65,7 +84,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => StockOpnameLabelBeforeViewModel()),
         ChangeNotifierProvider(create: (_) => StockOpnameDetailViewModel()),
         ChangeNotifierProvider(create: (_) => UserProfileViewModel()),
-        ChangeNotifierProvider(create: (_) => LokasiViewModel()),
+        ChangeNotifierProvider(create: (_) => LokasiViewModel(repository: LokasiRepository())),
         ChangeNotifierProvider(create: (_) => SocketManager()),
         ChangeNotifierProvider(create: (_) => LabelDetailViewModel()),
         ChangeNotifierProvider(create: (_) => StockOpnameAscendViewModel(repository: StockOpnameAscendRepository())),
@@ -77,7 +96,13 @@ class MyApp extends StatelessWidget {
         Provider<MaxSakService>(create: (_) => MaxSakService(MaxSakRepository())),
         ChangeNotifierProvider(create: (_) => PermissionViewModel()..loadPermissions()),
         ChangeNotifierProvider(create: (_) => BrokerViewModel(repository: BrokerRepository())),
+        ChangeNotifierProvider(create: (_) => BonggolanViewModel(repository: BonggolanRepository())),
+        ChangeNotifierProvider(create: (_) => CrusherViewModel(repository: CrusherRepository())),
         ChangeNotifierProvider(create: (_) => BrokerProductionViewModel(repository: BrokerProductionRepository())),
+        ChangeNotifierProvider(create: (_) => InjectProductionViewModel(repository: InjectProductionRepository())),
+        ChangeNotifierProvider(create: (_) => JenisBonggolanViewModel(repository: JenisBonggolanRepository())),
+        ChangeNotifierProvider(create: (_) => CrusherProductionViewModel(repository: CrusherProductionRepository())),
+        ChangeNotifierProvider(create: (_) => CrusherTypeViewModel(repository: CrusherTypeRepository())),
 
 
 
@@ -86,7 +111,6 @@ class MyApp extends StatelessWidget {
         title: 'PPS Tablet',
         theme: ThemeData(primarySwatch: Colors.blue),
         navigatorKey: AppNav.key,
-
 
         // ⬇️ Aktifkan localization supaya showDatePicker & widget lain pakai bahasa Indo
         localizationsDelegates: const [
@@ -108,6 +132,11 @@ class MyApp extends StatelessWidget {
           '/label': (context) => LabelSelectionScreen(),
           '/label/washing': (context) => WashingTableScreen(),
           '/label/broker': (context) => BrokerScreen(),
+          '/label/bonggolan': (context) => BonggolanScreen(),
+          '/label/crusher': (context) => CrusherScreen(),
+          '/production': (context) => ProductionSelectionScreen(),
+          '/production/washing': (context) => WashingProductionScreen(),
+          '/production/broker': (context) => BrokerProductionScreen(),
         },
       ),
     );

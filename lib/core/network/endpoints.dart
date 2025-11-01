@@ -17,43 +17,76 @@ class ApiConstants {
 
   static String labelData(String noLabel) => '$baseUrl/api/label-data/$noLabel';
 
+
   static String labelSOList({
     required String selectedNoSO,
     required int page,
     required int pageSize,
-    String? filterBy,
-    String? idLokasi,
-    String? search, // 🔍 Tambahkan parameter search
+    String? filterBy,     // 'all' | 'bahanbaku' | dst
+    String? blok,         // ex: 'A' (nullable -> tidak dikirim jika null/'all'/'')
+    int? idLokasi,        // ex: 3  (nullable/0 -> tidak dikirim)
+    String? search,       // optional
   }) {
-    final filter = filterBy ?? 'all';
-    final lokasi = idLokasi ?? 'all';
-    final encodedSearch = search != null ? Uri.encodeQueryComponent(search) : '';
+    final qp = <String, String>{
+      'page': '$page',
+      'pageSize': '$pageSize',
+      'filterBy': filterBy ?? 'all',
+      // kalau kamu butuh: 'filterbyuser': 'false',
+    };
 
-    final searchQuery = (encodedSearch.isNotEmpty) ? '&search=$encodedSearch' : '';
+    // kirim blok hanya jika bermakna
+    if (blok != null && blok.isNotEmpty && blok.toLowerCase() != 'all') {
+      qp['blok'] = blok;
+    }
 
-    return '$baseUrl/api/no-stock-opname/$selectedNoSO/hasil?page=$page&pageSize=$pageSize&filterBy=$filter&idlokasi=$lokasi$searchQuery';
+    // kirim idLokasi hanya jika ada dan bukan 0
+    if (idLokasi != null && idLokasi != 0) {
+      qp['idLokasi'] = idLokasi.toString(); // <-- penting: toString()
+    }
+
+    if (search != null && search.isNotEmpty) {
+      qp['search'] = search; // Uri(queryParameters: ...) akan auto-encode
+    }
+
+    final query = Uri(queryParameters: qp).query;
+    return '$baseUrl/api/no-stock-opname/$selectedNoSO/hasil?$query';
   }
+
 
   static String stockOpnameAcuanList({
     required String noSO,
     required int page,
     required int pageSize,
-    String? filterBy,
-    String? idLokasi,
-    String? search, // ← tambahkan parameter search
+    String? filterBy,          // 'all' | 'bahanbaku' | dst
+    String? blok,              // ex: 'A' (nullable -> tidak dikirim jika null/'all'/'')
+    int? idLokasi,             // ex: 3  (nullable/0 -> tidak dikirim)
+    String? search,            // optional
   }) {
-    final queryParams = {
+    final qp = <String, String>{
       'page': '$page',
       'pageSize': '$pageSize',
       'filterBy': filterBy ?? 'all',
-      'filterbyuser': 'false',
-      'idlokasi': idLokasi ?? 'all',
-      if (search != null && search.isNotEmpty) 'search': search, // ← tambahkan ke query jika ada
+      // kalau kamu ingin dukungan filter by user, tetap bisa tambahkan di sini:
+      // 'filterbyuser': 'false',
     };
 
-    final queryString = Uri(queryParameters: queryParams).query;
+    // sertakan blok hanya jika ada nilai yang bermakna
+    if (blok != null && blok.isNotEmpty && blok.toLowerCase() != 'all') {
+      qp['blok'] = blok;
+    }
 
-    return '$baseUrl/api/no-stock-opname/$noSO/acuan?$queryString';
+    // sertakan idLokasi hanya jika ada dan bukan 0
+    if (idLokasi != null && idLokasi != 0) {
+      qp['idLokasi'] = idLokasi.toString();
+    }
+
+    // search opsional
+    if (search != null && search.isNotEmpty) {
+      qp['search'] = search; // Uri(queryParameters) akan meng-encode
+    }
+
+    final query = Uri(queryParameters: qp).query;
+    return '$baseUrl/api/no-stock-opname/$noSO/acuan?$query';
   }
 
   static String labelList({

@@ -5,7 +5,11 @@ class CompactLabelCardWidget extends StatelessWidget {
   final String labelType;
   final int jmlhSak;
   final double berat;
-  final String idLokasi;
+
+  // ⬇️ baru: simpan terpisah
+  final String? blok;
+  final int? idLokasi;
+
   final String? username;
   final bool isReference;
 
@@ -15,14 +19,29 @@ class CompactLabelCardWidget extends StatelessWidget {
     required this.labelType,
     required this.jmlhSak,
     required this.berat,
-    required this.idLokasi,
+    this.blok,              // ⬅️ optional
+    this.idLokasi,          // ⬅️ optional
     this.username,
     required this.isReference,
   }) : super(key: key);
 
+  /// Gabungkan blok + idLokasi jadi satu label tampilan.
+  /// - Jika dua-duanya ada -> "A10"
+  /// - Hanya blok -> "A"
+  /// - Hanya id -> "10"
+  /// - Tidak ada -> "-"
+  String get _lokasiDisplay {
+    final b = (blok ?? '').trim();
+    final i = idLokasi;
+    if (b.isEmpty && i == null) return '-';
+    if (b.isNotEmpty && i != null) return '$b$i';
+    if (b.isNotEmpty) return b;
+    return i?.toString() ?? '-';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final Color baseColor = const Color(0xFF2196F3); // Senada biru
+    final Color baseColor = const Color(0xFF2196F3); // senada biru
     final Color backgroundColor = Colors.white;
 
     return Container(
@@ -61,7 +80,7 @@ class CompactLabelCardWidget extends StatelessWidget {
         Expanded(
           child: Text(
             nomorLabel,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 15.5,
               fontWeight: FontWeight.w600,
               color: Colors.black87,
@@ -101,7 +120,7 @@ class CompactLabelCardWidget extends StatelessWidget {
           children: [
             _InfoIconText(Icons.inventory_2, "Pcs", "$jmlhSak", iconColor, textColor),
             _InfoIconText(Icons.monitor_weight, "Berat", "${berat.toStringAsFixed(2)} kg", iconColor, textColor),
-            _InfoIconText(Icons.location_on, "Lokasi", idLokasi, iconColor, textColor),
+            _InfoIconText(Icons.location_on, "Lokasi", _lokasiDisplay, iconColor, textColor),
             if (username != null && username!.isNotEmpty)
               _InfoIconText(Icons.person, "Scanned by", username!, iconColor, textColor),
           ],

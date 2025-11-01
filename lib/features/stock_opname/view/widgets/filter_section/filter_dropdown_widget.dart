@@ -1,8 +1,7 @@
-// features/stock_opname/detail/widgets/filter_section/filter_dropdown_widget.dart
-
 import 'package:flutter/material.dart';
+import '../../../../../common/widgets/dropdown_field.dart'; // pastikan path ini benar
 
-class FilterDropdownWidget extends StatefulWidget {
+class FilterDropdownWidget extends StatelessWidget {
   final String? selectedFilter;
   final ValueChanged<String?> onChanged;
 
@@ -13,136 +12,47 @@ class FilterDropdownWidget extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<FilterDropdownWidget> createState() => _FilterDropdownWidgetState();
+  Widget build(BuildContext context) {
+    // definisikan daftar filter
+    final List<_FilterOption> options = const [
+      _FilterOption(value: 'all', label: 'Semua'),
+      _FilterOption(value: 'bahanbaku', label: 'Bahan Baku'),
+      _FilterOption(value: 'washing', label: 'Washing'),
+      _FilterOption(value: 'broker', label: 'Broker'),
+      _FilterOption(value: 'crusher', label: 'Crusher'),
+      _FilterOption(value: 'bonggolan', label: 'Bonggolan'),
+      _FilterOption(value: 'gilingan', label: 'Gilingan'),
+      _FilterOption(value: 'mixer', label: 'Mixer'),
+      _FilterOption(value: 'furniturewip', label: 'Furniture WIP'),
+      _FilterOption(value: 'barangjadi', label: 'Barang Jadi'),
+      _FilterOption(value: 'reject', label: 'Reject'),
+    ];
+
+    // cari nilai yang cocok (atau fallback ke 'all')
+    final _FilterOption? selected = options
+        .firstWhere((o) => o.value == selectedFilter,
+        orElse: () => options.first);
+
+    return DropdownPlainField<_FilterOption>(
+      label: 'Kategori',
+      hint: 'Pilih Kategori',
+      prefixIcon: Icons.category_outlined,
+      fieldHeight: 40,
+      isExpanded: true,
+      items: options,
+      value: selected,
+      itemAsString: (opt) => opt.label,
+      compareFn: (a, b) => a.value == b.value,
+      onChanged: (opt) => onChanged(opt?.value),
+    );
+  }
 }
 
-class _FilterDropdownWidgetState extends State<FilterDropdownWidget>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _animController;
-  late Animation<double> _rotationAnimation;
+class _FilterOption {
+  final String value;
+  final String label;
+  const _FilterOption({required this.value, required this.label});
 
   @override
-  void initState() {
-    super.initState();
-    _animController = AnimationController(
-      duration: const Duration(milliseconds: 200),
-      vsync: this,
-    );
-    _rotationAnimation = Tween<double>(
-      begin: 0.0,
-      end: 0.5,
-    ).animate(CurvedAnimation(
-      parent: _animController,
-      curve: Curves.easeInOut,
-    ));
-  }
-
-  @override
-  void dispose() {
-    _animController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 53,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade300),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: widget.selectedFilter,
-          isExpanded: true,
-          elevation: 8,
-          borderRadius: BorderRadius.circular(8),
-          dropdownColor: Colors.white,
-          menuMaxHeight: 400,
-          onTap: () {
-            _animController.forward();
-          },
-          onChanged: (value) {
-            widget.onChanged(value);
-            _animController.reverse();
-          },
-          icon: AnimatedBuilder(
-            animation: _rotationAnimation,
-            builder: (context, child) {
-              return Transform.rotate(
-                angle: _rotationAnimation.value * 3.14159,
-                child: Icon(
-                  Icons.keyboard_arrow_down,
-                  color: Colors.grey.shade600,
-                  size: 24,
-                ),
-              );
-            },
-          ),
-          hint: Text(
-            'Filter',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade600,
-            ),
-          ),
-          style: const TextStyle(
-            fontSize: 14,
-            color: Colors.black87,
-          ),
-          items: [
-            _buildDropdownItem('all', 'Semua'),
-            _buildDropdownItem('bahanbaku', 'Bahan Baku'),
-            _buildDropdownItem('washing', 'Washing'),
-            _buildDropdownItem('broker', 'Broker'),
-            _buildDropdownItem('crusher', 'Crusher'),
-            _buildDropdownItem('bonggolan', 'Bonggolan'),
-            _buildDropdownItem('gilingan', 'Gilingan'),
-            _buildDropdownItem('mixer', 'Mixer'),
-            _buildDropdownItem('furniturewip', 'Furniture WIP'),
-            _buildDropdownItem('barangjadi', 'Barang Jadi'),
-            _buildDropdownItem('reject', 'Reject'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  DropdownMenuItem<String> _buildDropdownItem(String value, String label) {
-    final bool isSelected = widget.selectedFilter == value;
-
-    return DropdownMenuItem<String>(
-      value: value,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.transparent,
-          border: Border(
-            bottom: BorderSide(
-              color: Colors.grey.shade200,
-              width: 0.5,
-            ),
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
-            color: isSelected ? Colors.blue.shade700 : Colors.black87,
-          ),
-        ),
-      ),
-    );
-  }
+  String toString() => label;
 }

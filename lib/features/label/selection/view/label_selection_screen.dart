@@ -27,7 +27,7 @@ class LabelSelectionScreen extends StatelessWidget {
             context,
             title: 'Label Washing',
             subtitle: 'Buat label untuk proses washing',
-            icon: Icons.local_laundry_service,
+            icon: Icons.label,
             enabled: canReadWashing,
             onTap: canReadWashing
                 ? () => Navigator.pushNamed(context, '/label/washing')
@@ -41,10 +41,36 @@ class LabelSelectionScreen extends StatelessWidget {
             context,
             title: 'Label Broker',
             subtitle: 'Buat label untuk proses broker',
-            icon: Icons.people,
+            icon: Icons.label,
             enabled: canReadBroker,
             onTap: canReadBroker
                 ? () => Navigator.pushNamed(context, '/label/broker')
+                : null,
+          ),
+
+          const SizedBox(height: 16),
+
+          // 🔹 Card Label Bonggolan
+          _buildLabelCard(
+            context,
+            title: 'Label Bonggolan',
+            subtitle: 'Buat label untuk proses bonggolan',
+            icon: Icons.label,
+            enabled: canReadBroker,
+            onTap: canReadBroker
+                ? () => Navigator.pushNamed(context, '/label/bonggolan')
+                : null,
+          ),
+
+          // 🔹 Card Label Crusher
+          _buildLabelCard(
+            context,
+            title: 'Label Crusher',
+            subtitle: 'Buat label untuk proses crusher',
+            icon: Icons.label,
+            enabled: canReadBroker,
+            onTap: canReadBroker
+                ? () => Navigator.pushNamed(context, '/label/crusher')
                 : null,
           ),
         ],

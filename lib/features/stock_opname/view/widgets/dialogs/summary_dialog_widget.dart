@@ -5,16 +5,21 @@ class SummaryDialogWidget extends StatefulWidget {
   final int stockTotalDataGlobal;
   final int stockTotalSakGlobal;
   final double stockTotalBeratGlobal;
-  final int stockTotalData;
+
+  final int stockTotalData;      // belum scan
   final int stockTotalSak;
   final double stockTotalBerat;
-  final int scanTotalData;
+
+  final int scanTotalData;       // sudah scan
   final int scanTotalSak;
   final double scanTotalBerat;
+
   final String noSO;
   final String tgl;
-  final String selectedCategory;
-  final String selectedLocation;
+
+  final String selectedCategory;   // 'all' | kategori lain
+  final String? selectedBlok;      // null/'all' => semua
+  final int? selectedIdLokasi;     // null/0 => semua
 
   const SummaryDialogWidget({
     Key? key,
@@ -30,7 +35,8 @@ class SummaryDialogWidget extends StatefulWidget {
     required this.noSO,
     required this.tgl,
     required this.selectedCategory,
-    required this.selectedLocation,
+    required this.selectedBlok,
+    required this.selectedIdLokasi,
   }) : super(key: key);
 
   @override
@@ -43,17 +49,33 @@ class _SummaryDialogWidgetState extends State<SummaryDialogWidget>
   late AnimationController _animationController;
   late Animation<double> _animation;
 
-  // Calculate total items (based on data count)
+  // Total item global = semua label acuan
   int get totalGlobalItems => widget.stockTotalDataGlobal;
+  // Belum scan = sisa acuan
   int get totalUnscannedItems => widget.stockTotalData;
+  // Sudah scan
   int get totalScannedItems => widget.scanTotalData;
 
-  double get scannedPercentage => totalGlobalItems > 0
-      ? (totalScannedItems / totalGlobalItems) * 100
-      : 0;
-  double get unscannedPercentage => totalGlobalItems > 0
-      ? (totalUnscannedItems / totalGlobalItems) * 100
-      : 0;
+  double get scannedPercentage =>
+      totalGlobalItems > 0 ? (totalScannedItems / totalGlobalItems) * 100 : 0;
+
+  double get unscannedPercentage =>
+      totalGlobalItems > 0 ? (totalUnscannedItems / totalGlobalItems) * 100 : 0;
+
+  // ➕ Helper teks lokasi untuk header
+  String get _lokasiDisplayUpper {
+    final blok = widget.selectedBlok;
+    final id = widget.selectedIdLokasi;
+
+    final isAllBlok = blok == null || blok.isEmpty || blok.toLowerCase() == 'all';
+    final isAllId = id == null || id == 0;
+
+    if (isAllBlok && isAllId) return 'SEMUA LOKASI';
+    if (!isAllBlok && !isAllId) return '${blok!.toUpperCase()}${id!}';
+    if (!isAllBlok && isAllId) return blok!.toUpperCase();
+    // isAllBlok && !isAllId
+    return '${id!}'.toUpperCase();
+  }
 
   @override
   void initState() {
@@ -66,7 +88,6 @@ class _SummaryDialogWidgetState extends State<SummaryDialogWidget>
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOutCubic),
     );
 
-    // Start animation after widget is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _animationController.forward();
     });
@@ -105,17 +126,9 @@ class _SummaryDialogWidgetState extends State<SummaryDialogWidget>
                 padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
                 child: Row(
                   children: [
-                    // Left side - Chart section
-                    Expanded(
-                      flex: 2,
-                      child: _buildChartSection(),
-                    ),
+                    Expanded(flex: 2, child: _buildChartSection()),
                     const SizedBox(width: 32),
-                    // Right side - Details section
-                    Expanded(
-                      flex: 3,
-                      child: _buildDetailsSection(),
-                    ),
+                    Expanded(flex: 3, child: _buildDetailsSection()),
                   ],
                 ),
               ),
@@ -127,6 +140,7 @@ class _SummaryDialogWidgetState extends State<SummaryDialogWidget>
   }
 
   Widget _buildHeader() {
+    final categoryText = widget.selectedCategory.toUpperCase();
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
@@ -175,7 +189,7 @@ class _SummaryDialogWidgetState extends State<SummaryDialogWidget>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${widget.tgl} • ${widget.noSO} (${widget.selectedCategory.toUpperCase()} - ${widget.selectedLocation.toUpperCase()})',
+                  '${widget.tgl} • ${widget.noSO} ($categoryText - $_lokasiDisplayUpper)',
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.white.withOpacity(0.9),
@@ -193,18 +207,9 @@ class _SummaryDialogWidgetState extends State<SummaryDialogWidget>
   Widget _buildChartSection() {
     return Column(
       children: [
-        // Animated Pie Chart with detailed percentages
-        Flexible(
-          flex: 3,
-          child: _buildAnimatedPieChart(),
-        ),
+        Flexible(flex: 3, child: _buildAnimatedPieChart()),
         const SizedBox(height: 16),
-
-        // Legend with progress indicators
-        Flexible(
-          flex: 2,
-          child: _buildDetailedLegend(),
-        ),
+        Flexible(flex: 2, child: _buildDetailedLegend()),
       ],
     );
   }
@@ -237,9 +242,9 @@ class _SummaryDialogWidgetState extends State<SummaryDialogWidget>
                       },
                     ),
                     sections: [
-                      // Scanned section (Green)
+                      // Sudah scan (Hijau)
                       PieChartSectionData(
-                        value: totalScannedItems * _animation.value,
+                        value: totalScannedItems * _animation.value.toDouble(),
                         color: Colors.green.shade600,
                         radius: touchedIndex == 0 ? 70 : 60,
                         title: animatedScannedPercentage > 5
@@ -250,14 +255,11 @@ class _SummaryDialogWidgetState extends State<SummaryDialogWidget>
                           fontWeight: FontWeight.bold,
                           fontSize: 12,
                         ),
-                        borderSide: BorderSide(
-                          color: Colors.white,
-                          width: 2,
-                        ),
+                        borderSide: const BorderSide(color: Colors.white, width: 2),
                       ),
-                      // Unscanned section (Orange)
+                      // Belum scan (Oranye)
                       PieChartSectionData(
-                        value: totalUnscannedItems * _animation.value,
+                        value: totalUnscannedItems * _animation.value.toDouble(),
                         color: Colors.orange.shade600,
                         radius: touchedIndex == 1 ? 70 : 60,
                         title: animatedUnscannedPercentage > 5
@@ -268,15 +270,12 @@ class _SummaryDialogWidgetState extends State<SummaryDialogWidget>
                           fontWeight: FontWeight.bold,
                           fontSize: 12,
                         ),
-                        borderSide: BorderSide(
-                          color: Colors.white,
-                          width: 2,
-                        ),
+                        borderSide: const BorderSide(color: Colors.white, width: 2),
                       ),
                     ],
                   ),
                 ),
-                // Center content showing overall progress
+                // Persen besar di tengah
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -332,7 +331,13 @@ class _SummaryDialogWidgetState extends State<SummaryDialogWidget>
     );
   }
 
-  Widget _buildLegendItem(String label, Color color, int value, double percentage, IconData icon) {
+  Widget _buildLegendItem(
+      String label,
+      Color color,
+      int value,
+      double percentage,
+      IconData icon,
+      ) {
     return AnimatedBuilder(
       animation: _animation,
       builder: (context, child) {
@@ -391,7 +396,6 @@ class _SummaryDialogWidgetState extends State<SummaryDialogWidget>
     return SingleChildScrollView(
       child: Column(
         children: [
-          // Summary cards in 2x2 grid
           Row(
             children: [
               Expanded(
@@ -437,9 +441,7 @@ class _SummaryDialogWidgetState extends State<SummaryDialogWidget>
                 ),
               ),
               const SizedBox(width: 12),
-              Expanded(
-                child: _buildComparisonCard(),
-              ),
+              Expanded(child: _buildComparisonCard()),
             ],
           ),
         ],

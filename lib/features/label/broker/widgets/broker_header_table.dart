@@ -78,7 +78,7 @@ class BrokerHeaderTable extends StatelessWidget {
           SizedBox(
             width: 150,
             child: Text(
-              'NO BROKER',
+              'NO. BROKER',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
@@ -90,7 +90,7 @@ class BrokerHeaderTable extends StatelessWidget {
           SizedBox(
             width: 130,
             child: Text(
-              'DATE CREATED',
+              'TANGGAL',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
@@ -101,7 +101,7 @@ class BrokerHeaderTable extends StatelessWidget {
           ),
           Expanded(
             child: Text(
-              'JENIS PLASTIK',
+              'JENIS',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 14,

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+
+import '../../../../core/utils/pdf_print_service.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../model/broker_header_model.dart';
 
@@ -27,8 +29,9 @@ class BrokerRowPopover extends StatelessWidget {
 
   Future<void> _copyOnly(BuildContext context) async {
     await Clipboard.setData(ClipboardData(text: header.noBroker));
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
+    final m = ScaffoldMessenger.maybeOf(context);
+    m?.hideCurrentSnackBar();
+    m?.showSnackBar(
       SnackBar(
         content: Text('NoBroker "${header.noBroker}" disalin'),
         duration: const Duration(milliseconds: 1200),
@@ -41,7 +44,7 @@ class BrokerRowPopover extends StatelessWidget {
   Widget build(BuildContext context) {
     final divider = Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
 
-    // ⬇️ ambil izin sekali
+    // izin
     final perm = context.watch<PermissionViewModel>();
     final canEdit   = perm.can('label_broker:update');
     final canDelete = perm.can('label_broker:delete');
@@ -53,7 +56,7 @@ class BrokerRowPopover extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header info - Blue Gradient Design
+            // Header
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
@@ -65,54 +68,35 @@ class BrokerRowPopover extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  // Icon Box
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: 40, height: 40,
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.25),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
                     ),
-                    child: const Icon(
-                      Icons.label,
-                      color: Colors.white,
-                      size: 20,
-                    ),
+                    child: const Icon(Icons.label, color: Colors.white, size: 20),
                   ),
                   const SizedBox(width: 12),
-
-                  // Title & Subtitle
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           header.noBroker,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 3),
                         Text(
                           header.namaJenisPlastik,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white.withOpacity(0.95),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.white.withOpacity(0.95)),
+                          overflow: TextOverflow.ellipsis, maxLines: 1,
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(width: 8),
-
-                  // Copy Button
                   IconButton(
                     tooltip: 'Salin NoBroker',
                     icon: Icon(Icons.copy_outlined, color: Colors.white.withOpacity(0.9)),
@@ -125,7 +109,7 @@ class BrokerRowPopover extends StatelessWidget {
             ),
             divider,
 
-            // Edit (dikunci oleh permission)
+            // Edit
             _MenuTile(
               icon: Icons.edit_outlined,
               label: 'Edit',
@@ -135,25 +119,43 @@ class BrokerRowPopover extends StatelessWidget {
             ),
             divider,
 
-            // Print (contoh tanpa izin)
+            // Print (pakai PdfPrintService)
             _MenuTile(
               icon: Icons.print_outlined,
               label: 'Print',
               enabled: true,
-              onTap: () => _runAndClose(onPrint),
+              onTap: () => _runAndClose(() async {
+                final rootCtx = Navigator.of(context, rootNavigator: true).context;
+
+                // ambil dari Provider jika kamu mendaftarkan PdfPrintService secara global:
+                // final pdfService = context.read<PdfPrintService>();
+
+                final pdfService = PdfPrintService(
+                  baseUrl: 'http://192.168.10.100:3000',
+                  defaultSystem: 'pps',
+                );
+
+                // klik Print:
+                await pdfService.printReport80mm(
+                  context: rootCtx,
+                  reportName: 'CrLabelPalletBroker',
+                  query: {'NoBroker': header.noBroker},
+                  // system: 'pps', // opsional kalau mau override
+                  // saveNameHint: 'Label_${header.noWashing}.pdf', // opsional; kalau kosong akan di-infer
+                );
+
+              }),
             ),
             divider,
 
-            // Hapus (destruktif, dikunci permission)
+            // Delete
             _MenuTile(
               icon: Icons.delete_outline,
               label: 'Delete',
               enabled: canDelete,
               tooltipWhenDisabled: 'Tidak punya izin hapus',
               iconColor: canDelete ? Colors.red.shade600 : null,
-              textStyle: TextStyle(
-                color: canDelete ? Colors.red.shade600 : Colors.grey,
-              ),
+              textStyle: TextStyle(color: canDelete ? Colors.red.shade600 : Colors.grey),
               onTap: () => _runAndClose(onDelete),
             ),
           ],
@@ -163,7 +165,6 @@ class BrokerRowPopover extends StatelessWidget {
   }
 }
 
-/// Tile menu dengan state enabled/disabled yang jelas
 class _MenuTile extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -199,19 +200,12 @@ class _MenuTile extends StatelessWidget {
           children: [
             Icon(icon, color: effectiveIconColor),
             const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                label,
-                style: effectiveTextStyle,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
+            Expanded(child: Text(label, style: effectiveTextStyle, overflow: TextOverflow.ellipsis)),
           ],
         ),
       ),
     );
 
-    // Tooltip saat disabled (opsional)
     if (!enabled && (tooltipWhenDisabled?.isNotEmpty ?? false)) {
       return Tooltip(message: tooltipWhenDisabled!, child: Opacity(opacity: 0.55, child: tile));
     }

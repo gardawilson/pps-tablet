@@ -12,6 +12,12 @@ import 'package:pps_tablet/features/label/bonggolan/view_model/bonggolan_view_mo
 import 'package:pps_tablet/features/label/broker/repository/broker_repository.dart';
 import 'package:pps_tablet/features/label/broker/view/broker_screen.dart';
 import 'package:pps_tablet/features/label/broker/view_model/broker_view_model.dart';
+import 'package:pps_tablet/features/mesin/repository/mesin_repository.dart';
+import 'package:pps_tablet/features/mesin/view_model/mesin_view_model.dart';
+import 'package:pps_tablet/features/operator/repository/operator_repository.dart';
+import 'package:pps_tablet/features/operator/view_model/operator_view_model.dart';
+import 'package:pps_tablet/features/production/broker/repository/broker_production_input_screen.dart';
+import 'package:pps_tablet/features/production/broker/view_model/broker_production_input_view_model.dart';
 import 'package:pps_tablet/features/production/crusher/repository/crusher_production_repository.dart';
 import 'package:pps_tablet/features/production/crusher/view_model/crusher_production_view_model.dart';
 import 'package:pps_tablet/features/production/inject/repository/inject_production_repository.dart';
@@ -27,6 +33,8 @@ import 'package:pps_tablet/features/shared/max_sak/max_sak_repository.dart';
 import 'package:pps_tablet/features/shared/max_sak/max_sak_service.dart';
 import 'package:pps_tablet/features/production/washing/repository/washing_production_repository.dart';
 import 'package:pps_tablet/features/production/washing/view_model/washing_production_view_model.dart';
+import 'package:pps_tablet/features/shared/overlap/repository/overlap_repository.dart';
+import 'package:pps_tablet/features/shared/overlap/view_model/overlap_view_model.dart';
 import 'package:provider/provider.dart';
 
 // ⬇️ Tambahan untuk locale & tanggal Indonesia
@@ -99,10 +107,14 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => BonggolanViewModel(repository: BonggolanRepository())),
         ChangeNotifierProvider(create: (_) => CrusherViewModel(repository: CrusherRepository())),
         ChangeNotifierProvider(create: (_) => BrokerProductionViewModel(repository: BrokerProductionRepository())),
+        ChangeNotifierProvider(create: (_) => BrokerProductionInputViewModel(repository: BrokerProductionInputRepository())),
         ChangeNotifierProvider(create: (_) => InjectProductionViewModel(repository: InjectProductionRepository())),
         ChangeNotifierProvider(create: (_) => JenisBonggolanViewModel(repository: JenisBonggolanRepository())),
         ChangeNotifierProvider(create: (_) => CrusherProductionViewModel(repository: CrusherProductionRepository())),
         ChangeNotifierProvider(create: (_) => CrusherTypeViewModel(repository: CrusherTypeRepository())),
+        ChangeNotifierProvider(create: (_) => MesinViewModel(repository: MesinRepository())),
+        ChangeNotifierProvider(create: (_) => OperatorViewModel(repository: OperatorRepository())),
+        ChangeNotifierProvider(create: (_) => OverlapViewModel(repository: OverlapRepository())),
 
 
 

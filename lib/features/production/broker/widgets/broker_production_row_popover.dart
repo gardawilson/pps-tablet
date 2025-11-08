@@ -10,6 +10,7 @@ import '../model/broker_production_model.dart';
 class BrokerProductionRowPopover extends StatelessWidget {
   final BrokerProduction row;
   final VoidCallback onClose;
+  final VoidCallback onInput;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onPrint;
@@ -18,6 +19,7 @@ class BrokerProductionRowPopover extends StatelessWidget {
     super.key,
     required this.row,
     required this.onClose,
+    required this.onInput,
     required this.onEdit,
     required this.onDelete,
     required this.onPrint,
@@ -47,8 +49,8 @@ class BrokerProductionRowPopover extends StatelessWidget {
 
     // Permissions (adjust keys to match your backend ACL if needed)
     final perm = context.watch<PermissionViewModel>();
-    final canEdit   = perm.can('broker_produksi:update');
-    final canDelete = perm.can('broker_produksi:delete');
+    final canEdit   = perm.can('label_washing:update');
+    final canDelete = perm.can('label_washing:delete');
 
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 240, maxWidth: 320),
@@ -125,6 +127,16 @@ class BrokerProductionRowPopover extends StatelessWidget {
               ),
               divider,
 
+              // Input
+              _MenuTile(
+                icon: Icons.input,
+                label: 'Input',
+                enabled: canEdit,
+                disabledHint: 'Tidak punya izin edit',
+                onTap: () => _runAndClose(onInput),
+              ),
+              divider,
+
               // Edit
               _MenuTile(
                 icon: Icons.edit_outlined,
@@ -132,33 +144,6 @@ class BrokerProductionRowPopover extends StatelessWidget {
                 enabled: canEdit,
                 disabledHint: 'Tidak punya izin edit',
                 onTap: () => _runAndClose(onEdit),
-              ),
-              divider,
-
-              // Print (via PdfPrintService)
-              _MenuTile(
-                icon: Icons.print_outlined,
-                label: 'Print',
-                enabled: true,
-                onTap: () => _runAndClose(() async {
-                  final rootCtx = Navigator.of(context, rootNavigator: true).context;
-
-                  // If you register PdfPrintService with Provider globally, prefer:
-                  // final pdfService = context.read<PdfPrintService>();
-                  final pdfService = PdfPrintService(
-                    baseUrl: 'http://192.168.10.100:3000',
-                    defaultSystem: 'pps',
-                  );
-
-                  await pdfService.printReport80mm(
-                    context: rootCtx,
-                    reportName: 'CrLabelPalletBroker',
-                    // For production header printing, often NoProduksi is the key:
-                    query: {'NoProduksi': row.noProduksi},
-                    // system: 'pps',
-                    // saveNameHint: 'Label_${row.noProduksi}.pdf',
-                  );
-                }),
               ),
               divider,
 

@@ -191,52 +191,272 @@ class BrokerProductionRepository {
     return BrokerInputs.fromJson(data);
   }
 
-  Future<BrokerInputs> fetchInputs(String noProduksi, {bool force = false}) async {
-    if (!force && _inputsCache.containsKey(noProduksi)) {
-      return _inputsCache[noProduksi]!;
+  // =========================
+  //  CREATE (POST)
+  // =========================
+  Future<BrokerProduction> createProduksi({
+    required DateTime tglProduksi,
+    required int idMesin,
+    required int idOperator,
+    required dynamic jam, // int atau 'HH:mm-HH:mm'
+    required int shift,
+    String? hourStart,    // ⬅️ baru
+    String? hourEnd,      // ⬅️ baru
+    String? checkBy1,
+    String? checkBy2,
+    String? approveBy,
+    int? jmlhAnggota,
+    int? hadir,
+    double? hourMeter,
+  }) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/production/broker');
+
+    final tglStr = toDbDateString(tglProduksi);
+
+    // helper kecil biar "08:00" -> "08:00:00"
+    String _normalizeTime(String v) {
+      final t = v.trim();
+      if (t.isEmpty) return t;
+      // kalau cuma HH:mm tambahin :00
+      if (t.length == 5) {
+        return '$t:00';
+      }
+      return t;
     }
 
-    final token = await TokenStorage.getToken();
-    final url = Uri.parse('$_base/api/production/broker/$noProduksi/inputs');
+    // 🔴 PENTING: kirim sebagai MAP<String, String>
+    final body = <String, String>{
+      'tglProduksi': tglStr,
+      'idMesin': idMesin.toString(),
+      'idOperator': idOperator.toString(),
+      'jam': jam.toString(),
+      'shift': shift.toString(),
+      if (hourStart != null && hourStart.isNotEmpty)
+        'hourStart': _normalizeTime(hourStart),
+      if (hourEnd != null && hourEnd.isNotEmpty)
+        'hourEnd': _normalizeTime(hourEnd),
+      if (checkBy1 != null) 'checkBy1': checkBy1,
+      if (checkBy2 != null) 'checkBy2': checkBy2,
+      if (approveBy != null) 'approveBy': approveBy,
+      if (jmlhAnggota != null) 'jmlhAnggota': jmlhAnggota.toString(),
+      if (hadir != null) 'hadir': hadir.toString(),
+      if (hourMeter != null) 'hourMeter': hourMeter.toString(),
+    };
 
-    final started = DateTime.now();
-    print('➡️ [GET] $url');
+    final headers = {
+      'Authorization': 'Bearer $token',
+      'Accept': 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
+    };
 
-    http.Response res;
+    print('➡️ [POST] $url');
+    print('📦 form body: $body');
+
+    late http.Response res;
     try {
-      res = await http.get(url, headers: _headers(token)).timeout(_timeout);
+      res = await http
+          .post(
+        url,
+        headers: headers,
+        body: body,
+      )
+          .timeout(_timeout);
     } on TimeoutException {
-      throw Exception('Timeout mengambil input ($noProduksi)');
+      throw Exception('Timeout membuat broker produksi');
     } catch (e) {
       print('❌ Request error: $e');
       rethrow;
     }
 
-    final elapsedMs = DateTime.now().difference(started).inMilliseconds;
-    print('⬅️ [${res.statusCode}] in ${elapsedMs}ms');
+    print('⬅️ [${res.statusCode}] ${res.body}');
 
-    if (res.statusCode != 200) {
-      throw Exception('Gagal mengambil input ($noProduksi), code ${res.statusCode})');
+    if (res.statusCode != 201 && res.statusCode != 200) {
+      try {
+        final decoded = json.decode(utf8.decode(res.bodyBytes));
+        final msg = decoded['message'] ?? 'Gagal membuat broker produksi';
+        throw Exception(msg);
+      } catch (_) {
+        throw Exception('Gagal membuat broker produksi (${res.statusCode})');
+      }
     }
 
-    // Decode safely (handles non-ASCII)
     final decoded = utf8.decode(res.bodyBytes);
+    final bodyJson = json.decode(decoded) as Map<String, dynamic>;
+    final data = bodyJson['data'] as Map<String, dynamic>?;
 
-    // Parse JSON (optionally via compute to keep UI smooth for large payloads)
-    Map<String, dynamic> body;
-    try {
-      body = json.decode(decoded) as Map<String, dynamic>;
-    } catch (e) {
-      throw FormatException('Response bukan JSON valid: $e');
+    if (data == null) {
+      throw Exception('Response tidak mengandung data header');
     }
 
-    final inputs = await compute(_parseInputs, body);
-
-    _inputsCache[noProduksi] = inputs;
-    return inputs;
+    return BrokerProduction.fromJson(data);
   }
 
-  void invalidateInputs(String noProduksi) => _inputsCache.remove(noProduksi);
-  void clearCache() => _inputsCache.clear();
+
+
+  Future<BrokerProduction> updateProduksi({
+    required String noProduksi,     // ← dari URL
+    DateTime? tglProduksi,
+    int? idMesin,
+    int? idOperator,
+    dynamic jam,                    // int atau 'HH:mm-HH:mm'
+    int? shift,
+    String? hourStart,
+    String? hourEnd,
+    String? checkBy1,
+    String? checkBy2,
+    String? approveBy,
+    int? jmlhAnggota,
+    int? hadir,
+    double? hourMeter,
+  }) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/production/broker/$noProduksi');
+
+    // helper sama kayak yang di create
+    String _normalizeTime(String v) {
+      final t = v.trim();
+      if (t.isEmpty) return t;
+      if (t.length == 5) {
+        return '$t:00'; // HH:mm -> HH:mm:00
+      }
+      return t;
+    }
+
+    // karena ini UPDATE, semua boleh null → kita kirim hanya yang diisi
+    final body = <String, String>{};
+
+    if (tglProduksi != null) {
+      body['tglProduksi'] = toDbDateString(tglProduksi);
+    }
+    if (idMesin != null) {
+      body['idMesin'] = idMesin.toString();
+    }
+    if (idOperator != null) {
+      body['idOperator'] = idOperator.toString();
+    }
+    if (jam != null) {
+      body['jam'] = jam.toString();
+    }
+    if (shift != null) {
+      body['shift'] = shift.toString();
+    }
+    if (hourStart != null && hourStart.isNotEmpty) {
+      body['hourStart'] = _normalizeTime(hourStart);
+    }
+    if (hourEnd != null && hourEnd.isNotEmpty) {
+      body['hourEnd'] = _normalizeTime(hourEnd);
+    }
+    if (checkBy1 != null) {
+      body['checkBy1'] = checkBy1;
+    }
+    if (checkBy2 != null) {
+      body['checkBy2'] = checkBy2;
+    }
+    if (approveBy != null) {
+      body['approveBy'] = approveBy;
+    }
+    if (jmlhAnggota != null) {
+      body['jmlhAnggota'] = jmlhAnggota.toString();
+    }
+    if (hadir != null) {
+      body['hadir'] = hadir.toString();
+    }
+    if (hourMeter != null) {
+      body['hourMeter'] = hourMeter.toString();
+    }
+
+    final headers = {
+      'Authorization': 'Bearer $token',
+      'Accept': 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
+    };
+
+    print('➡️ [PUT] $url');
+    print('📦 form body: $body');
+
+    late http.Response res;
+    try {
+      res = await http
+          .put(
+        url,
+        headers: headers,
+        body: body,
+      )
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout mengubah broker produksi');
+    } catch (e) {
+      print('❌ Request error: $e');
+      rethrow;
+    }
+
+    print('⬅️ [${res.statusCode}] ${res.body}');
+
+    if (res.statusCode != 200) {
+      try {
+        final decoded = json.decode(utf8.decode(res.bodyBytes));
+        final msg = decoded['message'] ?? 'Gagal mengubah broker produksi';
+        throw Exception(msg);
+      } catch (_) {
+        throw Exception('Gagal mengubah broker produksi (${res.statusCode})');
+      }
+    }
+
+    final decoded = utf8.decode(res.bodyBytes);
+    final bodyJson = json.decode(decoded) as Map<String, dynamic>;
+    final data = bodyJson['data'] as Map<String, dynamic>?;
+
+    if (data == null) {
+      throw Exception('Response tidak mengandung data header');
+    }
+
+    return BrokerProduction.fromJson(data);
+  }
+
+
+  Future<void> deleteProduksi(String noProduksi) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/production/broker/$noProduksi');
+
+    print('🗑️ [DELETE] $url');
+
+    late http.Response res;
+    try {
+      res = await http
+          .delete(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      )
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout menghapus broker produksi');
+    } catch (e) {
+      print('❌ Request error: $e');
+      rethrow;
+    }
+
+    print('⬅️ [${res.statusCode}] ${res.body}');
+
+    if (res.statusCode != 200) {
+      try {
+        final decoded = json.decode(utf8.decode(res.bodyBytes));
+        final msg = decoded['message'] ?? 'Gagal menghapus broker produksi';
+        throw Exception(msg);
+      } catch (_) {
+        throw Exception('Gagal menghapus broker produksi (${res.statusCode})');
+      }
+    }
+
+    // kalau sebelumnya kita sudah pernah ambil inputs untuk noProduksi ini, buang dari cache
+    _inputsCache.remove(noProduksi);
+  }
+
+
+
+
 }
 

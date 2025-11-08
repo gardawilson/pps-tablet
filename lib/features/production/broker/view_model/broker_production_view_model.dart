@@ -28,6 +28,10 @@ class BrokerProductionViewModel extends ChangeNotifier {
   bool isLoading = false;
   String error = '';
 
+  // ====== CREATE STATE ======
+  bool isSaving = false;
+  String? saveError;
+
   // To prevent duplicate per-row inputs fetch
   final Map<String, Future<BrokerInputs>> _inflight = {};
 
@@ -69,38 +73,6 @@ class BrokerProductionViewModel extends ChangeNotifier {
   int inputsCount(String noProduksi, String key) =>
       _inputsCache[noProduksi]?.summary[key] ?? 0;
 
-  Future<BrokerInputs?> loadInputs(String noProduksi, {bool force = false}) async {
-    if (!force && _inputsCache.containsKey(noProduksi)) {
-      return _inputsCache[noProduksi];
-    }
-    if (!force && _inflight.containsKey(noProduksi)) {
-      try {
-        return await _inflight[noProduksi];
-      } catch (_) {
-        // fall through
-      }
-    }
-
-    _inputsLoading[noProduksi] = true;
-    _inputsError[noProduksi] = null;
-    notifyListeners();
-
-    final future = repository.fetchInputs(noProduksi, force: force);
-    _inflight[noProduksi] = future;
-
-    try {
-      final result = await future;
-      _inputsCache[noProduksi] = result;
-      return result;
-    } catch (e) {
-      _inputsError[noProduksi] = e.toString();
-      return null;
-    } finally {
-      _inflight.remove(noProduksi);
-      _inputsLoading[noProduksi] = false;
-      notifyListeners();
-    }
-  }
 
   void clearInputsCache([String? noProduksi]) {
     if (noProduksi == null) {
@@ -255,6 +227,153 @@ class BrokerProductionViewModel extends ChangeNotifier {
       applyFilters(search: text);
     });
   }
+
+
+
+  // ====== CREATE / SAVE ======
+  Future<BrokerProduction?> createProduksi({
+    required DateTime tglProduksi,
+    required int idMesin,
+    required int idOperator,
+    required dynamic jam, // int atau 'HH:mm-HH:mm'
+    required int shift,
+    String? hourStart,    // ⬅️ baru
+    String? hourEnd,      // ⬅️ baru
+    String? checkBy1,
+    String? checkBy2,
+    String? approveBy,
+    int? jmlhAnggota,
+    int? hadir,
+    double? hourMeter,
+  }) async {
+    isSaving = true;
+    saveError = null;
+    notifyListeners();
+
+    try {
+      final created = await repository.createProduksi(
+        tglProduksi: tglProduksi,
+        idMesin: idMesin,
+        idOperator: idOperator,
+        jam: jam,
+        shift: shift,
+        hourStart: hourStart,   // ⬅️ lempar ke repo
+        hourEnd: hourEnd,       // ⬅️ lempar ke repo
+        checkBy1: checkBy1,
+        checkBy2: checkBy2,
+        approveBy: approveBy,
+        jmlhAnggota: jmlhAnggota,
+        hadir: hadir,
+        hourMeter: hourMeter,
+      );
+
+      // setelah create, refresh sesuai mode
+      if (_isByDateMode) {
+        await fetchByDate(tglProduksi);
+      } else {
+        clearInputsCache();
+        pagingController.refresh();
+      }
+
+      return created;
+    } catch (e) {
+      saveError = e.toString();
+      return null;
+    } finally {
+      isSaving = false;
+      notifyListeners();
+    }
+  }
+
+
+  // ====== UPDATE / SAVE ======
+  Future<BrokerProduction?> updateProduksi({
+    required String noProduksi,
+    DateTime? tglProduksi,
+    int? idMesin,
+    int? idOperator,
+    dynamic jam, // int atau 'HH:mm-HH:mm'
+    int? shift,
+    String? hourStart,
+    String? hourEnd,
+    String? checkBy1,
+    String? checkBy2,
+    String? approveBy,
+    int? jmlhAnggota,
+    int? hadir,
+    double? hourMeter,
+  }) async {
+    isSaving = true;
+    saveError = null;
+    notifyListeners();
+
+    try {
+      final updated = await repository.updateProduksi(
+        noProduksi: noProduksi,
+        tglProduksi: tglProduksi,
+        idMesin: idMesin,
+        idOperator: idOperator,
+        jam: jam,
+        shift: shift,
+        hourStart: hourStart,
+        hourEnd: hourEnd,
+        checkBy1: checkBy1,
+        checkBy2: checkBy2,
+        approveBy: approveBy,
+        jmlhAnggota: jmlhAnggota,
+        hadir: hadir,
+        hourMeter: hourMeter,
+      );
+
+      // setelah update, refresh sesuai mode
+      if (_isByDateMode) {
+        // kalau user lagi lihat per tanggal, kita ambil ulang tanggal itu
+        if (tglProduksi != null) {
+          await fetchByDate(tglProduksi);
+        } else if (_date != null) {
+          await fetchByDate(_date!);
+        } else {
+          // fallback: refresh paged aja
+          clearInputsCache(noProduksi);
+          pagingController.refresh();
+        }
+      } else {
+        // mode paged
+        clearInputsCache(noProduksi); // biar inputs row itu ke-refresh
+        pagingController.refresh();
+      }
+
+      return updated;
+    } catch (e) {
+      saveError = e.toString();
+      return null;
+    } finally {
+      isSaving = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> deleteProduksi(String noProduksi) async {
+    try {
+      await repository.deleteProduksi(noProduksi);
+      // refresh list
+      if (isByDateMode) {
+        if (date != null) {
+          await fetchByDate(date!);
+        }
+      } else {
+        clearInputsCache(noProduksi);
+        pagingController.refresh();
+      }
+      return true;
+    } catch (e) {
+      saveError = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+
 
   @override
   void dispose() {

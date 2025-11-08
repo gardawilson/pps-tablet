@@ -43,12 +43,18 @@ class BrokerItem {
   final double? beratAct;
   final bool? isPartial; // from source, may exist but not the same as "partial-row"
 
+  // seragam: idJenis/namaJenis (plastik)
+  final int? idJenis;
+  final String? namaJenis;
+
   BrokerItem({
     this.noBroker,
     this.noSak,
     this.berat,
     this.beratAct,
     this.isPartial,
+    this.idJenis,
+    this.namaJenis,
   });
 
   factory BrokerItem.fromJson(Map<String, dynamic> j) => BrokerItem(
@@ -57,6 +63,8 @@ class BrokerItem {
     berat: _asDouble(j['berat']),
     beratAct: _asDouble(j['beratAct']),
     isPartial: _asBool(j['isPartial']),
+    idJenis: _asInt(j['idJenis']),
+    namaJenis: _asString(j['namaJenis']),
   );
 }
 
@@ -73,6 +81,10 @@ class BbItem {
   final double? beratAct;
   final bool? isPartial;
 
+  // seragam: idJenis/namaJenis (plastik)
+  final int? idJenis;
+  final String? namaJenis;
+
   bool get isPartialRow => noBBPartial != null;
 
   BbItem({
@@ -83,6 +95,8 @@ class BbItem {
     this.berat,
     this.beratAct,
     this.isPartial,
+    this.idJenis,
+    this.namaJenis,
   });
 
   factory BbItem.fromJson(Map<String, dynamic> j) => BbItem(
@@ -93,6 +107,8 @@ class BbItem {
     berat: _asDouble(j['berat']),
     beratAct: _asDouble(j['beratAct']),
     isPartial: _asBool(j['isPartial']),
+    idJenis: _asInt(j['idJenis']),
+    namaJenis: _asString(j['namaJenis']),
   );
 }
 
@@ -102,7 +118,11 @@ class WashingItem {
   final int? noSak;
   final double? berat;
   final double? beratAct; // usually null
-  final bool? isPartial;  // usually null
+  final bool? isPartial; // usually null
+
+  // seragam: idJenis/namaJenis (plastik)
+  final int? idJenis;
+  final String? namaJenis;
 
   WashingItem({
     this.noWashing,
@@ -110,6 +130,8 @@ class WashingItem {
     this.berat,
     this.beratAct,
     this.isPartial,
+    this.idJenis,
+    this.namaJenis,
   });
 
   factory WashingItem.fromJson(Map<String, dynamic> j) => WashingItem(
@@ -118,6 +140,8 @@ class WashingItem {
     berat: _asDouble(j['berat']),
     beratAct: _asDouble(j['beratAct']),
     isPartial: _asBool(j['isPartial']),
+    idJenis: _asInt(j['idJenis']),
+    namaJenis: _asString(j['namaJenis']),
   );
 }
 
@@ -126,13 +150,19 @@ class CrusherItem {
   final String? noCrusher;
   final double? berat;
   final double? beratAct; // usually null
-  final bool? isPartial;  // usually null
+  final bool? isPartial; // usually null
+
+  // seragam: idJenis/namaJenis (crusher)
+  final int? idJenis;
+  final String? namaJenis;
 
   CrusherItem({
     this.noCrusher,
     this.berat,
     this.beratAct,
     this.isPartial,
+    this.idJenis,
+    this.namaJenis,
   });
 
   factory CrusherItem.fromJson(Map<String, dynamic> j) => CrusherItem(
@@ -140,6 +170,8 @@ class CrusherItem {
     berat: _asDouble(j['berat']),
     beratAct: _asDouble(j['beratAct']),
     isPartial: _asBool(j['isPartial']),
+    idJenis: _asInt(j['idJenis']),
+    namaJenis: _asString(j['namaJenis']),
   );
 }
 
@@ -154,6 +186,10 @@ class GilinganItem {
   final double? beratAct;
   final bool? isPartial;
 
+  // seragam: idJenis/namaJenis (gilingan)
+  final int? idJenis;
+  final String? namaJenis;
+
   bool get isPartialRow => noGilinganPartial != null;
 
   GilinganItem({
@@ -162,6 +198,8 @@ class GilinganItem {
     this.berat,
     this.beratAct,
     this.isPartial,
+    this.idJenis,
+    this.namaJenis,
   });
 
   factory GilinganItem.fromJson(Map<String, dynamic> j) => GilinganItem(
@@ -170,6 +208,8 @@ class GilinganItem {
     berat: _asDouble(j['berat']),
     beratAct: _asDouble(j['beratAct']),
     isPartial: _asBool(j['isPartial']),
+    idJenis: _asInt(j['idJenis']),
+    namaJenis: _asString(j['namaJenis']),
   );
 }
 
@@ -185,6 +225,10 @@ class MixerItem {
   final double? beratAct;
   final bool? isPartial;
 
+  // seragam: idJenis/namaJenis (mixer)
+  final int? idJenis;
+  final String? namaJenis;
+
   bool get isPartialRow => noMixerPartial != null;
 
   MixerItem({
@@ -194,6 +238,8 @@ class MixerItem {
     this.berat,
     this.beratAct,
     this.isPartial,
+    this.idJenis,
+    this.namaJenis,
   });
 
   factory MixerItem.fromJson(Map<String, dynamic> j) => MixerItem(
@@ -203,6 +249,8 @@ class MixerItem {
     berat: _asDouble(j['berat']),
     beratAct: _asDouble(j['beratAct']),
     isPartial: _asBool(j['isPartial']),
+    idJenis: _asInt(j['idJenis']),
+    namaJenis: _asString(j['namaJenis']),
   );
 }
 
@@ -217,6 +265,10 @@ class RejectItem {
   final double? beratAct;
   final bool? isPartial;
 
+  // seragam: idJenis/namaJenis (reject)
+  final int? idJenis;
+  final String? namaJenis;
+
   bool get isPartialRow => noRejectPartial != null;
 
   RejectItem({
@@ -225,6 +277,8 @@ class RejectItem {
     this.berat,
     this.beratAct,
     this.isPartial,
+    this.idJenis,
+    this.namaJenis,
   });
 
   factory RejectItem.fromJson(Map<String, dynamic> j) => RejectItem(
@@ -233,6 +287,8 @@ class RejectItem {
     berat: _asDouble(j['berat']),
     beratAct: _asDouble(j['beratAct']),
     isPartial: _asBool(j['isPartial']),
+    idJenis: _asInt(j['idJenis']),
+    namaJenis: _asString(j['namaJenis']),
   );
 }
 

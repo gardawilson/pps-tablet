@@ -11,8 +11,10 @@ import '../model/broker_production_model.dart';
 import '../../../../core/utils/date_formatter.dart';
 
 // Action bar
+import '../widgets/broker_delete_dialog.dart';
 import '../widgets/broker_production_action_bar.dart';
 // Inputs screen (Scan action)
+import '../widgets/broker_production_form_dialog.dart';
 import 'broker_inputs_screen.dart';
 // ⬇️ New: the popover panel you created
 import '../widgets/broker_production_row_popover.dart';
@@ -62,29 +64,67 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
               child: BrokerProductionRowPopover(
                 row: row,
                 onClose: () => Navigator.of(context).maybePop(),
+                onInput: () {
+                  // 1) tutup popover/dialog pakai context dialog
+                  Navigator.of(context).maybePop();
+
+                  // 2) setelah dialog ketutup, pakai context luar (yang ke _showRowPopover) buat push
+                  Future.microtask(() {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => BrokerInputsScreen(
+                          noProduksi: row.noProduksi,
+                        ),
+                      ),
+                    );
+                  });
+                },
                 onEdit: () async {
-                  // TODO: open your edit modal/screen with `row`
-                  // After success, refresh if needed:
-                  // context.read<BrokerProductionViewModel>().refreshPaged();
+                  await _openEditDialog(context, row);
+                  // after the dialog, you can also close the popover if it’s still open
+                  if (mounted) Navigator.of(context).maybePop();
                 },
+
                 onDelete: () async {
-                  final ok = await showDialog<bool>(
+                  // buka dialog konfirmasi custom kamu
+                  await showDialog<void>(
                     context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('Hapus Data'),
-                      content: Text('Hapus NoProduksi "${row.noProduksi}"?'),
-                      actions: [
-                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
-                        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Hapus')),
-                      ],
-                    ),
+                    barrierDismissible: false,
+                    builder: (ctx) {
+                      return BrokerProductionDeleteDialog(
+                        header: row,
+                        onConfirm: () async {
+                          final vm = context.read<BrokerProductionViewModel>();
+
+                          // kita boleh kasih loading di dalam dialog (dialog kamu sudah punya _submitting)
+                          final success = await vm.deleteProduksi(row.noProduksi);
+
+                          if (success) {
+                            // tutup dialog konfirmasi
+                            if (ctx.mounted) Navigator.of(ctx).pop();
+
+                            // kasih snackbar di layar utama
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('No. Produksi ${row.noProduksi} berhasil dihapus')),
+                              );
+                            }
+                          } else {
+                            // gagal → tetap tutup dialog supaya user bisa ulang
+                            if (ctx.mounted) Navigator.of(ctx).pop();
+
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(vm.saveError ?? 'Gagal menghapus data')),
+                              );
+                            }
+                          }
+                        },
+                      );
+                    },
                   );
-                  if (ok == true && context.mounted) {
-                    // TODO: call delete API here
-                    // await repository.delete(row.noProduksi);
-                    context.read<BrokerProductionViewModel>().refreshPaged();
-                  }
                 },
+
                 onPrint: () async {
                   // This hook is optional since the popover already implements print
                   // If you want extra behavior, put it here.
@@ -195,10 +235,8 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
                     _searchCtl.clear();
                     vm.clearFilters();
                   },
-                  onAddPressed: () {
-                    // TODO: open your create flow
-                    // after create => vm.refreshPaged();
-                  },
+                  onAddPressed: _openCreateDialog,   // ⬅️ open dialog here
+
                 ),
 
                 // 🔹 TABLE
@@ -225,4 +263,65 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
       ),
     );
   }
+
+  Future<void> _openCreateDialog() async {
+    final vm = context.read<BrokerProductionViewModel>();
+
+    final created = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => BrokerProductionFormDialog(
+        // header: null  // create mode
+        onSave: (draft) async {
+          try {
+            // await vm.create(draft);      // implement in your VM/repo
+            if (context.mounted) {
+              Navigator.of(context).pop(true); // signal success to caller
+            }
+          } catch (e) {
+            // optional: show error
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Gagal membuat label: $e')),
+              );
+            }
+          }
+        },
+      ),
+    );
+
+    if (created == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Label berhasil dibuat')),
+      );
+    }
+  }
+
+
+  Future<void> _openEditDialog(BuildContext context, BrokerProduction row) async {
+    final vm = context.read<BrokerProductionViewModel>();
+
+    // Open the form in EDIT mode by passing `header: row`
+    final updated = await showDialog<BrokerProduction>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => BrokerProductionFormDialog(
+        header: row, // ← send current values here
+        onSave: (v) {
+          // return the saved/updated item to this screen
+          Navigator.of(ctx).pop(v);
+        },
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (updated != null) {
+      // (Optional) Give feedback
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No. Produksi ${updated.noProduksi} berhasil diperbarui')),
+      );
+    }
+  }
+
 }

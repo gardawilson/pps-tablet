@@ -17,6 +17,10 @@ class BrokerProduction {
   final String? checkBy2;
   final String? approveBy;
 
+  // ⬇️ NEW
+  final String? hourStart; // "HH:mm"
+  final String? hourEnd;   // "HH:mm"
+
   const BrokerProduction({
     required this.noProduksi,
     required this.idOperator,
@@ -33,6 +37,9 @@ class BrokerProduction {
     this.checkBy1,
     this.checkBy2,
     this.approveBy,
+    // ⬇️ NEW (optional)
+    this.hourStart,
+    this.hourEnd,
   });
 
   // ---------- tolerant parsers ----------
@@ -55,7 +62,6 @@ class BrokerProduction {
     if (v == null) return null;
     if (v is DateTime) return v;
     if (v is String) {
-      // Accept both 'YYYY-MM-DD' and ISO strings
       try {
         return DateTime.tryParse(v);
       } catch (_) {
@@ -63,9 +69,40 @@ class BrokerProduction {
       }
     }
     if (v is int) {
-      // If backend ever sends epoch millis
       return DateTime.fromMillisecondsSinceEpoch(v);
     }
+    return null;
+  }
+
+  // ⬇️ NEW: normalize MSSQL TIME to "HH:mm"
+  static String? _asTimeHHmm(dynamic v) {
+    if (v == null) return null;
+
+    // If driver mapped TIME to DateTime (often 1900-01-01 + time)
+    if (v is DateTime) {
+      return DateFormat('HH:mm').format(v.toLocal());
+    }
+
+    // If string, accept several shapes: "HH:mm[:ss[.fff]]"
+    if (v is String) {
+      final s = v.trim();
+      if (s.isEmpty) return null;
+
+      // Try parse as DateTime first (covers ISO like 1900-01-01T07:30:00)
+      final asDt = DateTime.tryParse(s);
+      if (asDt != null) {
+        return DateFormat('HH:mm').format(asDt.toLocal());
+      }
+
+      // Fallback: extract leading HH:mm from a TIME string
+      final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(s);
+      if (m != null) {
+        final hh = m.group(1)!.padLeft(2, '0');
+        final mm = m.group(2)!;
+        return '$hh:$mm';
+      }
+    }
+
     return null;
   }
 
@@ -86,6 +123,9 @@ class BrokerProduction {
       jmlhAnggota: _asInt(j['JmlhAnggota']),
       hadir: _asInt(j['Hadir']),
       hourMeter: _asInt(j['HourMeter']),
+      // ⬇️ NEW
+      hourStart: _asTimeHHmm(j['HourStart']),
+      hourEnd: _asTimeHHmm(j['HourEnd']),
     );
   }
 
@@ -98,7 +138,6 @@ class BrokerProduction {
     'TglProduksi': tglProduksi == null
         ? null
         : (asDateOnly
-    // Keep LOCAL date to avoid day shift on UTC conversion
         ? DateFormat('yyyy-MM-dd').format(tglProduksi!)
         : tglProduksi!.toIso8601String()),
     'JamKerja': jamKerja,
@@ -110,6 +149,9 @@ class BrokerProduction {
     'JmlhAnggota': jmlhAnggota,
     'Hadir': hadir,
     'HourMeter': hourMeter,
+    // ⬇️ NEW: send back as "HH:mm" strings (backend can parse to TIME)
+    'HourStart': hourStart,
+    'HourEnd': hourEnd,
   };
 
   String get tglProduksiTextShort {
@@ -120,5 +162,12 @@ class BrokerProduction {
   String get tglProduksiTextFull {
     if (tglProduksi == null) return '';
     return DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(tglProduksi!.toLocal());
+  }
+
+  // ⬇️ Optional helpers
+  String get hourRangeText {
+    if ((hourStart == null || hourStart!.isEmpty) &&
+        (hourEnd == null || hourEnd!.isEmpty)) return '';
+    return '${hourStart ?? '--:--'} - ${hourEnd ?? '--:--'}';
   }
 }

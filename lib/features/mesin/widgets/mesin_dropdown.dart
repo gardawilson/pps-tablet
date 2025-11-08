@@ -1,4 +1,3 @@
-// lib/features/mesin/widgets/mesin_dropdown.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -7,37 +6,50 @@ import '../model/mesin_model.dart';
 import '../view_model/mesin_view_model.dart';
 
 class MesinDropdown extends StatefulWidget {
-  final String bagian;
+  /// Wajib: filter by IdBagianMesin (integer)
+  final int idBagianMesin;
 
-  /// Optional: preselect row by its id
+  /// Opsional: preselect by IdMesin
   final int? preselectId;
 
-  /// Emit selected mesin (or null)
+  /// Callback ketika nilai berubah
   final ValueChanged<MstMesin?>? onChanged;
 
-  // UI props
-  final String label;
-  final String hintText;
-  final bool enabled;
-
-  // Data props
+  /// Sertakan mesin non-aktif? default false
   final bool includeDisabled;
 
-  // Form props
+  /// ---------- UI & Form ----------
+  final String label;
+  final String hint;
+  final bool enabled;
+  final bool isExpanded;
+  final double fieldHeight;
   final String? Function(MstMesin?)? validator;
   final AutovalidateMode? autovalidateMode;
+  final String? helperText;
+  final String? errorText; // override error
+  final IconData? prefixIcon;
+  final double popupMaxHeight;
+  final EdgeInsetsGeometry contentPadding;
 
   const MesinDropdown({
     super.key,
-    required this.bagian,
+    required this.idBagianMesin,
     this.preselectId,
     this.onChanged,
-    this.label = 'Mesin',
-    this.hintText = 'PILIH MESIN',
-    this.enabled = true,
     this.includeDisabled = false,
+    this.label = 'Mesin',
+    this.hint = 'PILIH MESIN',
+    this.enabled = true,
+    this.isExpanded = true,
+    this.fieldHeight = 40,
     this.validator,
     this.autovalidateMode,
+    this.helperText,
+    this.errorText,
+    this.prefixIcon = Icons.precision_manufacturing_outlined,
+    this.popupMaxHeight = 500,
+    this.contentPadding = const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
   });
 
   @override
@@ -45,110 +57,99 @@ class MesinDropdown extends StatefulWidget {
 }
 
 class _MesinDropdownState extends State<MesinDropdown> {
-  MstMesin? _selected;
+  MstMesin? _selected; // state lokal supaya dropdown terkontrol
 
   @override
   void initState() {
     super.initState();
-    // Fetch initial data
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final vm = context.read<MesinViewModel>();
-      vm.fetchByBagian(widget.bagian, includeDisabled: widget.includeDisabled).then((_) {
-        _syncSelectedFromVM();
-      });
-    });
+    _ensureDataLoaded();
   }
 
   @override
-  void didUpdateWidget(covariant MesinDropdown old) {
-    super.didUpdateWidget(old);
-
-    final vm = context.read<MesinViewModel>();
-
-    // If bagian/includeDisabled changes, refetch
-    final bagianChanged = widget.bagian != old.bagian;
-    final includeChanged = widget.includeDisabled != old.includeDisabled;
-    if (bagianChanged || includeChanged) {
-      vm.fetchByBagian(widget.bagian, includeDisabled: widget.includeDisabled).then((_) {
-        _syncSelectedFromVM();
-      });
-      return; // will resync after fetch
-    }
-
-    // If preselectId changed, resync selection
-    if (widget.preselectId != old.preselectId) {
-      _syncSelectedFromVM();
-    } else {
-      // If items changed outside, try to keep selection object in-sync by id
-      _rebindSelectedToCurrentItems();
+  void didUpdateWidget(covariant MesinDropdown oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.idBagianMesin != widget.idBagianMesin ||
+        oldWidget.includeDisabled != widget.includeDisabled) {
+      _selected = null; // reset saat ganti bagian
+      _ensureDataLoaded();
     }
   }
 
-  void _syncSelectedFromVM() {
-    final vm = context.read<MesinViewModel>();
-    if (widget.preselectId != null) {
-      final found = vm.items.firstWhere(
-            (m) => _idOf(m) == widget.preselectId,
-        orElse: () => null as MstMesin, // will throw; handle with try/catch
+  void _ensureDataLoaded() {
+    // Jalankan fetch setelah frame agar tidak trigger notify saat build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final vm = context.read<MesinViewModel>();
+      vm.fetchByIdBagian(
+        widget.idBagianMesin,
+        includeDisabled: widget.includeDisabled,
       );
-      setState(() {
-        _selected = found;
-      });
-      return;
-    }
-    // No explicit preselect: keep current if exists in new list
-    _rebindSelectedToCurrentItems();
-  }
-
-  void _rebindSelectedToCurrentItems() {
-    final vm = context.read<MesinViewModel>();
-    if (_selected == null) return;
-    final current = vm.items.where((m) => _idOf(m) == _idOf(_selected!)).toList();
-    setState(() {
-      _selected = current.isNotEmpty ? current.first : null;
     });
   }
 
-  int _idOf(MstMesin m) {
-    // 🔧 Adjust if your model uses a different id field
-    return m.idMesin;
-  }
-
-  String _nameOf(MstMesin m) {
-    // 🔧 Adjust if your model uses a different display field
-    return m.namaMesin;
+  /// Temukan item by IdMesin dari list
+  MstMesin? _findById(List<MstMesin> items, int? id) {
+    if (id == null) return null;
+    try {
+      return items.firstWhere((e) => e.idMesin == id);
+    } catch (_) {
+      return null;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<MesinViewModel>(
       builder: (context, vm, _) {
+        // Saat data baru datang, jika belum ada pilihan lokal, coba preselect
+        if (_selected == null && vm.items.isNotEmpty) {
+          _selected = _findById(vm.items, widget.preselectId);
+        }
+
+        final items = vm.items;
+
         return DropdownPlainField<MstMesin>(
-          items: vm.items,
+          // data
+          items: items,
           value: _selected,
           onChanged: (val) {
             setState(() => _selected = val);
             widget.onChanged?.call(val);
           },
-          itemAsString: (m) => _nameOf(m),
-          compareFn: (a, b) => _idOf(a) == _idOf(b),
+          itemAsString: (item) {
+            final suffix = item.enable ? '' : ' (non-aktif)';
+            return '${item.namaMesin}$suffix';
+          },
+
+          // compare
+          compareFn: (a, b) => a.idMesin == b.idMesin,
 
           // UX & form
           label: widget.label,
-          hint: widget.hintText,
+          hint: widget.hint,
+          prefixIcon: widget.prefixIcon,
           enabled: widget.enabled,
+          isExpanded: widget.isExpanded,
+          fieldHeight: widget.fieldHeight,
           validator: widget.validator,
           autovalidateMode: widget.autovalidateMode,
+          helperText: widget.helperText,
+          errorText: widget.errorText,
 
-          // Loading / error reflection from VM
+          // state → mapping dari VM
           isLoading: vm.isLoading,
           fetchError: vm.error.isNotEmpty,
-          fetchErrorText: vm.error,
+          fetchErrorText: vm.error.isNotEmpty ? vm.error : null,
           onRetry: () {
-            vm.fetchByBagian(widget.bagian, includeDisabled: widget.includeDisabled).then((_) {
-              _syncSelectedFromVM();
-            });
+            final r = context.read<MesinViewModel>();
+            r.fetchByIdBagian(
+              widget.idBagianMesin,
+              includeDisabled: widget.includeDisabled,
+            );
           },
+
+          // style
+          popupMaxHeight: widget.popupMaxHeight,
+          contentPadding: widget.contentPadding,
         );
       },
     );

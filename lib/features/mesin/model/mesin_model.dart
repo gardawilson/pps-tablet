@@ -2,7 +2,7 @@ class MstMesin {
   final int idMesin;
   final String namaMesin;
   final String bagian;
-  final String? defaultOperator;
+  final int? defaultOperatorId; // ⬅️ was String?
   final bool enable;
   final num? kapasitas;
   final int? idUom;
@@ -12,11 +12,11 @@ class MstMesin {
   final int? idBagianMesin;
   final num? target;
 
-  MstMesin({
+  const MstMesin({
     required this.idMesin,
     required this.namaMesin,
     required this.bagian,
-    this.defaultOperator,
+    this.defaultOperatorId,
     required this.enable,
     this.kapasitas,
     this.idUom,
@@ -26,6 +26,9 @@ class MstMesin {
     this.idBagianMesin,
     this.target,
   });
+
+  bool get isActive => enable == true;
+  String get displayName => isActive ? namaMesin : '$namaMesin (non-aktif)';
 
   factory MstMesin.fromJson(Map<String, dynamic> j) {
     int? _toIntN(dynamic v) {
@@ -59,7 +62,7 @@ class MstMesin {
       idMesin: _toInt(j['IdMesin']),
       namaMesin: (j['NamaMesin'] ?? '') as String,
       bagian: (j['Bagian'] ?? '') as String,
-      defaultOperator: j['DefaultOperator'] as String?,
+      defaultOperatorId: _toIntN(j['DefaultOperator']), // ⬅️ parse as int?
       enable: _toBool(j['Enable']),
       kapasitas: _toNum(j['Kapasitas']),
       idUom: _toIntN(j['IdUOM']),
@@ -70,4 +73,57 @@ class MstMesin {
       target: _toNum(j['Target']),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'IdMesin': idMesin,
+    'NamaMesin': namaMesin,
+    'Bagian': bagian,
+    'DefaultOperator': defaultOperatorId, // ⬅️ keep same key
+    'Enable': enable ? 1 : 0,
+    'Kapasitas': kapasitas,
+    'IdUOM': idUom,
+    'ShotWeightPS': shotWeightPs,
+    'KlemLebar': klemLebar,
+    'KlemPanjang': klemPanjang,
+    'IdBagianMesin': idBagianMesin,
+    'Target': target,
+  };
+
+  MstMesin copyWith({
+    int? idMesin,
+    String? namaMesin,
+    String? bagian,
+    int? defaultOperatorId,
+    bool? enable,
+    num? kapasitas,
+    int? idUom,
+    num? shotWeightPs,
+    num? klemLebar,
+    num? klemPanjang,
+    int? idBagianMesin,
+    num? target,
+  }) {
+    return MstMesin(
+      idMesin: idMesin ?? this.idMesin,
+      namaMesin: namaMesin ?? this.namaMesin,
+      bagian: bagian ?? this.bagian,
+      defaultOperatorId: defaultOperatorId ?? this.defaultOperatorId,
+      enable: enable ?? this.enable,
+      kapasitas: kapasitas ?? this.kapasitas,
+      idUom: idUom ?? this.idUom,
+      shotWeightPs: shotWeightPs ?? this.shotWeightPs,
+      klemLebar: klemLebar ?? this.klemLebar,
+      klemPanjang: klemPanjang ?? this.klemPanjang,
+      idBagianMesin: idBagianMesin ?? this.idBagianMesin,
+      target: target ?? this.target,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+          other is MstMesin && runtimeType == other.runtimeType && idMesin == other.idMesin;
+
+  @override
+  int get hashCode => idMesin.hashCode;
 }

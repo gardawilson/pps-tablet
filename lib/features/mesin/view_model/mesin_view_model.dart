@@ -10,14 +10,18 @@ class MesinViewModel extends ChangeNotifier {
   bool isLoading = false;
   String error = '';
 
-  Future<void> fetchByBagian(String bagian, {bool includeDisabled = false}) async {
+  /// ✅ Baru: ambil mesin berdasarkan **IdBagianMesin** (integer).
+  Future<void> fetchByIdBagian(
+      int idBagianMesin, {
+        bool includeDisabled = false,
+      }) async {
     isLoading = true;
     error = '';
     notifyListeners();
 
     try {
-      items = await repository.fetchByBagian(
-        bagian: bagian,
+      items = await repository.fetchByIdBagian(
+        idBagianMesin: idBagianMesin,
         includeDisabled: includeDisabled,
       );
     } catch (e) {

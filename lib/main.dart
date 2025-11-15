@@ -16,7 +16,7 @@ import 'package:pps_tablet/features/mesin/repository/mesin_repository.dart';
 import 'package:pps_tablet/features/mesin/view_model/mesin_view_model.dart';
 import 'package:pps_tablet/features/operator/repository/operator_repository.dart';
 import 'package:pps_tablet/features/operator/view_model/operator_view_model.dart';
-import 'package:pps_tablet/features/production/broker/repository/broker_production_input_screen.dart';
+import 'package:pps_tablet/features/production/broker/repository/broker_production_input_repository.dart';
 import 'package:pps_tablet/features/production/broker/view_model/broker_production_input_view_model.dart';
 import 'package:pps_tablet/features/production/crusher/repository/crusher_production_repository.dart';
 import 'package:pps_tablet/features/production/crusher/view_model/crusher_production_view_model.dart';

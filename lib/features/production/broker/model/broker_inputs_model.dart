@@ -1,12 +1,12 @@
 // lib/features/broker/model/broker_inputs_model.dart
 import 'dart:convert';
 
-double? _asDouble(dynamic v) {
+/* ===================== PARSER HELPERS (tolerant keys) ===================== */
+
+String? _asString(dynamic v) {
   if (v == null) return null;
-  if (v is num) return v.toDouble();
-  final s = v.toString().trim();
-  if (s.isEmpty) return null;
-  return double.tryParse(s);
+  final s = v.toString();
+  return s.isEmpty ? null : s;
 }
 
 int? _asInt(dynamic v) {
@@ -18,6 +18,14 @@ int? _asInt(dynamic v) {
   return int.tryParse(s);
 }
 
+double? _asDouble(dynamic v) {
+  if (v == null) return null;
+  if (v is num) return v.toDouble();
+  final s = v.toString().trim();
+  if (s.isEmpty) return null;
+  return double.tryParse(s);
+}
+
 bool? _asBool(dynamic v) {
   if (v == null) return null;
   if (v is bool) return v;
@@ -27,23 +35,55 @@ bool? _asBool(dynamic v) {
   return null;
 }
 
-String? _asString(dynamic v) {
-  if (v == null) return null;
-  final s = v.toString();
-  return s.isEmpty ? null : s;
+/// Ambil string dari beberapa kandidat key
+String? _pickS(Map<String, dynamic> j, List<String> keys) {
+  for (final k in keys) {
+    if (j.containsKey(k) && j[k] != null) {
+      final v = _asString(j[k]);
+      if (v != null) return v;
+    }
+  }
+  return null;
+}
+
+int? _pickI(Map<String, dynamic> j, List<String> keys) {
+  for (final k in keys) {
+    if (j.containsKey(k) && j[k] != null) {
+      final v = _asInt(j[k]);
+      if (v != null) return v;
+    }
+  }
+  return null;
+}
+
+double? _pickD(Map<String, dynamic> j, List<String> keys) {
+  for (final k in keys) {
+    if (j.containsKey(k) && j[k] != null) {
+      final v = _asDouble(j[k]);
+      if (v != null) return v;
+    }
+  }
+  return null;
+}
+
+bool? _pickB(Map<String, dynamic> j, List<String> keys) {
+  for (final k in keys) {
+    if (j.containsKey(k) && j[k] != null) {
+      final v = _asBool(j[k]);
+      if (v != null) return v;
+    }
+  }
+  return null;
 }
 
 /* ===================== ITEM MODELS ===================== */
 
-// broker: main only (NoBroker + NoSak), no partial concept
 class BrokerItem {
   final String? noBroker;
   final int? noSak;
   final double? berat;
   final double? beratAct;
-  final bool? isPartial; // from source, may exist but not the same as "partial-row"
-
-  // seragam: idJenis/namaJenis (plastik)
+  final bool? isPartial;
   final int? idJenis;
   final String? namaJenis;
 
@@ -58,34 +98,40 @@ class BrokerItem {
   });
 
   factory BrokerItem.fromJson(Map<String, dynamic> j) => BrokerItem(
-    noBroker: _asString(j['noBroker']),
-    noSak: _asInt(j['noSak']),
-    berat: _asDouble(j['berat']),
-    beratAct: _asDouble(j['beratAct']),
-    isPartial: _asBool(j['isPartial']),
-    idJenis: _asInt(j['idJenis']),
-    namaJenis: _asString(j['namaJenis']),
+    noBroker: _pickS(j, ['noBroker', 'NoBroker', 'no_broker']),
+    noSak: _pickI(j, ['noSak', 'NoSak', 'no_sak']),
+    berat: _pickD(j, ['berat', 'Berat']),
+    beratAct: _pickD(j, ['beratAct', 'BeratAct', 'berat_act']),
+    isPartial: _pickB(j, ['isPartial', 'IsPartial', 'is_partial']),
+    idJenis: _pickI(j, ['idJenis', 'IdJenis']),
+    namaJenis: _pickS(j, ['namaJenis', 'NamaJenis']),
   );
+
+  String toDebugString() =>
+      '[BROKER] ${noBroker ?? '-'} #${noSak ?? 0} • ${(berat ?? 0).toStringAsFixed(2)}kg';
 }
 
-// bb: main (noBahanBaku,noPallet,noSak,berat,beratAct,isPartial) OR partial ({noBBPartial, noBahanBaku,noPallet,noSak,berat})
 class BbItem {
   final String? noBahanBaku;
   final int? noPallet;
   final int? noSak;
 
-  // present only for partial row
+  /// partial row only (kode partial gabungan, kalau ada)
   final String? noBBPartial;
 
   final double? berat;
   final double? beratAct;
   final bool? isPartial;
 
-  // seragam: idJenis/namaJenis (plastik)
+  /// waktu pemakaian (bila sudah terpakai); nullable
+  final DateTime? dateUsage;
+
   final int? idJenis;
   final String? namaJenis;
 
-  bool get isPartialRow => noBBPartial != null;
+  /// Row dianggap "partial" jika ada kode partial ATAU flag isPartial = true
+  bool get isPartialRow =>
+      (noBBPartial?.trim().isNotEmpty ?? false) || (isPartial == true);
 
   BbItem({
     this.noBahanBaku,
@@ -95,32 +141,106 @@ class BbItem {
     this.berat,
     this.beratAct,
     this.isPartial,
+    this.dateUsage,
     this.idJenis,
     this.namaJenis,
   });
 
   factory BbItem.fromJson(Map<String, dynamic> j) => BbItem(
-    noBahanBaku: _asString(j['noBahanBaku']),
-    noPallet: _asInt(j['noPallet']),
-    noSak: _asInt(j['noSak']),
-    noBBPartial: _asString(j['noBBPartial']),
-    berat: _asDouble(j['berat']),
-    beratAct: _asDouble(j['beratAct']),
-    isPartial: _asBool(j['isPartial']),
-    idJenis: _asInt(j['idJenis']),
-    namaJenis: _asString(j['namaJenis']),
+    noBahanBaku: _pickS(j, ['noBahanBaku', 'NoBahanBaku', 'no_bahan_baku']),
+    noPallet: _pickI(j, ['noPallet', 'NoPallet', 'no_pallet']),
+    noSak: _pickI(j, ['noSak', 'NoSak', 'no_sak']),
+    noBBPartial: _pickS(j, ['noBBPartial', 'NoBBPartial', 'no_bb_partial']),
+    berat: _pickD(j, ['berat', 'Berat']),
+    beratAct: _pickD(j, ['beratAct', 'BeratAct', 'berat_act']),
+    isPartial: _pickB(j, ['isPartial', 'IsPartial', 'is_partial']),
+    dateUsage: _pickDT(j, ['dateUsage', 'DateUsage', 'date_usage']),
+    idJenis: _pickI(j, ['idJenis', 'IdJenis', 'id_jenis']),
+    namaJenis: _pickS(j, ['namaJenis', 'NamaJenis', 'nama_jenis']),
   );
+
+  BbItem copyWith({
+    String? noBahanBaku,
+    int? noPallet,
+    int? noSak,
+    String? noBBPartial,
+    double? berat,
+    double? beratAct,
+    bool? isPartial,
+    DateTime? dateUsage,
+    int? idJenis,
+    String? namaJenis,
+  }) {
+    return BbItem(
+      noBahanBaku: noBahanBaku ?? this.noBahanBaku,
+      noPallet: noPallet ?? this.noPallet,
+      noSak: noSak ?? this.noSak,
+      noBBPartial: noBBPartial ?? this.noBBPartial,
+      berat: berat ?? this.berat,
+      beratAct: beratAct ?? this.beratAct,
+      isPartial: isPartial ?? this.isPartial,
+      dateUsage: dateUsage ?? this.dateUsage,
+      idJenis: idJenis ?? this.idJenis,
+      namaJenis: namaJenis ?? this.namaJenis,
+    );
+  }
+
+  String toDebugString() {
+    final part = (noBBPartial ?? '').trim();
+    final base = (noBahanBaku ?? '-').trim();
+    final pal = noPallet;
+    final title = part.isNotEmpty
+        ? part
+        : (pal == null || pal == 0 ? base : '$base-$pal');
+    final tag = isPartialRow ? '[BB•PART]' : '[BB]';
+    return '$tag $title • sak ${noSak ?? 0} • ${(berat ?? 0).toStringAsFixed(2)}kg';
+  }
 }
 
-// washing: (NoWashing + NoSak) no partial concept
+/// ---- helper kecil untuk DateTime (aman null) ----
+/// Mencoba baca ISO string (e.g. "2025-11-13T07:10:00Z") atau epoch (ms/s).
+DateTime? _pickDT(Map<String, dynamic> j, List<String> keys) {
+  dynamic v;
+  for (final k in keys) {
+    if (j.containsKey(k)) {
+      v = j[k];
+      break;
+    }
+  }
+  if (v == null) return null;
+
+  if (v is DateTime) return v;
+
+  if (v is String) {
+    final s = v.trim();
+    if (s.isEmpty) return null;
+    final iso = DateTime.tryParse(s);
+    if (iso != null) return iso;
+    // fallback angka dalam string
+    final maybeNum = num.tryParse(s);
+    if (maybeNum != null) {
+      final n = maybeNum.toInt();
+      // deteksi ms vs s (>= 10^12 kita anggap ms)
+      return DateTime.fromMillisecondsSinceEpoch(n >= 1000000000000 ? n : n * 1000, isUtc: true);
+    }
+    return null;
+  }
+
+  if (v is num) {
+    final n = v.toInt();
+    return DateTime.fromMillisecondsSinceEpoch(n >= 1000000000000 ? n : n * 1000, isUtc: true);
+  }
+
+  return null;
+}
+
+
 class WashingItem {
   final String? noWashing;
   final int? noSak;
   final double? berat;
-  final double? beratAct; // usually null
-  final bool? isPartial; // usually null
-
-  // seragam: idJenis/namaJenis (plastik)
+  final double? beratAct;
+  final bool? isPartial;
   final int? idJenis;
   final String? namaJenis;
 
@@ -135,24 +255,24 @@ class WashingItem {
   });
 
   factory WashingItem.fromJson(Map<String, dynamic> j) => WashingItem(
-    noWashing: _asString(j['noWashing']),
-    noSak: _asInt(j['noSak']),
-    berat: _asDouble(j['berat']),
-    beratAct: _asDouble(j['beratAct']),
-    isPartial: _asBool(j['isPartial']),
-    idJenis: _asInt(j['idJenis']),
-    namaJenis: _asString(j['namaJenis']),
+    noWashing: _pickS(j, ['noWashing', 'NoWashing', 'no_washing']),
+    noSak: _pickI(j, ['noSak', 'NoSak', 'no_sak']),
+    berat: _pickD(j, ['berat', 'Berat']),
+    beratAct: _pickD(j, ['beratAct', 'BeratAct', 'berat_act']),
+    isPartial: _pickB(j, ['isPartial', 'IsPartial', 'is_partial']),
+    idJenis: _pickI(j, ['idJenis', 'IdJenis']),
+    namaJenis: _pickS(j, ['namaJenis', 'NamaJenis']),
   );
+
+  String toDebugString() =>
+      '[WASH] ${noWashing ?? '-'} • sak ${noSak ?? 0} • ${(berat ?? 0).toStringAsFixed(2)}kg';
 }
 
-// crusher: (NoCrusher), no partial concept
 class CrusherItem {
   final String? noCrusher;
   final double? berat;
-  final double? beratAct; // usually null
-  final bool? isPartial; // usually null
-
-  // seragam: idJenis/namaJenis (crusher)
+  final double? beratAct;
+  final bool? isPartial;
   final int? idJenis;
   final String? namaJenis;
 
@@ -166,31 +286,36 @@ class CrusherItem {
   });
 
   factory CrusherItem.fromJson(Map<String, dynamic> j) => CrusherItem(
-    noCrusher: _asString(j['noCrusher']),
-    berat: _asDouble(j['berat']),
-    beratAct: _asDouble(j['beratAct']),
-    isPartial: _asBool(j['isPartial']),
-    idJenis: _asInt(j['idJenis']),
-    namaJenis: _asString(j['namaJenis']),
+    noCrusher: _pickS(j, ['noCrusher', 'NoCrusher', 'no_crusher']),
+    berat: _pickD(j, ['berat', 'Berat']),
+    beratAct: _pickD(j, ['beratAct', 'BeratAct', 'berat_act']),
+    isPartial: _pickB(j, ['isPartial', 'IsPartial', 'is_partial']),
+    idJenis: _pickI(j, ['idJenis', 'IdJenis']),
+    namaJenis: _pickS(j, ['namaJenis', 'NamaJenis']),
   );
+
+  String toDebugString() =>
+      '[CRUSH] ${noCrusher ?? '-'} • ${(berat ?? 0).toStringAsFixed(2)}kg';
 }
 
-// gilingan: main (NoGilingan, ...) OR partial ({noGilinganPartial, noGilingan, berat})
 class GilinganItem {
   final String? noGilingan;
-
-  // partial row only
   final String? noGilinganPartial;
 
   final double? berat;
   final double? beratAct;
   final bool? isPartial;
 
-  // seragam: idJenis/namaJenis (gilingan)
   final int? idJenis;
   final String? namaJenis;
 
-  bool get isPartialRow => noGilinganPartial != null;
+  /// waktu dibuat & dipakai (nullable)
+  final DateTime? dateCreate;
+  final DateTime? dateUsage;
+
+  /// Row dianggap partial jika ada kode partial ATAU isPartial = true
+  bool get isPartialRow =>
+      (noGilinganPartial?.trim().isNotEmpty ?? false) || (isPartial == true);
 
   GilinganItem({
     this.noGilingan,
@@ -200,36 +325,66 @@ class GilinganItem {
     this.isPartial,
     this.idJenis,
     this.namaJenis,
+    this.dateCreate,
+    this.dateUsage,
   });
 
   factory GilinganItem.fromJson(Map<String, dynamic> j) => GilinganItem(
-    noGilingan: _asString(j['noGilingan']),
-    noGilinganPartial: _asString(j['noGilinganPartial']),
-    berat: _asDouble(j['berat']),
-    beratAct: _asDouble(j['beratAct']),
-    isPartial: _asBool(j['isPartial']),
-    idJenis: _asInt(j['idJenis']),
-    namaJenis: _asString(j['namaJenis']),
+    noGilingan: _pickS(j, ['noGilingan', 'NoGilingan', 'no_gilingan']),
+    noGilinganPartial: _pickS(
+        j, ['noGilinganPartial', 'NoGilinganPartial', 'no_gilingan_partial']),
+    berat: _pickD(j, ['berat', 'Berat']),
+    beratAct: _pickD(j, ['beratAct', 'BeratAct', 'berat_act']),
+    isPartial: _pickB(j, ['isPartial', 'IsPartial', 'is_partial']),
+    idJenis: _pickI(j, ['idJenis', 'IdJenis', 'id_jenis']),
+    namaJenis: _pickS(j, ['namaJenis', 'NamaJenis', 'nama_jenis']),
+    dateCreate: _pickDT(j, ['dateCreate', 'DateCreate', 'date_create']),
+    dateUsage: _pickDT(j, ['dateUsage', 'DateUsage', 'date_usage']),
   );
+
+  GilinganItem copyWith({
+    String? noGilingan,
+    String? noGilinganPartial,
+    double? berat,
+    double? beratAct,
+    bool? isPartial,
+    int? idJenis,
+    String? namaJenis,
+    DateTime? dateCreate,
+    DateTime? dateUsage,
+  }) {
+    return GilinganItem(
+      noGilingan: noGilingan ?? this.noGilingan,
+      noGilinganPartial: noGilinganPartial ?? this.noGilinganPartial,
+      berat: berat ?? this.berat,
+      beratAct: beratAct ?? this.beratAct,
+      isPartial: isPartial ?? this.isPartial,
+      idJenis: idJenis ?? this.idJenis,
+      namaJenis: namaJenis ?? this.namaJenis,
+      dateCreate: dateCreate ?? this.dateCreate,
+      dateUsage: dateUsage ?? this.dateUsage,
+    );
+  }
+
+  String toDebugString() {
+    final part = (noGilinganPartial ?? '').trim();
+    final title = part.isNotEmpty ? part : (noGilingan ?? '-');
+    final tag = isPartialRow ? '[GIL•PART]' : '[GIL]';
+    return '$tag $title • ${(berat ?? 0).toStringAsFixed(2)}kg';
+  }
 }
 
-// mixer: main (NoMixer + NoSak) OR partial ({noMixerPartial, noMixer, noSak, berat})
 class MixerItem {
   final String? noMixer;
   final int? noSak;
-
-  // partial row only
   final String? noMixerPartial;
-
   final double? berat;
   final double? beratAct;
   final bool? isPartial;
-
-  // seragam: idJenis/namaJenis (mixer)
   final int? idJenis;
   final String? namaJenis;
 
-  bool get isPartialRow => noMixerPartial != null;
+  bool get isPartialRow => (noMixerPartial?.trim().isNotEmpty ?? false);
 
   MixerItem({
     this.noMixer,
@@ -243,33 +398,58 @@ class MixerItem {
   });
 
   factory MixerItem.fromJson(Map<String, dynamic> j) => MixerItem(
-    noMixer: _asString(j['noMixer']),
-    noSak: _asInt(j['noSak']),
-    noMixerPartial: _asString(j['noMixerPartial']),
-    berat: _asDouble(j['berat']),
-    beratAct: _asDouble(j['beratAct']),
-    isPartial: _asBool(j['isPartial']),
-    idJenis: _asInt(j['idJenis']),
-    namaJenis: _asString(j['namaJenis']),
+    noMixer: _pickS(j, ['noMixer', 'NoMixer', 'no_mixer']),
+    noSak: _pickI(j, ['noSak', 'NoSak', 'no_sak']),
+    noMixerPartial:
+    _pickS(j, ['noMixerPartial', 'NoMixerPartial', 'no_mixer_partial']),
+    berat: _pickD(j, ['berat', 'Berat']),
+    beratAct: _pickD(j, ['beratAct', 'BeratAct', 'berat_act']),
+    isPartial: _pickB(j, ['isPartial', 'IsPartial', 'is_partial']),
+    idJenis: _pickI(j, ['idJenis', 'IdJenis']),
+    namaJenis: _pickS(j, ['namaJenis', 'NamaJenis']),
   );
+
+  MixerItem copyWith({
+    String? noMixer,
+    int? noSak,
+    String? noMixerPartial,
+    double? berat,
+    double? beratAct,
+    bool? isPartial,
+    int? idJenis,
+    String? namaJenis,
+  }) {
+    return MixerItem(
+      noMixer: noMixer ?? this.noMixer,
+      noSak: noSak ?? this.noSak,
+      noMixerPartial: noMixerPartial ?? this.noMixerPartial,
+      berat: berat ?? this.berat,
+      beratAct: beratAct ?? this.beratAct,
+      isPartial: isPartial ?? this.isPartial,
+      idJenis: idJenis ?? this.idJenis,
+      namaJenis: namaJenis ?? this.namaJenis,
+    );
+  }
+
+  String toDebugString() {
+    final part = (noMixerPartial ?? '').trim();
+    final title = part.isNotEmpty ? part : (noMixer ?? '-');
+    return (part.isNotEmpty)
+        ? '[MIX•PART] $title • sak ${noSak ?? 0} • ${(berat ?? 0).toStringAsFixed(2)}kg'
+        : '[MIX] $title • sak ${noSak ?? 0} • ${(berat ?? 0).toStringAsFixed(2)}kg';
+  }
 }
 
-// reject: main (NoReject) OR partial ({noRejectPartial, noReject, berat})
 class RejectItem {
   final String? noReject;
-
-  // partial row only
   final String? noRejectPartial;
-
   final double? berat;
   final double? beratAct;
   final bool? isPartial;
-
-  // seragam: idJenis/namaJenis (reject)
   final int? idJenis;
   final String? namaJenis;
 
-  bool get isPartialRow => noRejectPartial != null;
+  bool get isPartialRow => (noRejectPartial?.trim().isNotEmpty ?? false);
 
   RejectItem({
     this.noReject,
@@ -282,14 +462,43 @@ class RejectItem {
   });
 
   factory RejectItem.fromJson(Map<String, dynamic> j) => RejectItem(
-    noReject: _asString(j['noReject']),
-    noRejectPartial: _asString(j['noRejectPartial']),
-    berat: _asDouble(j['berat']),
-    beratAct: _asDouble(j['beratAct']),
-    isPartial: _asBool(j['isPartial']),
-    idJenis: _asInt(j['idJenis']),
-    namaJenis: _asString(j['namaJenis']),
+    noReject: _pickS(j, ['noReject', 'NoReject', 'no_reject']),
+    noRejectPartial:
+    _pickS(j, ['noRejectPartial', 'NoRejectPartial', 'no_reject_partial']),
+    berat: _pickD(j, ['berat', 'Berat']),
+    beratAct: _pickD(j, ['beratAct', 'BeratAct', 'berat_act']),
+    isPartial: _pickB(j, ['isPartial', 'IsPartial', 'is_partial']),
+    idJenis: _pickI(j, ['idJenis', 'IdJenis']),
+    namaJenis: _pickS(j, ['namaJenis', 'NamaJenis']),
   );
+
+  RejectItem copyWith({
+    String? noReject,
+    String? noRejectPartial,
+    double? berat,
+    double? beratAct,
+    bool? isPartial,
+    int? idJenis,
+    String? namaJenis,
+  }) {
+    return RejectItem(
+      noReject: noReject ?? this.noReject,
+      noRejectPartial: noRejectPartial ?? this.noRejectPartial,
+      berat: berat ?? this.berat,
+      beratAct: beratAct ?? this.beratAct,
+      isPartial: isPartial ?? this.isPartial,
+      idJenis: idJenis ?? this.idJenis,
+      namaJenis: namaJenis ?? this.namaJenis,
+    );
+  }
+
+  String toDebugString() {
+    final part = (noRejectPartial ?? '').trim();
+    final title = part.isNotEmpty ? part : (noReject ?? '-');
+    return (part.isNotEmpty)
+        ? '[REJ•PART] $title • ${(berat ?? 0).toStringAsFixed(2)}kg'
+        : '[REJ] $title • ${(berat ?? 0).toStringAsFixed(2)}kg';
+  }
 }
 
 /* ===================== ROOT ===================== */
@@ -328,23 +537,23 @@ class BrokerInputs {
     }
 
     return BrokerInputs(
-      broker:   _listOf(j['broker'],   (m) => BrokerItem.fromJson(m)),
-      bb:       _listOf(j['bb'],       (m) => BbItem.fromJson(m)),
-      washing:  _listOf(j['washing'],  (m) => WashingItem.fromJson(m)),
-      crusher:  _listOf(j['crusher'],  (m) => CrusherItem.fromJson(m)),
+      broker: _listOf(j['broker'], (m) => BrokerItem.fromJson(m)),
+      bb: _listOf(j['bb'], (m) => BbItem.fromJson(m)),
+      washing: _listOf(j['washing'], (m) => WashingItem.fromJson(m)),
+      crusher: _listOf(j['crusher'], (m) => CrusherItem.fromJson(m)),
       gilingan: _listOf(j['gilingan'], (m) => GilinganItem.fromJson(m)),
-      mixer:    _listOf(j['mixer'],    (m) => MixerItem.fromJson(m)),
-      reject:   _listOf(j['reject'],   (m) => RejectItem.fromJson(m)),
-      summary:  _toSummary(j['summary']),
+      mixer: _listOf(j['mixer'], (m) => MixerItem.fromJson(m)),
+      reject: _listOf(j['reject'], (m) => RejectItem.fromJson(m)),
+      summary: _toSummary(j['summary']),
     );
   }
 
-  // Optional: quick totals (including partial rows) you can call in UI
-  double totalBeratBb()       => bb.fold(0.0, (s, it) => s + (it.berat ?? 0));
+  // quick totals
+  double totalBeratBb() => bb.fold(0.0, (s, it) => s + (it.berat ?? 0));
   double totalBeratGilingan() => gilingan.fold(0.0, (s, it) => s + (it.berat ?? 0));
-  double totalBeratMixer()    => mixer.fold(0.0, (s, it) => s + (it.berat ?? 0));
-  double totalBeratReject()   => reject.fold(0.0, (s, it) => s + (it.berat ?? 0));
-  double totalBeratBroker()   => broker.fold(0.0, (s, it) => s + (it.berat ?? 0));
-  double totalBeratWashing()  => washing.fold(0.0, (s, it) => s + (it.berat ?? 0));
-  double totalBeratCrusher()  => crusher.fold(0.0, (s, it) => s + (it.berat ?? 0));
+  double totalBeratMixer() => mixer.fold(0.0, (s, it) => s + (it.berat ?? 0));
+  double totalBeratReject() => reject.fold(0.0, (s, it) => s + (it.berat ?? 0));
+  double totalBeratBroker() => broker.fold(0.0, (s, it) => s + (it.berat ?? 0));
+  double totalBeratWashing() => washing.fold(0.0, (s, it) => s + (it.berat ?? 0));
+  double totalBeratCrusher() => crusher.fold(0.0, (s, it) => s + (it.berat ?? 0));
 }

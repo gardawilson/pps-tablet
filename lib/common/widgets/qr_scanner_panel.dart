@@ -1,16 +1,18 @@
 // =============================
 // lib/common/widgets/qr_scanner_panel.dart
 // Reusable QR/Barcode scanner panel using mobile_scanner
-// - Extracted to be reused across modules (Broker, Washing, etc.)
+// - Cocok untuk tablet (default preview lebih tinggi)
 // - Debounce & single-shot options to prevent double-detects
 // - Torch & camera switch controls included
 // - Simple rectangular overlay + corner guides
+// - Support rotasi preview dalam kelipatan 90°
 //
 // Usage:
 // QrScannerPanel(
 //   onDetected: (value) { /* handle */ },
 //   scanOnce: true,
 //   debounceMs: 800,
+//   rotationTurns: 1, // 90° ke kanan (default)
 // )
 // =============================
 
@@ -40,15 +42,20 @@ class QrScannerPanel extends StatefulWidget {
   /// Optional: border radius of preview container.
   final double borderRadius;
 
+  /// Rotasi preview dalam kelipatan 90° (0..3)
+  /// 0 = normal, 1 = 90° kanan, 2 = 180°, 3 = 270° (90° kiri)
+  final int rotationTurns;
+
   const QrScannerPanel({
     super.key,
     required this.onDetected,
     this.scanOnce = true,
     this.debounceMs = 800,
-    this.height = 220,
+    this.height = 260, // sedikit lebih tinggi, enak di tablet
     this.formats,
     this.showOverlay = true,
     this.borderRadius = 12,
+    this.rotationTurns = 3, // default: putar 90° ke kanan
   });
 
   @override
@@ -94,7 +101,6 @@ class _QrScannerPanelState extends State<QrScannerPanel> {
     // Optional single-shot lock
     if (widget.scanOnce) {
       _locked = true;
-      // Small delay to visually settle before (optionally) unlocking again elsewhere
     } else {
       _locked = true;
       Future.delayed(Duration(milliseconds: widget.debounceMs), () {
@@ -107,6 +113,9 @@ class _QrScannerPanelState extends State<QrScannerPanel> {
   Widget build(BuildContext context) {
     final borderRadius = BorderRadius.circular(widget.borderRadius);
 
+    // Pastikan nilai rotationTurns aman (0..3)
+    final turns = widget.rotationTurns % 4;
+
     return ClipRRect(
       borderRadius: borderRadius,
       child: Container(
@@ -115,16 +124,20 @@ class _QrScannerPanelState extends State<QrScannerPanel> {
           borderRadius: borderRadius,
         ),
         height: widget.height,
+        width: double.infinity,
         child: Stack(
           children: [
-            // Camera preview
-            MobileScanner(
-              controller: _controller,
-              onDetect: _handleDetection,
-              // formats: widget.formats, // (Uncomment if you want to limit)
+            // Camera preview dengan rotasi
+            RotatedBox(
+              quarterTurns: turns,
+              child: MobileScanner(
+                controller: _controller,
+                onDetect: _handleDetection,
+                // formats: widget.formats, // (Uncomment if you want to limit)
+              ),
             ),
 
-            // Optional overlay guides
+            // Optional overlay guides (tidak ikut di-rotate, tetap relatif ke panel)
             if (widget.showOverlay) _ScannerOverlay(),
 
             // Controls
@@ -198,7 +211,8 @@ class _HolePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final outer = Path()..addRect(Offset.zero & size);
-    final inner = Path()..addRRect(RRect.fromRectAndRadius(hole, const Radius.circular(12)));
+    final inner = Path()
+      ..addRRect(RRect.fromRectAndRadius(hole, const Radius.circular(12)));
     final path = Path.combine(PathOperation.difference, outer, inner);
 
     canvas.drawPath(
@@ -210,7 +224,8 @@ class _HolePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _HolePainter oldDelegate) => oldDelegate.hole != hole;
+  bool shouldRepaint(covariant _HolePainter oldDelegate) =>
+      oldDelegate.hole != hole;
 }
 
 class _CornerGuide extends StatelessWidget {
@@ -251,14 +266,19 @@ class _CornerPainter extends CustomPainter {
     canvas.drawLine(Offset(0, 0), Offset(cornerLen, 0), p);
     canvas.drawLine(Offset(0, 0), Offset(0, cornerLen), p);
     // TR
-    canvas.drawLine(Offset(size.width, 0), Offset(size.width - cornerLen, 0), p);
+    canvas.drawLine(
+        Offset(size.width, 0), Offset(size.width - cornerLen, 0), p);
     canvas.drawLine(Offset(size.width, 0), Offset(size.width, cornerLen), p);
     // BL
-    canvas.drawLine(Offset(0, size.height), Offset(cornerLen, size.height), p);
-    canvas.drawLine(Offset(0, size.height), Offset(0, size.height - cornerLen), p);
+    canvas.drawLine(
+        Offset(0, size.height), Offset(cornerLen, size.height), p);
+    canvas.drawLine(Offset(0, size.height),
+        Offset(0, size.height - cornerLen), p);
     // BR
-    canvas.drawLine(Offset(size.width, size.height), Offset(size.width - cornerLen, size.height), p);
-    canvas.drawLine(Offset(size.width, size.height), Offset(size.width, size.height - cornerLen), p);
+    canvas.drawLine(Offset(size.width, size.height),
+        Offset(size.width - cornerLen, size.height), p);
+    canvas.drawLine(Offset(size.width, size.height),
+        Offset(size.width, size.height - cornerLen), p);
   }
 
   @override
@@ -298,27 +318,21 @@ class _SquareIconButton extends StatelessWidget {
 
 // =============================
 // Example usage in your screen:
-// Replace `_QrScannerPanel` with the reusable one.
 // =============================
 
 /*
 // lib/features/production/broker/view/broker_inputs_screen.dart (snippet)
-import 'package:your_app/common/widgets/qr_scanner_panel.dart';
+import 'package:pps_tablet/common/widgets/qr_scanner_panel.dart';
+
 ...
+
 QrScannerPanel(
   onDetected: (code) {
     setState(() => _scannedCode = code);
   },
   scanOnce: true,
   debounceMs: 800,
+  rotationTurns: 1, // 90° ke kanan
 ),
 */
 
-// =============================
-// Notes:
-// - Add dependency in pubspec.yaml: mobile_scanner: ^3.x
-// - Android: <uses-permission android:name="android.permission.CAMERA"/>
-// - iOS: NSCameraUsageDescription in Info.plist
-// - If you need to externally reset the lock, rebuild the widget (e.g., by
-//   changing its key) or lift `scanOnce` and control your own de-dup logic.
-// =============================

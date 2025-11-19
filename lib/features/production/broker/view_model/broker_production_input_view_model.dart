@@ -27,6 +27,7 @@ class TempCommitResult {
 class TempItemsByLabel {
   final String labelCode;
   final List<BrokerItem> brokerItems;
+  final List<BrokerItem> brokerPartials;     // partial - TAMBAHKAN INI
   final List<BbItem> bbItems;              // full
   final List<BbItem> bbPartials;           // partial
   final List<WashingItem> washingItems;
@@ -42,6 +43,7 @@ class TempItemsByLabel {
   TempItemsByLabel({
     required this.labelCode,
     this.brokerItems = const [],
+    this.brokerPartials = const [],           // TAMBAHKAN INI
     this.bbItems = const [],
     this.bbPartials = const [],
     this.washingItems = const [],
@@ -57,6 +59,7 @@ class TempItemsByLabel {
 
   int get totalCount =>
       brokerItems.length +
+          brokerPartials.length +
           bbItems.length +
           bbPartials.length +
           washingItems.length +
@@ -72,6 +75,7 @@ class TempItemsByLabel {
 
   List<dynamic> get allItems => [
     ...brokerItems,
+    ...brokerPartials,                        // TAMBAHKAN INI
     ...bbItems,
     ...bbPartials,
     ...washingItems,
@@ -108,6 +112,12 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
   String _labelOf(dynamic it) => _getItemLabelCode(it) ?? '-';
 
   String displayTitleOf(dynamic it) {
+    if (it is BrokerItem) {
+      // TAMBAHKAN CEK PARTIAL
+      return (it.noBrokerPartial ?? '').trim().isNotEmpty
+          ? it.noBrokerPartial!
+          : _nn(it.noBroker);
+    }
     if (it is BbItem) {
       return (it.noBBPartial ?? '').trim().isNotEmpty
           ? it.noBBPartial!
@@ -150,7 +160,10 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
   String _fmtItem(dynamic it) {
     final t = displayTitleOf(it);
     if (it is BrokerItem) {
-      return '[BROKER] $t #${_nn(it.noSak)} • ${_kg(it.berat)}kg';
+      final isPart = (it.noBrokerPartial ?? '').trim().isNotEmpty; // TAMBAHKAN
+      return isPart
+          ? '[BROKER•PART] $t • sak ${_nn(it.noSak)} • ${_kg(it.berat)}kg'
+          : '[BROKER] $t • sak ${_nn(it.noSak)} • ${_kg(it.berat)}kg';
     }
     if (it is BbItem) {
       final isPart = (it.noBBPartial ?? '').trim().isNotEmpty;
@@ -194,6 +207,7 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     final hdr = tag.isEmpty ? '' : ' <$tag>';
     _d('========== TEMP LIST DUMP$hdr ==========');
     _dumpList('tempBroker', tempBroker, _keyFromBrokerItem);
+    _dumpList('tempBrokerPartial', tempBrokerPartial, _keyFromBrokerItem); // TAMBAHKAN
     _dumpList('tempBb', tempBb, _keyFromBbItem);
     _dumpList('tempBbPartial', tempBbPartial, _keyFromBbItem);
     _dumpList('tempWashing', tempWashing, _keyFromWashingItem);
@@ -406,6 +420,7 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     if (t == null || t.isEmpty) return 'Tidak ada data temporary';
     final s = <String>[];
     if (t.brokerItems.isNotEmpty) s.add('${t.brokerItems.length} Broker');
+    if (t.brokerPartials.isNotEmpty) s.add('${t.brokerPartials.length} Broker Partial'); // TAMBAHKAN
     if (t.bbItems.isNotEmpty) s.add('${t.bbItems.length} Bahan Baku (full)');
     if (t.bbPartials.isNotEmpty) s.add('${t.bbPartials.length} BB Partial');
     if (t.washingItems.isNotEmpty) s.add('${t.washingItems.length} Washing');
@@ -433,6 +448,7 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     for (final item in itemsToRemove) {
       if (item is BrokerItem) {
         tempBroker.remove(item);
+        tempBrokerPartial.remove(item); // TAMBAHKAN
         _tempKeys.remove(_keyFromBrokerItem(item));
       } else if (item is BbItem) {
         tempBb.remove(item);
@@ -466,7 +482,8 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
   void _updateTempItemsByLabel(String labelCode) {
     final code = labelCode.trim();
 
-    final brokerItems = tempBroker.where((e) => _getItemLabelCode(e) == code).toList();
+    final brokerFull = tempBroker.where((e) => _getItemLabelCode(e) == code).toList();
+    final brokerPart = tempBrokerPartial.where((e) => _getItemLabelCode(e) == code).toList();
 
     // Split full vs partial per kategori
     final bbFull = tempBb.where((e) => _getItemLabelCode(e) == code).toList();
@@ -484,7 +501,7 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     final rejFull = tempReject.where((e) => _getItemLabelCode(e) == code).toList();
     final rejPart = tempRejectPartial.where((e) => _getItemLabelCode(e) == code).toList();
 
-    if ([brokerItems, bbFull, bbPart, washingItems, crusherItems, gilFull, gilPart, mixFull, mixPart, rejFull, rejPart]
+    if ([brokerFull, brokerPart, bbFull, bbPart, washingItems, crusherItems, gilFull, gilPart, mixFull, mixPart, rejFull, rejPart]
         .every((l) => l.isEmpty)) {
       _tempItemsByLabel.remove(code);
       return;
@@ -492,7 +509,8 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
 
     _tempItemsByLabel[code] = TempItemsByLabel(
       labelCode: code,
-      brokerItems: brokerItems,
+      brokerItems: brokerFull,
+      brokerPartials: brokerPart,
       bbItems: bbFull,
       bbPartials: bbPart,
       washingItems: washingItems,
@@ -508,7 +526,11 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
   }
 
   String? _getItemLabelCode(dynamic item) {
-    if (item is BrokerItem) return item.noBroker;
+    if (item is BrokerItem) {
+      final part = (item.noBrokerPartial ?? '').trim();
+      if (part.isNotEmpty) return part;
+      return item.noBroker;
+    }
 
     if (item is BbItem) {
       final part = (item.noBBPartial ?? '').trim();
@@ -548,6 +570,7 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
   // Temp selections (anti-duplicate)
   // ---------------------------------------------------------------------------
   final List<BrokerItem> tempBroker = [];
+  final List<BrokerItem> tempBrokerPartial = []; // TAMBAHKAN INI
 
   final List<BbItem> tempBb = [];
   final List<BbItem> tempBbPartial = [];
@@ -713,6 +736,9 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
       if (v is String && (v == '1' || v.toLowerCase() == 'true')) return true;
     }
     switch (t) {
+      case PrefixType.broker: // TAMBAHKAN
+        final s = (row['NoBrokerPartial'] ?? row['noBrokerPartial'] ?? '').toString().trim();
+        return s.isNotEmpty;
       case PrefixType.bb:
         final s = (row['NoBBPartial'] ?? row['noBBPartial'] ?? '').toString().trim();
         return s.isNotEmpty;
@@ -836,7 +862,12 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
         else { tempReject.add(newItem); }
         itemAdded = true;
       } else if (newItem is BrokerItem) {
-        tempBroker.add(newItem); itemAdded = true;
+        if (newItem.isPartialRow) {
+          tempBrokerPartial.add(newItem);
+        } else {
+          tempBroker.add(newItem);
+        }
+        itemAdded = true;
       } else if (newItem is WashingItem) {
         tempWashing.add(newItem); itemAdded = true;
       } else if (newItem is CrusherItem) {
@@ -871,6 +902,10 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
   String _getBaseKeyWithoutWeight(Map<String, dynamic> row, PrefixType type) {
     // Buat key tanpa memperhitungkan berat
     switch (type) {
+      case PrefixType.broker:                  // TAMBAHKAN
+        final noBroker = row['NoBroker'] ?? row['noBroker'] ?? '';
+        final noSak = row['NoSak'] ?? row['noSak'] ?? '';
+        return 'D.|Broker_d|$noBroker|$noSak';
       case PrefixType.bb:
         final noBb = row['NoBahanBaku'] ?? row['noBahanBaku'] ?? '';
         final noPallet = row['NoPallet'] ?? row['noPallet'] ?? 0;
@@ -892,7 +927,14 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
   }
 
   dynamic _findExistingPartialItem(dynamic item, PrefixType type) {
-    if (item is BbItem) {
+    if (item is BrokerItem) {
+      for (final existing in tempBrokerPartial) {
+        if (existing.noBroker == item.noBroker &&
+            existing.noSak == item.noSak) {
+          return existing;
+        }
+      }
+    } else if (item is BbItem) {
       // Cari di tempBbPartial
       for (final existing in tempBbPartial) {
         if (existing.noBahanBaku == item.noBahanBaku &&
@@ -928,6 +970,7 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
   }
 
   double? _getWeightFromItem(dynamic item) {
+    if (item is BrokerItem) return item.berat;
     if (item is BbItem) return item.berat;
     if (item is GilinganItem) return item.berat;
     if (item is MixerItem) return item.berat;
@@ -940,6 +983,7 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
   // ---------------------------------------------------------------------------
   void deleteTempBrokerItem(BrokerItem item) {
     tempBroker.remove(item);
+    tempBrokerPartial.remove(item); // TAMBAHKAN
     _tempKeys.remove(_keyFromBrokerItem(item));
     final code = _getItemLabelCode(item);
     if (code != null) _updateTempItemsByLabel(code);
@@ -1010,6 +1054,7 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
 
   void clearAllTempItems() {
     tempBroker.clear();
+    tempBrokerPartial.clear(); // TAMBAHKAN
 
     tempBb.clear();
     tempBbPartial.clear();
@@ -1042,7 +1087,7 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
   bool deleteIfTemp(dynamic item) {
     bool ok = false;
     if (item is BrokerItem) {
-      ok = tempBroker.remove(item);
+      ok = tempBroker.remove(item) || tempBrokerPartial.remove(item); // UPDATE
       if (ok) _tempKeys.remove(_keyFromBrokerItem(item));
     } else if (item is BbItem) {
       ok = tempBb.remove(item) || tempBbPartial.remove(item);
@@ -1087,6 +1132,7 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
 
   // ===== Temp-partial numbering state (per kategori) =====
   final Map<PrefixType, int> _tempPartialSeq = {
+    PrefixType.broker: 0,    // TAMBAHKAN
     PrefixType.bb: 0,
     PrefixType.gilingan: 0,
     PrefixType.mixer: 0,
@@ -1102,14 +1148,16 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
   String _formatTempPartial(PrefixType tp, int seq) {
     final numStr = seq.toString().padLeft(1, '0');
     switch (tp) {
+      case PrefixType.broker:
+        return 'Q.XXXXXXXX ($numStr)';
       case PrefixType.bb:
-        return 'P.XXXXXXXXXX ($numStr)';
+        return 'P.XXXXXXXX ($numStr)';
       case PrefixType.gilingan:
-        return 'Y.XXXXXXXXXX ($numStr)';
+        return 'Y.XXXXXXXX ($numStr)';
       case PrefixType.mixer:
-        return 'T.XXXXXXXXXX ($numStr)';
+        return 'T.XXXXXXXX ($numStr)';
       case PrefixType.reject:
-        return 'BK.XXXXXXXXXX ($numStr)';
+        return 'BK.XXXXXXXX ($numStr)';
       default:
         return '';
     }
@@ -1117,8 +1165,17 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
 
   /// create copy with temp-partial only if `isPartial==true` and category supports it
   dynamic _withTempPartialIfNeeded(dynamic item, PrefixType t, bool isPartial) {
-    final supports = t == PrefixType.bb || t == PrefixType.gilingan || t == PrefixType.mixer || t == PrefixType.reject;
+    final supports = t == PrefixType.broker || t == PrefixType.bb || t == PrefixType.gilingan || t == PrefixType.mixer || t == PrefixType.reject;
     if (!supports || !isPartial) return item;
+
+    if (item is BrokerItem) {
+      final already = (item.noBrokerPartial ?? '').trim().isNotEmpty;
+      if (!already) {
+        final code = _formatTempPartial(t, _nextPartialSeq(t));
+        return item.copyWith(noBrokerPartial: code);
+      }
+      return item;
+    }
 
     if (item is BbItem) {
       final already = (item.noBBPartial ?? '').trim().isNotEmpty;
@@ -1161,6 +1218,7 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
 
   int get totalTempCount =>
       tempBroker.length +
+          tempBrokerPartial.length +      // TAMBAHKAN
           tempBb.length +
           tempBbPartial.length +
           tempWashing.length +
@@ -1235,6 +1293,14 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     if (tempReject.isNotEmpty) {
       payload['reject'] = tempReject.map((e) => {
         'noReject': e.noReject,
+      }).toList();
+    }
+
+    if (tempBrokerPartial.isNotEmpty) {
+      payload['brokerPartialNew'] = tempBrokerPartial.map((e) => {
+        'noBroker': e.noBroker,
+        'noSak': e.noSak,
+        'berat': e.berat,
       }).toList();
     }
 
@@ -1331,6 +1397,9 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
       // Clear all temp items
       clearAllTempItems();
 
+      // ✅ TAMBAHKAN: Clear lookup cache agar lookup berikutnya fresh
+      clearLookupCache();
+
       // Invalidate cache untuk noProduksi ini
       clearInputsCache(noProduksi);
 
@@ -1356,6 +1425,9 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
 
     if (tempBroker.isNotEmpty) {
       parts.add('${tempBroker.length} Broker');
+    }
+    if (tempBrokerPartial.isNotEmpty) {        // TAMBAHKAN
+      parts.add('${tempBrokerPartial.length} Broker Partial');
     }
     if (tempBb.isNotEmpty) {
       parts.add('${tempBb.length} Bahan Baku');
@@ -1389,6 +1461,205 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     }
 
     return 'Total $totalTempCount items:\n${parts.join(', ')}';
+  }
+
+
+
+
+  // ---------------------------------------------------------------------------
+  // Delete inputs & partials (DB + TEMP)
+  // ---------------------------------------------------------------------------
+  bool isDeleting = false;
+  String? deleteError;
+  Map<String, dynamic>? lastDeleteResult;
+
+
+  /// Build payload untuk endpoint DELETE /api/production/broker/:noProduksi/inputs
+  /// dari list item yang berasal dari DB (bukan temp).
+  Map<String, dynamic> _buildDeletePayloadFromItems(List<dynamic> items) {
+    final payload = <String, dynamic>{};
+
+    void add(String key, Map<String, dynamic> row) {
+      final list = (payload[key] ?? <Map<String, dynamic>>[]) as List<Map<String, dynamic>>;
+      list.add(row);
+      payload[key] = list;
+    }
+
+    for (final it in items) {
+      if (it is BrokerItem) {
+        final isPart = it.isPartialRow ||
+            ((it.noBrokerPartial ?? '').trim().isNotEmpty);
+        if (isPart) {
+          final code = (it.noBrokerPartial ?? '').trim();
+          if (code.isNotEmpty) {
+            add('brokerPartial', {
+              'noBrokerPartial': code,
+            });
+          }
+        } else {
+          add('broker', {
+            'noBroker': it.noBroker,
+            'noSak': it.noSak,
+          });
+        }
+      } else if (it is BbItem) {
+        final isPart = it.isPartialRow ||
+            ((it.noBBPartial ?? '').trim().isNotEmpty);
+        if (isPart) {
+          final code = (it.noBBPartial ?? '').trim();
+          if (code.isNotEmpty) {
+            add('bbPartial', {
+              'noBBPartial': code,
+            });
+          }
+        } else {
+          add('bb', {
+            'noBahanBaku': it.noBahanBaku,
+            'noPallet': it.noPallet,
+            'noSak': it.noSak,
+          });
+        }
+      } else if (it is WashingItem) {
+        add('washing', {
+          'noWashing': it.noWashing,
+          'noSak': it.noSak,
+        });
+      } else if (it is CrusherItem) {
+        add('crusher', {
+          'noCrusher': it.noCrusher,
+        });
+      } else if (it is GilinganItem) {
+        final isPart = it.isPartialRow ||
+            ((it.noGilinganPartial ?? '').trim().isNotEmpty);
+        if (isPart) {
+          final code = (it.noGilinganPartial ?? '').trim();
+          if (code.isNotEmpty) {
+            add('gilinganPartial', {
+              'noGilinganPartial': code,
+            });
+          }
+        } else {
+          add('gilingan', {
+            'noGilingan': it.noGilingan,
+          });
+        }
+      } else if (it is MixerItem) {
+        final isPart = it.isPartialRow ||
+            ((it.noMixerPartial ?? '').trim().isNotEmpty);
+        if (isPart) {
+          final code = (it.noMixerPartial ?? '').trim();
+          if (code.isNotEmpty) {
+            add('mixerPartial', {
+              'noMixerPartial': code,
+            });
+          }
+        } else {
+          add('mixer', {
+            'noMixer': it.noMixer,
+            'noSak': it.noSak,
+          });
+        }
+      } else if (it is RejectItem) {
+        final isPart = it.isPartialRow ||
+            ((it.noRejectPartial ?? '').trim().isNotEmpty);
+        if (isPart) {
+          final code = (it.noRejectPartial ?? '').trim();
+          if (code.isNotEmpty) {
+            add('rejectPartial', {
+              'noRejectPartial': code,
+            });
+          }
+        } else {
+          add('reject', {
+            'noReject': it.noReject,
+          });
+        }
+      }
+    }
+
+    return payload;
+  }
+
+
+  /// Hapus item (bisa campuran DB & TEMP) untuk satu noProduksi:
+  /// - Jika item ada di TEMP → cukup delete dari temp (tanpa call API)
+  /// - Jika item dari DB → build payload dan call DELETE API, lalu reload inputs
+  Future<bool> deleteItems(String noProduksi, List<dynamic> items) async {
+    if (items.isEmpty) {
+      deleteError = 'Tidak ada data yang dipilih untuk dihapus';
+      notifyListeners();
+      return false;
+    }
+
+    // 1) Pisahkan: mana yang temp, mana yang DB
+    final List<dynamic> dbItems = [];
+
+    for (final it in items) {
+      final removedFromTemp = deleteIfTemp(it);
+      if (!removedFromTemp) {
+        dbItems.add(it); // ini diasumsikan item dari DB (inputs cache)
+      }
+    }
+
+    // Kalau semua ternyata temp → tidak perlu call API
+    if (dbItems.isEmpty) {
+      _d('deleteItems: hanya menghapus TEMP, tidak call API');
+      // deleteIfTemp sudah update sebagian; update group by label juga sudah dilakukan
+      notifyListeners();
+      return true;
+    }
+
+    // 2) Build payload dari DB items
+    final payload = _buildDeletePayloadFromItems(dbItems);
+    if (payload.isEmpty) {
+      deleteError = 'Tidak ada data valid untuk dihapus (payload kosong)';
+      notifyListeners();
+      return false;
+    }
+
+    // 3) Call API lewat repository
+    isDeleting = true;
+    deleteError = null;
+    notifyListeners();
+
+    try {
+      _d('deleteItems: calling deleteInputsAndPartials for $noProduksi');
+      _d('Delete payload: ${json.encode(payload)}');
+
+      final res = await repository.deleteInputsAndPartials(noProduksi, payload);
+      lastDeleteResult = res;
+
+      final success = res['success'] == true;
+      final message = res['message'] as String? ?? '';
+
+      _d('Delete response: ${json.encode(res)}');
+
+      if (!success) {
+        deleteError = message.isEmpty ? 'Gagal menghapus data' : message;
+        return false;
+      }
+
+      // Berhasil: invalidasi & reload inputs
+      clearInputsCache(noProduksi);
+      await loadInputs(noProduksi, force: true);
+
+      // Opsional: bisa juga clear temp untuk label terkait,
+      // tapi karena tadi deleteIfTemp sudah dipanggil, state temp sudah bersih untuk item2 yg dihapus.
+
+      return true;
+    } catch (e) {
+      _d('Delete error: $e');
+      deleteError = e.toString();
+      return false;
+    } finally {
+      isDeleting = false;
+      notifyListeners();
+    }
+  }
+
+  /// Hapus satu item saja (TEMP atau DB) untuk noProduksi tertentu
+  Future<bool> deleteSingleItem(String noProduksi, dynamic item) {
+    return deleteItems(noProduksi, [item]);
   }
 
   // ---------------------------------------------------------------------------

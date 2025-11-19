@@ -442,14 +442,36 @@ class BrokerProductionRepository {
     print('⬅️ [${res.statusCode}] ${res.body}');
 
     if (res.statusCode != 200) {
+      final bodyText = utf8.decode(res.bodyBytes);
+      print('❌ Error body: $bodyText');
+
       try {
-        final decoded = json.decode(utf8.decode(res.bodyBytes));
-        final msg = decoded['message'] ?? 'Gagal menghapus broker produksi';
+        final decoded = json.decode(bodyText);
+
+        String msg;
+
+        if (decoded is Map<String, dynamic>) {
+          // coba beberapa kemungkinan key
+          msg = (decoded['message'] ??
+              decoded['error'] ??
+              decoded['msg'] ??
+              'Gagal menghapus broker produksi')
+              .toString();
+        } else {
+          // kalau backend kirim string langsung / array, pakai saja isinya
+          msg = decoded.toString();
+        }
+
         throw Exception(msg);
-      } catch (_) {
+      } catch (e) {
+        // kalau JSON.parse gagal total, pakai body apa adanya
+        if (bodyText.isNotEmpty) {
+          throw Exception(bodyText);
+        }
         throw Exception('Gagal menghapus broker produksi (${res.statusCode})');
       }
     }
+
 
     // kalau sebelumnya kita sudah pernah ambil inputs untuk noProduksi ini, buang dari cache
     _inputsCache.remove(noProduksi);

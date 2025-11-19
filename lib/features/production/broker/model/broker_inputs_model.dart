@@ -81,15 +81,21 @@ bool? _pickB(Map<String, dynamic> j, List<String> keys) {
 class BrokerItem {
   final String? noBroker;
   final int? noSak;
+  final String? noBrokerPartial;  // TAMBAHKAN INI untuk kode partial
   final double? berat;
   final double? beratAct;
   final bool? isPartial;
   final int? idJenis;
   final String? namaJenis;
 
+  /// Row dianggap "partial" jika ada kode partial ATAU flag isPartial = true
+  bool get isPartialRow =>
+      (noBrokerPartial?.trim().isNotEmpty ?? false) || (isPartial == true);
+
   BrokerItem({
     this.noBroker,
     this.noSak,
+    this.noBrokerPartial,  // TAMBAHKAN INI
     this.berat,
     this.beratAct,
     this.isPartial,
@@ -100,6 +106,7 @@ class BrokerItem {
   factory BrokerItem.fromJson(Map<String, dynamic> j) => BrokerItem(
     noBroker: _pickS(j, ['noBroker', 'NoBroker', 'no_broker']),
     noSak: _pickI(j, ['noSak', 'NoSak', 'no_sak']),
+    noBrokerPartial: _pickS(j, ['noBrokerPartial', 'NoBrokerPartial', 'no_broker_partial']), // TAMBAHKAN
     berat: _pickD(j, ['berat', 'Berat']),
     beratAct: _pickD(j, ['beratAct', 'BeratAct', 'berat_act']),
     isPartial: _pickB(j, ['isPartial', 'IsPartial', 'is_partial']),
@@ -107,8 +114,36 @@ class BrokerItem {
     namaJenis: _pickS(j, ['namaJenis', 'NamaJenis']),
   );
 
-  String toDebugString() =>
-      '[BROKER] ${noBroker ?? '-'} #${noSak ?? 0} • ${(berat ?? 0).toStringAsFixed(2)}kg';
+  // TAMBAHKAN copyWith method
+  BrokerItem copyWith({
+    String? noBroker,
+    int? noSak,
+    String? noBrokerPartial,
+    double? berat,
+    double? beratAct,
+    bool? isPartial,
+    int? idJenis,
+    String? namaJenis,
+  }) {
+    return BrokerItem(
+      noBroker: noBroker ?? this.noBroker,
+      noSak: noSak ?? this.noSak,
+      noBrokerPartial: noBrokerPartial ?? this.noBrokerPartial,
+      berat: berat ?? this.berat,
+      beratAct: beratAct ?? this.beratAct,
+      isPartial: isPartial ?? this.isPartial,
+      idJenis: idJenis ?? this.idJenis,
+      namaJenis: namaJenis ?? this.namaJenis,
+    );
+  }
+
+  // UPDATE toDebugString method
+  String toDebugString() {
+    final part = (noBrokerPartial ?? '').trim();
+    final title = part.isNotEmpty ? part : (noBroker ?? '-');
+    final tag = isPartialRow ? '[BROKER•PART]' : '[BROKER]';
+    return '$tag $title • sak ${noSak ?? 0} • ${(berat ?? 0).toStringAsFixed(2)}kg';
+  }
 }
 
 class BbItem {

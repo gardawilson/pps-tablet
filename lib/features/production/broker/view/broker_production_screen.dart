@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 
+import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/horizontal_paged_table.dart';
+import '../../../../common/widgets/success_status_dialog.dart';
 import '../../../../common/widgets/table_column_spec.dart';
 import '../view_model/broker_production_view_model.dart';
 import '../repository/broker_production_repository.dart';
@@ -15,7 +17,7 @@ import '../widgets/broker_delete_dialog.dart';
 import '../widgets/broker_production_action_bar.dart';
 // Inputs screen (Scan action)
 import '../widgets/broker_production_form_dialog.dart';
-import 'broker_inputs_screen.dart';
+import 'broker_production_input_screen.dart';
 // ⬇️ New: the popover panel you created
 import '../widgets/broker_production_row_popover.dart';
 
@@ -39,20 +41,18 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
   Future<void> _showRowPopover({
     required BuildContext context,
     required BrokerProduction row,
-    required Offset globalPos, // from onRowLongPress
+    required Offset globalPos,
   }) async {
     final overlay = Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
     if (overlay == null) return;
 
-    // Position the popover relative to the tap point
     final local = overlay.globalToLocal(globalPos);
 
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
       barrierColor: Colors.black26,
-      builder: (_) {
-        // Keep popover within the screen bounds a bit
+      builder: (dialogCtx) { // ⬅️ pakai dialogCtx
         final safeLeft = local.dx.clamp(8.0, overlay.size.width - 320.0);
         final safeTop  = local.dy.clamp(8.0, overlay.size.height - 220.0);
 
@@ -63,30 +63,28 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
               top: safeTop,
               child: BrokerProductionRowPopover(
                 row: row,
-                onClose: () => Navigator.of(context).maybePop(),
-                onInput: () {
-                  // 1) tutup popover/dialog pakai context dialog
-                  Navigator.of(context).maybePop();
+                // ⬅️ CLOSE popover dengan context dialog, bukan context screen
+                onClose: () => Navigator.of(dialogCtx).pop(),
 
-                  // 2) setelah dialog ketutup, pakai context luar (yang ke _showRowPopover) buat push
+                onInput: () {
+                  // popover sudah tertutup oleh _runAndClose di dalam popover
                   Future.microtask(() {
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) => BrokerInputsScreen(
+                        builder: (_) => BrokerProductionInputScreen(
                           noProduksi: row.noProduksi,
                         ),
                       ),
                     );
                   });
                 },
+
                 onEdit: () async {
                   await _openEditDialog(context, row);
-                  // after the dialog, you can also close the popover if it’s still open
-                  if (mounted) Navigator.of(context).maybePop();
+                  // gak perlu maybePop di sini, popover sudah di-close lewat onClose
                 },
 
                 onDelete: () async {
-                  // buka dialog konfirmasi custom kamu
                   await showDialog<void>(
                     context: context,
                     barrierDismissible: false,
@@ -96,28 +94,35 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
                         onConfirm: () async {
                           final vm = context.read<BrokerProductionViewModel>();
 
-                          // kita boleh kasih loading di dalam dialog (dialog kamu sudah punya _submitting)
                           final success = await vm.deleteProduksi(row.noProduksi);
 
+                          // 1) Tutup dialog konfirmasi
+                          if (ctx.mounted) Navigator.of(ctx).pop();
+
+                          if (!context.mounted) return;
+
+                          // 2) JANGAN pop lagi di sini — popover sudah ditutup oleh onClose()
+
                           if (success) {
-                            // tutup dialog konfirmasi
-                            if (ctx.mounted) Navigator.of(ctx).pop();
-
-                            // kasih snackbar di layar utama
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('No. Produksi ${row.noProduksi} berhasil dihapus')),
-                              );
-                            }
+                            // ✅ dialog sukses
+                            showDialog(
+                              context: context,
+                              builder: (_) => SuccessStatusDialog(
+                                title: 'Berhasil Menghapus',
+                                message: 'No. Produksi ${row.noProduksi} berhasil dihapus.',
+                              ),
+                            );
                           } else {
-                            // gagal → tetap tutup dialog supaya user bisa ulang
-                            if (ctx.mounted) Navigator.of(ctx).pop();
+                            final rawMsg = vm.saveError ?? 'Gagal menghapus data';
 
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(vm.saveError ?? 'Gagal menghapus data')),
-                              );
-                            }
+                            // ❌ dialog error
+                            showDialog(
+                              context: context,
+                              builder: (_) => ErrorStatusDialog(
+                                title: 'Gagal Menghapus!',
+                                message: rawMsg,
+                              ),
+                            );
                           }
                         },
                       );
@@ -126,8 +131,7 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
                 },
 
                 onPrint: () async {
-                  // This hook is optional since the popover already implements print
-                  // If you want extra behavior, put it here.
+                  // optional
                 },
               ),
             ),
@@ -136,6 +140,7 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
       },
     );
   }
+
 
   @override
   Widget build(BuildContext context) {

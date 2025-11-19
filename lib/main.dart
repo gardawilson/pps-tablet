@@ -121,8 +121,41 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'PPS Tablet',
-        theme: ThemeData(primarySwatch: Colors.blue),
         navigatorKey: AppNav.key,
+
+        // 🎨 THEME: pakai biru sebagai warna utama + atur default button
+        theme: ThemeData(
+          useMaterial3: true, // boleh kamu ganti false kalau belum mau M3
+
+          // Warna utama seluruh aplikasi
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFF1565C0), // 🔵 biru utama
+            brightness: Brightness.light,
+          ),
+
+          // ElevatedButton default → biru
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1565C0),
+              foregroundColor: Colors.white,
+            ),
+          ),
+
+          // FilledButton default → biru
+          filledButtonTheme: FilledButtonThemeData(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF1565C0),
+              foregroundColor: Colors.white,
+            ),
+          ),
+
+          // TextButton default → teks biru
+          textButtonTheme: TextButtonThemeData(
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF1565C0),
+            ),
+          ),
+        ),
 
         // ⬇️ Aktifkan localization supaya showDatePicker & widget lain pakai bahasa Indo
         localizationsDelegates: const [
@@ -151,6 +184,7 @@ class MyApp extends StatelessWidget {
           '/production/broker': (context) => BrokerProductionScreen(),
         },
       ),
+
     );
   }
 }

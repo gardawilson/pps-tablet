@@ -3,34 +3,54 @@
 // Updated: Delete All (TEMP) per grup + realtime via Provider
 //          Header chip "TEMP PARTIAL" bila isi temp adalah partial (berdasar data)
 //          Label tombol hapus dinamis (TEMP / TEMP Partial) + aktif hanya saat ada TEMP
+//          Sinkron lebar kolom header & data via columnFlexes
+//          Edit mode untuk multi-delete EXISTING (bukan TEMP) pakai checkbox
+//          Permission: delete TEMP by isTemp, delete EXISTING by canDelete
 // =============================
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../../common/widgets/loading_dialog.dart';
 import '../view_model/broker_production_input_view_model.dart';
 
 /// Cek apakah bucket TEMP untuk labelCode berisi item partial.
-/// (Sumber kebenaran: ada nomor partial di item, mis. noBBPartial/noGilinganPartial/… non-empty)
-bool _hasPartialTempForLabel(BrokerProductionInputViewModel vm, String labelCode) {
+/// (Sumber kebenaran: ada nomor partial di item, mis. noBrokerPartial/noBBPartial/noGilinganPartial/… non-empty)
+bool _hasPartialTempForLabel(
+    BrokerProductionInputViewModel vm,
+    String labelCode,
+    ) {
   final b = vm.getTemporaryDataForLabel(labelCode.trim());
   if (b == null || b.isEmpty) return false;
 
-  final hasBbPart       = b.bbItems.any((e) => (e.noBBPartial ?? '').trim().isNotEmpty);
-  final hasGilinganPart = b.gilinganItems.any((e) => (e.noGilinganPartial ?? '').trim().isNotEmpty);
-  final hasMixerPart    = b.mixerItems.any((e) => (e.noMixerPartial ?? '').trim().isNotEmpty);
-  final hasRejectPart   = b.rejectItems.any((e) => (e.noRejectPartial ?? '').trim().isNotEmpty);
+  final hasBrokerPart =
+  b.brokerItems.any((e) => (e.noBrokerPartial ?? '').trim().isNotEmpty);
+  final hasBbPart =
+  b.bbItems.any((e) => (e.noBBPartial ?? '').trim().isNotEmpty);
+  final hasGilinganPart = b.gilinganItems
+      .any((e) => (e.noGilinganPartial ?? '').trim().isNotEmpty);
+  final hasMixerPart =
+  b.mixerItems.any((e) => (e.noMixerPartial ?? '').trim().isNotEmpty);
+  final hasRejectPart =
+  b.rejectItems.any((e) => (e.noRejectPartial ?? '').trim().isNotEmpty);
 
-  return hasBbPart || hasGilinganPart || hasMixerPart || hasRejectPart;
+  return hasBrokerPart ||
+      hasBbPart ||
+      hasGilinganPart ||
+      hasMixerPart ||
+      hasRejectPart;
 }
 
 /// Popover tooltip di sebelah KIRI anchor tile.
-class InputsGroupTooltip extends StatelessWidget {
+class InputsGroupTooltip extends StatefulWidget {
   /// Header title (nomor label/partial) -> juga dipakai sebagai labelCode
   final String title;
+
   /// Optional subtitle (nama jenis)
   final String? subtitle;
+
   /// Warna header
   final Color headerColor;
+
   /// Builder isi baris (realtime)
   final List<Widget> Function() childrenBuilder;
   final VoidCallback onClose;
@@ -45,10 +65,16 @@ class InputsGroupTooltip extends StatelessWidget {
   /// Header kolom opsional
   final List<String>? tableHeaders;
 
+  /// Flex kolom data (tanpa kolom Action), digunakan untuk header & row
+  final List<int>? columnFlexes;
+
   /// Tombol Hapus Semua (TEMP) - kiri footer
   final VoidCallback? onDeleteAllTemp;
   final bool deleteAllTempDisabled;
   final String deleteAllTempLabel;
+
+  /// Permission delete existing rows
+  final bool canDelete;
 
   const InputsGroupTooltip({
     super.key,
@@ -61,18 +87,195 @@ class InputsGroupTooltip extends StatelessWidget {
     this.actions = const [],
     this.width = 340,
     this.tableHeaders,
+    this.columnFlexes,
     this.onDeleteAllTemp,
     this.deleteAllTempDisabled = false,
     this.deleteAllTempLabel = 'Hapus Semua (TEMP)',
+    this.canDelete = false,
   });
 
   @override
+  State<InputsGroupTooltip> createState() => _InputsGroupTooltipState();
+}
+
+class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
+  // Mode edit / multi-delete untuk EXISTING (bukan temp)
+  bool _selectionMode = false;
+
+  // Index row yang terpilih
+  final Set<int> _selectedIndices = <int>{};
+
+  // Simpan callback onDelete untuk row existing per index
+  final Map<int, VoidCallback> _rowDeleteCallbacks = <int, VoidCallback>{};
+
+  void _enterSelectionMode() {
+    if (!widget.canDelete) return; // safety guard
+    setState(() {
+      _selectionMode = true;
+      _selectedIndices.clear();
+    });
+  }
+
+  void _exitSelectionMode() {
+    setState(() {
+      _selectionMode = false;
+      _selectedIndices.clear();
+    });
+  }
+
+  void _toggleSelected(int index, bool? value) {
+    setState(() {
+      if (value ?? false) {
+        _selectedIndices.add(index);
+      } else {
+        _selectedIndices.remove(index);
+      }
+    });
+  }
+
+  void _confirmBulkDelete() async {
+    if (_selectedIndices.isEmpty) return;
+
+    final indices = _selectedIndices.toList()..sort();
+
+    final callbacks = <VoidCallback>[];
+    for (final i in indices) {
+      final cb = _rowDeleteCallbacks[i];
+      if (cb != null) {
+        callbacks.add(cb);
+      }
+    }
+
+    final count = callbacks.length;
+    if (count == 0) return;
+
+    setState(() {
+      _selectionMode = false;
+      _selectedIndices.clear();
+    });
+
+    final rootNavigator = Navigator.of(context, rootNavigator: true);
+    final rootCtx = rootNavigator.context;
+
+    widget.onClose();
+
+    final confirmed = await showDialog<bool>(
+      context: rootCtx,
+      useRootNavigator: true,
+      builder: (ctx) => AlertDialog(
+        title: Text('Hapus $count item?'),
+        content: Text(
+          'Yakin ingin menghapus $count item yang sudah dipilih?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text(
+              'Hapus',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    ) ?? false;
+
+    if (!confirmed) return;
+
+    // ❌ TIDAK ADA loading dialog
+    // ✅ Langsung eksekusi delete → skeleton otomatis muncul karena state loading
+    for (final cb in callbacks) {
+      cb();
+    }
+
+    // Snackbar setelah selesai
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (rootCtx.mounted) {
+      ScaffoldMessenger.of(rootCtx).showSnackBar(
+        SnackBar(
+          content: Text('✅ Berhasil menghapus $count item'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+
+  /// Bungkus row supaya:
+  /// - saat selectionMode, row existing (bukan TEMP) punya checkbox di kiri
+  /// - seleksi existing hanya aktif kalau canDelete = true
+  Widget _buildSelectableRow(Widget child, int index) {
+    bool canSelect = false;
+
+    // Semua TooltipTableRow existing (isTempRow == false) boleh dipilih
+    // hanya jika permission canDelete = true
+    if (widget.canDelete &&
+        child is TooltipTableRow &&
+        !child.isTempRow) {
+      canSelect = true;
+
+      // Kalau lagi selection mode, hide tombol delete single-row existing
+      child = TooltipTableRow(
+        columns: child.columns,
+        columnFlexes: child.columnFlexes,
+        onDelete: child.onDelete, // tetap dipass, dipakai bulk
+        deleteColor: child.deleteColor,
+        showDelete: !_selectionMode && child.showDelete,
+        isHighlighted: child.isHighlighted,
+        isDisabled: child.isDisabled,
+        isTempRow: child.isTempRow,
+      );
+    }
+
+    Widget content = child;
+
+    if (_selectionMode && canSelect) {
+      content = Row(
+        children: [
+          SizedBox(
+            width: 32,
+            child: Checkbox(
+              value: _selectedIndices.contains(index),
+              onChanged: (v) => _toggleSelected(index, v),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(child: content),
+        ],
+      );
+    }
+
+    return InkWell(
+      onTap: () {
+        if (_selectionMode && canSelect) {
+          final now = _selectedIndices.contains(index);
+          _toggleSelected(index, !now);
+        }
+      },
+      child: content,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final divider = Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
-    final double clampedMaxH = maxHeight.clamp(180.0, 520.0).toDouble();
+    final divider =
+    Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
+    final double clampedMaxH =
+    widget.maxHeight.clamp(180.0, 520.0).toDouble();
+
+    final bool canDeleteExisting = widget.canDelete;
 
     return ConstrainedBox(
-      constraints: BoxConstraints(minWidth: width, maxWidth: width, maxHeight: clampedMaxH),
+      constraints: BoxConstraints(
+        minWidth: widget.width,
+        maxWidth: widget.width,
+        maxHeight: clampedMaxH,
+      ),
       child: Material(
         color: Colors.transparent,
         child: Material(
@@ -81,16 +284,24 @@ class InputsGroupTooltip extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           clipBehavior: Clip.antiAlias,
           child: SizedBox(
-            width: width,
+            width: widget.width,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Header
+                // =======================================================
+                // HEADER
+                // =======================================================
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [headerColor.withOpacity(0.65), headerColor],
+                      colors: [
+                        widget.headerColor.withOpacity(0.65),
+                        widget.headerColor,
+                      ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -99,25 +310,35 @@ class InputsGroupTooltip extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        width: 40, height: 40,
+                        width: 40,
+                        height: 40,
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.25),
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.3),
+                            width: 1,
+                          ),
                         ),
-                        child: const Icon(Icons.qr_code_2, color: Colors.white, size: 20),
+                        child: const Icon(
+                          Icons.qr_code_2,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
                       const SizedBox(width: 12),
-
-                      // === Title + subtitle + (optional) chip TEMP / TEMP PARTIAL ===
                       Expanded(
                         child: Builder(
                           builder: (_) {
-                            final vm = context.read<BrokerProductionInputViewModel>();
-                            final hasTempForThis = vm.hasTemporaryDataForLabel(title);
-                            final hasPartialTemp = _hasPartialTempForLabel(vm, title);
+                            final vm = context
+                                .read<BrokerProductionInputViewModel>();
+                            final hasTempForThis =
+                            vm.hasTemporaryDataForLabel(widget.title);
+                            final hasPartialTemp =
+                            _hasPartialTempForLabel(vm, widget.title);
                             final showTempChip = hasTempForThis;
-                            final chipText = hasPartialTemp ? 'TEMP PARTIAL' : 'TEMP';
+                            final chipText =
+                            hasPartialTemp ? 'PENDING' : 'PENDING';
 
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -126,7 +347,9 @@ class InputsGroupTooltip extends StatelessWidget {
                                   children: [
                                     Expanded(
                                       child: Text(
-                                        title.isEmpty ? '-' : title,
+                                        widget.title.isEmpty
+                                            ? '-'
+                                            : widget.title,
                                         style: const TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w700,
@@ -139,11 +362,20 @@ class InputsGroupTooltip extends StatelessWidget {
                                     if (showTempChip) ...[
                                       const SizedBox(width: 8),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                        padding:
+                                        const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 2,
+                                        ),
                                         decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.2),
-                                          borderRadius: BorderRadius.circular(999),
-                                          border: Border.all(color: Colors.white.withOpacity(0.35)),
+                                          color:
+                                          Colors.white.withOpacity(0.2),
+                                          borderRadius:
+                                          BorderRadius.circular(999),
+                                          border: Border.all(
+                                            color: Colors.white
+                                                .withOpacity(0.35),
+                                          ),
                                         ),
                                         child: Text(
                                           chipText,
@@ -157,16 +389,19 @@ class InputsGroupTooltip extends StatelessWidget {
                                     ],
                                   ],
                                 ),
-                                if ((subtitle ?? '').trim().isNotEmpty) ...[
+                                if ((widget.subtitle ?? '')
+                                    .trim()
+                                    .isNotEmpty) ...[
                                   const SizedBox(height: 2),
                                   Text(
-                                    subtitle!.trim(),
+                                    widget.subtitle!.trim(),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
-                                      color: Colors.white.withOpacity(0.9),
+                                      color:
+                                      Colors.white.withOpacity(0.9),
                                     ),
                                   ),
                                 ],
@@ -175,74 +410,128 @@ class InputsGroupTooltip extends StatelessWidget {
                           },
                         ),
                       ),
-
                       const SizedBox(width: 8),
+
+                      // 🔧 TOMBOL EDIT / EXIT EDIT (disable kalau !canDeleteExisting)
                       IconButton(
-                        tooltip: 'Tutup',
-                        icon: const Icon(Icons.close_rounded, color: Colors.white),
-                        onPressed: onClose,
+                        tooltip: !canDeleteExisting
+                            ? 'Tidak punya izin menghapus data existing'
+                            : _selectionMode
+                            ? 'Keluar mode hapus'
+                            : 'Pilih data existing untuk dihapus',
+                        icon: Icon(
+                          _selectionMode
+                              ? Icons.close_rounded
+                              : Icons.edit,
+                          color: canDeleteExisting
+                              ? Colors.white
+                              : Colors.white.withOpacity(0.4),
+                        ),
+                        onPressed: !canDeleteExisting
+                            ? null
+                            : () {
+                          if (_selectionMode) {
+                            _exitSelectionMode();
+                          } else {
+                            _enterSelectionMode();
+                          }
+                        },
                       ),
                     ],
                   ),
                 ),
                 divider,
 
-                // Table header (opsional)
-                if (tableHeaders != null && tableHeaders!.isNotEmpty) ...[
+                // =======================================================
+                // TABLE HEADER (opsional)
+                // =======================================================
+                if (widget.tableHeaders != null &&
+                    widget.tableHeaders!.isNotEmpty) ...[
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.grey.shade100,
                       border: Border(
-                        bottom: BorderSide(color: Colors.grey.shade300, width: 1),
+                        bottom: BorderSide(
+                          color: Colors.grey.shade300,
+                          width: 1,
+                        ),
                       ),
                     ),
                     child: Row(
-                      children: tableHeaders!.asMap().entries.map((entry) {
-                        final index = entry.key;
-                        final header = entry.value;
+                      children: [
+                        if (_selectionMode && canDeleteExisting)
+                          const SizedBox(width: 32), // ruang checkbox
+                        ...widget.tableHeaders!.asMap().entries.map(
+                              (entry) {
+                            final index = entry.key;
+                            final header = entry.value;
 
-                        // Kolom aksi terakhir lebar tetap
-                        if (index == tableHeaders!.length - 1) {
-                          return SizedBox(
-                            width: 60,
-                            child: Text(
-                              header,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.grey.shade700,
-                                letterSpacing: 0.5,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          );
-                        }
+                            // Kolom aksi terakhir lebar tetap
+                            if (index ==
+                                widget.tableHeaders!.length - 1) {
+                              return SizedBox(
+                                width: 60,
+                                child: Text(
+                                  header,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.grey.shade700,
+                                    letterSpacing: 0.5,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              );
+                            }
 
-                        return Expanded(
-                          child: Padding(
-                            padding: EdgeInsets.only(right: index < tableHeaders!.length - 1 ? 8 : 0),
-                            child: Text(
-                              header,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.grey.shade700,
-                                letterSpacing: 0.5,
+                            // Flex sama dengan row data
+                            final flex =
+                            (widget.columnFlexes != null &&
+                                index <
+                                    widget
+                                        .columnFlexes!.length &&
+                                widget.columnFlexes![index] > 0)
+                                ? widget.columnFlexes![index]
+                                : 1;
+
+                            return Expanded(
+                              flex: flex,
+                              child: Padding(
+                                padding: EdgeInsets.only(
+                                  right: index <
+                                      widget.tableHeaders!.length - 1
+                                      ? 8
+                                      : 0,
+                                ),
+                                child: Text(
+                                  header,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.grey.shade700,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                   ),
                 ],
 
-                // Body: realtime via Consumer
+                // =======================================================
+                // BODY: realtime via Consumer
+                // =======================================================
                 Flexible(
                   child: Consumer<BrokerProductionInputViewModel>(
                     builder: (context, vm, _) {
-                      final children = childrenBuilder();
+                      final children = widget.childrenBuilder();
 
                       if (children.isEmpty) {
                         return const Padding(
@@ -250,39 +539,96 @@ class InputsGroupTooltip extends StatelessWidget {
                           child: Center(
                             child: Text(
                               'Tidak ada data',
-                              style: TextStyle(color: Colors.grey, fontSize: 14),
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 14,
+                              ),
                             ),
                           ),
                         );
                       }
 
+                      // Kumpulkan callback delete hanya untuk row EXISTING (bukan temp)
+                      _rowDeleteCallbacks.clear();
+                      if (canDeleteExisting) {
+                        for (var i = 0; i < children.length; i++) {
+                          final child = children[i];
+                          if (child is TooltipTableRow &&
+                              child.onDelete != null &&
+                              !child.isTempRow) {
+                            _rowDeleteCallbacks[i] = child.onDelete!;
+                          }
+                        }
+                      }
+
                       return ListView.separated(
                         shrinkWrap: true,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        itemBuilder: (_, i) => children[i],
-                        separatorBuilder: (_, __) => Divider(height: 1, thickness: 0.5, color: Colors.grey.shade200),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        itemBuilder: (_, i) =>
+                            _buildSelectableRow(children[i], i),
+                        separatorBuilder: (_, __) => Divider(
+                          height: 1,
+                          thickness: 0.5,
+                          color: Colors.grey.shade200,
+                        ),
                         itemCount: children.length,
                       );
                     },
                   ),
                 ),
 
-                // Footer: Hapus Semua TEMP (kiri) + actions custom (kanan)
+                // =======================================================
+                // FOOTER
+                // - normal: Hapus Semua TEMP + actions (Oke)
+                // - selection mode: Batal + Hapus (n)  [hanya kalau canDelete = true]
+                // =======================================================
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                   child: Row(
-                    children: [
-                      if (onDeleteAllTemp != null)
+                    children: _selectionMode && canDeleteExisting
+                        ? [
+                      // Mode multi-delete existing
+                      TextButton(
+                        onPressed: _exitSelectionMode,
+                        child: const Text('Batal'),
+                      ),
+                      const Spacer(),
+                      FilledButton.icon(
+                        onPressed: _selectedIndices.isEmpty
+                            ? null
+                            : _confirmBulkDelete,
+                        icon: const Icon(Icons.delete_outline),
+                        label: Text(
+                          'Hapus (${_selectedIndices.length})',
+                        ),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.red.shade600,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ]
+                        : [
+                      // Mode normal
+                      if (widget.onDeleteAllTemp != null)
                         TextButton.icon(
-                          onPressed: deleteAllTempDisabled ? null : onDeleteAllTemp,
-                          icon: const Icon(Icons.delete_sweep_outlined),
-                          label: Text(deleteAllTempLabel),
+                          onPressed:
+                          widget.deleteAllTempDisabled
+                              ? null
+                              : widget.onDeleteAllTemp,
+                          icon: const Icon(
+                            Icons.delete_sweep_outlined,
+                          ),
+                          label: Text(widget.deleteAllTempLabel),
                           style: TextButton.styleFrom(
-                            foregroundColor: Colors.red.shade700,
+                            foregroundColor:
+                            Colors.red.shade700,
                           ),
                         ),
                       const Spacer(),
-                      ...actions,
+                      ...widget.actions,
                     ],
                   ),
                 ),
@@ -298,37 +644,63 @@ class InputsGroupTooltip extends StatelessWidget {
 /// Table row sederhana dengan tombol delete di kolom aksi.
 class TooltipTableRow extends StatelessWidget {
   final List<String> columns;
+
+  /// Flex untuk tiap kolom data (BUKAN kolom action).
+  /// Contoh: [3, 2] → kolom[0] 3 bagian, kolom[1] 2 bagian.
+  final List<int>? columnFlexes;
+
+  /// Callback hapus untuk row ini.
   final VoidCallback? onDelete;
+
   final Color? deleteColor;
   final bool showDelete;
   final bool isHighlighted;
   final bool isDisabled;
 
+  /// Menandai bahwa row ini TEMP atau bukan.
+  /// Multi-delete hanya untuk row existing (isTempRow == false).
+  final bool isTempRow;
+
   const TooltipTableRow({
     super.key,
     required this.columns,
+    this.columnFlexes,
     this.onDelete,
     this.deleteColor,
     this.showDelete = true,
     this.isHighlighted = false,
     this.isDisabled = false,
+    this.isTempRow = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 10),
+      padding:
+      const EdgeInsets.symmetric(horizontal: 0, vertical: 10),
       decoration: BoxDecoration(
         color: isHighlighted ? Colors.yellow.shade50 : Colors.transparent,
       ),
       child: Row(
         children: [
+          // Kolom-kolom data
           ...columns.asMap().entries.map((entry) {
             final index = entry.key;
             final value = entry.value;
+
+            // flex default = 1 kalau tidak diset
+            final flex = (columnFlexes != null &&
+                index < columnFlexes!.length &&
+                columnFlexes![index] > 0)
+                ? columnFlexes![index]
+                : 1;
+
             return Expanded(
+              flex: flex,
               child: Padding(
-                padding: EdgeInsets.only(right: index < columns.length - 1 ? 8 : 0),
+                padding: EdgeInsets.only(
+                  right: index < columns.length - 1 ? 8 : 0,
+                ),
                 child: Text(
                   value,
                   style: TextStyle(
@@ -342,7 +714,7 @@ class TooltipTableRow extends StatelessWidget {
             );
           }),
 
-          // Kolom aksi
+          // Kolom aksi (fixed width)
           SizedBox(
             width: 60,
             child: Center(
@@ -360,20 +732,27 @@ class TooltipTableRow extends StatelessWidget {
                         color: deleteColor ?? Colors.red.shade50,
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
-                          color: deleteColor ?? Colors.red.shade200,
+                          color:
+                          deleteColor ?? Colors.red.shade200,
                           width: 1,
                         ),
                       ),
                       child: Icon(
-                        isDisabled ? Icons.lock_outline : Icons.delete_outline,
+                        isDisabled
+                            ? Icons.lock_outline
+                            : Icons.delete_outline,
                         size: 16,
-                        color: deleteColor ?? Colors.red.shade700,
+                        color: deleteColor ??
+                            Colors.red.shade700,
                       ),
                     ),
                   ),
                 ),
               )
-                  : const Text('-', style: TextStyle(color: Colors.grey)),
+                  : const Text(
+                '-',
+                style: TextStyle(color: Colors.grey),
+              ),
             ),
           ),
         ],
@@ -393,6 +772,13 @@ class GroupTooltipAnchorTile extends StatefulWidget {
   final List<Widget> Function() detailsBuilder;
 
   final List<String>? tableHeaders;
+
+  /// Flex kolom data (dipakai header & row)
+  final List<int>? columnFlexes;
+
+  /// Permission delete existing rows (temp tetap boleh dihapus)
+  final bool canDelete;
+
   final double popoverWidth;
   final double gap;
   final VoidCallback? onUpdate;
@@ -404,13 +790,16 @@ class GroupTooltipAnchorTile extends StatefulWidget {
     required this.detailsBuilder,
     this.headerSubtitle,
     this.tableHeaders,
+    this.columnFlexes,
+    this.canDelete = false,
     this.popoverWidth = 400,
     this.gap = 16,
     this.onUpdate,
   });
 
   @override
-  State<GroupTooltipAnchorTile> createState() => _GroupTooltipAnchorTileState();
+  State<GroupTooltipAnchorTile> createState() =>
+      _GroupTooltipAnchorTileState();
 }
 
 class _GroupTooltipAnchorTileState extends State<GroupTooltipAnchorTile> {
@@ -421,78 +810,112 @@ class _GroupTooltipAnchorTileState extends State<GroupTooltipAnchorTile> {
     if (_entry != null) return;
 
     final overlay = Overlay.of(context);
-    final overlayBox = overlay.context.findRenderObject() as RenderBox;
+    final overlayBox =
+    overlay.context.findRenderObject() as RenderBox;
 
-    final rb = context.findRenderObject() as RenderBox; // tile box
-    final targetTopLeft = rb.localToGlobal(Offset.zero, ancestor: overlayBox);
+    final media = MediaQuery.of(context);
+    final screenH = media.size.height;
+    final padding = media.padding;
+
+    // --- posisi & ukuran tile (anchor) ---
+    final rb = context.findRenderObject() as RenderBox;
+    final targetTopLeft =
+    rb.localToGlobal(Offset.zero, ancestor: overlayBox);
     final tileSize = rb.size;
+    final tileCenterY = targetTopLeft.dy + tileSize.height / 2;
 
-    final screenH = overlayBox.size.height;
-    final padding = MediaQuery.of(context).padding;
+    // --- tinggi maksimal popover ---
+    final double maxHeight =
+    (screenH - padding.vertical - 32)
+        .clamp(180.0, 520.0)
+        .toDouble();
 
-    final double spaceBelow =
-    (screenH - (targetTopLeft.dy + tileSize.height) - 12 - padding.bottom).toDouble();
-    final double spaceAbove = (targetTopLeft.dy - 12 - padding.top).toDouble();
+    // Batas aman atas & bawah layar (kasih margin 8px)
+    final double topLimit = padding.top + 8;
+    final double bottomLimit = screenH - padding.bottom - 8;
 
-    const double minDesired = 260.0;
-    final bool placeAbove = spaceBelow < minDesired && spaceAbove > spaceBelow;
+    // Hitung offset Y supaya popover tidak keluar layar
+    double yOffset = 0.0;
 
-    final double maxHeight = (placeAbove ? spaceAbove : spaceBelow).clamp(180.0, 520.0).toDouble();
-    final double dy = placeAbove ? -(maxHeight - 8.0) : -8.0;
+    final double popoverTop = tileCenterY - maxHeight / 2;
+    final double popoverBottom = tileCenterY + maxHeight / 2;
 
-    // Baca state VM untuk tombol Hapus Semua (TEMP)
+    if (popoverTop < topLimit) {
+      // Terlalu ke atas → geser turun
+      yOffset = topLimit - popoverTop;
+    } else if (popoverBottom > bottomLimit) {
+      // Terlalu ke bawah → geser naik
+      yOffset = bottomLimit - popoverBottom;
+    }
+
+    // --- state VM untuk tombol Hapus TEMP ---
     final vm = context.read<BrokerProductionInputViewModel>();
-    final hasTempForThis = vm.hasTemporaryDataForLabel(widget.title);
-    final hasPartialTemp = _hasPartialTempForLabel(vm, widget.title);
+    final hasTempForThis =
+    vm.hasTemporaryDataForLabel(widget.title);
+    final hasPartialTemp =
+    _hasPartialTempForLabel(vm, widget.title);
+    final delAllLabel = hasPartialTemp
+        ? 'Hapus Semua (TEMP Partial)'
+        : 'Hapus Semua (TEMP)';
 
-    // Label tombol mengikuti isi bucket TEMP
-    final delAllLabel = hasPartialTemp ? 'Hapus Semua (TEMP Partial)' : 'Hapus Semua (TEMP)';
-
-    _entry = OverlayEntry(builder: (context) {
-      return Stack(
-        children: [
-          // Barrier untuk dismiss
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: _hide,
-              child: const SizedBox.expand(),
+    _entry = OverlayEntry(
+      builder: (context) {
+        return Stack(
+          children: [
+            // Barrier untuk dismiss
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _hide,
+                child: const SizedBox.expand(),
+              ),
             ),
-          ),
 
-          // Popover di kiri tile
-          CompositedTransformFollower(
-            link: _link,
-            showWhenUnlinked: false,
-            offset: Offset(-(widget.popoverWidth + widget.gap), dy),
-            child: InputsGroupTooltip(
-              title: widget.title,
-              subtitle: (widget.headerSubtitle ?? '').trim().isNotEmpty ? widget.headerSubtitle!.trim() : null,
-              headerColor: widget.color,
-              onClose: _hide,
-              width: widget.popoverWidth,
-              maxHeight: maxHeight,
-              tableHeaders: widget.tableHeaders,
-              childrenBuilder: widget.detailsBuilder,
+            // POPUP: kiri tile, vertikal auto-clamp
+            CompositedTransformFollower(
+              link: _link,
+              showWhenUnlinked: false,
 
-              // Tombol Hapus Semua (TEMP) — aktif hanya jika ada TEMP
-              onDeleteAllTemp: hasTempForThis ? () => _handleDeleteAllTemp(vm) : null,
-              deleteAllTempDisabled: !hasTempForThis,
-              deleteAllTempLabel: delAllLabel,
+              // kiri-tengah tile ↔ kanan-tengah popover
+              targetAnchor: Alignment.centerLeft,
+              followerAnchor: Alignment.centerRight,
 
-              // Tombol OK
-              actions: [
-                TextButton.icon(
-                  onPressed: _hide,
-                  icon: const Icon(Icons.check_circle_outline),
-                  label: const Text('Oke'),
-                ),
-              ],
+              // X: geser ke kiri sedikit; Y: disesuaikan supaya tidak kepotong
+              offset: Offset(-widget.gap, yOffset),
+
+              child: InputsGroupTooltip(
+                title: widget.title,
+                subtitle: (widget.headerSubtitle ?? '')
+                    .trim()
+                    .isNotEmpty
+                    ? widget.headerSubtitle!.trim()
+                    : null,
+                headerColor: widget.color,
+                onClose: _hide,
+                width: widget.popoverWidth,
+                maxHeight: maxHeight,
+                tableHeaders: widget.tableHeaders,
+                columnFlexes: widget.columnFlexes,
+                canDelete: widget.canDelete,
+                childrenBuilder: widget.detailsBuilder,
+                onDeleteAllTemp: hasTempForThis
+                    ? () => _handleDeleteAllTemp(vm)
+                    : null,
+                deleteAllTempDisabled: !hasTempForThis,
+                deleteAllTempLabel: delAllLabel,
+                actions: [
+                  TextButton.icon(
+                    onPressed: _hide,
+                    icon: const Icon(Icons.check_circle_outline),
+                    label: const Text('Oke'),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
-      );
-    });
+          ],
+        );
+      },
+    );
 
     overlay.insert(_entry!);
   }
@@ -502,7 +925,8 @@ class _GroupTooltipAnchorTileState extends State<GroupTooltipAnchorTile> {
     _entry = null;
   }
 
-  Future<void> _handleDeleteAllTemp(BrokerProductionInputViewModel vm) async {
+  Future<void> _handleDeleteAllTemp(
+      BrokerProductionInputViewModel vm) async {
     // langsung hapus semua TEMP untuk label (widget.title)
     final removed = vm.deleteAllTempForLabel(widget.title);
 
@@ -542,36 +966,49 @@ class _GroupTooltipAnchorTileState extends State<GroupTooltipAnchorTile> {
           final details = widget.detailsBuilder();
           if (details.isEmpty) return const SizedBox.shrink();
 
-          final hasTempForThis = vm.hasTemporaryDataForLabel(widget.title);
+          final hasTempForThis =
+          vm.hasTemporaryDataForLabel(widget.title);
 
           return Card(
             margin: const EdgeInsets.only(bottom: 6),
             elevation: 0,
             // opsional: seluruh tile sedikit kuning saat ada TEMP
-            color: hasTempForThis ? Colors.yellow.shade50 : Colors.grey.shade50,
+            color: hasTempForThis
+                ? Colors.yellow.shade50
+                : Colors.grey.shade50,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
               side: BorderSide(
-                color: hasTempForThis ? Colors.amber.shade200 : Colors.grey.shade200,
+                color: hasTempForThis
+                    ? Colors.amber.shade200
+                    : Colors.grey.shade200,
               ),
             ),
             child: InkWell(
               borderRadius: BorderRadius.circular(8),
               onTap: _show,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 8,
+                ),
                 child: Row(
                   children: [
                     // === JUDUL DENGAN BG KUNING SAAT TEMP ===
                     Expanded(
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 4,
+                        ),
                         child: Text(
                           widget.title,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: hasTempForThis ? Colors.brown.shade800 : null,
+                            color: hasTempForThis
+                                ? Colors.brown.shade800
+                                : null,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -581,7 +1018,10 @@ class _GroupTooltipAnchorTileState extends State<GroupTooltipAnchorTile> {
                     // jumlah baris (badge)
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: widget.color.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(10),

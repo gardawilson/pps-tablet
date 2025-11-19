@@ -547,7 +547,7 @@ class _BrokerProductionFormDialogState extends State<BrokerProductionFormDialog>
                   child: AppNumberField(
                     controller: hourMeterCtrl,
                     label: 'Hour Meter',
-                    icon: Icons.people,
+                    icon: Icons.timer_sharp,
                     allowDecimal: false,
                     allowNegative: false,
                     hintText: '0',

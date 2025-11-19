@@ -45,7 +45,7 @@ class ShiftDropdown extends StatefulWidget {
     this.onChanged,
     this.onChangedId,
     this.label = 'Shift',
-    this.icon = Icons.schedule,
+    this.icon = Icons.schedule_outlined,
     this.hintText,
     this.enabled = true,
     this.validator,

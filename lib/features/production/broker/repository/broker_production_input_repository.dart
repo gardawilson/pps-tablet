@@ -195,4 +195,77 @@ class BrokerProductionInputRepository {
       throw Exception(message);
     }
   }
+
+
+
+  // -----------------------------
+  // NEW: Delete Inputs & Partials
+  // -----------------------------
+  /// DELETE /api/production/broker/:noProduksi/inputs
+  /// Body: { broker: [...], bb: [...], brokerPartial: [...], ... }
+  ///
+  /// Backend:
+  /// - 200 => success (bisa dengan warning kalau ada notFound)
+  /// - 404 => tidak ada data yang terhapus, tapi tetap response JSON yang rapi
+  /// - 400 => request tidak valid (mis. tidak ada array yang berisi)
+  /// - 500 => error server
+  Future<Map<String, dynamic>> deleteInputsAndPartials(
+      String noProduksi,
+      Map<String, dynamic> payload,
+      ) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/production/broker/$noProduksi/inputs');
+
+    final started = DateTime.now();
+    print('🗑️ [DELETE] $url');
+    print('📦 Delete payload: ${json.encode(payload)}');
+
+    http.Response res;
+    try {
+      res = await http
+          .delete(
+        url,
+        headers: {
+          ..._headers(token),
+          'Content-Type': 'application/json',
+        },
+        body: json.encode(payload),
+      )
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout delete inputs ($noProduksi)');
+    } catch (e) {
+      print('❌ Request error (delete inputs): $e');
+      rethrow;
+    }
+
+    final elapsedMs = DateTime.now().difference(started).inMilliseconds;
+    print('⬅️ [${res.statusCode}] (delete inputs) in ${elapsedMs}ms');
+
+    final decoded = utf8.decode(res.bodyBytes);
+    Map<String, dynamic> body;
+    try {
+      body = json.decode(decoded) as Map<String, dynamic>;
+    } catch (e) {
+      throw FormatException('Response delete inputs bukan JSON valid: $e');
+    }
+
+    // Log response untuk debugging
+    print('📥 Delete response: ${json.encode(body)}');
+
+    // Backend design:
+    // - 200: success / success + warning (lihat field success & hasWarnings di body)
+    // - 404: tidak ada yang terhapus → tetap kita return ke caller (biar bisa tampilkan pesan)
+    if (res.statusCode == 200 || res.statusCode == 404) {
+      return body;
+    } else if (res.statusCode == 400) {
+      final message =
+          body['message'] as String? ?? 'Request delete inputs tidak valid';
+      throw Exception(message);
+    } else {
+      final message = body['message'] as String? ??
+          'Gagal delete inputs (HTTP ${res.statusCode})';
+      throw Exception(message);
+    }
+  }
 }

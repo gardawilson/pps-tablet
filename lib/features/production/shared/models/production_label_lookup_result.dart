@@ -368,12 +368,13 @@ enum PrefixType {
 
 
 // ====== TEMP PARTIAL CODE GENERATOR ======
-// Aturan: A. -> P.XXXXX, V. -> X.XXX, H. -> Y.XXXX, BF. -> S.XXXX
+// Aturan: A. -> P.XXXXX, V. -> Y.XXX, H. -> T.XXXX, BF. -> BK.XXXX, D. -> Q.XXXXXXXXXX
 
 extension TempPartialFormat on PrefixType {
   /// Prefix huruf untuk partial sementara per kategori
   String get tempPartialLetter {
     switch (this) {
+      case PrefixType.broker:   return 'Q'; // Broker (DITAMBAHKAN)
       case PrefixType.bb:       return 'P'; // Bahan Baku
       case PrefixType.gilingan: return 'Y'; // Gilingan
       case PrefixType.mixer:    return 'T'; // Mixer
@@ -385,24 +386,29 @@ extension TempPartialFormat on PrefixType {
   /// Jumlah digit numeric setelah titik
   int get tempPartialDigits {
     switch (this) {
+      case PrefixType.broker:   return 10; // Q.0000000087 (DITAMBAHKAN)
       case PrefixType.bb:       return 5; // P.00001
-      case PrefixType.gilingan: return 3; // X.001
-      case PrefixType.mixer:    return 4; // Y.0001
-      case PrefixType.reject:   return 4; // S.0001
+      case PrefixType.gilingan: return 3; // Y.001
+      case PrefixType.mixer:    return 4; // T.0001
+      case PrefixType.reject:   return 4; // BK.0001
       default:                  return 0;
     }
   }
 
   /// Apakah kategori ini mendukung temp-partial
   bool get supportsTempPartial {
-    return this == PrefixType.bb ||
+    return this == PrefixType.broker ||  // DITAMBAHKAN
+        this == PrefixType.bb ||
         this == PrefixType.gilingan ||
         this == PrefixType.mixer ||
         this == PrefixType.reject;
   }
 
   /// Bentuk kode temp-partial dari sequence (0-based atau 1-based sama saja; kamu kontrol dari luar)
-  /// Contoh: bb (A.) seq=1 -> P.00001
+  /// Contoh:
+  /// - broker (D.) seq=87 -> Q.0000000087
+  /// - bb (A.) seq=1 -> P.00001
+  /// - mixer (H.) seq=1 -> T.0001
   String formatTempPartial(int seq) {
     if (!supportsTempPartial) return '';
     final n = seq < 1 ? (seq + 1) : seq; // aman kalau kamu pakai 0-based

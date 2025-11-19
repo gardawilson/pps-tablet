@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../shared/utils/format.dart';
+import '../../shared/widgets/weight_input_dialog.dart';
 import '../view_model/broker_production_input_view_model.dart';
 import '../model/broker_inputs_model.dart';
 import '../../shared/models/production_label_lookup_result.dart';
 
-/// Top-level enum (perlu di luar class)
 enum _Presence { none, temp }
 
 class LookupLabelDialog extends StatefulWidget {
@@ -26,15 +26,9 @@ class LookupLabelDialog extends StatefulWidget {
 }
 
 class _LookupLabelDialogState extends State<LookupLabelDialog> {
-  // Pilihan lokal (berbasis index list saat ini)
   final Set<int> _localPickedIndices = <int>{};
-
-  // Cache index disabled sejak dialog dibuka (hindari flicker)
   final Set<int> _disabledAtOpen = <int>{};
-
-  // State baru untuk tracking berat yang diedit
-  final Map<int, double> _editedWeights = {}; // index -> berat baru
-  final Set<int> _showWeightEdit = {}; // index yang sedang show edit
+  final Map<int, double> _editedWeights = {};
 
   bool _inputsReady = false;
   bool _didAutoSelect = false;
@@ -42,8 +36,19 @@ class _LookupLabelDialogState extends State<LookupLabelDialog> {
   @override
   void initState() {
     super.initState();
+    _editedWeights.clear();
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final vm = context.read<BrokerProductionInputViewModel>();
+
+      final lastLookup = vm.lastLookup;
+      if (lastLookup != null && lastLookup.typedItems.isNotEmpty) {
+        final firstItem = lastLookup.typedItems.first;
+        final labelCode = _labelCodeOf(firstItem);
+        if (labelCode != '-') {
+          await vm.lookupLabel(labelCode, force: true);
+        }
+      }
 
       if (vm.inputsOf(widget.noProduksi) == null) {
         await vm.loadInputs(widget.noProduksi);
@@ -123,13 +128,10 @@ class _LookupLabelDialogState extends State<LookupLabelDialog> {
     for (final i in _localPickedIndices) {
       if (i < result.data.length) {
         final row = result.data[i];
-
-        // ⬇️ PENTING: Update berat di row jika ada perubahan
         if (_editedWeights.containsKey(i)) {
           row['berat'] = _editedWeights[i];
-          row['Berat'] = _editedWeights[i]; // Backup case sensitivity
+          row['Berat'] = _editedWeights[i];
         }
-
         if (!vm.isPicked(row)) vm.togglePick(row);
       }
     }
@@ -150,64 +152,17 @@ class _LookupLabelDialogState extends State<LookupLabelDialog> {
     );
   }
 
-  /// Check presence: menggunakan method simpleKey dari model
   _Presence _presenceForRow(
       BrokerProductionInputViewModel vm,
       Map<String, dynamic> row,
       ProductionLabelLookupResult ctx,
       String noProduksi,
       ) {
-    final sk = ctx.simpleKey(row); // ← dari model, clean!
-
-    // Cek di TEMP (hanya cek TEMP sesuai requirement)
+    final sk = ctx.simpleKey(row);
     if (vm.isInTempKeys(sk)) {
       return _Presence.temp;
     }
-
     return _Presence.none;
-  }
-
-  // Widget untuk editor berat
-  Widget _buildWeightEditor(int idx, double? currentWeight, bool isDuplicate) {
-    final controller = TextEditingController(
-      text: currentWeight?.toString() ?? '',
-    );
-
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 100),
-      child: TextField(
-        controller: controller,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        textAlign: TextAlign.right,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-        decoration: InputDecoration(
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          suffixText: 'kg',
-          suffixStyle: const TextStyle(fontSize: 11),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.amber.withOpacity(0.5)),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.amber.withOpacity(0.5)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Colors.amber, width: 2),
-          ),
-        ),
-        onChanged: (value) {
-          final parsed = double.tryParse(value);
-          if (parsed != null) {
-            setState(() {
-              _editedWeights[idx] = parsed;
-            });
-          }
-        },
-      ),
-    );
   }
 
   @override
@@ -237,75 +192,161 @@ class _LookupLabelDialogState extends State<LookupLabelDialog> {
         final labelCode = sample == null ? '-' : _labelCodeOf(sample);
         final namaJenis = sample == null ? prefixType.displayName : (_namaJenisOf(sample) ?? '-');
 
-        // Hitung sekali di luar itemBuilder
         int newCount = 0;
         for (int i = 0; i < result.data.length; i++) {
           if (!_disabledAtOpen.contains(i)) newCount++;
         }
 
         return Dialog(
-          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720, maxHeight: 560),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          elevation: 8,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 720, maxHeight: 600),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: Colors.white,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // HEADER (clean)
+                // ✅ HEADER - Lebih modern dengan gradient
                 Container(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary.withOpacity(0.06),
-                    border: Border(
-                      bottom: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.5)),
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.blue.shade600,
+                        Colors.blue.shade700,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
                     ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.qr_code_2_rounded, size: 22),
-                      const SizedBox(width: 10),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.qr_code_2_rounded, size: 28, color: Colors.white),
+                      ),
+                      const SizedBox(width: 16),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(labelCode, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                            Text(
+                              labelCode,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
                             Text(
                               namaJenis,
-                              style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.w600),
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.white.withOpacity(0.9),
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      Chip(label: Text('${typedItems.length} item'), visualDensity: VisualDensity.compact),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '${typedItems.length} item',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
 
-                // COLUMN HEADERS (tanpa IDX)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                // ✅ COLUMN HEADERS - Lebih clean
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    border: Border(
+                      bottom: BorderSide(color: Colors.grey.shade200),
+                    ),
+                  ),
                   child: Row(
-                    children: const [
-                      SizedBox(width: 40), // checkbox
-                      Expanded(flex: 2, child: Text('SAK', style: TextStyle(fontWeight: FontWeight.w700))),
-                      Expanded(flex: 2, child: Text('BERAT (KG)', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w700))),
-                      SizedBox(width: 8),
-                      SizedBox(width: 200), // ruang badge + button
+                    children: [
+                      const SizedBox(width: 40),
+                      const Expanded(
+                        flex: 2,
+                        child: Text(
+                          'SAK',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                            color: Colors.black87,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                      const Expanded(
+                        flex: 2,
+                        child: Text(
+                          'BERAT (KG)',
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                            color: Colors.black87,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 220,
+                        child: Text(
+                          'STATUS',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                            color: Colors.black87,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
 
-                // LIST
+                // ✅ LIST - Design lebih modern
                 Expanded(
-                  child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(12),
                     itemCount: typedItems.length,
-                    separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade300),
                     itemBuilder: (_, idx) {
                       final item = typedItems[idx];
                       final rawRow = result.data[idx];
 
                       final presence = _presenceForRow(vm, rawRow, result, widget.noProduksi);
-                      final isDuplicate = _isDisabled(idx); // pakai precompute
+                      final isDuplicate = _isDisabled(idx);
                       final picked = _localPickedIndices.contains(idx);
 
                       if (isDuplicate && picked) {
@@ -317,20 +358,17 @@ class _LookupLabelDialogState extends State<LookupLabelDialog> {
 
                       final sak = _sakOf(item);
                       final originalBerat = _beratOf(item);
-
-                      // Gunakan berat yang diedit jika ada, otherwise gunakan original
                       final displayBerat = _editedWeights[idx] ?? originalBerat;
                       final beratTxt = displayBerat == null ? '-' : num2(displayBerat);
 
-                      // ==== PARTIAL DETECTION (tanpa sisa) ====
                       final isPartial = _isPartialOf(item, rawRow);
-                      final isEditingWeight = _showWeightEdit.contains(idx);
+                      final isWeightEdited = _editedWeights.containsKey(idx);
 
                       String? statusText;
                       Color? statusColor;
                       switch (presence) {
                         case _Presence.temp:
-                          statusText = 'Telah input (TEMP)';
+                          statusText = 'Sudah Input';
                           statusColor = Colors.orange;
                           break;
                         case _Presence.none:
@@ -339,194 +377,258 @@ class _LookupLabelDialogState extends State<LookupLabelDialog> {
                           break;
                       }
 
-                      final hasStatusBadge = presence != _Presence.none;
-                      final pillBg = hasStatusBadge ? statusColor!.withOpacity(0.12) : Colors.green.withOpacity(0.12);
-                      final pillBorder = hasStatusBadge ? statusColor!.withOpacity(0.25) : Colors.green.withOpacity(0.25);
-                      final pillText = hasStatusBadge ? statusColor!.withOpacity(0.95) : null;
-
-                      // Badge PARTIAL (tanpa sisa)
-                      final partialBadge = isPartial
-                          ? Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        margin: const EdgeInsets.only(right: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.withOpacity(0.14),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: Colors.amber.withOpacity(0.30)),
-                        ),
-                        child: const Text(
-                          'PARTIAL',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
-                        ),
-                      )
-                          : const SizedBox.shrink();
-
-                      final statusBadge = (statusText != null)
-                          ? Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: statusColor!.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: statusColor.withOpacity(0.25)),
-                        ),
-                        child: Text(
-                          statusText,
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-                        ),
-                      )
-                          : const SizedBox(width: 130);
-
-                      final rowChild = Container(
-                        // (opsional) garis indikator partial di kiri baris
-                        decoration: isPartial
-                            ? BoxDecoration(
-                          border: Border(
-                            left: BorderSide(color: Colors.amber.withOpacity(0.7), width: 3),
-                          ),
-                        )
-                            : null,
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            // Checkbox
-                            SizedBox(
-                              width: 40,
-                              child: AbsorbPointer(
-                                absorbing: isDuplicate,
-                                child: Checkbox(
-                                  value: picked && !isDuplicate,
-                                  onChanged: isDuplicate ? null : (_) => _toggleRow(vm, idx, rawRow),
-                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  visualDensity: VisualDensity.compact,
-                                ),
-                              ),
-                            ),
-
-                            // SAK
-                            Expanded(
-                              flex: 2,
-                              child: Row(
-                                children: [
-                                  if (isPartial) ...[
-                                    const Icon(Icons.content_cut, size: 14, color: Colors.amber),
-                                    const SizedBox(width: 6),
-                                  ],
-                                  Expanded(
-                                    child: Text(
-                                      sak?.toString() ?? '-',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        color: isDuplicate ? Colors.grey : null,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            // BERAT - Dengan Edit untuk Partial
-                            Expanded(
-                              flex: 2,
-                              child: Align(
-                                alignment: Alignment.centerRight,
-                                child: isPartial && isEditingWeight
-                                    ? _buildWeightEditor(idx, displayBerat, isDuplicate)
-                                    : Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: IgnorePointer(
+                          ignoring: isDuplicate,
+                          child: AnimatedOpacity(
+                            duration: const Duration(milliseconds: 200),
+                            opacity: isDuplicate ? 0.4 : 1.0,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: isDuplicate ? null : () => _toggleRow(vm, idx, rawRow),
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: pillBg,
-                                    borderRadius: BorderRadius.circular(999),
-                                    border: Border.all(color: pillBorder),
-                                  ),
-                                  child: Text(
-                                    '$beratTxt kg',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      color: pillText,
+                                    color: picked && !isDuplicate
+                                        ? Colors.blue.shade50
+                                        : Colors.white,
+                                    border: Border.all(
+                                      color: picked && !isDuplicate
+                                          ? Colors.blue.shade300
+                                          : Colors.grey.shade200,
+                                      width: picked && !isDuplicate ? 2 : 1,
                                     ),
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: picked && !isDuplicate
+                                        ? [
+                                      BoxShadow(
+                                        color: Colors.blue.withOpacity(0.1),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ]
+                                        : null,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      // Checkbox
+                                      Container(
+                                        width: 40,
+                                        height: 40,
+                                        alignment: Alignment.center,
+                                        child: Checkbox(
+                                          value: picked && !isDuplicate,
+                                          onChanged: isDuplicate
+                                              ? null
+                                              : (_) => _toggleRow(vm, idx, rawRow),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                      ),
+
+                                      // SAK dengan icon partial
+                                      Expanded(
+                                        flex: 2,
+                                        child: Row(
+                                          children: [
+                                            if (isPartial) ...[
+                                              Container(
+                                                padding: const EdgeInsets.all(4),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.amber.withOpacity(0.2),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: const Icon(
+                                                  Icons.content_cut,
+                                                  size: 14,
+                                                  color: Colors.amber,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                            ],
+                                            Expanded(
+                                              child: Text(
+                                                sak?.toString() ?? '-',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 15,
+                                                  color: isDuplicate
+                                                      ? Colors.grey.shade400
+                                                      : Colors.black87,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+
+                                      // BERAT - Pill style lebih modern
+                                      Expanded(
+                                        flex: 2,
+                                        child: Align(
+                                          alignment: Alignment.centerRight,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 6,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                colors: isWeightEdited
+                                                    ? [
+                                                  Colors.amber.shade300,
+                                                  Colors.amber.shade400,
+                                                ]
+                                                    : statusText != null
+                                                    ? [
+                                                  statusColor!.withOpacity(0.2),
+                                                  statusColor.withOpacity(0.3),
+                                                ]
+                                                    : [
+                                                  Colors.green.shade100,
+                                                  Colors.green.shade200,
+                                                ],
+                                              ),
+                                              borderRadius: BorderRadius.circular(20),
+                                            ),
+                                            child: Text(
+                                              '$beratTxt kg',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.bold,
+                                                color: isWeightEdited
+                                                    ? Colors.amber.shade900
+                                                    : statusText != null
+                                                    ? statusColor
+                                                    : Colors.green.shade800,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+
+                                      const SizedBox(width: 12),
+
+                                      // BADGES & BUTTON - Lebih compact
+                                      SizedBox(
+                                        width: 220,
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.end,
+                                          children: [
+                                            // Edit button
+                                            if (isPartial && !isDuplicate)
+                                              Container(
+                                                height: 32,
+                                                child: OutlinedButton.icon(
+                                                  style: OutlinedButton.styleFrom(
+                                                    padding: const EdgeInsets.symmetric(
+                                                      horizontal: 10,
+                                                      vertical: 4,
+                                                    ),
+                                                    side: BorderSide(
+                                                      color: Colors.amber.shade600,
+                                                      width: 1.5,
+                                                    ),
+                                                    shape: RoundedRectangleBorder(
+                                                      borderRadius: BorderRadius.circular(8),
+                                                    ),
+                                                  ),
+                                                  icon: Icon(
+                                                    Icons.edit_outlined,
+                                                    size: 14,
+                                                    color: Colors.amber.shade700,
+                                                  ),
+                                                  label: Text(
+                                                    'Edit',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: Colors.amber.shade700,
+                                                    ),
+                                                  ),
+                                                  onPressed: () async {
+                                                    if (originalBerat != null) {
+                                                      final newWeight =
+                                                      await WeightInputDialog.show(
+                                                        context,
+                                                        maxWeight: originalBerat,
+                                                        currentWeight: _editedWeights[idx],
+                                                      );
+
+                                                      if (newWeight != null && mounted) {
+                                                        setState(() {
+                                                          _editedWeights[idx] = newWeight;
+                                                        });
+                                                      }
+                                                    }
+                                                  },
+                                                ),
+                                              ),
+
+                                            if (isPartial && !isDuplicate)
+                                              const SizedBox(width: 8),
+
+                                            // Badges
+                                            if (isPartial)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 10,
+                                                  vertical: 4,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.amber.withOpacity(0.15),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  border: Border.all(
+                                                    color: Colors.amber.shade400,
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  'PARTIAL',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: Colors.amber.shade700,
+                                                    letterSpacing: 0.5,
+                                                  ),
+                                                ),
+                                              ),
+
+                                            if (statusText != null)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 10,
+                                                  vertical: 4,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: statusColor!.withOpacity(0.15),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  border: Border.all(
+                                                    color: statusColor.withOpacity(0.4),
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  statusText,
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: statusColor,
+                                                    letterSpacing: 0.3,
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
                             ),
-
-                            const SizedBox(width: 8),
-
-                            // BADGES & EDIT BUTTON
-                            SizedBox(
-                              width: 200, // diperlebar untuk tombol edit
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  // Tombol Edit Berat (hanya untuk partial)
-                                  if (isPartial && !isDuplicate) ...[
-                                    if (!isEditingWeight)
-                                      IconButton(
-                                        icon: const Icon(Icons.edit, size: 16),
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(),
-                                        onPressed: () {
-                                          setState(() {
-                                            _showWeightEdit.add(idx);
-                                          });
-                                        },
-                                        tooltip: 'Ubah Berat',
-                                        visualDensity: VisualDensity.compact,
-                                      )
-                                    else
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          IconButton(
-                                            icon: const Icon(Icons.check, size: 16, color: Colors.green),
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(),
-                                            onPressed: () {
-                                              setState(() {
-                                                _showWeightEdit.remove(idx);
-                                              });
-                                            },
-                                            tooltip: 'Simpan',
-                                            visualDensity: VisualDensity.compact,
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(Icons.close, size: 16, color: Colors.red),
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(),
-                                            onPressed: () {
-                                              setState(() {
-                                                _editedWeights.remove(idx);
-                                                _showWeightEdit.remove(idx);
-                                              });
-                                            },
-                                            tooltip: 'Batal',
-                                            visualDensity: VisualDensity.compact,
-                                          ),
-                                        ],
-                                      ),
-                                    const SizedBox(width: 8),
-                                  ],
-
-                                  // Badge Partial
-                                  if (isPartial) partialBadge,
-
-                                  // Status Badge
-                                  statusBadge,
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-
-                      return IgnorePointer(
-                        ignoring: isDuplicate,
-                        child: Opacity(
-                          opacity: isDuplicate ? 0.55 : 1.0,
-                          child: InkWell(
-                            onTap: isDuplicate || isEditingWeight ? null : () => _toggleRow(vm, idx, rawRow),
-                            child: rowChild,
                           ),
                         ),
                       );
@@ -534,37 +636,89 @@ class _LookupLabelDialogState extends State<LookupLabelDialog> {
                   ),
                 ),
 
-                // FOOTER
+                // ✅ FOOTER - Lebih modern dan intuitive
                 Container(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                  decoration: BoxDecoration(border: Border(top: BorderSide(color: Colors.grey.shade300))),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    border: Border(
+                      top: BorderSide(color: Colors.grey.shade200),
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(16),
+                      bottomRight: Radius.circular(16),
+                    ),
+                  ),
                   child: Row(
                     children: [
+                      // Clear button
                       TextButton.icon(
-                        onPressed: _localPickedIndices.isNotEmpty ? () => setState(_localPickedIndices.clear) : null,
-                        icon: const Icon(Icons.clear_all),
+                        onPressed: _localPickedIndices.isNotEmpty
+                            ? () => setState(_localPickedIndices.clear)
+                            : null,
+                        icon: const Icon(Icons.clear_all, size: 18),
                         label: const Text('Bersihkan'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.grey.shade700,
+                        ),
                       ),
                       const SizedBox(width: 8),
+
+                      // Select all button
                       if (newCount > 0)
                         OutlinedButton.icon(
                           onPressed: () => _selectAllNew(vm, result),
-                          icon: const Icon(Icons.select_all),
-                          label: Text('Pilih Semua Baru ($newCount)'),
-                        ),
-                      const Spacer(),
-                      if (_localPickedIndices.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 12),
-                          child: Text(
-                            '${_localPickedIndices.length} item dipilih',
-                            style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w600, fontSize: 13),
+                          icon: const Icon(Icons.done_all, size: 18),
+                          label: Text('Pilih Semua ($newCount)'),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: Colors.blue.shade300),
+                            foregroundColor: Colors.blue.shade700,
                           ),
                         ),
+
+                      const Spacer(),
+
+                      // Counter
+                      if (_localPickedIndices.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          margin: const EdgeInsets.only(right: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade100,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            '${_localPickedIndices.length} terpilih',
+                            style: TextStyle(
+                              color: Colors.blue.shade700,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+
+                      // Submit button
                       FilledButton.icon(
-                        onPressed: _localPickedIndices.isEmpty ? null : () => _commitSelection(vm, result),
-                        icon: const Icon(Icons.check),
-                        label: Text(_localPickedIndices.isEmpty ? 'Pilih Item' : 'Pakai (${_localPickedIndices.length})'),
+                        onPressed: _localPickedIndices.isEmpty
+                            ? null
+                            : () => _commitSelection(vm, result),
+                        icon: const Icon(Icons.check_circle, size: 18),
+                        label: Text(
+                          _localPickedIndices.isEmpty
+                              ? 'Pilih Item'
+                              : 'Tambahkan (${_localPickedIndices.length})',
+                        ),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.blue.shade600,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -623,7 +777,6 @@ class _LookupLabelDialogState extends State<LookupLabelDialog> {
     return null;
   }
 
-  // ===== PARTIAL helper (tanpa sisa) =====
   static bool _boolish(dynamic v) {
     if (v == null) return false;
     if (v is bool) return v;
@@ -632,13 +785,10 @@ class _LookupLabelDialogState extends State<LookupLabelDialog> {
   }
 
   static bool _isPartialOf(dynamic item, Map<String, dynamic> row) {
-    // dari JSON row (contoh di pertanyaan)
     if (_boolish(row['isPartial']) || _boolish(row['IsPartial'])) return true;
 
-    // fallback dari typed model (kalau ada)
     try {
       if (item is BbItem && item.isPartialRow == true) return true;
-      // beberapa model pakai isPartial
       final dynamic dyn = item;
       final hasIsPartial = (dyn as dynamic?)?.isPartial;
       if (hasIsPartial is bool && hasIsPartial) return true;

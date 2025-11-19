@@ -1,5 +1,6 @@
 // lib/features/broker/view_model/broker_production_view_model.dart
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 
@@ -355,7 +356,11 @@ class BrokerProductionViewModel extends ChangeNotifier {
 
   Future<bool> deleteProduksi(String noProduksi) async {
     try {
+      saveError = null; // clear error sebelumnya
+      notifyListeners();
+
       await repository.deleteProduksi(noProduksi);
+
       // refresh list
       if (isByDateMode) {
         if (date != null) {
@@ -367,7 +372,21 @@ class BrokerProductionViewModel extends ChangeNotifier {
       }
       return true;
     } catch (e) {
-      saveError = e.toString();
+      String msg = e.toString().replaceFirst('Exception: ', '').trim();
+
+      // 🔍 kalau msg kelihatan seperti JSON → coba ambil "message"
+      if (msg.startsWith('{') && msg.endsWith('}')) {
+        try {
+          final decoded = jsonDecode(msg);
+          if (decoded is Map && decoded['message'] != null) {
+            msg = decoded['message'].toString();
+          }
+        } catch (_) {
+          // kalau parsing gagal, biarkan msg apa adanya
+        }
+      }
+
+      saveError = msg;
       notifyListeners();
       return false;
     }

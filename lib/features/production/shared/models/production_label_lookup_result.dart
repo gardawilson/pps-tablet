@@ -1,6 +1,12 @@
-// lib/features/broker/model/production_label_lookup_result.dart
+// lib/features/production/shared/models/production_label_lookup_result.dart
 
-import '../../broker/model/broker_inputs_model.dart';
+import 'broker_item.dart';
+import 'bb_item.dart';
+import 'washing_item.dart';
+import 'crusher_item.dart';
+import 'gilingan_item.dart';
+import 'mixer_item.dart';
+import 'reject_item.dart';
 
 class ProductionLabelLookupResult {
   final bool found;
@@ -27,8 +33,8 @@ class ProductionLabelLookupResult {
       message: (body['message'] as String?) ?? 'OK',
       prefix: body['prefix'] as String?,
       tableName: body['tableName'] as String?,
-      totalRecords: (body['totalRecords'] as num?)?.toInt()
-          ?? (body['data'] is List ? (body['data'] as List).length : 0),
+      totalRecords: (body['totalRecords'] as num?)?.toInt() ??
+          (body['data'] is List ? (body['data'] as List).length : 0),
       data: _castListMap(body['data']),
       raw: body,
     );
@@ -48,7 +54,10 @@ class ProductionLabelLookupResult {
 
   static List<Map<String, dynamic>> _castListMap(dynamic v) {
     if (v is List) {
-      return v.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map)).toList();
+      return v
+          .map<Map<String, dynamic>>(
+              (e) => Map<String, dynamic>.from(e as Map))
+          .toList();
     }
     return const [];
   }
@@ -107,14 +116,22 @@ class ProductionLabelLookupResult {
     final p = (prefix ?? '').toUpperCase();
 
     switch (p) {
-      case 'D.':  return brokerItems;   // Broker_d
-      case 'A.':  return bbItems;       // BahanBaku_d
-      case 'B.':  return washingItems;  // Washing_d
-      case 'F.':  return crusherItems;  // Crusher
-      case 'V.':  return gilinganItems; // Gilingan
-      case 'H.':  return mixerItems;    // Mixer_d
-      case 'BF.': return rejectItems;   // RejectV2
-      default:    return const [];
+      case 'D.':
+        return brokerItems; // Broker_d
+      case 'A.':
+        return bbItems; // BahanBaku_d
+      case 'B.':
+        return washingItems; // Washing_d
+      case 'F.':
+        return crusherItems; // Crusher
+      case 'V.':
+        return gilinganItems; // Gilingan
+      case 'H.':
+        return mixerItems; // Mixer_d
+      case 'BF.':
+        return rejectItems; // RejectV2
+      default:
+        return const [];
     }
   }
 
@@ -124,14 +141,22 @@ class ProductionLabelLookupResult {
   PrefixType get prefixType {
     final p = (prefix ?? '').toUpperCase();
     switch (p) {
-      case 'D.':  return PrefixType.broker;
-      case 'A.':  return PrefixType.bb;
-      case 'B.':  return PrefixType.washing;
-      case 'F.':  return PrefixType.crusher;
-      case 'V.':  return PrefixType.gilingan;
-      case 'H.':  return PrefixType.mixer;
-      case 'BF.': return PrefixType.reject;
-      default:    return PrefixType.unknown;
+      case 'D.':
+        return PrefixType.broker;
+      case 'A.':
+        return PrefixType.bb;
+      case 'B.':
+        return PrefixType.washing;
+      case 'F.':
+        return PrefixType.crusher;
+      case 'V.':
+        return PrefixType.gilingan;
+      case 'H.':
+        return PrefixType.mixer;
+      case 'BF.':
+        return PrefixType.reject;
+      default:
+        return PrefixType.unknown;
     }
   }
 
@@ -158,7 +183,8 @@ class ProductionLabelLookupResult {
       table = 'Broker_d';
       prefix = 'D.';
       no = getValue('NoBroker', 'noBroker') ?? '-';
-    } else if (row.containsKey('NoBahanBaku') || row.containsKey('noBahanBaku')) {
+    } else if (row.containsKey('NoBahanBaku') ||
+        row.containsKey('noBahanBaku')) {
       table = 'BahanBaku_d';
       prefix = 'A.';
       no = getValue('NoBahanBaku', 'noBahanBaku') ?? '-';
@@ -170,7 +196,8 @@ class ProductionLabelLookupResult {
       table = 'Crusher';
       prefix = 'F.';
       no = getValue('NoCrusher', 'noCrusher') ?? '-';
-    } else if (row.containsKey('NoGilingan') || row.containsKey('noGilingan')) {
+    } else if (row.containsKey('NoGilingan') ||
+        row.containsKey('noGilingan')) {
       table = 'Gilingan';
       prefix = 'V.';
       no = getValue('NoGilingan', 'noGilingan') ?? '-';
@@ -218,7 +245,7 @@ class ProductionLabelLookupResult {
     final updatedAt = getValue('UpdatedAt', 'updated_at');
 
     // Gabungkan semua field untuk uniqueness maksimal
-    return '$simpleKeyPart|IDX:$index|${berat}${beratKg}|${id}${idCaps}|$createdAt|$updatedAt';
+    return '$simpleKeyPart|IDX:$index|$berat$beratKg|$id$idCaps|$createdAt|$updatedAt';
   }
 
   /// Alternative: Generate unique key dengan explicit index parameter
@@ -238,7 +265,7 @@ class ProductionLabelLookupResult {
     final createdAt = getValue('CreatedAt', 'created_at');
     final updatedAt = getValue('UpdatedAt', 'updated_at');
 
-    return '$simpleKeyPart|IDX:$index|${berat}${beratKg}|${id}${idCaps}|$createdAt|$updatedAt';
+    return '$simpleKeyPart|IDX:$index|$berat$beratKg|$id$idCaps|$createdAt|$updatedAt';
   }
 
   // ========== HELPER METHODS ==========
@@ -248,6 +275,8 @@ class ProductionLabelLookupResult {
     if (!found || data.isEmpty) return false;
 
     switch (prefixType) {
+      case PrefixType.broker:
+        return brokerItems.any((item) => item.isPartialRow);
       case PrefixType.bb:
         return bbItems.any((item) => item.isPartialRow);
       case PrefixType.gilingan:
@@ -330,42 +359,57 @@ class ProductionLabelLookupResult {
 
 /// Enum untuk tipe prefix yang dikenali sistem
 enum PrefixType {
-  broker,   // D.
-  bb,       // A.
-  washing,  // B.
-  crusher,  // F.
+  broker, // D.
+  bb, // A.
+  washing, // B.
+  crusher, // F.
   gilingan, // V.
-  mixer,    // H.
-  reject,   // BF.
+  mixer, // H.
+  reject, // BF.
   unknown;
 
   String get displayName {
     switch (this) {
-      case PrefixType.broker:   return 'Broker';
-      case PrefixType.bb:       return 'Bahan Baku';
-      case PrefixType.washing:  return 'Washing';
-      case PrefixType.crusher:  return 'Crusher';
-      case PrefixType.gilingan: return 'Gilingan';
-      case PrefixType.mixer:    return 'Mixer';
-      case PrefixType.reject:   return 'Reject';
-      case PrefixType.unknown:  return 'Unknown';
+      case PrefixType.broker:
+        return 'Broker';
+      case PrefixType.bb:
+        return 'Bahan Baku';
+      case PrefixType.washing:
+        return 'Washing';
+      case PrefixType.crusher:
+        return 'Crusher';
+      case PrefixType.gilingan:
+        return 'Gilingan';
+      case PrefixType.mixer:
+        return 'Mixer';
+      case PrefixType.reject:
+        return 'Reject';
+      case PrefixType.unknown:
+        return 'Unknown';
     }
   }
 
   String get prefixCode {
     switch (this) {
-      case PrefixType.broker:   return 'D.';
-      case PrefixType.bb:       return 'A.';
-      case PrefixType.washing:  return 'B.';
-      case PrefixType.crusher:  return 'F.';
-      case PrefixType.gilingan: return 'V.';
-      case PrefixType.mixer:    return 'H.';
-      case PrefixType.reject:   return 'BF.';
-      case PrefixType.unknown:  return '';
+      case PrefixType.broker:
+        return 'D.';
+      case PrefixType.bb:
+        return 'A.';
+      case PrefixType.washing:
+        return 'B.';
+      case PrefixType.crusher:
+        return 'F.';
+      case PrefixType.gilingan:
+        return 'V.';
+      case PrefixType.mixer:
+        return 'H.';
+      case PrefixType.reject:
+        return 'BF.';
+      case PrefixType.unknown:
+        return '';
     }
   }
 }
-
 
 // ====== TEMP PARTIAL CODE GENERATOR ======
 // Aturan: A. -> P.XXXXX, V. -> Y.XXX, H. -> T.XXXX, BF. -> BK.XXXX, D. -> Q.XXXXXXXXXX
@@ -374,30 +418,42 @@ extension TempPartialFormat on PrefixType {
   /// Prefix huruf untuk partial sementara per kategori
   String get tempPartialLetter {
     switch (this) {
-      case PrefixType.broker:   return 'Q'; // Broker (DITAMBAHKAN)
-      case PrefixType.bb:       return 'P'; // Bahan Baku
-      case PrefixType.gilingan: return 'Y'; // Gilingan
-      case PrefixType.mixer:    return 'T'; // Mixer
-      case PrefixType.reject:   return 'BK'; // Reject
-      default:                  return '';  // lainnya tidak dipakai
+      case PrefixType.broker:
+        return 'Q'; // Broker
+      case PrefixType.bb:
+        return 'P'; // Bahan Baku
+      case PrefixType.gilingan:
+        return 'Y'; // Gilingan
+      case PrefixType.mixer:
+        return 'T'; // Mixer
+      case PrefixType.reject:
+        return 'BK'; // Reject
+      default:
+        return ''; // lainnya tidak dipakai
     }
   }
 
   /// Jumlah digit numeric setelah titik
   int get tempPartialDigits {
     switch (this) {
-      case PrefixType.broker:   return 10; // Q.0000000087 (DITAMBAHKAN)
-      case PrefixType.bb:       return 5; // P.00001
-      case PrefixType.gilingan: return 3; // Y.001
-      case PrefixType.mixer:    return 4; // T.0001
-      case PrefixType.reject:   return 4; // BK.0001
-      default:                  return 0;
+      case PrefixType.broker:
+        return 10; // Q.0000000087
+      case PrefixType.bb:
+        return 5; // P.00001
+      case PrefixType.gilingan:
+        return 3; // Y.001
+      case PrefixType.mixer:
+        return 4; // T.0001
+      case PrefixType.reject:
+        return 4; // BK.0001
+      default:
+        return 0;
     }
   }
 
   /// Apakah kategori ini mendukung temp-partial
   bool get supportsTempPartial {
-    return this == PrefixType.broker ||  // DITAMBAHKAN
+    return this == PrefixType.broker ||
         this == PrefixType.bb ||
         this == PrefixType.gilingan ||
         this == PrefixType.mixer ||
@@ -419,4 +475,5 @@ extension TempPartialFormat on PrefixType {
 }
 
 /// Util sederhana jika kamu mau pakai tanpa instance enum
-String generateTempPartialCode(PrefixType t, int seq) => t.formatTempPartial(seq);
+String generateTempPartialCode(PrefixType t, int seq) =>
+    t.formatTempPartial(seq);

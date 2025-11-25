@@ -1,20 +1,13 @@
 // =============================
-// lib/features/production/broker/widgets/inputs_group_popover.dart
-// Updated: Delete All (TEMP) per grup + realtime via Provider
-//          Header chip "TEMP PARTIAL" bila isi temp adalah partial (berdasar data)
-//          Label tombol hapus dinamis (TEMP / TEMP Partial) + aktif hanya saat ada TEMP
-//          Sinkron lebar kolom header & data via columnFlexes
-//          Edit mode untuk multi-delete EXISTING (bukan TEMP) pakai checkbox
-//          Permission: delete TEMP by isTemp, delete EXISTING by canDelete
+// lib/features/production/broker/widgets/broker_input_group_popover.dart
+// Updated: Batch delete + Summary Total Sak & Berat
 // =============================
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../../common/widgets/loading_dialog.dart';
 import '../view_model/broker_production_input_view_model.dart';
 
 /// Cek apakah bucket TEMP untuk labelCode berisi item partial.
-/// (Sumber kebenaran: ada nomor partial di item, mis. noBrokerPartial/noBBPartial/noGilinganPartial/… non-empty)
 bool _hasPartialTempForLabel(
     BrokerProductionInputViewModel vm,
     String labelCode,
@@ -40,41 +33,36 @@ bool _hasPartialTempForLabel(
       hasRejectPart;
 }
 
+/// ✅ Model untuk summary data - HANYA BERAT
+class TooltipSummary {
+  final double totalBerat;
+
+  const TooltipSummary({
+    required this.totalBerat,
+  });
+}
+
+
 /// Popover tooltip di sebelah KIRI anchor tile.
 class InputsGroupTooltip extends StatefulWidget {
-  /// Header title (nomor label/partial) -> juga dipakai sebagai labelCode
   final String title;
-
-  /// Optional subtitle (nama jenis)
   final String? subtitle;
-
-  /// Warna header
   final Color headerColor;
-
-  /// Builder isi baris (realtime)
   final List<Widget> Function() childrenBuilder;
   final VoidCallback onClose;
-
-  /// Actions custom di kanan footer
   final List<Widget> actions;
-
-  /// Lebar & tinggi popover
   final double width;
   final double maxHeight;
-
-  /// Header kolom opsional
   final List<String>? tableHeaders;
-
-  /// Flex kolom data (tanpa kolom Action), digunakan untuk header & row
   final List<int>? columnFlexes;
-
-  /// Tombol Hapus Semua (TEMP) - kiri footer
   final VoidCallback? onDeleteAllTemp;
   final bool deleteAllTempDisabled;
   final String deleteAllTempLabel;
-
-  /// Permission delete existing rows
   final bool canDelete;
+  final Future<bool> Function(List<dynamic> items)? onBulkDelete;
+
+  /// ✅ NEW: Builder untuk summary total
+  final TooltipSummary Function()? summaryBuilder;
 
   const InputsGroupTooltip({
     super.key,
@@ -92,6 +80,8 @@ class InputsGroupTooltip extends StatefulWidget {
     this.deleteAllTempDisabled = false,
     this.deleteAllTempLabel = 'Hapus Semua (TEMP)',
     this.canDelete = false,
+    this.onBulkDelete,
+    this.summaryBuilder, // ✅ NEW
   });
 
   @override
@@ -99,17 +89,12 @@ class InputsGroupTooltip extends StatefulWidget {
 }
 
 class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
-  // Mode edit / multi-delete untuk EXISTING (bukan temp)
   bool _selectionMode = false;
-
-  // Index row yang terpilih
   final Set<int> _selectedIndices = <int>{};
-
-  // Simpan callback onDelete untuk row existing per index
-  final Map<int, VoidCallback> _rowDeleteCallbacks = <int, VoidCallback>{};
+  final Map<int, dynamic> _rowItems = <int, dynamic>{};
 
   void _enterSelectionMode() {
-    if (!widget.canDelete) return; // safety guard
+    if (!widget.canDelete) return;
     setState(() {
       _selectionMode = true;
       _selectedIndices.clear();
@@ -133,20 +118,21 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
     });
   }
 
-  void _confirmBulkDelete() async {
+  Future<void> _confirmBulkDelete() async {
     if (_selectedIndices.isEmpty) return;
+    if (widget.onBulkDelete == null) return;
 
     final indices = _selectedIndices.toList()..sort();
 
-    final callbacks = <VoidCallback>[];
+    final itemsToDelete = <dynamic>[];
     for (final i in indices) {
-      final cb = _rowDeleteCallbacks[i];
-      if (cb != null) {
-        callbacks.add(cb);
+      final item = _rowItems[i];
+      if (item != null) {
+        itemsToDelete.add(item);
       }
     }
 
-    final count = callbacks.length;
+    final count = itemsToDelete.length;
     if (count == 0) return;
 
     setState(() {
@@ -185,50 +171,53 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
 
     if (!confirmed) return;
 
-    // ❌ TIDAK ADA loading dialog
-    // ✅ Langsung eksekusi delete → skeleton otomatis muncul karena state loading
-    for (final cb in callbacks) {
-      cb();
-    }
+    final success = await widget.onBulkDelete!(itemsToDelete);
 
-    // Snackbar setelah selesai
     await Future.delayed(const Duration(milliseconds: 300));
+
     if (rootCtx.mounted) {
-      ScaffoldMessenger.of(rootCtx).showSnackBar(
-        SnackBar(
-          content: Text('✅ Berhasil menghapus $count item'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      if (success) {
+        ScaffoldMessenger.of(rootCtx).showSnackBar(
+          SnackBar(
+            content: Text('✅ Berhasil menghapus $count item'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(rootCtx).showSnackBar(
+          SnackBar(
+            content: const Text('❌ Gagal menghapus item'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
-
-  /// Bungkus row supaya:
-  /// - saat selectionMode, row existing (bukan TEMP) punya checkbox di kiri
-  /// - seleksi existing hanya aktif kalau canDelete = true
   Widget _buildSelectableRow(Widget child, int index) {
     bool canSelect = false;
 
-    // Semua TooltipTableRow existing (isTempRow == false) boleh dipilih
-    // hanya jika permission canDelete = true
-    if (widget.canDelete &&
-        child is TooltipTableRow &&
-        !child.isTempRow) {
+    if (widget.canDelete && child is TooltipTableRow && !child.isTempRow) {
       canSelect = true;
 
-      // Kalau lagi selection mode, hide tombol delete single-row existing
+      if (child.itemData != null) {
+        _rowItems[index] = child.itemData;
+      }
+
       child = TooltipTableRow(
         columns: child.columns,
         columnFlexes: child.columnFlexes,
-        onDelete: child.onDelete, // tetap dipass, dipakai bulk
+        onDelete: child.onDelete,
         deleteColor: child.deleteColor,
         showDelete: !_selectionMode && child.showDelete,
         isHighlighted: child.isHighlighted,
         isDisabled: child.isDisabled,
         isTempRow: child.isTempRow,
+        itemData: child.itemData,
       );
     }
 
@@ -265,9 +254,7 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
   Widget build(BuildContext context) {
     final divider =
     Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
-    final double clampedMaxH =
-    widget.maxHeight.clamp(180.0, 520.0).toDouble();
-
+    final double clampedMaxH = widget.maxHeight.clamp(180.0, 520.0).toDouble();
     final bool canDeleteExisting = widget.canDelete;
 
     return ConstrainedBox(
@@ -334,11 +321,8 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                                 .read<BrokerProductionInputViewModel>();
                             final hasTempForThis =
                             vm.hasTemporaryDataForLabel(widget.title);
-                            final hasPartialTemp =
-                            _hasPartialTempForLabel(vm, widget.title);
                             final showTempChip = hasTempForThis;
-                            final chipText =
-                            hasPartialTemp ? 'PENDING' : 'PENDING';
+                            final chipText = 'PENDING';
 
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -362,19 +346,17 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                                     if (showTempChip) ...[
                                       const SizedBox(width: 8),
                                       Container(
-                                        padding:
-                                        const EdgeInsets.symmetric(
+                                        padding: const EdgeInsets.symmetric(
                                           horizontal: 8,
                                           vertical: 2,
                                         ),
                                         decoration: BoxDecoration(
-                                          color:
-                                          Colors.white.withOpacity(0.2),
+                                          color: Colors.white.withOpacity(0.2),
                                           borderRadius:
                                           BorderRadius.circular(999),
                                           border: Border.all(
-                                            color: Colors.white
-                                                .withOpacity(0.35),
+                                            color:
+                                            Colors.white.withOpacity(0.35),
                                           ),
                                         ),
                                         child: Text(
@@ -389,9 +371,7 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                                     ],
                                   ],
                                 ),
-                                if ((widget.subtitle ?? '')
-                                    .trim()
-                                    .isNotEmpty) ...[
+                                if ((widget.subtitle ?? '').trim().isNotEmpty) ...[
                                   const SizedBox(height: 2),
                                   Text(
                                     widget.subtitle!.trim(),
@@ -400,8 +380,7 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
-                                      color:
-                                      Colors.white.withOpacity(0.9),
+                                      color: Colors.white.withOpacity(0.9),
                                     ),
                                   ),
                                 ],
@@ -411,8 +390,6 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                         ),
                       ),
                       const SizedBox(width: 8),
-
-                      // 🔧 TOMBOL EDIT / EXIT EDIT (disable kalau !canDeleteExisting)
                       IconButton(
                         tooltip: !canDeleteExisting
                             ? 'Tidak punya izin menghapus data existing'
@@ -420,9 +397,7 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                             ? 'Keluar mode hapus'
                             : 'Pilih data existing untuk dihapus',
                         icon: Icon(
-                          _selectionMode
-                              ? Icons.close_rounded
-                              : Icons.edit,
+                          _selectionMode ? Icons.close_rounded : Icons.edit,
                           color: canDeleteExisting
                               ? Colors.white
                               : Colors.white.withOpacity(0.4),
@@ -443,7 +418,7 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                 divider,
 
                 // =======================================================
-                // TABLE HEADER (opsional)
+                // TABLE HEADER
                 // =======================================================
                 if (widget.tableHeaders != null &&
                     widget.tableHeaders!.isNotEmpty) ...[
@@ -464,15 +439,13 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                     child: Row(
                       children: [
                         if (_selectionMode && canDeleteExisting)
-                          const SizedBox(width: 32), // ruang checkbox
+                          const SizedBox(width: 36),
                         ...widget.tableHeaders!.asMap().entries.map(
                               (entry) {
                             final index = entry.key;
                             final header = entry.value;
 
-                            // Kolom aksi terakhir lebar tetap
-                            if (index ==
-                                widget.tableHeaders!.length - 1) {
+                            if (index == widget.tableHeaders!.length - 1) {
                               return SizedBox(
                                 width: 60,
                                 child: Text(
@@ -488,12 +461,8 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                               );
                             }
 
-                            // Flex sama dengan row data
-                            final flex =
-                            (widget.columnFlexes != null &&
-                                index <
-                                    widget
-                                        .columnFlexes!.length &&
+                            final flex = (widget.columnFlexes != null &&
+                                index < widget.columnFlexes!.length &&
                                 widget.columnFlexes![index] > 0)
                                 ? widget.columnFlexes![index]
                                 : 1;
@@ -502,8 +471,7 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                               flex: flex,
                               child: Padding(
                                 padding: EdgeInsets.only(
-                                  right: index <
-                                      widget.tableHeaders!.length - 1
+                                  right: index < widget.tableHeaders!.length - 1
                                       ? 8
                                       : 0,
                                 ),
@@ -526,7 +494,7 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                 ],
 
                 // =======================================================
-                // BODY: realtime via Consumer
+                // BODY
                 // =======================================================
                 Flexible(
                   child: Consumer<BrokerProductionInputViewModel>(
@@ -548,18 +516,7 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                         );
                       }
 
-                      // Kumpulkan callback delete hanya untuk row EXISTING (bukan temp)
-                      _rowDeleteCallbacks.clear();
-                      if (canDeleteExisting) {
-                        for (var i = 0; i < children.length; i++) {
-                          final child = children[i];
-                          if (child is TooltipTableRow &&
-                              child.onDelete != null &&
-                              !child.isTempRow) {
-                            _rowDeleteCallbacks[i] = child.onDelete!;
-                          }
-                        }
-                      }
+                      _rowItems.clear();
 
                       return ListView.separated(
                         shrinkWrap: true,
@@ -580,17 +537,145 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                   ),
                 ),
 
+// =======================================================
+// ✅ SUMMARY SECTION (Total Berat Sejajar)
+// =======================================================
+                if (widget.summaryBuilder != null)
+                  Consumer<BrokerProductionInputViewModel>(
+                    builder: (context, vm, _) {
+                      final summary = widget.summaryBuilder!();
+                      final flexes = widget.columnFlexes ?? [];
+
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: widget.headerColor.withOpacity(0.08),
+                          border: Border(
+                            top: BorderSide(
+                              color: widget.headerColor.withOpacity(0.3),
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            // ✅ Align dengan checkbox space
+                            if (_selectionMode && canDeleteExisting)
+                              const SizedBox(width: 36),
+
+                            // ✅ Build kolom summary dengan flex yang SAMA dengan data rows
+                            ...() {
+                              final List<Widget> summaryColumns = [];
+
+                              if (flexes.isEmpty) {
+                                // Fallback jika tidak ada columnFlexes
+                                summaryColumns.add(
+                                  Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(right: 8),
+                                      child: Text(
+                                        'TOTAL',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w800,
+                                          color: widget.headerColor,
+                                          letterSpacing: 0.8,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                                summaryColumns.add(
+                                  Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(right: 8),
+                                      child: Text(
+                                        '${summary.totalBerat.toStringAsFixed(2)} kg',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          color: widget.headerColor,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              } else {
+                                // ✅ Render sesuai jumlah kolom (gunakan flex yang sama)
+                                for (int i = 0; i < flexes.length; i++) {
+                                  if (i == flexes.length - 1) {
+                                    // Kolom terakhir = Total Berat
+                                    summaryColumns.add(
+                                      Expanded(
+                                        flex: flexes[i],
+                                        child: Padding(
+                                          padding: const EdgeInsets.only(right: 8),
+                                          child: Text(
+                                            '${summary.totalBerat.toStringAsFixed(2)} kg',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w700,
+                                              color: widget.headerColor,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  } else if (i == 0) {
+                                    // Kolom pertama = TOTAL label
+                                    summaryColumns.add(
+                                      Expanded(
+                                        flex: flexes[i],
+                                        child: Padding(
+                                          padding: const EdgeInsets.only(right: 8),
+                                          child: Text(
+                                            'TOTAL',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w800,
+                                              color: widget.headerColor,
+                                              letterSpacing: 0.8,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  } else {
+                                    // Kolom tengah = kosong (untuk alignment)
+                                    summaryColumns.add(
+                                      Expanded(
+                                        flex: flexes[i],
+                                        child: const SizedBox.shrink(),
+                                      ),
+                                    );
+                                  }
+                                }
+                              }
+
+                              return summaryColumns;
+                            }(),
+
+                            // Spacer untuk kolom action (fixed 60px)
+                            const SizedBox(width: 60),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+
+                divider,
+
                 // =======================================================
                 // FOOTER
-                // - normal: Hapus Semua TEMP + actions (Oke)
-                // - selection mode: Batal + Hapus (n)  [hanya kalau canDelete = true]
                 // =======================================================
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                   child: Row(
                     children: _selectionMode && canDeleteExisting
                         ? [
-                      // Mode multi-delete existing
                       TextButton(
                         onPressed: _exitSelectionMode,
                         child: const Text('Batal'),
@@ -611,11 +696,9 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                       ),
                     ]
                         : [
-                      // Mode normal
                       if (widget.onDeleteAllTemp != null)
                         TextButton.icon(
-                          onPressed:
-                          widget.deleteAllTempDisabled
+                          onPressed: widget.deleteAllTempDisabled
                               ? null
                               : widget.onDeleteAllTemp,
                           icon: const Icon(
@@ -623,8 +706,7 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                           ),
                           label: Text(widget.deleteAllTempLabel),
                           style: TextButton.styleFrom(
-                            foregroundColor:
-                            Colors.red.shade700,
+                            foregroundColor: Colors.red.shade700,
                           ),
                         ),
                       const Spacer(),
@@ -641,25 +723,17 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
   }
 }
 
-/// Table row sederhana dengan tombol delete di kolom aksi.
+/// Table row dengan itemData
 class TooltipTableRow extends StatelessWidget {
   final List<String> columns;
-
-  /// Flex untuk tiap kolom data (BUKAN kolom action).
-  /// Contoh: [3, 2] → kolom[0] 3 bagian, kolom[1] 2 bagian.
   final List<int>? columnFlexes;
-
-  /// Callback hapus untuk row ini.
   final VoidCallback? onDelete;
-
   final Color? deleteColor;
   final bool showDelete;
   final bool isHighlighted;
   final bool isDisabled;
-
-  /// Menandai bahwa row ini TEMP atau bukan.
-  /// Multi-delete hanya untuk row existing (isTempRow == false).
   final bool isTempRow;
+  final dynamic itemData;
 
   const TooltipTableRow({
     super.key,
@@ -671,24 +745,22 @@ class TooltipTableRow extends StatelessWidget {
     this.isHighlighted = false,
     this.isDisabled = false,
     this.isTempRow = false,
+    this.itemData,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding:
-      const EdgeInsets.symmetric(horizontal: 0, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 10),
       decoration: BoxDecoration(
         color: isHighlighted ? Colors.yellow.shade50 : Colors.transparent,
       ),
       child: Row(
         children: [
-          // Kolom-kolom data
           ...columns.asMap().entries.map((entry) {
             final index = entry.key;
             final value = entry.value;
 
-            // flex default = 1 kalau tidak diset
             final flex = (columnFlexes != null &&
                 index < columnFlexes!.length &&
                 columnFlexes![index] > 0)
@@ -713,8 +785,6 @@ class TooltipTableRow extends StatelessWidget {
               ),
             );
           }),
-
-          // Kolom aksi (fixed width)
           SizedBox(
             width: 60,
             child: Center(
@@ -732,8 +802,7 @@ class TooltipTableRow extends StatelessWidget {
                         color: deleteColor ?? Colors.red.shade50,
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
-                          color:
-                          deleteColor ?? Colors.red.shade200,
+                          color: deleteColor ?? Colors.red.shade200,
                           width: 1,
                         ),
                       ),
@@ -742,8 +811,7 @@ class TooltipTableRow extends StatelessWidget {
                             ? Icons.lock_outline
                             : Icons.delete_outline,
                         size: 16,
-                        color: deleteColor ??
-                            Colors.red.shade700,
+                        color: deleteColor ?? Colors.red.shade700,
                       ),
                     ),
                   ),
@@ -761,27 +829,22 @@ class TooltipTableRow extends StatelessWidget {
   }
 }
 
-/// Tile anchor yang membuka [InputsGroupTooltip] saat di-tap.
+/// Tile anchor
 class GroupTooltipAnchorTile extends StatefulWidget {
-  /// Biasanya nomor label/partial, dan **dipakai sebagai labelCode**.
   final String title;
   final String? headerSubtitle;
   final Color color;
-
-  /// Builder konten (realtime)
   final List<Widget> Function() detailsBuilder;
-
   final List<String>? tableHeaders;
-
-  /// Flex kolom data (dipakai header & row)
   final List<int>? columnFlexes;
-
-  /// Permission delete existing rows (temp tetap boleh dihapus)
   final bool canDelete;
-
   final double popoverWidth;
   final double gap;
   final VoidCallback? onUpdate;
+  final Future<bool> Function(List<dynamic> items)? onBulkDelete;
+
+  /// ✅ NEW: Summary builder
+  final TooltipSummary Function()? summaryBuilder;
 
   const GroupTooltipAnchorTile({
     super.key,
@@ -792,9 +855,11 @@ class GroupTooltipAnchorTile extends StatefulWidget {
     this.tableHeaders,
     this.columnFlexes,
     this.canDelete = false,
-    this.popoverWidth = 400,
+    this.popoverWidth = 350,
     this.gap = 16,
     this.onUpdate,
+    this.onBulkDelete,
+    this.summaryBuilder, // ✅ NEW
   });
 
   @override
@@ -810,50 +875,35 @@ class _GroupTooltipAnchorTileState extends State<GroupTooltipAnchorTile> {
     if (_entry != null) return;
 
     final overlay = Overlay.of(context);
-    final overlayBox =
-    overlay.context.findRenderObject() as RenderBox;
-
+    final overlayBox = overlay.context.findRenderObject() as RenderBox;
     final media = MediaQuery.of(context);
     final screenH = media.size.height;
     final padding = media.padding;
 
-    // --- posisi & ukuran tile (anchor) ---
     final rb = context.findRenderObject() as RenderBox;
-    final targetTopLeft =
-    rb.localToGlobal(Offset.zero, ancestor: overlayBox);
+    final targetTopLeft = rb.localToGlobal(Offset.zero, ancestor: overlayBox);
     final tileSize = rb.size;
     final tileCenterY = targetTopLeft.dy + tileSize.height / 2;
 
-    // --- tinggi maksimal popover ---
     final double maxHeight =
-    (screenH - padding.vertical - 32)
-        .clamp(180.0, 520.0)
-        .toDouble();
+    (screenH - padding.vertical - 32).clamp(180.0, 520.0).toDouble();
 
-    // Batas aman atas & bawah layar (kasih margin 8px)
     final double topLimit = padding.top + 8;
     final double bottomLimit = screenH - padding.bottom - 8;
 
-    // Hitung offset Y supaya popover tidak keluar layar
     double yOffset = 0.0;
-
     final double popoverTop = tileCenterY - maxHeight / 2;
     final double popoverBottom = tileCenterY + maxHeight / 2;
 
     if (popoverTop < topLimit) {
-      // Terlalu ke atas → geser turun
       yOffset = topLimit - popoverTop;
     } else if (popoverBottom > bottomLimit) {
-      // Terlalu ke bawah → geser naik
       yOffset = bottomLimit - popoverBottom;
     }
 
-    // --- state VM untuk tombol Hapus TEMP ---
     final vm = context.read<BrokerProductionInputViewModel>();
-    final hasTempForThis =
-    vm.hasTemporaryDataForLabel(widget.title);
-    final hasPartialTemp =
-    _hasPartialTempForLabel(vm, widget.title);
+    final hasTempForThis = vm.hasTemporaryDataForLabel(widget.title);
+    final hasPartialTemp = _hasPartialTempForLabel(vm, widget.title);
     final delAllLabel = hasPartialTemp
         ? 'Hapus Semua (TEMP Partial)'
         : 'Hapus Semua (TEMP)';
@@ -862,7 +912,6 @@ class _GroupTooltipAnchorTileState extends State<GroupTooltipAnchorTile> {
       builder: (context) {
         return Stack(
           children: [
-            // Barrier untuk dismiss
             Positioned.fill(
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
@@ -870,24 +919,15 @@ class _GroupTooltipAnchorTileState extends State<GroupTooltipAnchorTile> {
                 child: const SizedBox.expand(),
               ),
             ),
-
-            // POPUP: kiri tile, vertikal auto-clamp
             CompositedTransformFollower(
               link: _link,
               showWhenUnlinked: false,
-
-              // kiri-tengah tile ↔ kanan-tengah popover
               targetAnchor: Alignment.centerLeft,
               followerAnchor: Alignment.centerRight,
-
-              // X: geser ke kiri sedikit; Y: disesuaikan supaya tidak kepotong
               offset: Offset(-widget.gap, yOffset),
-
               child: InputsGroupTooltip(
                 title: widget.title,
-                subtitle: (widget.headerSubtitle ?? '')
-                    .trim()
-                    .isNotEmpty
+                subtitle: (widget.headerSubtitle ?? '').trim().isNotEmpty
                     ? widget.headerSubtitle!.trim()
                     : null,
                 headerColor: widget.color,
@@ -897,10 +937,11 @@ class _GroupTooltipAnchorTileState extends State<GroupTooltipAnchorTile> {
                 tableHeaders: widget.tableHeaders,
                 columnFlexes: widget.columnFlexes,
                 canDelete: widget.canDelete,
+                onBulkDelete: widget.onBulkDelete,
+                summaryBuilder: widget.summaryBuilder, // ✅ PASS summary builder
                 childrenBuilder: widget.detailsBuilder,
-                onDeleteAllTemp: hasTempForThis
-                    ? () => _handleDeleteAllTemp(vm)
-                    : null,
+                onDeleteAllTemp:
+                hasTempForThis ? () => _handleDeleteAllTemp(vm) : null,
                 deleteAllTempDisabled: !hasTempForThis,
                 deleteAllTempLabel: delAllLabel,
                 actions: [
@@ -927,16 +968,10 @@ class _GroupTooltipAnchorTileState extends State<GroupTooltipAnchorTile> {
 
   Future<void> _handleDeleteAllTemp(
       BrokerProductionInputViewModel vm) async {
-    // langsung hapus semua TEMP untuk label (widget.title)
     final removed = vm.deleteAllTempForLabel(widget.title);
-
-    // trigger refresh opsional dari parent
     widget.onUpdate?.call();
-
-    // tutup popover
     _hide();
 
-    // info ke user
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -966,16 +1001,13 @@ class _GroupTooltipAnchorTileState extends State<GroupTooltipAnchorTile> {
           final details = widget.detailsBuilder();
           if (details.isEmpty) return const SizedBox.shrink();
 
-          final hasTempForThis =
-          vm.hasTemporaryDataForLabel(widget.title);
+          final hasTempForThis = vm.hasTemporaryDataForLabel(widget.title);
 
           return Card(
             margin: const EdgeInsets.only(bottom: 6),
             elevation: 0,
-            // opsional: seluruh tile sedikit kuning saat ada TEMP
-            color: hasTempForThis
-                ? Colors.yellow.shade50
-                : Colors.grey.shade50,
+            color:
+            hasTempForThis ? Colors.yellow.shade50 : Colors.grey.shade50,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
               side: BorderSide(
@@ -994,7 +1026,6 @@ class _GroupTooltipAnchorTileState extends State<GroupTooltipAnchorTile> {
                 ),
                 child: Row(
                   children: [
-                    // === JUDUL DENGAN BG KUNING SAAT TEMP ===
                     Expanded(
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -1014,8 +1045,6 @@ class _GroupTooltipAnchorTileState extends State<GroupTooltipAnchorTile> {
                         ),
                       ),
                     ),
-
-                    // jumlah baris (badge)
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(

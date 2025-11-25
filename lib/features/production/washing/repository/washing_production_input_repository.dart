@@ -1,23 +1,21 @@
-// lib/features/production/broker/repository/washing_production_input_screen.dart
+// lib/features/production/washing/repository/washing_production_input_repository.dart
+
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../../core/network/endpoints.dart';
 import '../../../../core/services/token_storage.dart';
-import '../../../stock_opname/model/label_validation_result.dart';
 import '../../shared/models/production_label_lookup_result.dart';
-import '../model/broker_inputs_model.dart';
-import '../model/broker_production_model.dart';
-import 'package:pps_tablet/core/utils/date_formatter.dart';
+import '../model/washing_inputs_model.dart';
 
-// ⬇️ model hasil validasi (shared)
-
-class BrokerProductionInputRepository {
+class WashingProductionInputRepository {
   static const _timeout = Duration(seconds: 25);
 
-  final Map<String, BrokerInputs> _inputsCache = {};
+  // cache per noProduksi
+  final Map<String, WashingInputs> _inputsCache = {};
 
   String get _base => ApiConstants.baseUrl.replaceFirst(RegExp(r'/*$'), '');
 
@@ -27,23 +25,34 @@ class BrokerProductionInputRepository {
   };
 
   // -----------------------------
-  // EXISTING: fetchInputs
+  // Parser untuk isolate (compute)
   // -----------------------------
-  static BrokerInputs _parseInputs(Map<String, dynamic> body) {
+  static WashingInputs _parseInputs(Map<String, dynamic> body) {
     final data = body['data'] as Map<String, dynamic>?;
     if (data == null) {
-      throw FormatException('Response tidak valid: field data kosong');
+      throw const FormatException('Response tidak valid: field data kosong');
     }
-    return BrokerInputs.fromJson(data);
+    return WashingInputs.fromJson(data);
   }
 
-  Future<BrokerInputs> fetchInputs(String noProduksi, {bool force = false}) async {
-    if (!force && _inputsCache.containsKey(noProduksi)) {
-      return _inputsCache[noProduksi]!;
+  // -----------------------------
+  // GET /api/production/washing/:noProduksi/inputs
+  // -----------------------------
+  Future<WashingInputs> fetchInputs(
+      String noProduksi, {
+        bool force = false,
+      }) async {
+    final key = noProduksi.trim();
+    if (key.isEmpty) {
+      throw ArgumentError('noProduksi tidak boleh kosong');
+    }
+
+    if (!force && _inputsCache.containsKey(key)) {
+      return _inputsCache[key]!;
     }
 
     final token = await TokenStorage.getToken();
-    final url = Uri.parse('$_base/api/production/broker/$noProduksi/inputs');
+    final url = Uri.parse('$_base/api/production/washing/$key/inputs');
 
     final started = DateTime.now();
     print('➡️ [GET] $url');
@@ -52,17 +61,19 @@ class BrokerProductionInputRepository {
     try {
       res = await http.get(url, headers: _headers(token)).timeout(_timeout);
     } on TimeoutException {
-      throw Exception('Timeout mengambil input ($noProduksi)');
+      throw Exception('Timeout mengambil washing inputs ($key)');
     } catch (e) {
-      print('❌ Request error: $e');
+      print('❌ Request error (washing inputs): $e');
       rethrow;
     }
 
     final elapsedMs = DateTime.now().difference(started).inMilliseconds;
-    print('⬅️ [${res.statusCode}] in ${elapsedMs}ms');
+    print('⬅️ [${res.statusCode}] (washing inputs) in ${elapsedMs}ms');
 
     if (res.statusCode != 200) {
-      throw Exception('Gagal mengambil input ($noProduksi), code ${res.statusCode})');
+      throw Exception(
+        'Gagal mengambil washing inputs ($key), code ${res.statusCode}',
+      );
     }
 
     final decoded = utf8.decode(res.bodyBytes);
@@ -70,22 +81,23 @@ class BrokerProductionInputRepository {
     try {
       body = json.decode(decoded) as Map<String, dynamic>;
     } catch (e) {
-      throw FormatException('Response bukan JSON valid: $e');
+      throw FormatException('Response washing inputs bukan JSON valid: $e');
     }
 
+    // parse di isolate biar ringan
     final inputs = await compute(_parseInputs, body);
 
-    _inputsCache[noProduksi] = inputs;
+    _inputsCache[key] = inputs;
     return inputs;
   }
 
-  void invalidateInputs(String noProduksi) => _inputsCache.remove(noProduksi);
+  void invalidateInputs(String noProduksi) =>
+      _inputsCache.remove(noProduksi.trim());
+
   void clearCache() => _inputsCache.clear();
 
-  // -----------------------------
-  // NEW: validateLabel
-  // -----------------------------
-  /// GET /api/production/broker/validate-label/:labelCode
+
+
   Future<ProductionLabelLookupResult> lookupLabel(String labelCode) async {
     final code = labelCode.trim();
     if (code.isEmpty) {
@@ -94,7 +106,7 @@ class BrokerProductionInputRepository {
 
     final token = await TokenStorage.getToken();
     final url = Uri.parse(
-      '$_base/api/production/broker/validate-label/${Uri.encodeComponent(code)}',
+      '$_base/api/production/washing/validate-label/${Uri.encodeComponent(code)}',
     );
 
     print('➡️ [GET] $url');
@@ -125,18 +137,17 @@ class BrokerProductionInputRepository {
   }
 
 
-
   // -----------------------------
   // NEW: Submit Inputs & Partials
   // -----------------------------
-  /// POST /api/production/broker/:noProduksi/inputs
+  /// POST /api/production/washing/:noProduksi/inputs
   /// Body: { broker: [...], bb: [...], bbPartialNew: [...], ... }
   Future<Map<String, dynamic>> submitInputsAndPartials(
       String noProduksi,
       Map<String, dynamic> payload,
       ) async {
     final token = await TokenStorage.getToken();
-    final url = Uri.parse('$_base/api/production/broker/$noProduksi/inputs');
+    final url = Uri.parse('$_base/api/production/washing/$noProduksi/inputs');
 
     final started = DateTime.now();
     print('➡️ [POST] $url');
@@ -200,7 +211,7 @@ class BrokerProductionInputRepository {
   // -----------------------------
   // NEW: Delete Inputs & Partials
   // -----------------------------
-  /// DELETE /api/production/broker/:noProduksi/inputs
+  /// DELETE /api/production/washing/:noProduksi/inputs
   /// Body: { broker: [...], bb: [...], brokerPartial: [...], ... }
   ///
   /// Backend:
@@ -213,7 +224,7 @@ class BrokerProductionInputRepository {
       Map<String, dynamic> payload,
       ) async {
     final token = await TokenStorage.getToken();
-    final url = Uri.parse('$_base/api/production/broker/$noProduksi/inputs');
+    final url = Uri.parse('$_base/api/production/washing/$noProduksi/inputs');
 
     final started = DateTime.now();
     print('🗑️ [DELETE] $url');
@@ -267,4 +278,6 @@ class BrokerProductionInputRepository {
       throw Exception(message);
     }
   }
+
+
 }

@@ -4,27 +4,32 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 
-class BrokerProductionActionBar extends StatefulWidget {
+class WashingProductionActionBar extends StatefulWidget {
   final TextEditingController controller;
   final ValueChanged<String> onSearchChanged; // debounced contains only
   final VoidCallback onClear;
-  final VoidCallback onAddPressed;
+
+  /// ⬇️ sekarang boleh null → kalau null, tombol tambah akan disable
+  final VoidCallback? onAddPressed;
+
   final Duration debounce;
 
-  const BrokerProductionActionBar({
+  const WashingProductionActionBar({
     super.key,
     required this.controller,
     required this.onSearchChanged,
     required this.onClear,
-    required this.onAddPressed,
+    this.onAddPressed,
     this.debounce = const Duration(milliseconds: 300),
   });
 
   @override
-  State<BrokerProductionActionBar> createState() => _BrokerProductionActionBarState();
+  State<WashingProductionActionBar> createState() =>
+      _WashingProductionActionBarState();
 }
 
-class _BrokerProductionActionBarState extends State<BrokerProductionActionBar> {
+class _WashingProductionActionBarState
+    extends State<WashingProductionActionBar> {
   final FocusNode _searchFocus = FocusNode();
   bool _focused = false;
 
@@ -76,6 +81,15 @@ class _BrokerProductionActionBarState extends State<BrokerProductionActionBar> {
     final perm = context.watch<PermissionViewModel>();
     final canCreate = perm.can('label_washing:create');
 
+    // Hanya aktif kalau punya permission & callback-nya tidak null
+    final enableAdd = canCreate && widget.onAddPressed != null;
+
+    final tooltipText = !canCreate
+        ? 'Anda tidak memiliki izin untuk membuat produksi washing'
+        : (widget.onAddPressed == null
+        ? 'Fitur tambah produksi belum tersedia'
+        : 'Tambah produksi washing');
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
       decoration: BoxDecoration(
@@ -97,19 +111,21 @@ class _BrokerProductionActionBarState extends State<BrokerProductionActionBar> {
                 children: [
                   // Create button
                   Tooltip(
-                    message: canCreate
-                        ? 'Buat Label Baru'
-                        : 'Anda tidak memiliki izin untuk membuat label',
+                    message: tooltipText,
                     waitDuration: const Duration(milliseconds: 400),
                     child: FilledButton.icon(
-                      onPressed: canCreate ? widget.onAddPressed : null,
+                      onPressed: enableAdd ? widget.onAddPressed : null,
                       icon: const Icon(Icons.add),
                       label: const Text('Tambah Produksi'),
                       style: FilledButton.styleFrom(
-                        backgroundColor:
-                        canCreate ? const Color(0xFF00897B) : Colors.grey.shade400,
+                        backgroundColor: enableAdd
+                            ? const Color(0xFF00897B)
+                            : Colors.grey.shade400,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 14,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -132,7 +148,9 @@ class _BrokerProductionActionBarState extends State<BrokerProductionActionBar> {
                         color: Colors.grey.shade50,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: _focused ? cs.primary.withOpacity(.5) : Colors.grey.shade300,
+                          color: _focused
+                              ? cs.primary.withOpacity(.5)
+                              : Colors.grey.shade300,
                           width: _focused ? 1.6 : 1,
                         ),
                         boxShadow: _focused
@@ -156,19 +174,18 @@ class _BrokerProductionActionBarState extends State<BrokerProductionActionBar> {
                               focusNode: _searchFocus,
                               controller: widget.controller,
                               onChanged: _handleChanged, // debounced
-                              // ⛔ No onSubmitted — Enter does nothing special
                               textInputAction: TextInputAction.none,
                               decoration: InputDecoration(
                                 hintText: 'Cari NoProduksi (contains)…',
-                                hintStyle: TextStyle(color: Colors.grey.shade500),
+                                hintStyle:
+                                TextStyle(color: Colors.grey.shade500),
                                 isCollapsed: true,
                                 border: InputBorder.none,
-                                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                                contentPadding:
+                                const EdgeInsets.symmetric(vertical: 14),
                               ),
                             ),
                           ),
-
-                          // ⛔ Removed arrow "search" button
 
                           // Clear button
                           AnimatedSwitcher(
@@ -180,7 +197,9 @@ class _BrokerProductionActionBarState extends State<BrokerProductionActionBar> {
                               icon: const Icon(Icons.close_rounded),
                               onPressed: _handleClear,
                             )
-                                : const SizedBox.shrink(key: ValueKey('clear_off')),
+                                : const SizedBox.shrink(
+                              key: ValueKey('clear_off'),
+                            ),
                           ),
                         ],
                       ),

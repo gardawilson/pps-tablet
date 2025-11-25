@@ -1,24 +1,25 @@
 // lib/view/widgets/washing_delete_dialog.dart
 import 'package:flutter/material.dart';
 import 'package:pps_tablet/core/utils/date_formatter.dart';
-import '../model/broker_header_model.dart';
 
-class BrokerDeleteDialog extends StatefulWidget {
-  final BrokerHeader header;
+import '../model/washing_production_model.dart';
+
+class WashingProductionDeleteDialog extends StatefulWidget {
+  final WashingProduction header;
   /// Parent yang menutup dialog; komponen ini tidak memanggil Navigator.pop.
   final Future<void> Function() onConfirm;
 
-  const BrokerDeleteDialog({
+  const WashingProductionDeleteDialog({
     super.key,
     required this.header,
     required this.onConfirm,
   });
 
   @override
-  State<BrokerDeleteDialog> createState() => _BrokerDeleteDialogState();
+  State<WashingProductionDeleteDialog> createState() => _WashingProductionDeleteDialogState();
 }
 
-class _BrokerDeleteDialogState extends State<BrokerDeleteDialog> {
+class _WashingProductionDeleteDialogState extends State<WashingProductionDeleteDialog> {
   bool _agree = false;
   bool _submitting = false;
 
@@ -49,13 +50,11 @@ class _BrokerDeleteDialogState extends State<BrokerDeleteDialog> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _InfoRow(label: 'NoBroker', value: widget.header.noBroker),
+                _InfoRow(label: 'NoWashing', value: widget.header.noProduksi),
                 const SizedBox(height: 6),
-                _InfoRow(label: 'Jenis', value: widget.header.namaJenisPlastik),
-                if ((widget.header.dateCreate ?? '').isNotEmpty) ...[
+                _InfoRow(label: 'Mesin', value: widget.header.namaMesin),
                   const SizedBox(height: 6),
-                  _InfoRow(label: 'Dibuat', value: formatDateToFullId(widget.header.dateCreate!)),
-                ],
+                _InfoRow(label: 'Tanggal', value: formatDateToFullId(widget.header.tglProduksi!)),
               ],
             ),
           ),

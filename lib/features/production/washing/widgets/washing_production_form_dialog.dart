@@ -1,3 +1,4 @@
+// lib/features/production/washing/widgets/washing_production_form_dialog.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
@@ -5,8 +6,7 @@ import 'package:provider/provider.dart';
 
 import 'package:pps_tablet/features/mesin/widgets/mesin_dropdown.dart';
 import 'package:pps_tablet/features/operator/model/operator_model.dart';
-import 'package:pps_tablet/features/production/shared/widgets/total_hours_pill.dart';
-
+import 'package:pps_tablet/features/production/shared/widgets/time_form_field.dart';
 
 import '../../../../common/widgets/app_number_field.dart';
 import '../../../../common/widgets/app_text_field.dart';
@@ -16,28 +16,32 @@ import '../../../operator/widgets/operator_dropdown.dart';
 import '../../../shared/overlap/repository/overlap_repository.dart';
 import '../../../shared/overlap/view_model/overlap_view_model.dart';
 import '../../../shared/shift/widgets/shift_dropdown.dart';
-import '../../shared/widgets/time_form_field.dart';
-import '../model/broker_production_model.dart';
-import '../view_model/broker_production_view_model.dart';
-import 'broker_text_field.dart';
+
+
+import '../../shared/widgets/total_hours_pill.dart';
+import '../model/washing_production_model.dart';
+import '../view_model/washing_production_view_model.dart' show WashingProductionViewModel;
+import 'washing_text_field.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../common/widgets/app_date_field.dart';
 
-class BrokerProductionFormDialog extends StatefulWidget {
-  final BrokerProduction? header;
-  final Function(BrokerProduction)? onSave;
+class WashingProductionFormDialog extends StatefulWidget {
+  final WashingProduction? header;
+  final Function(WashingProduction)? onSave;
 
-  const BrokerProductionFormDialog({
+  const WashingProductionFormDialog({
     super.key,
     this.header,
     this.onSave,
   });
 
   @override
-  State<BrokerProductionFormDialog> createState() => _BrokerProductionFormDialogState();
+  State<WashingProductionFormDialog> createState() =>
+      _WashingProductionFormDialogState();
 }
 
-class _BrokerProductionFormDialogState extends State<BrokerProductionFormDialog> {
+class _WashingProductionFormDialogState
+    extends State<WashingProductionFormDialog> {
   final _formKey = GlobalKey<FormState>();
 
   // Controllers
@@ -52,8 +56,7 @@ class _BrokerProductionFormDialogState extends State<BrokerProductionFormDialog>
   // State
   MstMesin? _selectedMesin;
   MstOperator? _selectedOperator;
-  int? _selectedShift; // ← tambah ini
-
+  int? _selectedShift; // ← sama seperti washing
 
   // hold the preselect id for operator (from mesin.defaultOperatorId)
   int? _operatorPreselectId;
@@ -70,8 +73,8 @@ class _BrokerProductionFormDialogState extends State<BrokerProductionFormDialog>
 
   bool get isEdit => widget.header != null;
 
-  // kind untuk endpoint overlap (dialog ini broker)
-  static const String _kind = 'broker';
+  // kind untuk endpoint overlap (modul washing)
+  static const String _kind = 'washing';
 
   @override
   void initState() {
@@ -99,17 +102,9 @@ class _BrokerProductionFormDialogState extends State<BrokerProductionFormDialog>
       text: widget.header?.hourMeter?.toString() ?? '',
     );
 
-
+    // washing sudah punya hourStart/hourEnd di model
     hourStartCtrl = TextEditingController(text: widget.header?.hourStart);
     hourEndCtrl   = TextEditingController(text: widget.header?.hourEnd);
-
-    // // Seed saat edit
-    // if (widget.header != null) {
-    //   _startTime = parseHHmm(widget.header!.hourStart);
-    //   _endTime   = parseHHmm(widget.header!.hourEnd);
-    //   if (_startTime != null) hourStartCtrl.text = formatHHmm(_startTime!);
-    //   if (_endTime != null)   hourEndCtrl.text   = formatHHmm(_endTime!);
-    // }
   }
 
   @override
@@ -118,6 +113,11 @@ class _BrokerProductionFormDialogState extends State<BrokerProductionFormDialog>
     dateCreatedCtrl.dispose();
     hourStartCtrl.dispose();
     hourEndCtrl.dispose();
+    mesinCtrl.dispose();
+    operatorCtrl.dispose();
+    jlhAnggotaCtrl.dispose();
+    hadirCtrl.dispose();
+    hourMeterCtrl.dispose();
     super.dispose();
   }
 
@@ -190,7 +190,7 @@ class _BrokerProductionFormDialogState extends State<BrokerProductionFormDialog>
     final hadir = int.tryParse(hadirCtrl.text.trim());
     final hourMeter = double.tryParse(hourMeterCtrl.text.trim());
 
-    final prodVm = context.read<BrokerProductionViewModel>();
+    final prodVm = context.read<WashingProductionViewModel>();
 
     // show loading
     showDialog(
@@ -199,18 +199,17 @@ class _BrokerProductionFormDialogState extends State<BrokerProductionFormDialog>
       builder: (_) => const Center(child: CircularProgressIndicator()),
     );
 
-    BrokerProduction? result;
+    WashingProduction? result;
 
     try {
       if (isEdit) {
-        // 🔁 UPDATE
+        // 🔁 UPDATE (SEKARANG SUDAH BISA)
         result = await prodVm.updateProduksi(
           noProduksi: widget.header!.noProduksi,
-          // update boleh partial, tapi di dialog ini kita kirim semua nilai yg ada di form
           tglProduksi: _selectedDate,
           idMesin: mesinId,
           idOperator: operatorId,
-          jam: jamRange,
+          jamKerja: jamRange,      // ⚠️ PERBEDAAN: jamKerja (bukan jam)
           shift: _selectedShift!,
           hourStart: hourStartSql,
           hourEnd: hourEndSql,
@@ -224,7 +223,7 @@ class _BrokerProductionFormDialogState extends State<BrokerProductionFormDialog>
           tglProduksi: _selectedDate,
           idMesin: mesinId,
           idOperator: operatorId,
-          jam: jamRange,
+          jamKerja: jamRange,
           shift: _selectedShift!,
           hourStart: hourStartSql,
           hourEnd: hourEndSql,
@@ -235,20 +234,22 @@ class _BrokerProductionFormDialogState extends State<BrokerProductionFormDialog>
       }
     } finally {
       // pop loading
-      Navigator.of(context).pop();
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
     }
 
     if (result != null) {
       widget.onSave?.call(result);
-      Navigator.of(context).pop(); // tutup dialog form
+      if (mounted) {
+        Navigator.of(context).pop(); // tutup dialog form
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(prodVm.saveError ?? 'Gagal menyimpan data')),
       );
     }
   }
-
-
 
   /// Panggil cek-overlap via ViewModel hanya jika input sudah lengkap:
   /// - Jam Mulai & Jam Selesai terisi
@@ -391,12 +392,13 @@ class _BrokerProductionFormDialogState extends State<BrokerProductionFormDialog>
             ),
             const SizedBox(height: 16),
 
-            BrokerTextField(
+            WashingTextField(
               controller: noProduction,
               label: 'No. Produksi',
               icon: Icons.label,
               asText: true,                // readonly text (bold)
-              placeholderText: 'F.XXXXXXXXXX', // ⬅️ tampil jika kosong
+              // ⬅️ Washing: prefix 'C' tanpa titik
+              placeholderText: 'CXXXXXXXXXX',
             ),
 
             const SizedBox(height: 16),
@@ -421,7 +423,7 @@ class _BrokerProductionFormDialogState extends State<BrokerProductionFormDialog>
 
             // Jenis Mesin (Required)
             MesinDropdown(
-              idBagianMesin: 2, // ganti sesuai ID bagian untuk modul ini
+              idBagianMesin: 7, // sesuaikan ID bagian untuk modul washing
               preselectId: widget.header?.idMesin,
               label: 'Mesin',
               hint: 'Pilih jenis mesin',
@@ -434,7 +436,6 @@ class _BrokerProductionFormDialogState extends State<BrokerProductionFormDialog>
                 setState(() {});
                 await _checkOverlapIfReadyVM();
               },
-              // includeDisabled: true,
             ),
 
             const SizedBox(height: 16),
@@ -599,8 +600,8 @@ class _BrokerProductionFormDialogState extends State<BrokerProductionFormDialog>
     final vm = context.watch<OverlapViewModel>();
     final hasOverlap = vm.hasOverlap;
 
-    // kita juga bisa cek saving dari BrokerProductionViewModel
-    final prodVm = context.watch<BrokerProductionViewModel>();
+    // cek saving dari WashingProductionViewModel
+    final prodVm = context.watch<WashingProductionViewModel>();
     final isSaving = prodVm.isSaving;
 
     return Row(
@@ -627,5 +628,4 @@ class _BrokerProductionFormDialogState extends State<BrokerProductionFormDialog>
       ],
     );
   }
-
 }

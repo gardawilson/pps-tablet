@@ -1,4 +1,4 @@
-// lib/view/widgets/broker_delete_dialog.dart
+// lib/view/widgets/washing_delete_dialog.dart
 import 'package:flutter/material.dart';
 import 'package:pps_tablet/core/utils/date_formatter.dart';
 import '../model/bonggolan_header_model.dart';

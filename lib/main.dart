@@ -23,7 +23,9 @@ import 'package:pps_tablet/features/production/crusher/view_model/crusher_produc
 import 'package:pps_tablet/features/production/inject/repository/inject_production_repository.dart';
 import 'package:pps_tablet/features/production/inject/view_model/inject_production_view_model.dart';
 import 'package:pps_tablet/features/production/selection/view/production_selection_screen.dart';
+import 'package:pps_tablet/features/production/washing/repository/washing_production_input_repository.dart';
 import 'package:pps_tablet/features/production/washing/view/washing_production_screen.dart';
+import 'package:pps_tablet/features/production/washing/view_model/washing_production_input_view_model.dart';
 import 'package:pps_tablet/features/shared/bongkar_susun/bongkar_susun_repository.dart';
 import 'package:pps_tablet/features/shared/bongkar_susun/bongkar_susun_view_model.dart';
 import 'package:pps_tablet/features/production/broker/repository/broker_production_repository.dart';
@@ -100,6 +102,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => WashingViewModel(repository: WashingRepository())),
         ChangeNotifierProvider(create: (_) => JenisPlastikViewModel(repository: JenisPlastikRepository())),
         ChangeNotifierProvider(create: (_) => WashingProductionViewModel(repository: WashingProductionRepository())),
+        ChangeNotifierProvider(create: (_) => WashingProductionInputViewModel(repository: WashingProductionInputRepository())),
         ChangeNotifierProvider(create: (_) => BongkarSusunViewModel(repository: BongkarSusunRepository())),
         Provider<MaxSakService>(create: (_) => MaxSakService(MaxSakRepository())),
         ChangeNotifierProvider(create: (_) => PermissionViewModel()..loadPermissions()),

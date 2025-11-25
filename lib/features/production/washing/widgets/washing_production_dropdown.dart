@@ -80,13 +80,15 @@ class _WashingProductionDropdownState extends State<WashingProductionDropdown> {
         tglProduksi: DateTime.now().toUtc(),
         jamKerja: 0,
         shift: widget.shiftFilter ?? 0,
-        createBy: null,
+        createBy: '',
         checkBy1: null,
         checkBy2: null,
         approveBy: null,
         jmlhAnggota: 0,
         hadir: 0,
         hourMeter: 0,
+        hourStart: '',
+        hourEnd: '',
       );
 
       setState(() {

@@ -1,329 +1,375 @@
-// lib/features/shared/washing_production/screens/washing_production_screen.dart
+// lib/features/production/washing/view/washing_production_screen.dart
 import 'package:flutter/material.dart';
+import 'package:pps_tablet/features/production/washing/view/washing_production_input_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 
-import '../view_model/washing_production_view_model.dart';
-import '../model/washing_production_model.dart';
-import '../repository/washing_production_repository.dart';
+import '../../../../common/widgets/error_status_dialog.dart';
+import '../../../../common/widgets/horizontal_paged_table.dart';
+import '../../../../common/widgets/success_status_dialog.dart';
+import '../../../../common/widgets/table_column_spec.dart';
+import '../../../../core/utils/date_formatter.dart';
 
-class WashingProductionScreen extends StatelessWidget {
+// VM + Repo + Model washing
+import '../view_model/washing_production_view_model.dart';
+import '../repository/washing_production_repository.dart';
+import '../model/washing_production_model.dart';
+
+// Action bar & form dialog washing
+import '../widgets/washing_delete_dialog.dart';
+import '../widgets/washing_production_action_bar.dart';
+import '../widgets/washing_production_form_dialog.dart';
+import '../widgets/washing_production_row_popover.dart';
+
+
+
+class WashingProductionScreen extends StatefulWidget {
   const WashingProductionScreen({super.key});
+
+  @override
+  State<WashingProductionScreen> createState() =>
+      _WashingProductionScreenState();
+}
+
+class _WashingProductionScreenState extends State<WashingProductionScreen> {
+  final _searchCtl = TextEditingController();
+  String? _selectedNoProduksi;
+
+  @override
+  void dispose() {
+    _searchCtl.dispose();
+    super.dispose();
+  }
+
+  // =========================================================
+  //  POPOVER (format sama dengan BrokerProductionScreen)
+  // =========================================================
+  Future<void> _showRowPopover({
+    required BuildContext context,
+    required WashingProduction row,
+    required Offset globalPos,
+  }) async {
+    final overlayBox =
+    Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
+    if (overlayBox == null) return;
+
+    // konversi global → lokal terhadap overlay
+    final local = overlayBox.globalToLocal(globalPos);
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black26,
+      builder: (dialogCtx) {
+        final safeLeft =
+        local.dx.clamp(8.0, overlayBox.size.width - 320.0); // max width popover
+        final safeTop =
+        local.dy.clamp(8.0, overlayBox.size.height - 220.0); // max height popover
+
+        return Stack(
+          children: [
+            Positioned(
+              left: safeLeft,
+              top: safeTop,
+              child: WashingProductionRowPopover(
+                row: row,
+                // CLOSE popover pakai dialogCtx (bukan context screen)
+                onClose: () => Navigator.of(dialogCtx).pop(),
+
+                // ⬇️ Saat ini modul washing belum punya screen input detail
+                onInput: () {
+                  // popover sudah tertutup oleh _runAndClose di dalam popover
+                  Future.microtask(() {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => WashingProductionInputScreen(
+                          noProduksi: row.noProduksi,
+                        ),
+                      ),
+                    );
+                  });
+                },
+
+                // ⬇️ Edit: sementara tampilkan info belum tersedia
+                onEdit: () async {
+                  await _openEditDialog(context, row);
+                  // gak perlu maybePop di sini, popover sudah di-close lewat onClose
+                },
+
+                // ⬇️ Delete header
+                onDelete: () async {
+                  await showDialog<void>(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (ctx) {
+                      return WashingProductionDeleteDialog(
+                        header: row,
+                        onConfirm: () async {
+                          final vm = context.read<WashingProductionViewModel>();
+
+                          final success = await vm.deleteProduksi(row.noProduksi);
+
+                          // 1) Tutup dialog konfirmasi
+                          if (ctx.mounted) Navigator.of(ctx).pop();
+
+                          if (!context.mounted) return;
+
+                          // 2) JANGAN pop lagi di sini — popover sudah ditutup oleh onClose()
+
+                          if (success) {
+                            // ✅ dialog sukses
+                            showDialog(
+                              context: context,
+                              builder: (_) => SuccessStatusDialog(
+                                title: 'Berhasil Menghapus',
+                                message: 'No. Produksi ${row.noProduksi} berhasil dihapus.',
+                              ),
+                            );
+                          } else {
+                            final rawMsg = vm.saveError ?? 'Gagal menghapus data';
+
+                            // ❌ dialog error
+                            showDialog(
+                              context: context,
+                              builder: (_) => ErrorStatusDialog(
+                                title: 'Gagal Menghapus!',
+                                message: rawMsg,
+                              ),
+                            );
+                          }
+                        },
+                      );
+                    },
+                  );
+                },
+
+                // ⬇️ Print: placeholder
+                onPrint: () async {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content:
+                      Text('Fitur print Washing belum tersedia untuk saat ini.'),
+                      duration: Duration(milliseconds: 1200),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => WashingProductionViewModel(
         repository: WashingProductionRepository(),
-      )..refreshPaged(), // mulai di mode paged
-      child: const _ScaffoldBody(),
-    );
-  }
-}
-
-class _ScaffoldBody extends StatefulWidget {
-  const _ScaffoldBody();
-
-  @override
-  State<_ScaffoldBody> createState() => _ScaffoldBodyState();
-}
-
-class _ScaffoldBodyState extends State<_ScaffoldBody> {
-  // Controller untuk sinkronisasi scroll horizontal header & isi tabel
-  final _hScroll = ScrollController();
-
-  // Lebar total tabel (silakan sesuaikan jika kolom ditambah/diubah)
-  static const double _tableWidth = 1100;
-
-  @override
-  void dispose() {
-    _hScroll.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final vm = context.watch<WashingProductionViewModel>();
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Washing Production'),
-        actions: [
-          if (vm.isByDateMode)
-            IconButton(
-              tooltip: 'Tampilkan Semua (Paged)',
-              icon: const Icon(Icons.list_alt),
-              onPressed: vm.exitByDateModeAndRefreshPaged,
-            ),
-          if (!vm.isByDateMode)
-            IconButton(
-              tooltip: 'Refresh',
-              icon: const Icon(Icons.refresh),
-              onPressed: vm.refreshPaged,
-            ),
-        ],
-      ),
-      body: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            // ====== HEADER TABEL (ikut scroll horizontal) ======
-            Material(
-              color: Theme.of(context).colorScheme.surfaceVariant,
-              child: SingleChildScrollView(
-                controller: _hScroll,
-                scrollDirection: Axis.horizontal,
-                child: SizedBox(
-                  width: _tableWidth,
-                  child: const _TableHeader(),
-                ),
+      )..refreshPaged(),
+      child: Consumer<WashingProductionViewModel>(
+        builder: (context, vm, _) {
+          final columns = <TableColumnSpec<WashingProduction>>[
+            TableColumnSpec(
+              title: 'NO. PRODUKSI',
+              width: 160,
+              headerAlign: TextAlign.left,
+              cellAlign: TextAlign.left,
+              cellBuilder: (_, r) => Text(
+                r.noProduksi,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            const Divider(height: 1),
-            // ====== ISI TABEL (PagedListView) dalam scroll horizontal yang sama ======
-            Expanded(
-              child: _TableBody(
-                hScroll: _hScroll,
-                tableWidth: _tableWidth,
+            TableColumnSpec(
+              title: 'TANGGAL',
+              width: 130,
+              headerAlign: TextAlign.left,
+              cellAlign: TextAlign.left,
+              cellBuilder: (_, r) =>
+                  Text(formatDateToShortId(r.tglProduksi)),
+            ),
+            TableColumnSpec(
+              title: 'SHIFT',
+              width: 70,
+              headerAlign: TextAlign.center,
+              cellAlign: TextAlign.center,
+              cellBuilder: (_, r) => Text('${r.shift}'),
+            ),
+            TableColumnSpec(
+              title: 'MESIN',
+              width: 180,
+              cellBuilder: (_, r) => Text(
+                r.namaMesin,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// =======================================================
-// TABEL: HEADER
-// =======================================================
-
-class _TableHeader extends StatelessWidget {
-  const _TableHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.labelMedium?.copyWith(
-      fontWeight: FontWeight.w700,
-    );
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      child: Row(
-        children: const [
-          _HCell('No Produksi', width: 160),
-          _HCell('Tanggal', width: 110),
-          _HCell('Shift', width: 70, align: TextAlign.center),
-          _HCell('Mesin', width: 140),
-          _HCell('Operator', width: 200),
-          _HCell('Jam', width: 70, align: TextAlign.right),
-          _HCell('HM', width: 90, align: TextAlign.right),
-          _HCell('Anggota/Hadir', width: 140, align: TextAlign.center),
-          _HCell('Approved', width: 90, align: TextAlign.center),
-        ],
-      ),
-    );
-  }
-}
-
-class _HCell extends StatelessWidget {
-  final String text;
-  final double width;
-  final TextAlign align;
-  const _HCell(this.text, {required this.width, this.align = TextAlign.left});
-
-  @override
-  Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.labelMedium?.copyWith(
-      fontWeight: FontWeight.w700,
-    );
-    return SizedBox(
-      width: width,
-      child: Text(text, style: style, textAlign: align, maxLines: 1),
-    );
-  }
-}
-
-// =======================================================
-// TABEL: BODY (Paged v5)
-// =======================================================
-
-class _TableBody extends StatelessWidget {
-  const _TableBody({required this.hScroll, required this.tableWidth});
-  final ScrollController hScroll;
-  final double tableWidth;
-
-  @override
-  Widget build(BuildContext context) {
-    final vm = context.watch<WashingProductionViewModel>();
-
-    return PagingListener<int, WashingProduction>(
-      controller: vm.pagingController,
-      builder: (context, state, fetchNextPage) => RefreshIndicator(
-        onRefresh: () async => vm.refreshPaged(),
-        child: SingleChildScrollView(
-          controller: hScroll,
-          scrollDirection: Axis.horizontal,
-          child: SizedBox(
-            width: tableWidth,
-            child: PagedListView<int, WashingProduction>(
-              // penting: scroll vertikal untuk list
-              state: state,
-              fetchNextPage: fetchNextPage,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              builderDelegate: PagedChildBuilderDelegate<WashingProduction>(
-                itemBuilder: (context, item, index) => _TableRowItem(
-                  row: item,
-                  index: index,
-                ),
-                // Prefetch ketika sisa item tak terlihat < 3
-                invisibleItemsThreshold: 3,
-
-                // indikator bawaan
-                firstPageProgressIndicatorBuilder: (_) =>
-                const Center(child: CircularProgressIndicator()),
-                newPageProgressIndicatorBuilder: (_) => const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-                firstPageErrorIndicatorBuilder: (_) => _ErrorView(
-                  message: '${state.error}',
-                  onRetry: fetchNextPage,
-                ),
-                newPageErrorIndicatorBuilder: (_) => _NewPageError(
-                  onRetry: fetchNextPage,
-                ),
-                noItemsFoundIndicatorBuilder: (_) =>
-                const Center(child: Text('Tidak ada data.')),
+            TableColumnSpec(
+              title: 'OPERATOR',
+              width: 200,
+              cellBuilder: (_, r) => Text(
+                r.namaOperator,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// =======================================================
-// TABEL: ROW ITEM
-// =======================================================
-
-class _TableRowItem extends StatelessWidget {
-  const _TableRowItem({required this.row, required this.index});
-  final WashingProduction row;
-  final int index;
-
-  String _formatDate(DateTime d) {
-    final dd = d.day.toString().padLeft(2, '0');
-    final mm = d.month.toString().padLeft(2, '0');
-    final yy = d.year.toString();
-    return '$dd-$mm-$yy';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bg = index.isEven
-        ? Theme.of(context).colorScheme.surface
-        : Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.25);
-
-    return Container(
-      key: ValueKey(row.noProduksi),
-      color: bg,
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        children: [
-          _Cell(row.noProduksi, width: 160, fontWeight: FontWeight.w600),
-          _Cell(_formatDate(row.tglProduksi), width: 110),
-          _Cell('${row.shift}', width: 70, align: TextAlign.center),
-          _Cell(row.namaMesin, width: 140),
-          _Cell(row.namaOperator, width: 200, maxLines: 1, overflow: TextOverflow.ellipsis),
-          _Cell('${row.jamKerja}', width: 70, align: TextAlign.right),
-          _Cell('${row.hourMeter}', width: 90, align: TextAlign.right),
-          _Cell('${row.jmlhAnggota}/${row.hadir}', width: 140, align: TextAlign.center),
-          SizedBox(
-            width: 90,
-            child: Center(
-              child: row.approveBy != null
-                  ? const Icon(Icons.verified, size: 18)
-                  : const SizedBox.shrink(),
+            TableColumnSpec(
+              title: 'JAM',
+              width: 70,
+              headerAlign: TextAlign.right,
+              cellAlign: TextAlign.right,
+              cellBuilder: (_, r) => Text('${r.jamKerja}'),
             ),
-          ),
-        ],
+            TableColumnSpec(
+              title: 'HM',
+              width: 80,
+              headerAlign: TextAlign.right,
+              cellAlign: TextAlign.right,
+              cellBuilder: (_, r) => Text('${r.hourMeter}'),
+            ),
+            TableColumnSpec(
+              title: 'ANGGOTA/HADIR',
+              width: 150,
+              headerAlign: TextAlign.center,
+              cellAlign: TextAlign.center,
+              cellBuilder: (_, r) =>
+                  Text('${r.jmlhAnggota}/${r.hadir}'),
+            ),
+            TableColumnSpec(
+              title: 'APPROVED',
+              width: 110,
+              headerAlign: TextAlign.center,
+              cellAlign: TextAlign.center,
+              cellBuilder: (_, r) =>
+              (r.approveBy != null && r.approveBy!.isNotEmpty)
+                  ? const Icon(Icons.verified,
+                  size: 18, color: Colors.green)
+                  : const Text(
+                '-',
+                style: TextStyle(color: Colors.black54),
+              ),
+            ),
+          ];
+
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Washing Production'),
+              actions: [
+                if (vm.isByDateMode)
+                  IconButton(
+                    icon: const Icon(Icons.list_alt),
+                    onPressed: vm.exitByDateModeAndRefreshPaged,
+                  )
+                else
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    onPressed: vm.refreshPaged,
+                  ),
+              ],
+            ),
+            body: Column(
+              children: [
+                // 🔹 ACTION BAR (search + create) — mirip BrokerProductionActionBar
+                WashingProductionActionBar(
+                  controller: _searchCtl,
+                  onSearchChanged: (value) => vm.setSearchDebounced(value),
+                  onClear: () {
+                    _searchCtl.clear();
+                    vm.clearFilters();
+                  },
+                  onAddPressed: _openCreateDialog,
+                ),
+
+                // 🔹 TABLE
+                Expanded(
+                  child: HorizontalPagedTable<WashingProduction>(
+                    pagingController: vm.pagingController,
+                    columns: columns,
+                    horizontalPadding: 16,
+                    selectedPredicate: (r) =>
+                    r.noProduksi == _selectedNoProduksi,
+                    onRowTap: (r) =>
+                        setState(() => _selectedNoProduksi = r.noProduksi),
+
+                    // format sama dengan broker: long-press + posisi global
+                    onRowLongPress: (row, globalPos) async {
+                      await _showRowPopover(
+                        context: context,
+                        row: row,
+                        globalPos: globalPos,
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
-}
 
-class _Cell extends StatelessWidget {
-  final String text;
-  final double width;
-  final TextAlign align;
-  final FontWeight? fontWeight;
-  final int? maxLines;
-  final TextOverflow? overflow;
+  // =========================================================
+  //  DIALOG CREATE (format mirip broker, tapi simple)
+  // =========================================================
+  Future<void> _openCreateDialog() async {
+    // VM sebenarnya dipakai di dalam dialog via Provider,
+    // jadi di sini kita hanya terima hasilnya saja.
+    final created = await showDialog<WashingProduction>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => WashingProductionFormDialog(
+        header: null, // mode create
+        onSave: (saved) {
+          // kembalikan ke caller
+          Navigator.of(ctx).pop(saved);
+        },
+      ),
+    );
 
-  const _Cell(
-      this.text, {
-        required this.width,
-        this.align = TextAlign.left,
-        this.fontWeight,
-        this.maxLines,
-        this.overflow,
+    if (!mounted) return;
+
+    if (created != null) {
+      setState(() {
+        _selectedNoProduksi = created.noProduksi;
       });
 
-  @override
-  Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.bodyMedium?.copyWith(
-      fontWeight: fontWeight,
-    );
-    return SizedBox(
-      width: width,
-      child: Text(
-        text,
-        textAlign: align,
-        style: style,
-        maxLines: maxLines,
-        overflow: overflow,
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content:
+          Text('Washing No. Produksi ${created.noProduksi} berhasil dibuat'),
+        ),
+      );
+    }
+  }
+
+  // =========================================================
+  //  DIALOG EDIT (kalau nanti sudah ada endpoint update)
+  // =========================================================
+  Future<void> _openEditDialog(BuildContext context, WashingProduction row) async {
+    final vm = context.read<WashingProductionViewModel>();
+
+    // Open the form in EDIT mode by passing `header: row`
+    final updated = await showDialog<WashingProduction>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => WashingProductionFormDialog(
+        header: row, // ← send current values here
+        onSave: (v) {
+          // return the saved/updated item to this screen
+          Navigator.of(ctx).pop(v);
+        },
       ),
     );
-  }
-}
 
-// =======================================================
-// Komponen error & retry sederhana (lokal screen)
-// (Boleh kamu pindah ke commons/widget seperti sebelumnya)
-// =======================================================
+    if (!mounted) return;
 
-class _ErrorView extends StatelessWidget {
-  final String message;
-  final VoidCallback onRetry;
-  const _ErrorView({required this.message, required this.onRetry});
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text(message, textAlign: TextAlign.center),
-          const SizedBox(height: 8),
-          FilledButton(onPressed: onRetry, child: const Text('Coba lagi')),
-        ]),
-      ),
-    );
-  }
-}
-
-class _NewPageError extends StatelessWidget {
-  final VoidCallback onRetry;
-  const _NewPageError({required this.onRetry});
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        const Text('Gagal memuat halaman berikutnya'),
-        const SizedBox(height: 8),
-        TextButton(onPressed: onRetry, child: const Text('Coba lagi')),
-      ],
-    );
+    if (updated != null) {
+      // (Optional) Give feedback
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No. Produksi ${updated.noProduksi} berhasil diperbarui')),
+      );
+    }
   }
 }

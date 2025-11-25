@@ -1,7 +1,7 @@
 // lib/view/widgets/washing_text_field.dart
 import 'package:flutter/material.dart';
 
-class BrokerTextField extends StatelessWidget {
+class WashingTextField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
   final IconData icon;
@@ -18,7 +18,7 @@ class BrokerTextField extends StatelessWidget {
   final String? placeholderText;  // placeholder saat asText & value kosong
   final int maxLines;
 
-  const BrokerTextField({
+  const WashingTextField({
     super.key,
     required this.controller,
     required this.label,

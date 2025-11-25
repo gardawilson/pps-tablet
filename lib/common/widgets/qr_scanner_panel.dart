@@ -321,7 +321,7 @@ class _SquareIconButton extends StatelessWidget {
 // =============================
 
 /*
-// lib/features/production/broker/view/broker_production_input_screen.dart (snippet)
+// lib/features/production/broker/view/washing_production_input_screen.dart (snippet)
 import 'package:pps_tablet/common/widgets/qr_scanner_panel.dart';
 
 ...

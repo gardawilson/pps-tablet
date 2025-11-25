@@ -3,18 +3,18 @@ import 'package:provider/provider.dart';
 
 import '../../shared/utils/format.dart';
 import '../../shared/widgets/weight_input_dialog.dart';
-import '../view_model/broker_production_input_view_model.dart';
-import '../model/broker_inputs_model.dart';
+import '../view_model/washing_production_input_view_model.dart';
+import '../model/washing_inputs_model.dart';
 import '../../shared/models/production_label_lookup_result.dart';
 
 enum _Presence { none, temp }
 
-class LookupLabelDialog extends StatefulWidget {
+class WashingLookupLabelDialog extends StatefulWidget {
   final String noProduksi;
   final String selectedMode;
   final Set<int>? preDisabledIndices;
 
-  const LookupLabelDialog({
+  const WashingLookupLabelDialog({
     super.key,
     required this.noProduksi,
     required this.selectedMode,
@@ -22,10 +22,10 @@ class LookupLabelDialog extends StatefulWidget {
   });
 
   @override
-  State<LookupLabelDialog> createState() => _LookupLabelDialogState();
+  State<WashingLookupLabelDialog> createState() => _WashingLookupLabelDialogState();
 }
 
-class _LookupLabelDialogState extends State<LookupLabelDialog> {
+class _WashingLookupLabelDialogState extends State<WashingLookupLabelDialog> {
   final Set<int> _localPickedIndices = <int>{};
   final Set<int> _disabledAtOpen = <int>{};
   final Map<int, double> _editedWeights = {};
@@ -39,7 +39,7 @@ class _LookupLabelDialogState extends State<LookupLabelDialog> {
     _editedWeights.clear();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final vm = context.read<BrokerProductionInputViewModel>();
+      final vm = context.read<WashingProductionInputViewModel>();
 
       final lastLookup = vm.lastLookup;
       if (lastLookup != null && lastLookup.typedItems.isNotEmpty) {
@@ -63,7 +63,7 @@ class _LookupLabelDialogState extends State<LookupLabelDialog> {
   }
 
   void _precomputeDisabledRows() {
-    final vm = context.read<BrokerProductionInputViewModel>();
+    final vm = context.read<WashingProductionInputViewModel>();
     final result = vm.lastLookup;
     if (result == null) return;
 
@@ -81,7 +81,7 @@ class _LookupLabelDialogState extends State<LookupLabelDialog> {
 
   void _maybeAutoSelectFirstTime() {
     if (_didAutoSelect) return;
-    final vm = context.read<BrokerProductionInputViewModel>();
+    final vm = context.read<WashingProductionInputViewModel>();
     final result = vm.lastLookup;
     if (result == null || result.typedItems.isEmpty) return;
 
@@ -99,7 +99,7 @@ class _LookupLabelDialogState extends State<LookupLabelDialog> {
     _didAutoSelect = true;
   }
 
-  void _toggleRow(BrokerProductionInputViewModel vm, int index, Map<String, dynamic> row) {
+  void _toggleRow(WashingProductionInputViewModel vm, int index, Map<String, dynamic> row) {
     if (_isDisabled(index)) return;
     setState(() {
       if (_localPickedIndices.contains(index)) {
@@ -110,7 +110,7 @@ class _LookupLabelDialogState extends State<LookupLabelDialog> {
     });
   }
 
-  void _selectAllNew(BrokerProductionInputViewModel vm, ProductionLabelLookupResult result) {
+  void _selectAllNew(WashingProductionInputViewModel vm, ProductionLabelLookupResult result) {
     setState(() {
       _localPickedIndices.clear();
       for (int i = 0; i < result.data.length; i++) {
@@ -121,7 +121,7 @@ class _LookupLabelDialogState extends State<LookupLabelDialog> {
     });
   }
 
-  void _commitSelection(BrokerProductionInputViewModel vm, ProductionLabelLookupResult result) {
+  void _commitSelection(WashingProductionInputViewModel vm, ProductionLabelLookupResult result) {
     if (_localPickedIndices.isEmpty) return;
 
     vm.clearPicks();
@@ -153,7 +153,7 @@ class _LookupLabelDialogState extends State<LookupLabelDialog> {
   }
 
   _Presence _presenceForRow(
-      BrokerProductionInputViewModel vm,
+      WashingProductionInputViewModel vm,
       Map<String, dynamic> row,
       ProductionLabelLookupResult ctx,
       String noProduksi,
@@ -167,7 +167,7 @@ class _LookupLabelDialogState extends State<LookupLabelDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<BrokerProductionInputViewModel>(
+    return Consumer<WashingProductionInputViewModel>(
       builder: (context, vm, _) {
         final result = vm.lastLookup;
         if (result == null) {
@@ -731,49 +731,39 @@ class _LookupLabelDialogState extends State<LookupLabelDialog> {
     );
   }
 
-  // ===== Helpers =====
+  // ===== Helpers (hanya untuk Washing: BB, Washing, Gilingan) =====
   static String _labelCodeOf(dynamic item) {
-    if (item is BrokerItem) return item.noBroker ?? '-';
     if (item is BbItem) {
       final npart = (item.noBBPartial ?? '').trim();
       if (npart.isNotEmpty) return npart;
       return item.noBahanBaku ?? '-';
     }
     if (item is WashingItem) return item.noWashing ?? '-';
-    if (item is CrusherItem) return item.noCrusher ?? '-';
-    if (item is GilinganItem) return item.noGilingan ?? '-';
-    if (item is MixerItem) return item.noMixer ?? '-';
-    if (item is RejectItem) return item.noReject ?? '-';
+    if (item is GilinganItem) {
+      final npart = (item.noGilinganPartial ?? '').trim();
+      if (npart.isNotEmpty) return npart;
+      return item.noGilingan ?? '-';
+    }
     return '-';
   }
 
   static String? _namaJenisOf(dynamic item) {
-    if (item is BrokerItem) return item.namaJenis;
     if (item is BbItem) return item.namaJenis;
     if (item is WashingItem) return item.namaJenis;
-    if (item is CrusherItem) return item.namaJenis;
     if (item is GilinganItem) return item.namaJenis;
-    if (item is MixerItem) return item.namaJenis;
-    if (item is RejectItem) return item.namaJenis;
     return null;
   }
 
   static int? _sakOf(dynamic item) {
-    if (item is BrokerItem) return item.noSak;
     if (item is BbItem) return item.noSak;
     if (item is WashingItem) return item.noSak;
-    if (item is MixerItem) return item.noSak;
-    return null;
+    return null; // Gilingan tidak punya noSak
   }
 
   static double? _beratOf(dynamic item) {
-    if (item is BrokerItem) return item.berat;
     if (item is BbItem) return item.berat;
     if (item is WashingItem) return item.berat;
-    if (item is CrusherItem) return item.berat;
     if (item is GilinganItem) return item.berat;
-    if (item is MixerItem) return item.berat;
-    if (item is RejectItem) return item.berat;
     return null;
   }
 
@@ -789,6 +779,7 @@ class _LookupLabelDialogState extends State<LookupLabelDialog> {
 
     try {
       if (item is BbItem && item.isPartialRow == true) return true;
+      if (item is GilinganItem && item.isPartialRow == true) return true;
       final dynamic dyn = item;
       final hasIsPartial = (dyn as dynamic?)?.isPartial;
       if (hasIsPartial is bool && hasIsPartial) return true;

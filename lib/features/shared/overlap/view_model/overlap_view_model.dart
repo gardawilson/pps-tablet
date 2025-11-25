@@ -17,7 +17,7 @@ class OverlapViewModel extends ChangeNotifier {
 
   bool get hasOverlap => _conflicts.isNotEmpty;
   String? get overlapMessage =>
-      hasOverlap ? 'Jam bertabrakan dengan ${_conflicts.length} dokumen' : null;
+      hasOverlap ? 'Rentang jam ini telah di gunakan' : null;
 
   Future<void> check({
     required String kind,          // 'broker' | 'crusher' | 'washing' | 'gilingan'

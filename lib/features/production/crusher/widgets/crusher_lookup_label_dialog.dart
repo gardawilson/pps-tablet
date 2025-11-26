@@ -3,18 +3,18 @@ import 'package:provider/provider.dart';
 
 import '../../shared/utils/format.dart';
 import '../../shared/widgets/weight_input_dialog.dart';
-import '../view_model/broker_production_input_view_model.dart';
-import '../model/broker_inputs_model.dart';
+import '../view_model/crusher_production_input_view_model.dart';
+import '../model/crusher_inputs_model.dart'; // ✅ untuk BbItem & BonggolanItem
 import '../../shared/models/production_label_lookup_result.dart';
 
 enum _Presence { none, temp }
 
-class BrokerLookupLabelDialog extends StatefulWidget {
+class CrusherLookupLabelDialog extends StatefulWidget {
   final String noProduksi;
   final String selectedMode;
   final Set<int>? preDisabledIndices;
 
-  const BrokerLookupLabelDialog({
+  const CrusherLookupLabelDialog({
     super.key,
     required this.noProduksi,
     required this.selectedMode,
@@ -22,10 +22,11 @@ class BrokerLookupLabelDialog extends StatefulWidget {
   });
 
   @override
-  State<BrokerLookupLabelDialog> createState() => _BrokerLookupLabelDialogState();
+  State<CrusherLookupLabelDialog> createState() =>
+      _CrusherLookupLabelDialogState();
 }
 
-class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
+class _CrusherLookupLabelDialogState extends State<CrusherLookupLabelDialog> {
   final Set<int> _localPickedIndices = <int>{};
   final Set<int> _disabledAtOpen = <int>{};
   final Map<int, double> _editedWeights = {};
@@ -39,8 +40,9 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
     _editedWeights.clear();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final vm = context.read<BrokerProductionInputViewModel>();
+      final vm = context.read<CrusherProductionInputViewModel>();
 
+      // Refresh lookup berdasarkan label pertama
       final lastLookup = vm.lastLookup;
       if (lastLookup != null && lastLookup.typedItems.isNotEmpty) {
         final firstItem = lastLookup.typedItems.first;
@@ -63,7 +65,7 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
   }
 
   void _precomputeDisabledRows() {
-    final vm = context.read<BrokerProductionInputViewModel>();
+    final vm = context.read<CrusherProductionInputViewModel>();
     final result = vm.lastLookup;
     if (result == null) return;
 
@@ -81,7 +83,7 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
 
   void _maybeAutoSelectFirstTime() {
     if (_didAutoSelect) return;
-    final vm = context.read<BrokerProductionInputViewModel>();
+    final vm = context.read<CrusherProductionInputViewModel>();
     final result = vm.lastLookup;
     if (result == null || result.typedItems.isEmpty) return;
 
@@ -99,7 +101,11 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
     _didAutoSelect = true;
   }
 
-  void _toggleRow(BrokerProductionInputViewModel vm, int index, Map<String, dynamic> row) {
+  void _toggleRow(
+      CrusherProductionInputViewModel vm,
+      int index,
+      Map<String, dynamic> row,
+      ) {
     if (_isDisabled(index)) return;
     setState(() {
       if (_localPickedIndices.contains(index)) {
@@ -110,7 +116,10 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
     });
   }
 
-  void _selectAllNew(BrokerProductionInputViewModel vm, ProductionLabelLookupResult result) {
+  void _selectAllNew(
+      CrusherProductionInputViewModel vm,
+      ProductionLabelLookupResult result,
+      ) {
     setState(() {
       _localPickedIndices.clear();
       for (int i = 0; i < result.data.length; i++) {
@@ -121,7 +130,10 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
     });
   }
 
-  void _commitSelection(BrokerProductionInputViewModel vm, ProductionLabelLookupResult result) {
+  void _commitSelection(
+      CrusherProductionInputViewModel vm,
+      ProductionLabelLookupResult result,
+      ) {
     if (_localPickedIndices.isEmpty) return;
 
     vm.clearPicks();
@@ -140,7 +152,8 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
     Navigator.pop(context);
 
     final msg = r.added > 0
-        ? 'Ditambahkan ${r.added} item${r.skipped > 0 ? ' • Duplikat terlewati ${r.skipped}' : ''}'
+        ? 'Ditambahkan ${r.added} item'
+        '${r.skipped > 0 ? ' • Duplikat terlewati ${r.skipped}' : ''}'
         : 'Tidak ada item baru ditambahkan';
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -148,12 +161,13 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
         content: Text(msg),
         behavior: SnackBarBehavior.floating,
         backgroundColor: r.added > 0 ? Colors.green : Colors.orange,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
 
   _Presence _presenceForRow(
-      BrokerProductionInputViewModel vm,
+      CrusherProductionInputViewModel vm,
       Map<String, dynamic> row,
       ProductionLabelLookupResult ctx,
       String noProduksi,
@@ -167,12 +181,15 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<BrokerProductionInputViewModel>(
+    return Consumer<CrusherProductionInputViewModel>(
       builder: (context, vm, _) {
         final result = vm.lastLookup;
         if (result == null) {
           return const Dialog(
-            child: SizedBox(height: 120, child: Center(child: Text('Tidak ada hasil lookup'))),
+            child: SizedBox(
+              height: 120,
+              child: Center(child: Text('Tidak ada hasil lookup')),
+            ),
           );
         }
 
@@ -190,7 +207,8 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
 
         final dynamic sample = typedItems.isNotEmpty ? typedItems.first : null;
         final labelCode = sample == null ? '-' : _labelCodeOf(sample);
-        final namaJenis = sample == null ? prefixType.displayName : (_namaJenisOf(sample) ?? '-');
+        final namaJenis =
+        sample == null ? prefixType.displayName : (_namaJenisOf(sample) ?? '-');
 
         int newCount = 0;
         for (int i = 0; i < result.data.length; i++) {
@@ -210,7 +228,7 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // ✅ HEADER - Lebih modern dengan gradient
+                // HEADER
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
@@ -235,7 +253,11 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                           color: Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.qr_code_2_rounded, size: 28, color: Colors.white),
+                        child: const Icon(
+                          Icons.qr_code_2_rounded,
+                          size: 28,
+                          color: Colors.white,
+                        ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
@@ -263,7 +285,8 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(20),
@@ -281,9 +304,10 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                   ),
                 ),
 
-                // ✅ COLUMN HEADERS - Lebih clean
+                // COLUMN HEADERS
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade50,
                     border: Border(
@@ -293,11 +317,11 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                   child: Row(
                     children: [
                       const SizedBox(width: 40),
-                      const Expanded(
+                      Expanded(
                         flex: 2,
                         child: Text(
-                          'SAK',
-                          style: TextStyle(
+                          _getDetailHeader(prefixType),
+                          style: const TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 12,
                             color: Colors.black87,
@@ -324,7 +348,7 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                         child: Text(
                           'STATUS',
                           textAlign: TextAlign.center,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 12,
                             color: Colors.black87,
@@ -336,7 +360,7 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                   ),
                 ),
 
-                // ✅ LIST - Design lebih modern
+                // LIST
                 Expanded(
                   child: ListView.builder(
                     padding: const EdgeInsets.all(12),
@@ -345,7 +369,8 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                       final item = typedItems[idx];
                       final rawRow = result.data[idx];
 
-                      final presence = _presenceForRow(vm, rawRow, result, widget.noProduksi);
+                      final presence =
+                      _presenceForRow(vm, rawRow, result, widget.noProduksi);
                       final isDuplicate = _isDisabled(idx);
                       final picked = _localPickedIndices.contains(idx);
 
@@ -356,10 +381,11 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                         });
                       }
 
-                      final sak = _sakOf(item);
+                      final detail = _getDetailText(item, prefixType);
                       final originalBerat = _beratOf(item);
                       final displayBerat = _editedWeights[idx] ?? originalBerat;
-                      final beratTxt = displayBerat == null ? '-' : num2(displayBerat);
+                      final beratTxt =
+                      displayBerat == null ? '-' : num2(displayBerat);
 
                       final isPartial = _isPartialOf(item, rawRow);
                       final isWeightEdited = _editedWeights.containsKey(idx);
@@ -377,6 +403,10 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                           break;
                       }
 
+                      // Edit berat hanya relevan untuk BbItem (yang bisa partial)
+                      final canEditWeight =
+                          item is BbItem && isPartial && !isDuplicate;
+
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: IgnorePointer(
@@ -388,7 +418,9 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                               color: Colors.transparent,
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(12),
-                                onTap: isDuplicate ? null : () => _toggleRow(vm, idx, rawRow),
+                                onTap: isDuplicate
+                                    ? null
+                                    : () => _toggleRow(vm, idx, rawRow),
                                 child: Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
@@ -415,33 +447,40 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                                   child: Row(
                                     children: [
                                       // Checkbox
-                                      Container(
+                                      SizedBox(
                                         width: 40,
                                         height: 40,
-                                        alignment: Alignment.center,
-                                        child: Checkbox(
-                                          value: picked && !isDuplicate,
-                                          onChanged: isDuplicate
-                                              ? null
-                                              : (_) => _toggleRow(vm, idx, rawRow),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(6),
+                                        child: Center(
+                                          child: Checkbox(
+                                            value: picked && !isDuplicate,
+                                            onChanged: isDuplicate
+                                                ? null
+                                                : (_) =>
+                                                _toggleRow(vm, idx, rawRow),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                              BorderRadius.circular(6),
+                                            ),
+                                            materialTapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
                                           ),
-                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                         ),
                                       ),
 
-                                      // SAK dengan icon partial
+                                      // DETAIL (SAK / NO BONGGOL) + icon partial
                                       Expanded(
                                         flex: 2,
                                         child: Row(
                                           children: [
                                             if (isPartial) ...[
                                               Container(
-                                                padding: const EdgeInsets.all(4),
+                                                padding:
+                                                const EdgeInsets.all(4),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.amber.withOpacity(0.2),
-                                                  borderRadius: BorderRadius.circular(6),
+                                                  color: Colors.amber
+                                                      .withOpacity(0.2),
+                                                  borderRadius:
+                                                  BorderRadius.circular(6),
                                                 ),
                                                 child: const Icon(
                                                   Icons.content_cut,
@@ -453,7 +492,7 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                                             ],
                                             Expanded(
                                               child: Text(
-                                                sak?.toString() ?? '-',
+                                                detail,
                                                 style: TextStyle(
                                                   fontWeight: FontWeight.w600,
                                                   fontSize: 15,
@@ -467,13 +506,14 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                                         ),
                                       ),
 
-                                      // BERAT - Pill style lebih modern
+                                      // BERAT
                                       Expanded(
                                         flex: 2,
                                         child: Align(
                                           alignment: Alignment.centerRight,
                                           child: Container(
-                                            padding: const EdgeInsets.symmetric(
+                                            padding:
+                                            const EdgeInsets.symmetric(
                                               horizontal: 12,
                                               vertical: 6,
                                             ),
@@ -486,15 +526,20 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                                                 ]
                                                     : statusText != null
                                                     ? [
-                                                  statusColor!.withOpacity(0.2),
-                                                  statusColor.withOpacity(0.3),
+                                                  statusColor!
+                                                      .withOpacity(
+                                                      0.2),
+                                                  statusColor
+                                                      .withOpacity(
+                                                      0.3),
                                                 ]
                                                     : [
                                                   Colors.green.shade100,
                                                   Colors.green.shade200,
                                                 ],
                                               ),
-                                              borderRadius: BorderRadius.circular(20),
+                                              borderRadius:
+                                              BorderRadius.circular(20),
                                             ),
                                             child: Text(
                                               '$beratTxt kg',
@@ -514,19 +559,22 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
 
                                       const SizedBox(width: 12),
 
-                                      // BADGES & BUTTON - Lebih compact
+                                      // BADGES & BUTTON
                                       SizedBox(
                                         width: 220,
                                         child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.end,
+                                          mainAxisAlignment:
+                                          MainAxisAlignment.end,
                                           children: [
-                                            // Edit button
-                                            if (isPartial && !isDuplicate)
-                                              Container(
+                                            // Edit button (hanya BbItem partial)
+                                            if (canEditWeight)
+                                              SizedBox(
                                                 height: 32,
                                                 child: OutlinedButton.icon(
-                                                  style: OutlinedButton.styleFrom(
-                                                    padding: const EdgeInsets.symmetric(
+                                                  style:
+                                                  OutlinedButton.styleFrom(
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
                                                       horizontal: 10,
                                                       vertical: 4,
                                                     ),
@@ -534,8 +582,11 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                                                       color: Colors.amber.shade600,
                                                       width: 1.5,
                                                     ),
-                                                    shape: RoundedRectangleBorder(
-                                                      borderRadius: BorderRadius.circular(8),
+                                                    shape:
+                                                    RoundedRectangleBorder(
+                                                      borderRadius:
+                                                      BorderRadius.circular(
+                                                          8),
                                                     ),
                                                   ),
                                                   icon: Icon(
@@ -547,22 +598,27 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                                                     'Edit',
                                                     style: TextStyle(
                                                       fontSize: 11,
-                                                      fontWeight: FontWeight.w600,
+                                                      fontWeight:
+                                                      FontWeight.w600,
                                                       color: Colors.amber.shade700,
                                                     ),
                                                   ),
                                                   onPressed: () async {
                                                     if (originalBerat != null) {
                                                       final newWeight =
-                                                      await WeightInputDialog.show(
+                                                      await WeightInputDialog
+                                                          .show(
                                                         context,
                                                         maxWeight: originalBerat,
-                                                        currentWeight: _editedWeights[idx],
+                                                        currentWeight:
+                                                        _editedWeights[idx],
                                                       );
 
-                                                      if (newWeight != null && mounted) {
+                                                      if (newWeight != null &&
+                                                          mounted) {
                                                         setState(() {
-                                                          _editedWeights[idx] = newWeight;
+                                                          _editedWeights[idx] =
+                                                              newWeight;
                                                         });
                                                       }
                                                     }
@@ -570,21 +626,25 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                                                 ),
                                               ),
 
-                                            if (isPartial && !isDuplicate)
+                                            if (canEditWeight)
                                               const SizedBox(width: 8),
 
-                                            // Badges
+                                            // Badges PARTIAL / STATUS
                                             if (isPartial)
                                               Container(
-                                                padding: const EdgeInsets.symmetric(
+                                                padding:
+                                                const EdgeInsets.symmetric(
                                                   horizontal: 10,
                                                   vertical: 4,
                                                 ),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.amber.withOpacity(0.15),
-                                                  borderRadius: BorderRadius.circular(6),
+                                                  color: Colors.amber
+                                                      .withOpacity(0.15),
+                                                  borderRadius:
+                                                  BorderRadius.circular(6),
                                                   border: Border.all(
-                                                    color: Colors.amber.shade400,
+                                                    color:
+                                                    Colors.amber.shade400,
                                                   ),
                                                 ),
                                                 child: Text(
@@ -599,25 +659,34 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                                               ),
 
                                             if (statusText != null)
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(
-                                                  horizontal: 10,
-                                                  vertical: 4,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  color: statusColor!.withOpacity(0.15),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                  border: Border.all(
-                                                    color: statusColor.withOpacity(0.4),
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                    left: 6),
+                                                child: Container(
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                    horizontal: 10,
+                                                    vertical: 4,
                                                   ),
-                                                ),
-                                                child: Text(
-                                                  statusText,
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: statusColor,
-                                                    letterSpacing: 0.3,
+                                                  decoration: BoxDecoration(
+                                                    color: statusColor!
+                                                        .withOpacity(0.15),
+                                                    borderRadius:
+                                                    BorderRadius.circular(6),
+                                                    border: Border.all(
+                                                      color: statusColor
+                                                          .withOpacity(0.4),
+                                                    ),
+                                                  ),
+                                                  child: Text(
+                                                    statusText,
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight:
+                                                      FontWeight.w700,
+                                                      color: statusColor,
+                                                      letterSpacing: 0.3,
+                                                    ),
                                                   ),
                                                 ),
                                               ),
@@ -636,7 +705,7 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                   ),
                 ),
 
-                // ✅ FOOTER - Lebih modern dan intuitive
+                // FOOTER
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -651,7 +720,7 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                   ),
                   child: Row(
                     children: [
-                      // Clear button
+                      // Clear
                       TextButton.icon(
                         onPressed: _localPickedIndices.isNotEmpty
                             ? () => setState(_localPickedIndices.clear)
@@ -664,7 +733,7 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                       ),
                       const SizedBox(width: 8),
 
-                      // Select all button
+                      // Select all
                       if (newCount > 0)
                         OutlinedButton.icon(
                           onPressed: () => _selectAllNew(vm, result),
@@ -681,7 +750,10 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                       // Counter
                       if (_localPickedIndices.isNotEmpty)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           margin: const EdgeInsets.only(right: 12),
                           decoration: BoxDecoration(
                             color: Colors.blue.shade100,
@@ -697,7 +769,7 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                           ),
                         ),
 
-                      // Submit button
+                      // Submit
                       FilledButton.icon(
                         onPressed: _localPickedIndices.isEmpty
                             ? null
@@ -731,9 +803,26 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
     );
   }
 
-  // ===== Helpers =====
+  // ===== Helpers: HANYA BbItem + BonggolanItem =====
+
+  String _getDetailHeader(PrefixType type) {
+    switch (type) {
+      case PrefixType.bb:
+        return 'SAK';
+      case PrefixType.crusher:
+        return 'NO BONGGOL';
+      default:
+        return 'DETAIL';
+    }
+  }
+
+  String _getDetailText(dynamic item, PrefixType type) {
+    if (item is BbItem) return '${item.noSak ?? '-'}';
+    if (item is BonggolanItem) return item.noBonggolan ?? '-';
+    return '-';
+  }
+
   static String _labelCodeOf(dynamic item) {
-    if (item is BrokerItem) return item.noBroker ?? '-';
     if (item is BbItem) {
       // 1) Kalau ada kode partial (Q./P. dsb) → pakai itu
       final npart = (item.noBBPartial ?? '').trim();
@@ -756,41 +845,22 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
       // Contoh: A.0000000001-1
       return '$noBB-$palletStr';
     }
-    if (item is WashingItem) return item.noWashing ?? '-';
-    if (item is CrusherItem) return item.noCrusher ?? '-';
-    if (item is GilinganItem) return item.noGilingan ?? '-';
-    if (item is MixerItem) return item.noMixer ?? '-';
-    if (item is RejectItem) return item.noReject ?? '-';
+
+    if (item is BonggolanItem) {
+      return item.noBonggolan ?? '-';
+    }
     return '-';
   }
 
   static String? _namaJenisOf(dynamic item) {
-    if (item is BrokerItem) return item.namaJenis;
     if (item is BbItem) return item.namaJenis;
-    if (item is WashingItem) return item.namaJenis;
-    if (item is CrusherItem) return item.namaJenis;
-    if (item is GilinganItem) return item.namaJenis;
-    if (item is MixerItem) return item.namaJenis;
-    if (item is RejectItem) return item.namaJenis;
-    return null;
-  }
-
-  static int? _sakOf(dynamic item) {
-    if (item is BrokerItem) return item.noSak;
-    if (item is BbItem) return item.noSak;
-    if (item is WashingItem) return item.noSak;
-    if (item is MixerItem) return item.noSak;
+    if (item is BonggolanItem) return item.namaJenis;
     return null;
   }
 
   static double? _beratOf(dynamic item) {
-    if (item is BrokerItem) return item.berat;
     if (item is BbItem) return item.berat;
-    if (item is WashingItem) return item.berat;
-    if (item is CrusherItem) return item.berat;
-    if (item is GilinganItem) return item.berat;
-    if (item is MixerItem) return item.berat;
-    if (item is RejectItem) return item.berat;
+    if (item is BonggolanItem) return item.berat;
     return null;
   }
 
@@ -802,13 +872,13 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
   }
 
   static bool _isPartialOf(dynamic item, Map<String, dynamic> row) {
+    // Flag di row (IsPartial, isPartial)
     if (_boolish(row['isPartial']) || _boolish(row['IsPartial'])) return true;
 
+    // Dari model
     try {
       if (item is BbItem && item.isPartialRow == true) return true;
-      final dynamic dyn = item;
-      final hasIsPartial = (dyn as dynamic?)?.isPartial;
-      if (hasIsPartial is bool && hasIsPartial) return true;
+      // BonggolanItem tidak punya partial
     } catch (_) {}
     return false;
   }

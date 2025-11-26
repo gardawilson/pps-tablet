@@ -18,7 +18,10 @@ import 'package:pps_tablet/features/operator/repository/operator_repository.dart
 import 'package:pps_tablet/features/operator/view_model/operator_view_model.dart';
 import 'package:pps_tablet/features/production/broker/repository/broker_production_input_repository.dart';
 import 'package:pps_tablet/features/production/broker/view_model/broker_production_input_view_model.dart';
+import 'package:pps_tablet/features/production/crusher/repository/crusher_production_input_repository.dart';
 import 'package:pps_tablet/features/production/crusher/repository/crusher_production_repository.dart';
+import 'package:pps_tablet/features/production/crusher/view/crusher_production_screen.dart';
+import 'package:pps_tablet/features/production/crusher/view_model/crusher_production_input_view_model.dart';
 import 'package:pps_tablet/features/production/crusher/view_model/crusher_production_view_model.dart';
 import 'package:pps_tablet/features/production/inject/repository/inject_production_repository.dart';
 import 'package:pps_tablet/features/production/inject/view_model/inject_production_view_model.dart';
@@ -109,6 +112,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => BrokerViewModel(repository: BrokerRepository())),
         ChangeNotifierProvider(create: (_) => BonggolanViewModel(repository: BonggolanRepository())),
         ChangeNotifierProvider(create: (_) => CrusherViewModel(repository: CrusherRepository())),
+        ChangeNotifierProvider(create: (_) => CrusherProductionInputViewModel(repository: CrusherProductionInputRepository())),
         ChangeNotifierProvider(create: (_) => BrokerProductionViewModel(repository: BrokerProductionRepository())),
         ChangeNotifierProvider(create: (_) => BrokerProductionInputViewModel(repository: BrokerProductionInputRepository())),
         ChangeNotifierProvider(create: (_) => InjectProductionViewModel(repository: InjectProductionRepository())),
@@ -185,6 +189,7 @@ class MyApp extends StatelessWidget {
           '/production': (context) => ProductionSelectionScreen(),
           '/production/washing': (context) => WashingProductionScreen(),
           '/production/broker': (context) => BrokerProductionScreen(),
+          '/production/crusher': (context) => CrusherProductionScreen(),
         },
       ),
 

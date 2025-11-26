@@ -7,6 +7,7 @@ import 'crusher_item.dart';
 import 'gilingan_item.dart';
 import 'mixer_item.dart';
 import 'reject_item.dart';
+import 'bonggolan_item.dart'; // ⬅️ pastikan path & nama file sesuai
 
 class ProductionLabelLookupResult {
   final bool found;
@@ -106,6 +107,12 @@ class ProductionLabelLookupResult {
     return data.map((json) => RejectItem.fromJson(json)).toList();
   }
 
+  /// Konversi data ke List<BonggolanItem>
+  List<BonggolanItem> get bonggolanItems {
+    if (!found || data.isEmpty) return const [];
+    return data.map((json) => BonggolanItem.fromJson(json)).toList();
+  }
+
   // ========== SMART GETTER BASED ON PREFIX ==========
 
   /// Mengembalikan list item yang sesuai berdasarkan prefix
@@ -130,6 +137,8 @@ class ProductionLabelLookupResult {
         return mixerItems; // Mixer_d
       case 'BF.':
         return rejectItems; // RejectV2
+      case 'M.':
+        return bonggolanItems; // Bonggolan (Crusher Bonggol)
       default:
         return const [];
     }
@@ -155,6 +164,8 @@ class ProductionLabelLookupResult {
         return PrefixType.mixer;
       case 'BF.':
         return PrefixType.reject;
+      case 'M.':
+        return PrefixType.bonggolan;
       default:
         return PrefixType.unknown;
     }
@@ -187,7 +198,20 @@ class ProductionLabelLookupResult {
         row.containsKey('noBahanBaku')) {
       table = 'BahanBaku_d';
       prefix = 'A.';
-      no = getValue('NoBahanBaku', 'noBahanBaku') ?? '-';
+
+      final nb = getValue('NoBahanBaku', 'noBahanBaku') ?? '-';
+      final palletRaw = row['NoPallet'] ?? row['noPallet'];
+
+      String noCombined;
+      if (palletRaw == null ||
+          (palletRaw is num && palletRaw == 0) ||
+          (palletRaw is String && palletRaw.trim().isEmpty)) {
+        noCombined = nb;
+      } else {
+        noCombined = '$nb-$palletRaw'; // contoh: A.0000002171-2
+      }
+
+      no = noCombined;
     } else if (row.containsKey('NoWashing') || row.containsKey('noWashing')) {
       table = 'Washing_d';
       prefix = 'B.';
@@ -209,11 +233,16 @@ class ProductionLabelLookupResult {
       table = 'RejectV2';
       prefix = 'BF.';
       no = getValue('NoReject', 'noReject') ?? '-';
+    } else if (row.containsKey('NoBonggolan') ||
+        row.containsKey('noBonggolan')) {
+      table = 'Bonggolan';
+      prefix = 'M.'; // prefix untuk bonggolan
+      no = getValue('NoBonggolan', 'noBonggolan') ?? '-';
     } else {
       // Fallback: gunakan info dari context
       table = this.tableName ?? '-';
       prefix = this.prefix ?? '-';
-      no = getValue('NoBonggolan', 'noBonggolan') ?? '-';
+      no = '-';
     }
 
     // Ambil NoSak (support kedua format)
@@ -285,7 +314,10 @@ class ProductionLabelLookupResult {
         return mixerItems.any((item) => item.isPartialRow);
       case PrefixType.reject:
         return rejectItems.any((item) => item.isPartialRow);
-      default:
+      case PrefixType.washing:
+      case PrefixType.crusher:
+      case PrefixType.bonggolan: // bonggolan tidak partial
+      case PrefixType.unknown:
         return false;
     }
   }
@@ -302,6 +334,7 @@ class ProductionLabelLookupResult {
       if (item is GilinganItem) return sum + (item.berat ?? 0);
       if (item is MixerItem) return sum + (item.berat ?? 0);
       if (item is RejectItem) return sum + (item.berat ?? 0);
+      if (item is BonggolanItem) return sum + (item.berat ?? 0);
       return sum;
     });
   }
@@ -324,7 +357,9 @@ class ProductionLabelLookupResult {
         return row['NoMixer'] != null || row['noMixer'] != null;
       case PrefixType.reject:
         return row['NoReject'] != null || row['noReject'] != null;
-      default:
+      case PrefixType.bonggolan:
+        return row['NoBonggolan'] != null || row['noBonggolan'] != null;
+      case PrefixType.unknown:
         return false;
     }
   }
@@ -359,13 +394,14 @@ class ProductionLabelLookupResult {
 
 /// Enum untuk tipe prefix yang dikenali sistem
 enum PrefixType {
-  broker, // D.
-  bb, // A.
-  washing, // B.
-  crusher, // F.
-  gilingan, // V.
-  mixer, // H.
-  reject, // BF.
+  broker,    // D.
+  bb,        // A.
+  washing,   // B.
+  crusher,   // F.
+  gilingan,  // V.
+  mixer,     // H.
+  reject,    // BF.
+  bonggolan, // M.
   unknown;
 
   String get displayName {
@@ -384,6 +420,8 @@ enum PrefixType {
         return 'Mixer';
       case PrefixType.reject:
         return 'Reject';
+      case PrefixType.bonggolan:
+        return 'Bonggolan';
       case PrefixType.unknown:
         return 'Unknown';
     }
@@ -405,6 +443,8 @@ enum PrefixType {
         return 'H.';
       case PrefixType.reject:
         return 'BF.';
+      case PrefixType.bonggolan:
+        return 'M.';
       case PrefixType.unknown:
         return '';
     }
@@ -428,7 +468,10 @@ extension TempPartialFormat on PrefixType {
         return 'T'; // Mixer
       case PrefixType.reject:
         return 'BK'; // Reject
-      default:
+      case PrefixType.washing:
+      case PrefixType.crusher:
+      case PrefixType.bonggolan:
+      case PrefixType.unknown:
         return ''; // lainnya tidak dipakai
     }
   }
@@ -446,7 +489,10 @@ extension TempPartialFormat on PrefixType {
         return 4; // T.0001
       case PrefixType.reject:
         return 4; // BK.0001
-      default:
+      case PrefixType.washing:
+      case PrefixType.crusher:
+      case PrefixType.bonggolan:
+      case PrefixType.unknown:
         return 0;
     }
   }

@@ -19,16 +19,12 @@ String bbTitleKey(BbItem e) {
 
 String bbPairLabel(BbItem i) {
   final nb = (i.noBahanBaku ?? '').trim();
-  final partRaw = (i.noSak.toString()).trim();
-  if (i.isPartialRow) {
-    if (nb.isEmpty && partRaw.isEmpty) return '-';
-    if (nb.isNotEmpty && partRaw.startsWith('$nb-')) return partRaw;
-    final idx = partRaw.lastIndexOf('-');
-    final suffix = idx == -1 ? partRaw : partRaw.substring(idx + 1);
-    if (nb.isEmpty) return partRaw.isEmpty ? '-' : partRaw;
-    return suffix.isEmpty ? nb : '$nb-$suffix';
-  }
   final pallet = i.noPallet;
-  if (nb.isEmpty && pallet == null) return '-';
-  return (pallet == null) ? nb : '$nb-$pallet';
+  final hasNb = nb.isNotEmpty;
+  final hasPallet = pallet != null && pallet > 0;
+
+  if (!hasNb && !hasPallet) return '-';
+  if (hasNb && hasPallet) return '$nb-$pallet'; // A.0000000001-1
+  if (hasNb) return nb;                         // A.0000000001
+  return 'Pallet $pallet';                      // Pallet 1
 }

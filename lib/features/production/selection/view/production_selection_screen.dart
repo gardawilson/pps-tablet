@@ -47,6 +47,20 @@ class ProductionSelectionScreen extends StatelessWidget {
                 ? () => Navigator.pushNamed(context, '/production/broker')
                 : null,
           ),
+
+          const SizedBox(height: 16),
+
+          // 🔹 Card Label Broker
+          _buildLabelCard(
+            context,
+            title: 'Proses Crusher',
+            subtitle: 'Buat label untuk proses crusher',
+            icon: Icons.people,
+            enabled: canReadBroker,
+            onTap: canReadBroker
+                ? () => Navigator.pushNamed(context, '/production/crusher')
+                : null,
+          ),
         ],
       ),
     );

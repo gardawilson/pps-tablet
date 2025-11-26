@@ -734,9 +734,26 @@ class _WashingLookupLabelDialogState extends State<WashingLookupLabelDialog> {
   // ===== Helpers (hanya untuk Washing: BB, Washing, Gilingan) =====
   static String _labelCodeOf(dynamic item) {
     if (item is BbItem) {
+      // 1) Kalau ada kode partial (Q./P. dsb) → pakai itu
       final npart = (item.noBBPartial ?? '').trim();
       if (npart.isNotEmpty) return npart;
-      return item.noBahanBaku ?? '-';
+
+      // 2) Kalau tidak partial → gabung NoBahanBaku + "-" + NoPallet
+      final noBB = (item.noBahanBaku ?? '').trim();
+      final pallet = item.noPallet; // pastikan field ini ada di BbItem
+
+      if (noBB.isEmpty) return '-';
+
+      if (pallet == null) {
+        // tidak ada pallet → tampilkan NoBahanBaku saja
+        return noBB;
+      }
+
+      final palletStr = pallet.toString().trim();
+      if (palletStr.isEmpty) return noBB;
+
+      // Contoh: A.0000000001-1
+      return '$noBB-$palletStr';
     }
     if (item is WashingItem) return item.noWashing ?? '-';
     if (item is GilinganItem) {

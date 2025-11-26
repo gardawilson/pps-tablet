@@ -71,19 +71,22 @@ class _CrusherProductionDropdownState extends State<CrusherProductionDropdown> {
       // EDIT MODE: single local item
       final item = CrusherProduction(
         noCrusherProduksi: pre,
-        tanggal: DateTime.now(), // display-only; not used
+        idOperator: 0,
         idMesin: 0,
         namaMesin: widget.preselectNamaMesin ?? '',
-        idOperator: 0,
-        jam: null,
-        shift: widget.shiftFilter ?? '',
-        createBy: null,
+        namaOperator: '', // ⬅️ CHANGED: added required field
+        tanggal: DateTime.now(), // display-only; not used
+        jamKerja: 0, // ⬅️ CHANGED: int instead of String?
+        shift: int.tryParse(widget.shiftFilter ?? '0') ?? 0, // ⬅️ CHANGED: int instead of String
+        createBy: '', // ⬅️ CHANGED: required String
         checkBy1: null,
         checkBy2: null,
         approveBy: null,
         jmlhAnggota: 0,
         hadir: 0,
         hourMeter: null,
+        hourStart: null, // ⬅️ ADDED
+        hourEnd: null,   // ⬅️ ADDED
         outputNoCrusher: null,
       );
 
@@ -142,7 +145,10 @@ class _CrusherProductionDropdownState extends State<CrusherProductionDropdown> {
 
         // Optional filter by shift (client-side), in case backend returns mixed shifts
         if (widget.shiftFilter != null && widget.shiftFilter!.isNotEmpty) {
-          base = base.where((e) => e.shift.toString() == widget.shiftFilter).toList();
+          final shiftInt = int.tryParse(widget.shiftFilter!);
+          if (shiftInt != null) {
+            base = base.where((e) => e.shift == shiftInt).toList(); // ⬅️ CHANGED: compare int
+          }
         }
 
         final hasMatch = base.any((e) => e.noCrusherProduksi == _value?.noCrusherProduksi);
@@ -155,7 +161,7 @@ class _CrusherProductionDropdownState extends State<CrusherProductionDropdown> {
         String itemLabel(CrusherProduction e) {
           final outputs = e.outputNoCrusherList;
           final outputsStr = outputs.isEmpty ? '' : ' • [${outputs.join(', ')}]';
-          final shiftStr = (e.shift.isEmpty) ? '' : ' (SHIFT ${e.shift})';
+          final shiftStr = (e.shift == 0) ? '' : ' (SHIFT ${e.shift})'; // ⬅️ CHANGED: int comparison
           return '${e.noCrusherProduksi} | ${e.namaMesin}$shiftStr$outputsStr';
         }
 

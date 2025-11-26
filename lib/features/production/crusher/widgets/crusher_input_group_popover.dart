@@ -1,36 +1,23 @@
-// =============================
-// lib/features/production/broker/widgets/crusher_input_group_popover.dart
-// Updated: Batch delete + Summary Total Sak & Berat
-// =============================
+// lib/features/production/crusher/widgets/crusher_input_group_popover.dart
+// Crusher Input Group Popover - Simplified version with BB + Bonggolan only
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../view_model/broker_production_input_view_model.dart';
+import '../view_model/crusher_production_input_view_model.dart';
 
-/// Cek apakah bucket TEMP untuk labelCode berisi item partial.
+/// Cek apakah bucket TEMP untuk labelCode berisi item partial (hanya BB yang punya partial)
 bool _hasPartialTempForLabel(
-    BrokerProductionInputViewModel vm,
+    CrusherProductionInputViewModel vm,
     String labelCode,
     ) {
   final b = vm.getTemporaryDataForLabel(labelCode.trim());
   if (b == null || b.isEmpty) return false;
 
-  final hasBrokerPart =
-  b.brokerItems.any((e) => (e.noBrokerPartial ?? '').trim().isNotEmpty);
+  // Hanya BB yang punya partial
   final hasBbPart =
   b.bbItems.any((e) => (e.noBBPartial ?? '').trim().isNotEmpty);
-  final hasGilinganPart = b.gilinganItems
-      .any((e) => (e.noGilinganPartial ?? '').trim().isNotEmpty);
-  final hasMixerPart =
-  b.mixerItems.any((e) => (e.noMixerPartial ?? '').trim().isNotEmpty);
-  final hasRejectPart =
-  b.rejectItems.any((e) => (e.noRejectPartial ?? '').trim().isNotEmpty);
 
-  return hasBrokerPart ||
-      hasBbPart ||
-      hasGilinganPart ||
-      hasMixerPart ||
-      hasRejectPart;
+  return hasBbPart;
 }
 
 /// ✅ Model untuk summary data - HANYA BERAT
@@ -41,7 +28,6 @@ class TooltipSummary {
     required this.totalBerat,
   });
 }
-
 
 /// Popover tooltip di sebelah KIRI anchor tile.
 class InputsGroupTooltip extends StatefulWidget {
@@ -81,7 +67,7 @@ class InputsGroupTooltip extends StatefulWidget {
     this.deleteAllTempLabel = 'Hapus Semua (TEMP)',
     this.canDelete = false,
     this.onBulkDelete,
-    this.summaryBuilder, // ✅ NEW
+    this.summaryBuilder,
   });
 
   @override
@@ -167,7 +153,8 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
           ),
         ],
       ),
-    ) ?? false;
+    ) ??
+        false;
 
     if (!confirmed) return;
 
@@ -318,7 +305,7 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                         child: Builder(
                           builder: (_) {
                             final vm = context
-                                .read<BrokerProductionInputViewModel>();
+                                .read<CrusherProductionInputViewModel>();
                             final hasTempForThis =
                             vm.hasTemporaryDataForLabel(widget.title);
                             final showTempChip = hasTempForThis;
@@ -497,7 +484,7 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                 // BODY
                 // =======================================================
                 Flexible(
-                  child: Consumer<BrokerProductionInputViewModel>(
+                  child: Consumer<CrusherProductionInputViewModel>(
                     builder: (context, vm, _) {
                       final children = widget.childrenBuilder();
 
@@ -537,11 +524,11 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                   ),
                 ),
 
-// =======================================================
-// ✅ SUMMARY SECTION (Total Berat Sejajar)
-// =======================================================
+                // =======================================================
+                // ✅ SUMMARY SECTION (Total Berat Sejajar)
+                // =======================================================
                 if (widget.summaryBuilder != null)
-                  Consumer<BrokerProductionInputViewModel>(
+                  Consumer<CrusherProductionInputViewModel>(
                     builder: (context, vm, _) {
                       final summary = widget.summaryBuilder!();
                       final flexes = widget.columnFlexes ?? [];
@@ -859,7 +846,7 @@ class GroupTooltipAnchorTile extends StatefulWidget {
     this.gap = 16,
     this.onUpdate,
     this.onBulkDelete,
-    this.summaryBuilder, // ✅ NEW
+    this.summaryBuilder,
   });
 
   @override
@@ -901,7 +888,7 @@ class _GroupTooltipAnchorTileState extends State<GroupTooltipAnchorTile> {
       yOffset = bottomLimit - popoverBottom;
     }
 
-    final vm = context.read<BrokerProductionInputViewModel>();
+    final vm = context.read<CrusherProductionInputViewModel>();
     final hasTempForThis = vm.hasTemporaryDataForLabel(widget.title);
     final hasPartialTemp = _hasPartialTempForLabel(vm, widget.title);
     final delAllLabel = hasPartialTemp
@@ -938,7 +925,7 @@ class _GroupTooltipAnchorTileState extends State<GroupTooltipAnchorTile> {
                 columnFlexes: widget.columnFlexes,
                 canDelete: widget.canDelete,
                 onBulkDelete: widget.onBulkDelete,
-                summaryBuilder: widget.summaryBuilder, // ✅ PASS summary builder
+                summaryBuilder: widget.summaryBuilder,
                 childrenBuilder: widget.detailsBuilder,
                 onDeleteAllTemp:
                 hasTempForThis ? () => _handleDeleteAllTemp(vm) : null,
@@ -967,7 +954,7 @@ class _GroupTooltipAnchorTileState extends State<GroupTooltipAnchorTile> {
   }
 
   Future<void> _handleDeleteAllTemp(
-      BrokerProductionInputViewModel vm) async {
+      CrusherProductionInputViewModel vm) async {
     final removed = vm.deleteAllTempForLabel(widget.title);
     widget.onUpdate?.call();
     _hide();
@@ -996,7 +983,7 @@ class _GroupTooltipAnchorTileState extends State<GroupTooltipAnchorTile> {
   Widget build(BuildContext context) {
     return CompositedTransformTarget(
       link: _link,
-      child: Consumer<BrokerProductionInputViewModel>(
+      child: Consumer<CrusherProductionInputViewModel>(
         builder: (context, vm, _) {
           final details = widget.detailsBuilder();
           if (details.isEmpty) return const SizedBox.shrink();

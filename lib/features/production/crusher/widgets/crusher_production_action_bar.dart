@@ -104,7 +104,7 @@ class _CrusherProductionActionBarState extends State<CrusherProductionActionBar>
                     child: FilledButton.icon(
                       onPressed: canCreate ? widget.onAddPressed : null,
                       icon: const Icon(Icons.add),
-                      label: const Text('Tambah Crusher'), // ⬅️ CHANGED: shorter label
+                      label: const Text('Tambah Produksi'), // ⬅️ CHANGED: shorter label
                       style: FilledButton.styleFrom(
                         backgroundColor:
                         canCreate ? const Color(0xFF00897B) : Colors.grey.shade400,

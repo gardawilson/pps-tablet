@@ -73,6 +73,30 @@ class LabelSelectionScreen extends StatelessWidget {
                 ? () => Navigator.pushNamed(context, '/label/crusher')
                 : null,
           ),
+
+          // 🔹 Card Label Gilingan
+          _buildLabelCard(
+            context,
+            title: 'Label Gilingan',
+            subtitle: 'Buat label untuk proses gilingan',
+            icon: Icons.label,
+            enabled: canReadBroker,
+            onTap: canReadBroker
+                ? () => Navigator.pushNamed(context, '/label/gilingan')
+                : null,
+          ),
+
+          // 🔹 Card Label Mixer
+          _buildLabelCard(
+            context,
+            title: 'Label Mixer',
+            subtitle: 'Buat label untuk proses mixer',
+            icon: Icons.label,
+            enabled: canReadBroker,
+            onTap: canReadBroker
+                ? () => Navigator.pushNamed(context, '/label/mixer')
+                : null,
+          ),
         ],
       ),
     );

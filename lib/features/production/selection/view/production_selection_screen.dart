@@ -27,7 +27,7 @@ class ProductionSelectionScreen extends StatelessWidget {
             context,
             title: 'Proses Washing',
             subtitle: 'Buat label untuk proses washing',
-            icon: Icons.local_laundry_service,
+            icon: Icons.inventory_2_outlined,
             enabled: canReadWashing,
             onTap: canReadWashing
                 ? () => Navigator.pushNamed(context, '/production/washing')
@@ -41,7 +41,7 @@ class ProductionSelectionScreen extends StatelessWidget {
             context,
             title: 'Proses Broker',
             subtitle: 'Buat label untuk proses broker',
-            icon: Icons.people,
+            icon: Icons.inventory_2_outlined,
             enabled: canReadBroker,
             onTap: canReadBroker
                 ? () => Navigator.pushNamed(context, '/production/broker')
@@ -55,7 +55,7 @@ class ProductionSelectionScreen extends StatelessWidget {
             context,
             title: 'Proses Crusher',
             subtitle: 'Buat label untuk proses crusher',
-            icon: Icons.people,
+            icon: Icons.inventory_2_outlined,
             enabled: canReadBroker,
             onTap: canReadBroker
                 ? () => Navigator.pushNamed(context, '/production/crusher')

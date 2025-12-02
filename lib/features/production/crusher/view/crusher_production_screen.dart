@@ -18,7 +18,7 @@ import '../widgets/crusher_production_row_popover.dart';
 import 'crusher_production_input_screen.dart';
 
 // Action bar
-// import '../widgets/crusher_delete_dialog.dart';
+// import '../widgets/gilingan_delete_dialog.dart';
 // import '../widgets/crusher_production_action_bar.dart';
 // Inputs screen (Scan action)
 // import '../widgets/crusher_production_form_dialog.dart';
@@ -204,19 +204,19 @@ class _CrusherProductionScreenState extends State<CrusherProductionScreen> {
               cellAlign: TextAlign.right,
               cellBuilder: (_, r) => Text('${r.jamKerja}'),
             ),
-            TableColumnSpec(
-              title: 'WAKTU',
-              width: 130,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) => Text(
-                r.hourRangeText.isEmpty ? '-' : r.hourRangeText,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: r.hourRangeText.isEmpty ? Colors.black45 : Colors.black87,
-                ),
-              ),
-            ),
+            // TableColumnSpec(
+            //   title: 'WAKTU',
+            //   width: 130,
+            //   headerAlign: TextAlign.center,
+            //   cellAlign: TextAlign.center,
+            //   cellBuilder: (_, r) => Text(
+            //     r.hourRangeText.isEmpty ? '-' : r.hourRangeText,
+            //     style: TextStyle(
+            //       fontSize: 12,
+            //       color: r.hourRangeText.isEmpty ? Colors.black45 : Colors.black87,
+            //     ),
+            //   ),
+            // ),
             TableColumnSpec(
               title: 'HM',
               width: 80,
@@ -233,35 +233,35 @@ class _CrusherProductionScreenState extends State<CrusherProductionScreen> {
               cellAlign: TextAlign.center,
               cellBuilder: (_, r) => Text('${r.jmlhAnggota ?? 0}/${r.hadir ?? 0}'),
             ),
-            TableColumnSpec(
-              title: 'OUTPUT',
-              width: 120,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) {
-                final outputs = r.outputNoCrusherList;
-                if (outputs.isEmpty) {
-                  return const Text('-', style: TextStyle(color: Colors.black54));
-                }
-                return Text(
-                  '${outputs.length} item',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.blue,
-                    fontWeight: FontWeight.w500,
-                  ),
-                );
-              },
-            ),
-            TableColumnSpec(
-              title: 'APPROVED',
-              width: 110,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) => (r.approveBy != null && r.approveBy!.isNotEmpty)
-                  ? const Icon(Icons.verified, size: 18, color: Colors.green)
-                  : const Text('-', style: TextStyle(color: Colors.black54)),
-            ),
+            // TableColumnSpec(
+            //   title: 'OUTPUT',
+            //   width: 120,
+            //   headerAlign: TextAlign.center,
+            //   cellAlign: TextAlign.center,
+            //   cellBuilder: (_, r) {
+            //     final outputs = r.outputNoCrusherList;
+            //     if (outputs.isEmpty) {
+            //       return const Text('-', style: TextStyle(color: Colors.black54));
+            //     }
+            //     return Text(
+            //       '${outputs.length} item',
+            //       style: const TextStyle(
+            //         fontSize: 12,
+            //         color: Colors.blue,
+            //         fontWeight: FontWeight.w500,
+            //       ),
+            //     );
+            //   },
+            // ),
+            // TableColumnSpec(
+            //   title: 'APPROVED',
+            //   width: 110,
+            //   headerAlign: TextAlign.center,
+            //   cellAlign: TextAlign.center,
+            //   cellBuilder: (_, r) => (r.approveBy != null && r.approveBy!.isNotEmpty)
+            //       ? const Icon(Icons.verified, size: 18, color: Colors.green)
+            //       : const Text('-', style: TextStyle(color: Colors.black54)),
+            // ),
           ];
 
           return Scaffold(

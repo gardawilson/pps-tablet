@@ -1,4 +1,4 @@
-// lib/view/widgets/broker_partial_info_popover.dart
+// lib/view/widgets/gilingan_partial_info_popover.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pps_tablet/core/utils/date_formatter.dart';

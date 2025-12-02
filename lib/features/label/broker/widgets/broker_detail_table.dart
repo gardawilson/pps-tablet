@@ -1,4 +1,4 @@
-// lib/view/widgets/broker_detail_table.dart
+// lib/view/widgets/mixer_detail_table.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../view_model/broker_view_model.dart';
@@ -162,63 +162,58 @@ class _BrokerDetailTableState extends State<BrokerDetailTable> {
         final isEven = index % 2 == 0;
         final isPartial = d.isPartial == true;
 
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: isEven ? Colors.white : Colors.grey.shade50,
-            border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-          ),
-          child: Row(
-            children: [
-              // Kolom SAK
-              SizedBox(
-                width: 80,
-                child: Text(
-                  d.noSak.toString(),
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          // klik di baris mana saja → kalau partial, tampilkan popover
+          onTapDown: (details) {
+            if (isPartial) {
+              showBrokerPartialInfoPopover(
+                context: context,
+                vm: vm,
+                noSak: d.noSak,
+                popover: _popover,
+                globalPosition: details.globalPosition,
+              );
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: isEven ? Colors.white : Colors.grey.shade50,
+              border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+            ),
+            child: Row(
+              children: [
+                // Kolom SAK
+                SizedBox(
+                  width: 80,
+                  child: Text(
+                    d.noSak.toString(),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
-              ),
 
-              // Kolom Berat + icon info (kalau partial)
-              Expanded(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
+                // Kolom BERAT – merah kalau partial, tanpa icon
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
                       d.berat?.toStringAsFixed(2) ?? '-',
                       style: TextStyle(
                         fontSize: 15,
-                        color: Colors.grey.shade800,
+                        fontWeight: isPartial ? FontWeight.bold : FontWeight.w500,
+                        color: isPartial
+                            ? Colors.red              // 🔴 merah jika partial
+                            : Colors.grey.shade800,   // normal jika bukan partial
                       ),
                     ),
-                    if (isPartial)
-                      InkWell(
-                        // capture global position and show popover
-                        onTapDown: (details) {
-                          showBrokerPartialInfoPopover(
-                            context: context,
-                            vm: vm,
-                            noSak: d.noSak,
-                            popover: _popover,
-                            globalPosition: details.globalPosition,
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(12),
-                        child: const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: Center(
-                            child: Icon(Icons.info_outline, size: 18, color: Colors.orange),
-                          ),
-                        ),
-                      ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },

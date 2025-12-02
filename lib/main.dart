@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:pps_tablet/core/view_model/permission_view_model.dart';
-import 'package:pps_tablet/features/crusher_type/model/crusher_type_model.dart';
 import 'package:pps_tablet/features/crusher_type/repository/crusher_type_repository.dart';
 import 'package:pps_tablet/features/crusher_type/view_model/crusher_type_view_model.dart';
+import 'package:pps_tablet/features/gilingan_type/repository/gilingan_type_repository.dart';
+import 'package:pps_tablet/features/gilingan_type/view_model/gilingan_type_view_model.dart';
 import 'package:pps_tablet/features/jenis_bonggolan/repository/jenis_bonggolan_repository.dart';
 import 'package:pps_tablet/features/jenis_bonggolan/view_model/jenis_bonggolan_view_model.dart';
 import 'package:pps_tablet/features/label/bonggolan/repository/bonggolan_repository.dart';
@@ -12,8 +13,15 @@ import 'package:pps_tablet/features/label/bonggolan/view_model/bonggolan_view_mo
 import 'package:pps_tablet/features/label/broker/repository/broker_repository.dart';
 import 'package:pps_tablet/features/label/broker/view/broker_screen.dart';
 import 'package:pps_tablet/features/label/broker/view_model/broker_view_model.dart';
+import 'package:pps_tablet/features/label/gilingan/repository/gilingan_repository.dart';
+import 'package:pps_tablet/features/label/gilingan/view_model/gilingan_view_model.dart';
+import 'package:pps_tablet/features/label/mixer/repository/mixer_repository.dart';
+import 'package:pps_tablet/features/label/mixer/view/mixer_screen.dart';
+import 'package:pps_tablet/features/label/mixer/view_model/mixer_view_model.dart';
 import 'package:pps_tablet/features/mesin/repository/mesin_repository.dart';
 import 'package:pps_tablet/features/mesin/view_model/mesin_view_model.dart';
+import 'package:pps_tablet/features/mixer_type/repository/mixer_type_repository.dart';
+import 'package:pps_tablet/features/mixer_type/view_model/mixer_type_view_model.dart';
 import 'package:pps_tablet/features/operator/repository/operator_repository.dart';
 import 'package:pps_tablet/features/operator/view_model/operator_view_model.dart';
 import 'package:pps_tablet/features/production/broker/repository/broker_production_input_repository.dart';
@@ -23,8 +31,12 @@ import 'package:pps_tablet/features/production/crusher/repository/crusher_produc
 import 'package:pps_tablet/features/production/crusher/view/crusher_production_screen.dart';
 import 'package:pps_tablet/features/production/crusher/view_model/crusher_production_input_view_model.dart';
 import 'package:pps_tablet/features/production/crusher/view_model/crusher_production_view_model.dart';
+import 'package:pps_tablet/features/production/gilingan/repository/gilingan_production_repository.dart';
+import 'package:pps_tablet/features/production/gilingan/view_model/gilingan_production_view_model.dart';
 import 'package:pps_tablet/features/production/inject/repository/inject_production_repository.dart';
 import 'package:pps_tablet/features/production/inject/view_model/inject_production_view_model.dart';
+import 'package:pps_tablet/features/production/mixer/repository/mixer_production_repository.dart';
+import 'package:pps_tablet/features/production/mixer/view_model/mixer_production_view_model.dart';
 import 'package:pps_tablet/features/production/selection/view/production_selection_screen.dart';
 import 'package:pps_tablet/features/production/washing/repository/washing_production_input_repository.dart';
 import 'package:pps_tablet/features/production/washing/view/washing_production_screen.dart';
@@ -63,6 +75,7 @@ import 'core/navigation/app_nav.dart';
 import 'features/label/crusher/repository/crusher_repository.dart';
 import 'features/label/crusher/view/crusher_screen.dart';
 import 'features/label/crusher/view_model/crusher_view_model.dart';
+import 'features/label/gilingan/view/gilingan_screen.dart';
 import 'features/login/view/login_screen.dart';
 import 'features/production/broker/view/broker_production_screen.dart';
 import 'features/shared/lokasi/lokasi_view_model.dart';
@@ -122,6 +135,15 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => MesinViewModel(repository: MesinRepository())),
         ChangeNotifierProvider(create: (_) => OperatorViewModel(repository: OperatorRepository())),
         ChangeNotifierProvider(create: (_) => OverlapViewModel(repository: OverlapRepository())),
+        ChangeNotifierProvider(create: (_) => MixerViewModel(repository: MixerRepository())),
+        ChangeNotifierProvider(create: (_) => MixerProductionViewModel(repository: MixerProductionRepository())),
+        ChangeNotifierProvider(create: (_) => MixerTypeViewModel(repository: MixerTypeRepository())),
+        ChangeNotifierProvider(create: (_) => GilinganViewModel(repository: GilinganRepository())),
+        ChangeNotifierProvider(create: (_) => GilinganTypeViewModel(repository: GilinganTypeRepository())),
+        ChangeNotifierProvider(create: (_) => GilinganProductionViewModel(repository: GilinganProductionRepository())),
+
+
+
 
 
 
@@ -186,6 +208,8 @@ class MyApp extends StatelessWidget {
           '/label/broker': (context) => BrokerScreen(),
           '/label/bonggolan': (context) => BonggolanScreen(),
           '/label/crusher': (context) => CrusherScreen(),
+          '/label/gilingan': (context) => GilinganScreen(),
+          '/label/mixer': (context) => MixerScreen(),
           '/production': (context) => ProductionSelectionScreen(),
           '/production/washing': (context) => WashingProductionScreen(),
           '/production/broker': (context) => BrokerProductionScreen(),

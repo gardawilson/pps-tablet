@@ -1,4 +1,4 @@
-  // lib/view/widgets/broker_detail_table.dart
+  // lib/view/widgets/mixer_detail_table.dart
 
   import 'package:flutter/material.dart';
   import 'package:provider/provider.dart';

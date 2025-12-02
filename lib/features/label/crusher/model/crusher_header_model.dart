@@ -1,4 +1,4 @@
-// lib/features/crusher/model/crusher_header_model.dart
+// lib/features/crusher/model/gilingan_header_model.dart
 class CrusherHeader {
   // Core
   final String noCrusher;        // NoCrusher

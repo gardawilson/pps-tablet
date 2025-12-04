@@ -18,7 +18,7 @@ import '../widgets/crusher_production_row_popover.dart';
 import 'crusher_production_input_screen.dart';
 
 // Action bar
-// import '../widgets/gilingan_delete_dialog.dart';
+// import '../widgets/furniture_wip_delete_dialog.dart';
 // import '../widgets/crusher_production_action_bar.dart';
 // Inputs screen (Scan action)
 // import '../widgets/crusher_production_form_dialog.dart';

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_vector_icons/flutter_vector_icons.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:provider/provider.dart';
 
 import './bongkar_susun_view_model.dart';
@@ -9,7 +11,7 @@ class BongkarSusunDropdown extends StatefulWidget {
   final String? preselectNoBongkarSusun;
   final ValueChanged<BongkarSusun?>? onChanged;
   final String label;
-  final IconData icon;
+  final IconData? icon;
   final String? hintText;
   final DateTime? date;
   final bool enabled;
@@ -19,7 +21,7 @@ class BongkarSusunDropdown extends StatefulWidget {
     this.preselectNoBongkarSusun,
     this.onChanged,
     this.label = 'Bongkar Susun',
-    this.icon = Icons.local_shipping_outlined,
+    this.icon,
     this.hintText,
     this.date,
     this.enabled = true,
@@ -126,7 +128,7 @@ class _BongkarSusunDropdownState extends State<BongkarSusunDropdown> {
 
         return DropdownPlainField<BongkarSusun>(
           label: widget.label,
-          prefixIcon: widget.icon,
+          prefixIcon: widget.icon ?? Ionicons.layers_outline,
           fieldHeight: 40,
           value: safeValue,
           items: vm.items,                          // <— langsung list of T

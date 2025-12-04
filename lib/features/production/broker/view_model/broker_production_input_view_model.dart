@@ -598,8 +598,13 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
   // ====== key builders ======
   String _keyFromBrokerItem(BrokerItem i) =>
       'D.|Broker_d|${i.noBroker ?? '-'}|${(i.noSak ?? '').toString().trim()}';
-  String _keyFromBbItem(BbItem i) =>
-      'A.|BahanBaku_d|${i.noBahanBaku ?? '-'}|${(i.noSak ?? '').toString().trim()}';
+  String _keyFromBbItem(BbItem i) {
+    final noBB = i.noBahanBaku ?? '-';
+    final noSak = (i.noSak ?? '').toString().trim();
+    final noPallet = i.noPallet ?? 0;
+
+    return 'A.|BahanBaku_d|$noBB|$noPallet|$noSak';
+  }
   String _keyFromWashingItem(WashingItem i) =>
       'B.|Washing_d|${i.noWashing ?? '-'}|${(i.noSak ?? '').toString().trim()}';
   String _keyFromCrusherItem(CrusherItem i) =>

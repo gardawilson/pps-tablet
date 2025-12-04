@@ -1,4 +1,4 @@
-// lib/features/gilingan/model/gilingan_header_model.dart
+// lib/features/gilingan/model/furniture_wip_header_model.dart
 
 class GilinganHeader {
   // Core

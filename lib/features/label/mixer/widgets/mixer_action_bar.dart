@@ -52,7 +52,7 @@ class _MixerActionBarState extends State<MixerActionBar> {
 
     // PermissionViewModel from Provider
     final perm = context.watch<PermissionViewModel>();
-    final canCreate = perm.can('label_mixer:create');
+    final canCreate = perm.can('label_crusher:create');
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),

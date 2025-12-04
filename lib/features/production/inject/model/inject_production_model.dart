@@ -1,4 +1,4 @@
-// lib/features/shared/inject_production/model/gilingan_production_model.dart
+// lib/features/shared/inject_production/model/hot_stamp_production_model.dart
 class InjectProduction {
   final String noProduksi;
   final int idOperator;

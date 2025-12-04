@@ -468,8 +468,13 @@ class WashingProductionInputViewModel extends ChangeNotifier {
   final Set<String> _tempKeys = <String>{};
 
   // ====== key builders ======
-  String _keyFromBbItem(BbItem i) =>
-      'A.|BahanBaku_d|${i.noBahanBaku ?? '-'}|${(i.noSak ?? '').toString().trim()}';
+  String _keyFromBbItem(BbItem i) {
+    final noBB = i.noBahanBaku ?? '-';
+    final noSak = (i.noSak ?? '').toString().trim();
+    final noPallet = i.noPallet ?? 0;
+
+    return 'A.|BahanBaku_d|$noBB|$noPallet|$noSak';
+  }
   String _keyFromWashingItem(WashingItem i) =>
       'B.|Washing_d|${i.noWashing ?? '-'}|${(i.noSak ?? '').toString().trim()}';
   String _keyFromGilinganItem(GilinganItem i) =>

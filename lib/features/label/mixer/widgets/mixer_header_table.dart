@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../view_model/mixer_view_model.dart';
 import '../model/mixer_header_model.dart';
 import '../../../../core/utils/date_formatter.dart';
@@ -64,6 +65,9 @@ class MixerHeaderTable extends StatelessWidget {
     );
   }
 
+  // =========================
+  // HEADER
+  // =========================
   Widget _buildTableHeader() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -73,12 +77,12 @@ class MixerHeaderTable extends StatelessWidget {
           bottom: BorderSide(color: Colors.grey.shade300, width: 2),
         ),
       ),
-      child: Row(
-        children: const [
+      child: const Row(
+        children: [
           SizedBox(
             width: 150,
             child: Text(
-              'NO. BROKER',
+              'NO. MIXER',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
@@ -112,7 +116,7 @@ class MixerHeaderTable extends StatelessWidget {
           ),
           Expanded(
             child: Text(
-              'PROSES',
+              'OUTPUT',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
@@ -138,6 +142,9 @@ class MixerHeaderTable extends StatelessWidget {
     );
   }
 
+  // =========================
+  // ROW
+  // =========================
   Widget _buildTableRow({
     required BuildContext context,
     required MixerHeader item,
@@ -148,6 +155,23 @@ class MixerHeaderTable extends StatelessWidget {
     final bgColor = isSelected
         ? Colors.blue.shade50
         : (isEven ? Colors.white : Colors.grey.shade50);
+
+    // ---- OUTPUT: gunakan generic OutputType/OutputCode/OutputNamaMesin ----
+    String code = (item.outputCode ?? '').trim();
+    String namaOutput = (item.outputNamaMesin ?? '').trim();
+
+    // Fallback kalau server masih kirim legacy fields
+    if (code.isEmpty) {
+      if ((item.noProduksi ?? '').isNotEmpty) {
+        code = item.noProduksi!;
+      } else if ((item.noBongkarSusun ?? '').isNotEmpty) {
+        code = item.noBongkarSusun!;
+      }
+    }
+
+    if (namaOutput.isEmpty && (item.namaMesin ?? '').isNotEmpty) {
+      namaOutput = item.namaMesin!;
+    }
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -173,6 +197,7 @@ class MixerHeaderTable extends StatelessWidget {
           ),
           child: Row(
             children: [
+              // NO. MIXER
               SizedBox(
                 width: 150,
                 child: Text(
@@ -187,37 +212,64 @@ class MixerHeaderTable extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+
+              // TANGGAL
               SizedBox(
                 width: 130,
                 child: Text(
                   formatDateToShortId(item.dateCreate),
-                  style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
+                  style:
+                  TextStyle(fontSize: 15, color: Colors.grey.shade800),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+
+              // JENIS (Nama Mixer)
               Expanded(
                 child: Text(
                   item.namaMixer,
-                  style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
+                  style:
+                  TextStyle(fontSize: 15, color: Colors.grey.shade800),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+
+              // OUTPUT (Kode + Nama Mesin/Bongkar/Inject)
               Expanded(
-                child: Text(
-                  (item.namaMesin?.isNotEmpty == true)
-                      ? item.namaMesin!
-                      : (item.noBongkarSusun?.isNotEmpty == true
-                      ? item.noBongkarSusun!
-                      : '-'),
-                  style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
-                  overflow: TextOverflow.ellipsis,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      code.isNotEmpty ? code : '-',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade900,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (namaOutput.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        namaOutput,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
                 ),
               ),
+
+              // LOKASI
               SizedBox(
                 width: 120,
                 child: Text(
                   _formatBlokLokasi(item.blok, item.idLokasi),
-                  style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
+                  style:
+                  TextStyle(fontSize: 15, color: Colors.grey.shade800),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -230,7 +282,8 @@ class MixerHeaderTable extends StatelessWidget {
 
   String _formatBlokLokasi(String? blok, dynamic idLokasi) {
     final hasBlok = blok != null && blok.trim().isNotEmpty;
-    final hasLokasi = idLokasi != null && idLokasi.toString().trim().isNotEmpty;
+    final hasLokasi =
+        idLokasi != null && idLokasi.toString().trim().isNotEmpty;
 
     if (!hasBlok && !hasLokasi) {
       return '-';
@@ -239,7 +292,6 @@ class MixerHeaderTable extends StatelessWidget {
     // kalau keduanya ada → gabung tanpa spasi (contoh: A1)
     return '${blok ?? ''}${idLokasi ?? ''}';
   }
-
 
   Widget _buildErrorState(String message) {
     return Center(

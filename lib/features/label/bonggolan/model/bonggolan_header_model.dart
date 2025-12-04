@@ -1,4 +1,4 @@
-// lib/features/bonggolan/model/gilingan_header_model.dart
+// lib/features/bonggolan/model/furniture_wip_header_model.dart
 class BonggolanHeader {
   // Core
   final String noBonggolan;       // NoBonggolan

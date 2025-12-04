@@ -1,4 +1,4 @@
-// lib/features/gilingan/widgets/gilingan_form_dialog.dart
+// lib/features/gilingan/widgets/furniture_wip_form_dialog.dart
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';

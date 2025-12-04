@@ -97,6 +97,18 @@ class LabelSelectionScreen extends StatelessWidget {
                 ? () => Navigator.pushNamed(context, '/label/mixer')
                 : null,
           ),
+
+          // 🔹 Card Label FurnitureWIP
+          _buildLabelCard(
+            context,
+            title: 'Label Furniture WIP',
+            subtitle: 'Buat label untuk proses FWIP',
+            icon: Icons.label,
+            enabled: canReadBroker,
+            onTap: canReadBroker
+                ? () => Navigator.pushNamed(context, '/label/furniture_wip')
+                : null,
+          ),
         ],
       ),
     );

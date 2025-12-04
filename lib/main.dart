@@ -3,6 +3,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:pps_tablet/core/view_model/permission_view_model.dart';
 import 'package:pps_tablet/features/crusher_type/repository/crusher_type_repository.dart';
 import 'package:pps_tablet/features/crusher_type/view_model/crusher_type_view_model.dart';
+import 'package:pps_tablet/features/furniture_wip_type/repository/furniture_wip_type_repository.dart';
+import 'package:pps_tablet/features/furniture_wip_type/view_model/furniture_wip_type_view_model.dart';
 import 'package:pps_tablet/features/gilingan_type/repository/gilingan_type_repository.dart';
 import 'package:pps_tablet/features/gilingan_type/view_model/gilingan_type_view_model.dart';
 import 'package:pps_tablet/features/jenis_bonggolan/repository/jenis_bonggolan_repository.dart';
@@ -13,6 +15,9 @@ import 'package:pps_tablet/features/label/bonggolan/view_model/bonggolan_view_mo
 import 'package:pps_tablet/features/label/broker/repository/broker_repository.dart';
 import 'package:pps_tablet/features/label/broker/view/broker_screen.dart';
 import 'package:pps_tablet/features/label/broker/view_model/broker_view_model.dart';
+import 'package:pps_tablet/features/label/furniture_wip/repository/furniture_wip_repository.dart';
+import 'package:pps_tablet/features/label/furniture_wip/view/furniture_wip_screen.dart';
+import 'package:pps_tablet/features/label/furniture_wip/view_model/furniture_wip_view_model.dart';
 import 'package:pps_tablet/features/label/gilingan/repository/gilingan_repository.dart';
 import 'package:pps_tablet/features/label/gilingan/view_model/gilingan_view_model.dart';
 import 'package:pps_tablet/features/label/mixer/repository/mixer_repository.dart';
@@ -33,11 +38,20 @@ import 'package:pps_tablet/features/production/crusher/view_model/crusher_produc
 import 'package:pps_tablet/features/production/crusher/view_model/crusher_production_view_model.dart';
 import 'package:pps_tablet/features/production/gilingan/repository/gilingan_production_repository.dart';
 import 'package:pps_tablet/features/production/gilingan/view_model/gilingan_production_view_model.dart';
+import 'package:pps_tablet/features/production/hot_stamp/model/hot_stamp_production_model.dart';
+import 'package:pps_tablet/features/production/hot_stamp/repository/hot_stamp_production_repository.dart';
+import 'package:pps_tablet/features/production/hot_stamp/view_model/hot_stamp_production_view_model.dart';
 import 'package:pps_tablet/features/production/inject/repository/inject_production_repository.dart';
 import 'package:pps_tablet/features/production/inject/view_model/inject_production_view_model.dart';
+import 'package:pps_tablet/features/production/key_fitting/repository/key_fitting_production_repository.dart';
+import 'package:pps_tablet/features/production/key_fitting/view_model/key_fitting_production_view_model.dart';
 import 'package:pps_tablet/features/production/mixer/repository/mixer_production_repository.dart';
 import 'package:pps_tablet/features/production/mixer/view_model/mixer_production_view_model.dart';
+import 'package:pps_tablet/features/production/return/repository/return_production_repository.dart';
+import 'package:pps_tablet/features/production/return/view_model/return_production_view_model.dart';
 import 'package:pps_tablet/features/production/selection/view/production_selection_screen.dart';
+import 'package:pps_tablet/features/production/spanner/repository/spanner_production_repository.dart';
+import 'package:pps_tablet/features/production/spanner/view_model/spanner_production_view_model.dart';
 import 'package:pps_tablet/features/production/washing/repository/washing_production_input_repository.dart';
 import 'package:pps_tablet/features/production/washing/view/washing_production_screen.dart';
 import 'package:pps_tablet/features/production/washing/view_model/washing_production_input_view_model.dart';
@@ -72,6 +86,7 @@ import 'package:pps_tablet/features/stock_opname/repository/stock_opname_reposit
 import 'package:pps_tablet/features/stock_opname/view_model/stock_opname_ascend_view_model.dart';
 import 'package:pps_tablet/features/stock_opname/view_model/stock_opname_family_view_model.dart';
 import 'core/navigation/app_nav.dart';
+import 'core/network/api_client.dart';
 import 'features/label/crusher/repository/crusher_repository.dart';
 import 'features/label/crusher/view/crusher_screen.dart';
 import 'features/label/crusher/view_model/crusher_view_model.dart';
@@ -106,6 +121,11 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        // 🔹 Sediakan ApiClient sekali untuk seluruh app
+        Provider<ApiClient>(
+          create: (_) => ApiClient(),
+        ),
+
         ChangeNotifierProvider(create: (_) => StockOpnameViewModel(repository: StockOpnameRepository())),
         ChangeNotifierProvider(create: (_) => StockOpnameLabelBeforeViewModel()),
         ChangeNotifierProvider(create: (_) => StockOpnameDetailViewModel()),
@@ -122,7 +142,13 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => BongkarSusunViewModel(repository: BongkarSusunRepository())),
         Provider<MaxSakService>(create: (_) => MaxSakService(MaxSakRepository())),
         ChangeNotifierProvider(create: (_) => PermissionViewModel()..loadPermissions()),
-        ChangeNotifierProvider(create: (_) => BrokerViewModel(repository: BrokerRepository())),
+        ChangeNotifierProvider<BrokerViewModel>(
+          create: (ctx) => BrokerViewModel(
+            repository: BrokerRepository(
+              api: ctx.read<ApiClient>(),
+            ),
+          ),
+        ),
         ChangeNotifierProvider(create: (_) => BonggolanViewModel(repository: BonggolanRepository())),
         ChangeNotifierProvider(create: (_) => CrusherViewModel(repository: CrusherRepository())),
         ChangeNotifierProvider(create: (_) => CrusherProductionInputViewModel(repository: CrusherProductionInputRepository())),
@@ -142,6 +168,52 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => GilinganTypeViewModel(repository: GilinganTypeRepository())),
         ChangeNotifierProvider(create: (_) => GilinganProductionViewModel(repository: GilinganProductionRepository())),
 
+        ChangeNotifierProvider(create: (_) => FurnitureWipViewModel(repository: FurnitureWipRepository())),
+
+
+        ChangeNotifierProvider<HotStampProductionViewModel>(
+          create: (ctx) => HotStampProductionViewModel(
+            repository: HotStampProductionRepository(
+              api: ctx.read<ApiClient>(),
+            ),
+          ),
+        ),
+
+
+        ChangeNotifierProvider<SpannerProductionViewModel>(
+          create: (ctx) => SpannerProductionViewModel(
+            repository: SpannerProductionRepository(
+              api: ctx.read<ApiClient>(),
+            ),
+          ),
+        ),
+
+
+        ChangeNotifierProvider<KeyFittingProductionViewModel>(
+          create: (ctx) => KeyFittingProductionViewModel(
+            repository: KeyFittingProductionRepository(
+              api: ctx.read<ApiClient>(),
+            ),
+          ),
+        ),
+
+
+        ChangeNotifierProvider<ReturnProductionViewModel>(
+          create: (ctx) => ReturnProductionViewModel(
+            repository: ReturnProductionRepository(
+              api: ctx.read<ApiClient>(),
+            ),
+          ),
+        ),
+
+
+        ChangeNotifierProvider<FurnitureWipTypeViewModel>(
+          create: (ctx) => FurnitureWipTypeViewModel(
+            repository: FurnitureWipTypeRepository(
+              api: ctx.read<ApiClient>(),
+            ),
+          ),
+        ),
 
 
 
@@ -210,6 +282,7 @@ class MyApp extends StatelessWidget {
           '/label/crusher': (context) => CrusherScreen(),
           '/label/gilingan': (context) => GilinganScreen(),
           '/label/mixer': (context) => MixerScreen(),
+          '/label/furniture_wip': (context) => FurnitureWipScreen(),
           '/production': (context) => ProductionSelectionScreen(),
           '/production/washing': (context) => WashingProductionScreen(),
           '/production/broker': (context) => BrokerProductionScreen(),

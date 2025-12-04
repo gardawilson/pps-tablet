@@ -1,4 +1,4 @@
-// lib/features/shared/inject_production/widgets/gilingan_production_dropdown.dart
+// lib/features/shared/inject_production/widgets/hot_stamp_production_dropdown.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -23,7 +23,7 @@ class InjectProductionDropdown extends StatefulWidget {
     this.preselectNoProduksi,
     this.preselectNamaMesin,
     this.onChanged,
-    this.label = 'Proses Inject',
+    this.label = 'Inject',
     this.icon = Icons.precision_manufacturing_outlined,
     this.hintText,
     this.date,

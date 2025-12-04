@@ -1,30 +1,41 @@
 class MixerHeader {
-  final String noMixer;          // NoMixer
-  final int idMixer;            // IdMixer
-  final String namaMixer;       // NamaMixer (from MstMixer.Jenis)
-  final String dateCreate;      // DateCreate (string as sent by API)
+  final String noMixer;      // NoMixer
+  final int idMixer;         // IdMixer
+  final String namaMixer;    // NamaMixer (from MstMixer.Jenis)
+  final String dateCreate;   // DateCreate (string as sent by API)
 
   /// Server gives 'PASS' / 'HOLD'
-  final String statusText;      // StatusText
+  final String statusText;   // StatusText
   /// Derived from statusText (PASS=true, HOLD=false, else null)
   final bool? idStatus;
 
   // Location
-  final String? blok;           // Blok
-  final int? idLokasi;          // IdLokasi (INT in DB)
+  final String? blok;        // Blok
+  final int? idLokasi;       // IdLokasi (INT in DB)
 
   // Quality / process fields (optional)
-  final double? moisture;       // Moisture
-  final double? maxMeltTemp;    // MaxMeltTemp
-  final double? minMeltTemp;    // MinMeltTemp
-  final double? mfi;            // MFI
-  final double? moisture2;      // Moisture2
-  final double? moisture3;      // Moisture3
+  final double? moisture;    // Moisture
+  final double? maxMeltTemp; // MaxMeltTemp
+  final double? minMeltTemp; // MinMeltTemp
+  final double? mfi;         // MFI
+  final double? moisture2;   // Moisture2
+  final double? moisture3;   // Moisture3
 
-  // Production / machine / bongkar susun joins
-  final String? noProduksi;     // NoProduksi
-  final String? namaMesin;      // NamaMesin (from MstMesin)
-  final String? noBongkarSusun; // NoBongkarSusun
+  // ==== OUTPUT GENERIC (baru, mengikuti Furniture WIP) ====
+  /// Contoh: 'MIXER_PRODUKSI', 'BONGKAR_SUSUN'
+  final String? outputType;
+  /// Contoh: 'H.0000012345' atau 'BG.0000000123'
+  final String? outputCode;
+  /// Contoh: 'MESIN INJECT 09' atau 'Bongkar Susun'
+  final String? outputNamaMesin;
+
+  // ==== LEGACY / helper (turunan dari output generic) ====
+  /// Kalau outputType == 'MIXER_PRODUKSI' -> sama dengan outputCode, selain itu null.
+  final String? noProduksi;
+  /// Kalau outputType == 'BONGKAR_SUSUN' -> sama dengan outputCode, selain itu null.
+  final String? noBongkarSusun;
+  /// Biasanya sama dengan outputNamaMesin (untuk backward compatibility).
+  final String? namaMesin;
 
   // Audit (optional)
   final String? createBy;       // CreateBy
@@ -45,9 +56,12 @@ class MixerHeader {
     this.mfi,
     this.moisture2,
     this.moisture3,
+    this.outputType,
+    this.outputCode,
+    this.outputNamaMesin,
     this.noProduksi,
-    this.namaMesin,
     this.noBongkarSusun,
+    this.namaMesin,
     this.createBy,
     this.dateTimeCreate,
   });
@@ -85,6 +99,39 @@ class MixerHeader {
   factory MixerHeader.fromJson(Map<String, dynamic> json) {
     final statusText = json['StatusText']?.toString() ?? '';
 
+    // ===== Baca field output baru (generic) =====
+    final rawOutputType = json['OutputType']?.toString();
+    final rawOutputCode = json['OutputCode']?.toString();
+    final rawOutputNamaMesin = json['OutputNamaMesin']?.toString();
+
+    // ===== Fallback ke field lama kalau server belum lengkap =====
+    final legacyNoProduksi = json['NoProduksi']?.toString();
+    final legacyNoBongkarSusun = json['NoBongkarSusun']?.toString();
+    final legacyNamaMesin = json['NamaMesin']?.toString();
+
+    // OutputType final:
+    final effOutputType = rawOutputType ??
+        (legacyNoProduksi != null
+            ? 'MIXER_PRODUKSI'
+            : legacyNoBongkarSusun != null
+            ? 'BONGKAR_SUSUN'
+            : null);
+
+    // OutputCode final:
+    final effOutputCode = rawOutputCode ?? legacyNoProduksi ?? legacyNoBongkarSusun;
+
+    // OutputNamaMesin final:
+    final effOutputNamaMesin = rawOutputNamaMesin ??
+        (effOutputType == 'BONGKAR_SUSUN'
+            ? 'Bongkar Susun'
+            : legacyNamaMesin);
+
+    // Derived legacy fields:
+    final effNoProduksi =
+    effOutputType == 'MIXER_PRODUKSI' ? effOutputCode : null;
+    final effNoBongkarSusun =
+    effOutputType == 'BONGKAR_SUSUN' ? effOutputCode : null;
+
     return MixerHeader(
       noMixer: json['NoMixer']?.toString() ?? '',
       idMixer: _toInt(json['IdMixer']),
@@ -104,9 +151,15 @@ class MixerHeader {
       moisture2: _toDouble(json['Moisture2']),
       moisture3: _toDouble(json['Moisture3']),
 
-      noProduksi: json['NoProduksi']?.toString(),
-      namaMesin: json['NamaMesin']?.toString(),
-      noBongkarSusun: json['NoBongkarSusun']?.toString(),
+      // generic output
+      outputType: effOutputType,
+      outputCode: effOutputCode,
+      outputNamaMesin: effOutputNamaMesin,
+
+      // legacy helpers
+      noProduksi: effNoProduksi,
+      noBongkarSusun: effNoBongkarSusun,
+      namaMesin: effOutputNamaMesin,
 
       createBy: json['CreateBy']?.toString(),
       dateTimeCreate: json['DateTimeCreate']?.toString(),
@@ -131,9 +184,15 @@ class MixerHeader {
     'Moisture2': moisture2,
     'Moisture3': moisture3,
 
+    // Generic output (utama)
+    'OutputType': outputType,
+    'OutputCode': outputCode,
+    'OutputNamaMesin': outputNamaMesin,
+
+    // Legacy fields (kalau mau tetap kirim)
     'NoProduksi': noProduksi,
-    'NamaMesin': namaMesin,
     'NoBongkarSusun': noBongkarSusun,
+    'NamaMesin': namaMesin,
 
     'CreateBy': createBy,
     'DateTimeCreate': dateTimeCreate,
@@ -154,9 +213,12 @@ class MixerHeader {
     double? mfi,
     double? moisture2,
     double? moisture3,
+    String? outputType,
+    String? outputCode,
+    String? outputNamaMesin,
     String? noProduksi,
-    String? namaMesin,
     String? noBongkarSusun,
+    String? namaMesin,
     String? createBy,
     String? dateTimeCreate,
   }) {
@@ -175,9 +237,12 @@ class MixerHeader {
       mfi: mfi ?? this.mfi,
       moisture2: moisture2 ?? this.moisture2,
       moisture3: moisture3 ?? this.moisture3,
+      outputType: outputType ?? this.outputType,
+      outputCode: outputCode ?? this.outputCode,
+      outputNamaMesin: outputNamaMesin ?? this.outputNamaMesin,
       noProduksi: noProduksi ?? this.noProduksi,
-      namaMesin: namaMesin ?? this.namaMesin,
       noBongkarSusun: noBongkarSusun ?? this.noBongkarSusun,
+      namaMesin: namaMesin ?? this.namaMesin,
       createBy: createBy ?? this.createBy,
       dateTimeCreate: dateTimeCreate ?? this.dateTimeCreate,
     );

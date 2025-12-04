@@ -397,8 +397,13 @@ class CrusherProductionInputViewModel extends ChangeNotifier {
   final Set<String> _tempKeys = <String>{};
 
   // key builders (TEMP)
-  String _keyFromBbItem(BbItem i) =>
-      'A.|BahanBaku_d|${i.noBahanBaku ?? '-'}|${(i.noSak ?? '').toString().trim()}';
+  String _keyFromBbItem(BbItem i) {
+    final noBB = i.noBahanBaku ?? '-';
+    final noSak = (i.noSak ?? '').toString().trim();
+    final noPallet = i.noPallet ?? 0;
+
+    return 'A.|BahanBaku_d|$noBB|$noPallet|$noSak';
+  }
 
   String _keyFromBonggolanItem(BonggolanItem i) =>
       'E.|Bonggolan|${i.noBonggolan ?? '-'}|';

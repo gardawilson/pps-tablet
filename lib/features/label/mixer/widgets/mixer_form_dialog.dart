@@ -17,6 +17,7 @@ import '../../../../common/widgets/app_date_field.dart';
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
 
+import '../../../production/inject/widgets/inject_production_dropdown.dart';
 import '../../../shared/bongkar_susun/bongkar_susun_dropdown.dart';
 import '../model/mixer_detail_model.dart';
 import '../model/mixer_header_model.dart';
@@ -40,7 +41,7 @@ class MixerFormDialog extends StatefulWidget {
   State<MixerFormDialog> createState() => _MixerFormDialogState();
 }
 
-enum InputMode { production, bongkar }
+enum InputMode { production, inject, bongkar }
 
 class _MixerFormDialogState extends State<MixerFormDialog> {
   late final TextEditingController noMixerCtrl;
@@ -52,13 +53,14 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
   late List<MixerDetail> detailList;
 
   MixerType? _selectedType; // mixer type
-  InputMode? _selectedMode; // production vs bongkar
+  InputMode? _selectedMode; // production vs inject vs bongkar
 
   DateTime _selectedDate = DateTime.now(); // single source of truth for date
 
   /// Kode label output yang akan dikirim ke BE (WAJIB untuk create):
-  /// - "I.XXXX"  → dari produksi
-  /// - "BG.XXXX" → dari bongkar susun
+  /// - "I.XXXX"  → dari MixerProduksiOutput
+  /// - "S.XXXX"  → dari InjectProduksiOutputMixer
+  /// - "BG.XXXX" → dari BongkarSusunOutputMixer
   String? _selectedOutputCode;
 
   @override
@@ -78,19 +80,29 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
     );
 
     jenisCtrl = TextEditingController(text: widget.header?.namaMixer ?? '');
-    noProduksiCtrl = TextEditingController(text: widget.header?.noProduksi ?? '');
+    noProduksiCtrl =
+        TextEditingController(text: widget.header?.noProduksi ?? '');
     noBongkarSusunCtrl =
         TextEditingController(text: widget.header?.noBongkarSusun ?? '');
 
     detailList = List.from(widget.details ?? []);
 
     // Auto-select mode based on existing header when editing
-    if ((widget.header?.noProduksi ?? '').isNotEmpty) {
-      _selectedMode = InputMode.production;
-    } else if ((widget.header?.noBongkarSusun ?? '').isNotEmpty) {
-      _selectedMode = InputMode.bongkar;
+    if (widget.header != null) {
+      final np = (widget.header!.noProduksi ?? '').trim();
+      final nb = (widget.header!.noBongkarSusun ?? '').trim();
+
+      if (np.isNotEmpty && np.toUpperCase().startsWith('S.')) {
+        _selectedMode = InputMode.inject;
+      } else if (np.isNotEmpty) {
+        _selectedMode = InputMode.production;
+      } else if (nb.isNotEmpty) {
+        _selectedMode = InputMode.bongkar;
+      } else {
+        _selectedMode = InputMode.production;
+      }
     } else {
-      _selectedMode = InputMode.production; // default
+      _selectedMode = InputMode.production; // default add mode
     }
 
     // Saat EDIT, kita biarkan _selectedOutputCode = null
@@ -181,7 +193,10 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
   Widget _buildLeftColumn() {
     final bool isProductionEnabled =
         !isEdit && _selectedMode == InputMode.production;
-    final bool isBongkarEnabled = !isEdit && _selectedMode == InputMode.bongkar;
+    final bool isInjectEnabled =
+        !isEdit && _selectedMode == InputMode.inject;
+    final bool isBongkarEnabled =
+        !isEdit && _selectedMode == InputMode.bongkar;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -264,6 +279,7 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                       _selectedMode = val!;
                       // ganti mode → clear output code & bongkar
                       _selectedOutputCode = null;
+                      noProduksiCtrl.clear();
                       noBongkarSusunCtrl.clear();
                     });
                   },
@@ -275,23 +291,75 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                     child: Opacity(
                       opacity: isProductionEnabled ? 1 : 0.6,
                       child: MixerProductionDropdown(
-                        preselectNoProduksi: widget.header?.noProduksi,
+                        preselectNoProduksi:
+                        (widget.header?.noProduksi ?? '').toUpperCase().startsWith('I.')
+                            ? widget.header?.noProduksi
+                            : null,
                         preselectNamaMesin: widget.header?.namaMesin,
                         date: _selectedDate,
                         enabled: isProductionEnabled,
                         onChanged: isProductionEnabled
                             ? (wp) {
                           setState(() {
-                            noProduksiCtrl.text = wp?.noProduksi ?? '';
-
-                            // ASUMSI: wp.noProduksi SUDAH termasuk prefix (mis. "I.0000000123")
-                            _selectedOutputCode = (wp?.noProduksi?.trim().isEmpty ?? true)
-                                ? null
-                                : wp!.noProduksi!.trim();
+                            final code = wp?.noProduksi?.trim() ?? '';
+                            noProduksiCtrl.text = code;
+                            // ASUMSI: wp.noProduksi sudah termasuk prefix "I."
+                            _selectedOutputCode =
+                            code.isEmpty ? null : code;
                           });
                         }
                             : null,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
 
+            // Mode: Inject (S.* → InjectProduksiOutputMixer)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Radio<InputMode>(
+                  value: InputMode.inject,
+                  groupValue: _selectedMode,
+                  onChanged: isEdit
+                      ? null
+                      : (val) {
+                    setState(() {
+                      _selectedMode = val!;
+                      _selectedOutputCode = null;
+                      noProduksiCtrl.clear();
+                      noBongkarSusunCtrl.clear();
+                    });
+                  },
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: IgnorePointer(
+                    ignoring: !isInjectEnabled,
+                    child: Opacity(
+                      opacity: isInjectEnabled ? 1 : 0.6,
+                      child: InjectProductionDropdown(
+                        preselectNoProduksi:
+                        (widget.header?.noProduksi ?? '').toUpperCase().startsWith('S.')
+                            ? widget.header?.noProduksi
+                            : null,
+                        preselectNamaMesin: widget.header?.namaMesin,
+                        date: _selectedDate,
+                        enabled: isInjectEnabled,
+                        onChanged: isInjectEnabled
+                            ? (ip) {
+                          setState(() {
+                            final code = ip?.noProduksi?.trim() ?? '';
+                            noProduksiCtrl.text = code;
+                            // ASUMSI: ip.noProduksi sudah "S.000000..."
+                            _selectedOutputCode =
+                            code.isEmpty ? null : code;
+                          });
+                        }
+                            : null,
                       ),
                     ),
                   ),
@@ -312,9 +380,10 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                       : (val) {
                     setState(() {
                       _selectedMode = val!;
-                      // ganti mode → clear output code & produksi
+                      // ganti mode → clear output code & produksi/inject
                       _selectedOutputCode = null;
                       noProduksiCtrl.clear();
+                      noBongkarSusunCtrl.clear();
                     });
                   },
                 ),
@@ -325,18 +394,20 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                     child: Opacity(
                       opacity: isBongkarEnabled ? 1 : 0.6,
                       child: BongkarSusunDropdown(
-                        preselectNoBongkarSusun: widget.header?.noBongkarSusun,
+                        preselectNoBongkarSusun:
+                        widget.header?.noBongkarSusun,
                         date: _selectedDate,
                         enabled: isBongkarEnabled,
                         onChanged: isBongkarEnabled
                             ? (bs) {
                           setState(() {
-                            noBongkarSusunCtrl.text = bs?.noBongkarSusun ?? '';
+                            final code =
+                                bs?.noBongkarSusun?.trim() ?? '';
+                            noBongkarSusunCtrl.text = code;
 
-                            // ASUMSI: bs.noBongkarSusun SUDAH "BG.0000000X"
-                            _selectedOutputCode = (bs?.noBongkarSusun?.trim().isEmpty ?? true)
-                                ? null
-                                : bs!.noBongkarSusun!.trim();
+                            // ASUMSI: bs.noBongkarSusun sudah "BG.0000000X"
+                            _selectedOutputCode =
+                            code.isEmpty ? null : code;
                           });
                         }
                             : null,
@@ -898,7 +969,8 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
   // ===== EDIT DETAIL =====
   void _editDetail(MixerDetail detail, int index) {
     final noSakCtrl = TextEditingController(text: detail.noSak.toString());
-    final beratCtrl = TextEditingController(text: detail.berat?.toString() ?? '');
+    final beratCtrl =
+    TextEditingController(text: detail.berat?.toString() ?? '');
 
     showDialog(
       context: context,
@@ -968,8 +1040,8 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
                       ),
                     ),
                   ],
@@ -1100,7 +1172,8 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
               statusText: '',
               idStatus: null,
               // output source:
-              noProduksi: _selectedMode == InputMode.production
+              noProduksi: (_selectedMode == InputMode.production ||
+                  _selectedMode == InputMode.inject)
                   ? (noProduksiCtrl.text.trim().isEmpty
                   ? null
                   : noProduksiCtrl.text.trim())
@@ -1117,7 +1190,8 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
               idMixer: selected.idMixer,
               namaMixer: selected.jenis,
               dateCreate: dateCreatedCtrl.text.trim(),
-              noProduksi: _selectedMode == InputMode.production
+              noProduksi: (_selectedMode == InputMode.production ||
+                  _selectedMode == InputMode.inject)
                   ? (noProduksiCtrl.text.trim().isEmpty
                   ? null
                   : noProduksiCtrl.text.trim())
@@ -1139,7 +1213,7 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
               await DialogService.instance.showError(
                 title: 'Lengkapi Data!',
                 message:
-                'Wajib pilih Proses Produksi atau Bongkar Susun',
+                'Wajib pilih Proses Produksi, Inject, atau Bongkar Susun',
               );
               return;
             }
@@ -1152,7 +1226,7 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                 await DialogService.instance.showError(
                   title: 'Validasi',
                   message:
-                  'Output code belum terbentuk.\nPilih NoProduksi / Bongkar yang valid.',
+                  'Output code belum terbentuk.\nPilih NoProduksi / Inject / Bongkar yang valid.',
                 );
                 return;
               }
@@ -1236,7 +1310,11 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                 if (context.mounted) Navigator.pop(context);
               } else {
                 // EDIT (tidak ubah mapping outputCode)
-                final res = await vm.updateMixer(headerToSave, detailList);
+                final res = await vm.updateMixer(
+                  headerToSave,
+                  detailList,
+                  // outputCode: null -> mapping lama tidak disentuh
+                );
                 DialogService.instance.hideLoading();
 
                 if (res != null) {

@@ -1,4 +1,4 @@
-// lib/features/shared/gilingan_production/gilingan_production_view_model.dart
+// lib/features/shared/gilingan_production/hot_stamp_production_view_model.dart
 
 import 'package:flutter/foundation.dart';
 

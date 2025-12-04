@@ -1,4 +1,4 @@
-// lib/features/gilingan/view/gilingan_screen.dart
+// lib/features/gilingan/view/furniture_wip_screen.dart
 
 import 'dart:async';
 import 'package:flutter/material.dart';

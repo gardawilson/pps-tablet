@@ -1,4 +1,4 @@
-// lib/features/shared/mixer_production/model/hot_stamp_production_model.dart
+// lib/features/shared/mixer_production/model/packing_production_model.dart
 
 class MixerProduction {
   final String noProduksi;

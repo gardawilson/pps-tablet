@@ -1,4 +1,4 @@
-// lib/features/furniture_wip/view_model/furniture_wip_view_model.dart
+// lib/features/furniture_wip/view_model/packing_view_model.dart
 
 import 'package:flutter/material.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';

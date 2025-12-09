@@ -1,4 +1,4 @@
-// lib/features/shared/return_production/model/hot_stamp_production_model.dart
+// lib/features/shared/return_production/model/packing_production_model.dart
 
 class ReturnProduction {
   final String noRetur;

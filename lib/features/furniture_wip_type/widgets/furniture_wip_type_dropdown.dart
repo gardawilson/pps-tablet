@@ -1,4 +1,4 @@
-// lib/features/furniture_wip_type/widgets/furniture_wip_type_dropdown.dart
+// lib/features/furniture_wip_type/widgets/packing_type_dropdown.dart
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';

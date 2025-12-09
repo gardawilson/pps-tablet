@@ -1,11 +1,11 @@
-// lib/features/furniture_wip/model/furniture_wip_header_model.dart
+// lib/features/packing/model/packing_header_model.dart
 
-class FurnitureWipHeader {
+class PackingHeader {
   // Core
-  final String noFurnitureWip;    // NoFurnitureWIP
-  final String dateCreate;        // DateCreate (ISO/string dari API)
-  final int idFurnitureWip;       // IdFurnitureWIP
-  final String? namaFurnitureWip; // NamaFurnitureWIP (join MstCabinetWIP)
+  final String noBJ;        // NoBJ
+  final String dateCreate;  // DateCreate (string apa adanya dari API)
+  final int idBJ;           // IdBJ
+  final String? namaBJ;     // NamaBJ (join MstBarangJadi)
 
   /// Pcs di sini SUDAH dikurangi total partial
   /// sesuai logic di service (kalau IsPartial = 1).
@@ -14,25 +14,31 @@ class FurnitureWipHeader {
   /// Berat dari header (tidak dikurangi partial di service)
   final double? berat;
 
-  final int isPartial;     // IsPartial (0 / 1)
-  final int? idWarna;      // IdWarna
-  final String? blok;      // Blok
-  final String? idLokasi;  // IdLokasi (stringified)
+  final int isPartial;        // IsPartial (0 / 1)
+  final int? idWarehouse;     // IdWarehouse (boleh null)
+  final String? blok;         // Blok
+  final String? idLokasi;     // IdLokasi (stringified)
 
   // 🔹 Info sumber produksi
-  final String? outputType;       // 'HOTSTAMPING' / 'PASANG_KUNCI' / 'BONGKAR_SUSUN' / 'RETUR' / 'SPANNER' / 'INJECT'
-  final String? outputCode;       // BH./BI./BG./L./BJ./S.******
-  final String? outputNamaMesin;  // NamaMesin / 'Bongkar Susun' / NamaPembeli
+  /// 'PACKING' / 'INJECT' / 'BONGKAR_SUSUN' / 'RETUR'
+  final String? outputType;
 
-  const FurnitureWipHeader({
-    required this.noFurnitureWip,
+  /// NoPacking / NoProduksi / NoBongkarSusun / NoRetur
+  /// (BD./S./BG./L.***** kalau pakai prefix)
+  final String? outputCode;
+
+  /// NamaMesin / 'Bongkar Susun' / NamaPembeli
+  final String? outputNamaMesin;
+
+  const PackingHeader({
+    required this.noBJ,
     required this.dateCreate,
-    required this.idFurnitureWip,
-    this.namaFurnitureWip,
+    required this.idBJ,
+    this.namaBJ,
     this.pcs,
     this.berat,
     required this.isPartial,
-    this.idWarna,
+    this.idWarehouse,
     this.blok,
     this.idLokasi,
     this.outputType,
@@ -40,12 +46,15 @@ class FurnitureWipHeader {
     this.outputNamaMesin,
   });
 
+  // ---------------------------------------------------------------------------
   // Convenience getters buat UI
+  // ---------------------------------------------------------------------------
+
   bool get isPartialBool => isPartial == 1;
   bool get hasLocation => (idLokasi ?? '').isNotEmpty;
 
   /// Label singkat untuk di table, kalau mau dipakai:
-  /// contoh: "BH.000001 | MESIN 15"
+  /// contoh: "S.0000029950 | MESIN 280T"
   String get outputDisplay {
     if ((outputCode ?? '').isEmpty && (outputNamaMesin ?? '').isEmpty) {
       return '-';
@@ -55,9 +64,11 @@ class FurnitureWipHeader {
     return '$outputCode | $outputNamaMesin';
   }
 
-  // ---- JSON helpers ----
+  // ---------------------------------------------------------------------------
+  // JSON helpers
+  // ---------------------------------------------------------------------------
 
-  factory FurnitureWipHeader.fromJson(Map<String, dynamic> json) {
+  factory PackingHeader.fromJson(Map<String, dynamic> json) {
     double? _toDouble(dynamic v) {
       if (v == null) return null;
       if (v is num) return v.toDouble();
@@ -85,19 +96,18 @@ class FurnitureWipHeader {
       return 0;
     }
 
-    return FurnitureWipHeader(
-      noFurnitureWip: json['NoFurnitureWIP'] ?? '',
+    return PackingHeader(
+      noBJ: json['NoBJ']?.toString() ?? '',
       dateCreate: json['DateCreate']?.toString() ?? '',
-      idFurnitureWip: _toInt(json['IdFurnitureWIP']),
-      namaFurnitureWip: json['NamaFurnitureWIP'],
+      idBJ: _toInt(json['IdBJ']),
+      namaBJ: json['NamaBJ']?.toString(),
       pcs: _toDouble(json['Pcs']),
       berat: _toDouble(json['Berat']),
       isPartial: _toInt(json['IsPartial']),
-      idWarna: json['IdWarna'] != null ? _toInt(json['IdWarna']) : null,
-      blok: json['Blok'],
+      idWarehouse:
+      json['IdWarehouse'] != null ? _toInt(json['IdWarehouse']) : null,
+      blok: json['Blok']?.toString(),
       idLokasi: json['IdLokasi']?.toString(),
-
-      // 🔹 mapping kolom baru dari API
       outputType: json['OutputType']?.toString(),
       outputCode: json['OutputCode']?.toString(),
       outputNamaMesin: json['OutputNamaMesin']?.toString(),
@@ -105,46 +115,45 @@ class FurnitureWipHeader {
   }
 
   Map<String, dynamic> toJson() => {
-    'NoFurnitureWIP': noFurnitureWip,
+    'NoBJ': noBJ,
     'DateCreate': dateCreate,
-    'IdFurnitureWIP': idFurnitureWip,
-    'NamaFurnitureWIP': namaFurnitureWip,
+    'IdBJ': idBJ,
+    'NamaBJ': namaBJ,
     'Pcs': pcs,
     'Berat': berat,
     'IsPartial': isPartial,
-    'IdWarna': idWarna,
+    'IdWarehouse': idWarehouse,
     'Blok': blok,
     'IdLokasi': idLokasi,
-
     'OutputType': outputType,
     'OutputCode': outputCode,
     'OutputNamaMesin': outputNamaMesin,
   };
 
-  FurnitureWipHeader copyWith({
-    String? noFurnitureWip,
+  PackingHeader copyWith({
+    String? noBJ,
     String? dateCreate,
-    int? idFurnitureWip,
-    String? namaFurnitureWip,
+    int? idBJ,
+    String? namaBJ,
     double? pcs,
     double? berat,
     int? isPartial,
-    int? idWarna,
+    int? idWarehouse,
     String? blok,
     String? idLokasi,
     String? outputType,
     String? outputCode,
     String? outputNamaMesin,
   }) {
-    return FurnitureWipHeader(
-      noFurnitureWip: noFurnitureWip ?? this.noFurnitureWip,
+    return PackingHeader(
+      noBJ: noBJ ?? this.noBJ,
       dateCreate: dateCreate ?? this.dateCreate,
-      idFurnitureWip: idFurnitureWip ?? this.idFurnitureWip,
-      namaFurnitureWip: namaFurnitureWip ?? this.namaFurnitureWip,
+      idBJ: idBJ ?? this.idBJ,
+      namaBJ: namaBJ ?? this.namaBJ,
       pcs: pcs ?? this.pcs,
       berat: berat ?? this.berat,
       isPartial: isPartial ?? this.isPartial,
-      idWarna: idWarna ?? this.idWarna,
+      idWarehouse: idWarehouse ?? this.idWarehouse,
       blok: blok ?? this.blok,
       idLokasi: idLokasi ?? this.idLokasi,
       outputType: outputType ?? this.outputType,

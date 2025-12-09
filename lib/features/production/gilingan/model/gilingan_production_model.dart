@@ -1,4 +1,4 @@
-// lib/features/shared/gilingan_production/model/hot_stamp_production_model.dart
+// lib/features/shared/gilingan_production/model/packing_production_model.dart
 
 class GilinganProduction {
   final String noProduksi;

@@ -1,4 +1,4 @@
-// lib/features/shared/key_fitting_production/view_model/hot_stamp_production_view_model.dart
+// lib/features/shared/key_fitting_production/view_model/packing_production_view_model.dart
 
 import 'package:flutter/foundation.dart';
 

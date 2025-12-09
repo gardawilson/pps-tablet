@@ -23,12 +23,17 @@ import 'package:pps_tablet/features/label/gilingan/view_model/gilingan_view_mode
 import 'package:pps_tablet/features/label/mixer/repository/mixer_repository.dart';
 import 'package:pps_tablet/features/label/mixer/view/mixer_screen.dart';
 import 'package:pps_tablet/features/label/mixer/view_model/mixer_view_model.dart';
+import 'package:pps_tablet/features/label/packing/repository/packing_repository.dart';
+import 'package:pps_tablet/features/label/packing/view/packing_screen.dart';
+import 'package:pps_tablet/features/label/packing/view_model/packing_view_model.dart';
 import 'package:pps_tablet/features/mesin/repository/mesin_repository.dart';
 import 'package:pps_tablet/features/mesin/view_model/mesin_view_model.dart';
 import 'package:pps_tablet/features/mixer_type/repository/mixer_type_repository.dart';
 import 'package:pps_tablet/features/mixer_type/view_model/mixer_type_view_model.dart';
 import 'package:pps_tablet/features/operator/repository/operator_repository.dart';
 import 'package:pps_tablet/features/operator/view_model/operator_view_model.dart';
+import 'package:pps_tablet/features/packing_type/repository/packing_type_repository.dart';
+import 'package:pps_tablet/features/packing_type/view_model/packing_type_view_model.dart';
 import 'package:pps_tablet/features/production/broker/repository/broker_production_input_repository.dart';
 import 'package:pps_tablet/features/production/broker/view_model/broker_production_input_view_model.dart';
 import 'package:pps_tablet/features/production/crusher/repository/crusher_production_input_repository.dart';
@@ -47,6 +52,8 @@ import 'package:pps_tablet/features/production/key_fitting/repository/key_fittin
 import 'package:pps_tablet/features/production/key_fitting/view_model/key_fitting_production_view_model.dart';
 import 'package:pps_tablet/features/production/mixer/repository/mixer_production_repository.dart';
 import 'package:pps_tablet/features/production/mixer/view_model/mixer_production_view_model.dart';
+import 'package:pps_tablet/features/production/packing/repository/packing_production_repository.dart';
+import 'package:pps_tablet/features/production/packing/view_model/packing_production_view_model.dart';
 import 'package:pps_tablet/features/production/return/repository/return_production_repository.dart';
 import 'package:pps_tablet/features/production/return/view_model/return_production_view_model.dart';
 import 'package:pps_tablet/features/production/selection/view/production_selection_screen.dart';
@@ -154,7 +161,6 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => CrusherProductionInputViewModel(repository: CrusherProductionInputRepository())),
         ChangeNotifierProvider(create: (_) => BrokerProductionViewModel(repository: BrokerProductionRepository())),
         ChangeNotifierProvider(create: (_) => BrokerProductionInputViewModel(repository: BrokerProductionInputRepository())),
-        ChangeNotifierProvider(create: (_) => InjectProductionViewModel(repository: InjectProductionRepository())),
         ChangeNotifierProvider(create: (_) => JenisBonggolanViewModel(repository: JenisBonggolanRepository())),
         ChangeNotifierProvider(create: (_) => CrusherProductionViewModel(repository: CrusherProductionRepository())),
         ChangeNotifierProvider(create: (_) => CrusherTypeViewModel(repository: CrusherTypeRepository())),
@@ -216,7 +222,40 @@ class MyApp extends StatelessWidget {
         ),
 
 
+        ChangeNotifierProvider<PackingViewModel>(
+          create: (ctx) => PackingViewModel(
+            repository: PackingRepository(
+              api: ctx.read<ApiClient>(),
+            ),
+          ),
+        ),
 
+
+        ChangeNotifierProvider<PackingProductionViewModel>(
+          create: (ctx) => PackingProductionViewModel(
+            repository: PackingProductionRepository(
+              api: ctx.read<ApiClient>(),
+            ),
+          ),
+        ),
+
+
+        ChangeNotifierProvider<PackingTypeViewModel>(
+          create: (ctx) => PackingTypeViewModel(
+            repository: PackingTypeRepository(
+              api: ctx.read<ApiClient>(),
+            ),
+          ),
+        ),
+
+
+        ChangeNotifierProvider<InjectProductionViewModel>(
+          create: (ctx) => InjectProductionViewModel(
+            repository: InjectProductionRepository(
+              api: ctx.read<ApiClient>(),
+            ),
+          ),
+        ),
 
 
       ],
@@ -287,6 +326,8 @@ class MyApp extends StatelessWidget {
           '/production/washing': (context) => WashingProductionScreen(),
           '/production/broker': (context) => BrokerProductionScreen(),
           '/production/crusher': (context) => CrusherProductionScreen(),
+          '/label/packing': (context) => PackingScreen(),
+
         },
       ),
 

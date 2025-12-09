@@ -1,4 +1,4 @@
-// lib/features/furniture_wip_type/view_model/furniture_wip_type_view_model.dart
+// lib/features/furniture_wip_type/view_model/packing_type_view_model.dart
 
 import 'package:flutter/foundation.dart';
 

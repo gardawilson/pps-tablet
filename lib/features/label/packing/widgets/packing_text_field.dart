@@ -1,8 +1,8 @@
-// lib/features/gilingan/widgets/furniture_wip_text_field.dart
+// lib/features/gilingan/widgets/packing_text_field.dart
 
 import 'package:flutter/material.dart';
 
-class FurnitureWipTextField extends StatelessWidget {
+class PackingTextField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
   final IconData icon;
@@ -10,7 +10,7 @@ class FurnitureWipTextField extends StatelessWidget {
   final bool readOnly;
   final bool asText;
 
-  const FurnitureWipTextField({
+  const PackingTextField({
     super.key,
     required this.controller,
     required this.label,
@@ -36,7 +36,7 @@ class FurnitureWipTextField extends StatelessWidget {
           ),
         ),
         child: Text(
-          (controller.text.isNotEmpty) ? controller.text : "BB.XXXXXXXXXX",
+          (controller.text.isNotEmpty) ? controller.text : "BA.XXXXXXXXXX",
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,

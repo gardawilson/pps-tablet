@@ -1,35 +1,29 @@
-// lib/features/furniture_wip/view_model/furniture_wip_view_model.dart
-
 import 'package:flutter/material.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 
-import '../model/furniture_wip_header_model.dart';
-import '../model/furniture_wip_partial_model.dart';
-import '../repository/furniture_wip_repository.dart';
+import '../model/packing_header_model.dart';
+import '../model/packing_partial_model.dart';
+import '../repository/packing_repository.dart';
 
-/// Dari proses mana Furniture WIP ini berasal (label sumber)
-/// - hotStamping  -> BH.******
-/// - pasangKunci  -> BI.******
-/// - bongkarSusun -> BG.******
-/// - retur        -> L.******
-/// - spanner      -> BJ.******
-/// - inject       -> S.******
-enum FurnitureWipInputMode {
-  hotStamping,
-  pasangKunci,
+/// Dari proses mana Barang Jadi (Packing) ini berasal (label sumber)
+/// - packing       -> BD.******   (PackingProduksiOutputLabelBJ)
+/// - inject        -> S.******    (InjectProduksiOutputBarangJadi)
+/// - bongkarSusun  -> BG.******   (BongkarSusunOutputBarangjadi)
+/// - retur         -> L.******    (BJReturBarangJadi_d)
+enum PackingInputMode {
+  packing,
+  inject,
   bongkarSusun,
   retur,
-  spanner,
-  inject,
 }
 
-class FurnitureWipViewModel extends ChangeNotifier {
-  final FurnitureWipRepository repository;
+class PackingViewModel extends ChangeNotifier {
+  final PackingRepository repository;
 
-  FurnitureWipViewModel({required this.repository}) {
+  PackingViewModel({required this.repository}) {
     // === PagingController v5 ===
-    pagingController = PagingController<int, FurnitureWipHeader>(
-      // pageKey di sini kita treat sebagai "page index" (0,1,2,...)
+    pagingController = PagingController<int, PackingHeader>(
+      // pageKey kita treat sebagai "page index" (0,1,2,...)
       fetchPage: _fetchPage,
       // Ditanya: "next page key berapa?" setelah setiap page berhasil di-load
       getNextPageKey: _getNextPageKey,
@@ -39,10 +33,10 @@ class FurnitureWipViewModel extends ChangeNotifier {
   static const int _pageSize = 20;
 
   /// Controller untuk HorizontalPagedTable
-  late final PagingController<int, FurnitureWipHeader> pagingController;
+  late final PagingController<int, PackingHeader> pagingController;
 
-  // === LIST STATE LAMA (masih dipakai utk AppBar, dsb) ===
-  List<FurnitureWipHeader> items = [];
+  // === LIST STATE (untuk AppBar, dsb) ===
+  List<PackingHeader> items = [];
   bool isLoading = false;
   String errorMessage = '';
 
@@ -56,24 +50,23 @@ class FurnitureWipViewModel extends ChangeNotifier {
   bool get hasMore => pagingController.value.hasNextPage;
 
   // === PARTIAL INFO STATE ===
-  FurnitureWipPartialInfo? partialInfo;
+  PackingPartialInfo? partialInfo;
   String? partialError;
   bool isPartialLoading = false;
 
-  /// Optional: simpan NoFurnitureWIP terpilih (misal untuk popover)
-  String? currentNoFurnitureWip;
+  /// Optional: simpan NoBJ terpilih (misal untuk popover)
+  String? currentNoBJ;
 
   // Highlight row
-  String? selectedNoFurnitureWip;
-  FurnitureWipHeader? get selectedItem {
-    final i =
-    items.indexWhere((e) => e.noFurnitureWip == selectedNoFurnitureWip);
+  String? selectedNoBJ;
+  PackingHeader? get selectedItem {
+    final i = items.indexWhere((e) => e.noBJ == selectedNoBJ);
     return i == -1 ? null : items[i];
   }
 
   void setSelected(String? no) {
-    if (selectedNoFurnitureWip == no) return;
-    selectedNoFurnitureWip = no;
+    if (selectedNoBJ == no) return;
+    selectedNoBJ = no;
     notifyListeners();
   }
 
@@ -86,27 +79,21 @@ class FurnitureWipViewModel extends ChangeNotifier {
   // ==========================
   // FETCH HEADER (TRIGGER PAGING)
   // ==========================
-  ///
-  /// Dipanggil saat:
-  /// - pertama kali screen muncul
-  /// - user ganti search
-  ///
-  /// Actual load dilakukan oleh `_fetchPage` via PagingController.
+
   Future<void> fetchHeaders({String search = ''}) async {
     _search = search;
     errorMessage = '';
     _total = 0;
     items = [];
-    selectedNoFurnitureWip = null;
+    selectedNoBJ = null;
 
     isLoading = true;
     notifyListeners();
 
-    // akan memicu fetchPage(pageKey pertama) lagi
+    // akan memicu _fetchPage(pageKey pertama) lagi
     pagingController.refresh();
   }
 
-  // Quick helpers (masih dipakai di beberapa tempat)
   Future<void> refreshCurrent() => fetchHeaders(search: _search);
   Future<void> applySearch(String search) => fetchHeaders(search: search);
 
@@ -114,11 +101,7 @@ class FurnitureWipViewModel extends ChangeNotifier {
   // IMPLEMENTASI PAGING v5
   // ==========================
 
-  /// Dipanggil otomatis oleh PagingController ketika butuh page baru.
-  ///
-  /// `pageKey` (int) kita treat sebagai index mulai 0,
-  /// sedangkan API kita butuh "page" mulai 1 → `page = pageKey + 1`.
-  Future<List<FurnitureWipHeader>> _fetchPage(int pageKey) async {
+  Future<List<PackingHeader>> _fetchPage(int pageKey) async {
     try {
       // first page → set loading true utk AppBar
       if (pageKey == 0) {
@@ -135,14 +118,14 @@ class FurnitureWipViewModel extends ChangeNotifier {
         search: _search,
       );
 
-      final list = (result['items'] as List<FurnitureWipHeader>);
+      final list = (result['items'] as List<PackingHeader>);
       _total = (result['total'] as int?) ?? list.length;
 
       errorMessage = '';
 
       // update cache items lokal (flatten)
       if (pageKey == 0) {
-        items = List<FurnitureWipHeader>.from(list);
+        items = List<PackingHeader>.from(list);
       } else {
         items = [
           ...items,
@@ -160,51 +143,40 @@ class FurnitureWipViewModel extends ChangeNotifier {
     }
   }
 
-  /// Menentukan key page berikutnya.
-  ///
-  /// Signature baru: `NextPageKeyCallback<PageKeyType, ItemType>`
-  /// = `PageKeyType? Function(PagingState<PageKeyType, ItemType> state)`
   int? _getNextPageKey(
-      PagingState<int, FurnitureWipHeader> state,
+      PagingState<int, PackingHeader> state,
       ) {
-    // Kalau last page kosong → sudah mentok
     if (state.lastPageIsEmpty) return null;
-
-    // Cara paling simple: pakai extension nextIntPageKey
-    // (0,1,2,3,...)
     return state.nextIntPageKey;
   }
 
   // ==========================
-// CREATE (POST /labels/furniture-wip)
-// ==========================
+  // CREATE (POST /labels/packing)
+  // ==========================
 
-  String? lastCreatedNoFurnitureWip;
+  String? lastCreatedNoBJ;
 
-  /// Validasi input create Furniture WIP
+  /// Validasi input create Packing (Barang Jadi)
   String? validateCreate({
-    required int? idFurnitureWip,
+    required int? idBJ,
     required DateTime dateCreate,
     double? pcs,
     double? berat,
-    required FurnitureWipInputMode? mode,
-    String? hotStampCode,      // BH.******
-    String? pasangKunciCode,   // BI.******
-    String? bongkarSusunCode,  // BG.******
-    String? returCode,         // L.******
-    String? spannerCode,       // BJ.******
-    String? injectCode,        // S.******
+    required PackingInputMode? mode,
+    String? packingCode,      // BD.******
+    String? injectCode,       // S.******
+    String? bongkarSusunCode, // BG.******
+    String? returCode,        // L.******
   }) {
-    // Mode wajib
     if (mode == null) {
-      return 'Pilih proses sumber (Hot Stamping / Pasang Kunci / dll).';
+      return 'Pilih proses sumber (Packing / Inject / Bongkar Susun / Retur).';
     }
 
-    final bool isInjectMode = mode == FurnitureWipInputMode.inject;
+    final bool isInjectMode = mode == PackingInputMode.inject;
 
-    // Jenis wajib KECUALI untuk INJECT multi (IdFurnitureWIP boleh null)
-    if (!isInjectMode && idFurnitureWip == null) {
-      return 'Pilih jenis Furniture WIP terlebih dahulu.';
+    // Jenis wajib KECUALI untuk INJECT multi (IdBJ boleh null)
+    if (!isInjectMode && idBJ == null) {
+      return 'Pilih jenis Barang Jadi terlebih dahulu.';
     }
 
     if (pcs != null && pcs <= 0) {
@@ -218,29 +190,21 @@ class FurnitureWipViewModel extends ChangeNotifier {
     String prefix;
 
     switch (mode) {
-      case FurnitureWipInputMode.hotStamping:
-        code = hotStampCode;
-        prefix = 'BH.';
+      case PackingInputMode.packing:
+        code = packingCode;
+        prefix = 'BD.';
         break;
-      case FurnitureWipInputMode.pasangKunci:
-        code = pasangKunciCode;
-        prefix = 'BI.';
+      case PackingInputMode.inject:
+        code = injectCode;
+        prefix = 'S.';
         break;
-      case FurnitureWipInputMode.bongkarSusun:
+      case PackingInputMode.bongkarSusun:
         code = bongkarSusunCode;
         prefix = 'BG.';
         break;
-      case FurnitureWipInputMode.retur:
+      case PackingInputMode.retur:
         code = returCode;
         prefix = 'L.';
-        break;
-      case FurnitureWipInputMode.spanner:
-        code = spannerCode;
-        prefix = 'BJ.';
-        break;
-      case FurnitureWipInputMode.inject:
-        code = injectCode;
-        prefix = 'S.';
         break;
     }
 
@@ -255,55 +219,48 @@ class FurnitureWipViewModel extends ChangeNotifier {
   }
 
   Map<String, dynamic> _buildCreateBody({
-    required int? idFurnitureWip,
+    required int? idBJ,
     required String dateCreateYmd,
+    String? jam,
     double? pcs,
     double? berat,
     bool? isPartial,
-    int? idWarna,
+    int? idWarehouse,
     String? blok,
     String? idLokasi,
-    required FurnitureWipInputMode? mode,
-    String? hotStampCode,      // BH.******
-    String? pasangKunciCode,   // BI.******
-    String? bongkarSusunCode,  // BG.******
-    String? returCode,         // L.******
-    String? spannerCode,       // BJ.******
-    String? injectCode,        // S.******
+    required PackingInputMode? mode,
+    String? packingCode,      // BD.******
+    String? injectCode,       // S.******
+    String? bongkarSusunCode, // BG.******
+    String? returCode,        // L.******
   }) {
-    // Tentukan outputCode berdasarkan mode
     String? outputCode;
     switch (mode) {
-      case FurnitureWipInputMode.hotStamping:
-        outputCode = hotStampCode?.trim();
+      case PackingInputMode.packing:
+        outputCode = packingCode?.trim();
         break;
-      case FurnitureWipInputMode.pasangKunci:
-        outputCode = pasangKunciCode?.trim();
+      case PackingInputMode.inject:
+        outputCode = injectCode?.trim();
         break;
-      case FurnitureWipInputMode.bongkarSusun:
+      case PackingInputMode.bongkarSusun:
         outputCode = bongkarSusunCode?.trim();
         break;
-      case FurnitureWipInputMode.retur:
+      case PackingInputMode.retur:
         outputCode = returCode?.trim();
-        break;
-      case FurnitureWipInputMode.spanner:
-        outputCode = spannerCode?.trim();
-        break;
-      case FurnitureWipInputMode.inject:
-        outputCode = injectCode?.trim();
         break;
       default:
         outputCode = null;
     }
 
     final header = <String, dynamic>{
-      // ⬇️ Untuk INJECT multi, IdFurnitureWIP boleh null → field ini tidak dikirim
-      if (idFurnitureWip != null) "IdFurnitureWIP": idFurnitureWip,
+      // ⬇️ Untuk INJECT multi, IdBJ boleh null → field ini tidak dikirim
+      if (idBJ != null) "IdBJ": idBJ,
       "DateCreate": dateCreateYmd,
+      if (jam != null && jam.isNotEmpty) "Jam": jam,
       if (pcs != null) "Pcs": pcs,
       if (berat != null) "Berat": berat,
       if (isPartial != null) "IsPartial": isPartial ? 1 : 0,
-      if (idWarna != null) "IdWarna": idWarna,
+      if (idWarehouse != null) "IdWarehouse": idWarehouse,
       if (blok != null && blok.isNotEmpty) "Blok": blok,
       if (idLokasi != null && idLokasi.isNotEmpty) "IdLokasi": idLokasi,
     };
@@ -316,40 +273,37 @@ class FurnitureWipViewModel extends ChangeNotifier {
 
   /// Full create flow from form
   Future<Map<String, dynamic>> createFromForm({
-    required int? idFurnitureWip,
+    required int? idBJ,
     required DateTime dateCreate,
     double? pcs,
     double? berat,
     bool? isPartial,
-    int? idWarna,
+    int? idWarehouse,
     String? blok,
     String? idLokasi,
+    String? jam,
 
-    /// mode: Hot Stamping / Pasang Kunci / Bongkar / Retur / Spanner / Inject
-    required FurnitureWipInputMode? mode,
+    /// mode: Packing / Inject / Bongkar Susun / Retur
+    required PackingInputMode? mode,
 
-    String? hotStampCode,      // BH.******
-    String? pasangKunciCode,   // BI.******
-    String? bongkarSusunCode,  // BG.******
-    String? returCode,         // L.******
-    String? spannerCode,       // BJ.******
-    String? injectCode,        // S.******
+    String? packingCode,      // BD.******
+    String? injectCode,       // S.******
+    String? bongkarSusunCode, // BG.******
+    String? returCode,        // L.******
 
     required String Function(DateTime) toDbDateString, // yyyy-MM-dd
   }) async {
     // 1) Validate
     final err = validateCreate(
-      idFurnitureWip: idFurnitureWip,
+      idBJ: idBJ,
       dateCreate: dateCreate,
       pcs: pcs,
       berat: berat,
       mode: mode,
-      hotStampCode: hotStampCode,
-      pasangKunciCode: pasangKunciCode,
+      packingCode: packingCode,
+      injectCode: injectCode,
       bongkarSusunCode: bongkarSusunCode,
       returCode: returCode,
-      spannerCode: spannerCode,
-      injectCode: injectCode,
     );
     if (err != null) {
       throw Exception(err);
@@ -357,21 +311,20 @@ class FurnitureWipViewModel extends ChangeNotifier {
 
     // 2) Build body
     final body = _buildCreateBody(
-      idFurnitureWip: idFurnitureWip, // ⬅️ boleh null untuk Inject multi
+      idBJ: idBJ, // ⬅️ boleh null untuk Inject multi
       dateCreateYmd: toDbDateString(dateCreate),
+      jam: jam,
       pcs: pcs,
       berat: berat,
       isPartial: isPartial,
-      idWarna: idWarna,
+      idWarehouse: idWarehouse,
       blok: blok,
       idLokasi: idLokasi,
       mode: mode,
-      hotStampCode: hotStampCode,
-      pasangKunciCode: pasangKunciCode,
+      packingCode: packingCode,
+      injectCode: injectCode,
       bongkarSusunCode: bongkarSusunCode,
       returCode: returCode,
-      spannerCode: spannerCode,
-      injectCode: injectCode,
     );
 
     try {
@@ -379,25 +332,20 @@ class FurnitureWipViewModel extends ChangeNotifier {
       errorMessage = '';
       notifyListeners();
 
-      final res = await repository.createFurnitureWip(body);
+      final res = await repository.createPacking(body);
 
-      // Response baru: data.headers (array), bukan lagi data.header tunggal
       final data = res['data'] as Map<String, dynamic>? ?? {};
       final List headers = data['headers'] as List? ?? [];
 
       if (headers.isNotEmpty) {
-        lastCreatedNoFurnitureWip =
-            headers.first['NoFurnitureWIP']?.toString();
+        lastCreatedNoBJ = headers.first['NoBJ']?.toString();
       } else {
-        // fallback lama (kalau backend masih kirim header tunggal)
-        lastCreatedNoFurnitureWip =
-            res['data']?['header']?['NoFurnitureWIP']?.toString();
+        lastCreatedNoBJ = res['data']?['header']?['NoBJ']?.toString();
       }
 
-      // Refresh list & biarkan PagingController yang load
       await fetchHeaders(search: _search);
-      if (lastCreatedNoFurnitureWip != null) {
-        setSelected(lastCreatedNoFurnitureWip);
+      if (lastCreatedNoBJ != null) {
+        setSelected(lastCreatedNoBJ);
       }
 
       return res;
@@ -410,38 +358,41 @@ class FurnitureWipViewModel extends ChangeNotifier {
     }
   }
 
-
   // ==========================
-  // UPDATE (PUT /labels/furniture-wip/:noFurnitureWip)
+  // UPDATE (PUT /labels/packing/:noBJ)
   // ==========================
 
   Map<String, dynamic> _buildUpdateBody({
     DateTime? dateCreate,
-    int? idFurnitureWip,
+    int? idBJ,
     double? pcs,
     double? berat,
     bool? isPartial,
-    int? idWarna,
+    int? idWarehouse,
     String? blok,
     String? idLokasi,
+    String? jam,
 
     /// null  -> mapping tidak disentuh
-    /// ""    -> mapping dihapus (backend akan deleteAllMappings)
-    /// "BH..." / "BI..." / dst -> mapping diganti
+    /// ""    -> mapping dihapus
+    /// "BD..." / "S..." / "BG..." / "L..." -> mapping diganti
     String? outputCode,
     required String Function(DateTime) toDbDateString,
   }) {
     final header = <String, dynamic>{};
 
     if (dateCreate != null) header['DateCreate'] = toDbDateString(dateCreate);
-    if (idFurnitureWip != null) header['IdFurnitureWIP'] = idFurnitureWip;
+    if (idBJ != null) header['IdBJ'] = idBJ;
     if (pcs != null) header['Pcs'] = pcs;
     if (berat != null) header['Berat'] = berat;
     if (isPartial != null) header['IsPartial'] = isPartial ? 1 : 0;
-    if (idWarna != null) header['IdWarna'] = idWarna;
+    if (idWarehouse != null) header['IdWarehouse'] = idWarehouse;
     if (blok != null && blok.trim().isNotEmpty) header['Blok'] = blok.trim();
     if (idLokasi != null && idLokasi.trim().isNotEmpty) {
       header['IdLokasi'] = idLokasi.trim();
+    }
+    if (jam != null && jam.trim().isNotEmpty) {
+      header['Jam'] = jam.trim();
     }
 
     final body = <String, dynamic>{
@@ -465,15 +416,16 @@ class FurnitureWipViewModel extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> updateFromForm({
-    required String noFurnitureWip,
+    required String noBJ,
     DateTime? dateCreate,
-    int? idFurnitureWip,
+    int? idBJ,
     double? pcs,
     double? berat,
     bool? isPartial,
-    int? idWarna,
+    int? idWarehouse,
     String? blok,
     String? idLokasi,
+    String? jam,
     String? outputCode,
     required String Function(DateTime) toDbDateString,
   }) async {
@@ -482,13 +434,14 @@ class FurnitureWipViewModel extends ChangeNotifier {
 
     final body = _buildUpdateBody(
       dateCreate: dateCreate,
-      idFurnitureWip: idFurnitureWip,
+      idBJ: idBJ,
       pcs: pcs,
       berat: berat,
       isPartial: isPartial,
-      idWarna: idWarna,
+      idWarehouse: idWarehouse,
       blok: blok,
       idLokasi: idLokasi,
+      jam: jam,
       outputCode: outputCode,
       toDbDateString: toDbDateString,
     );
@@ -502,12 +455,10 @@ class FurnitureWipViewModel extends ChangeNotifier {
       errorMessage = '';
       notifyListeners();
 
-      final res =
-      await repository.updateFurnitureWip(noFurnitureWip, body);
+      final res = await repository.updatePacking(noBJ, body);
 
-      // Refresh list and keep this row selected
       await fetchHeaders(search: _search);
-      setSelected(noFurnitureWip);
+      setSelected(noBJ);
 
       return res;
     } catch (e) {
@@ -522,18 +473,18 @@ class FurnitureWipViewModel extends ChangeNotifier {
   // ==========================
   // DELETE
   // ==========================
-  Future<void> deleteFurnitureWip(String noFurnitureWip) async {
+  Future<void> deletePacking(String noBJ) async {
     isLoading = true;
     errorMessage = '';
     notifyListeners();
 
     try {
-      await repository.deleteFurnitureWip(noFurnitureWip);
+      await repository.deletePacking(noBJ);
 
-      items.removeWhere((e) => e.noFurnitureWip == noFurnitureWip);
+      items.removeWhere((e) => e.noBJ == noBJ);
 
-      if (selectedNoFurnitureWip == noFurnitureWip) {
-        selectedNoFurnitureWip = null;
+      if (selectedNoBJ == noBJ) {
+        selectedNoBJ = null;
       }
 
       await refreshCurrent();
@@ -549,11 +500,11 @@ class FurnitureWipViewModel extends ChangeNotifier {
   // ==========================
   // LOAD PARTIAL INFO
   // ==========================
-  Future<void> loadPartialInfo({String? noFurnitureWip}) async {
-    final nf = noFurnitureWip ?? currentNoFurnitureWip;
+  Future<void> loadPartialInfo({String? noBJ}) async {
+    final nbj = noBJ ?? currentNoBJ;
 
-    if (nf == null || nf.isEmpty) {
-      partialError = "NoFurnitureWIP not selected";
+    if (nbj == null || nbj.isEmpty) {
+      partialError = "NoBJ not selected";
       partialInfo = null;
       notifyListeners();
       return;
@@ -564,25 +515,24 @@ class FurnitureWipViewModel extends ChangeNotifier {
       partialError = null;
       notifyListeners();
 
-      debugPrint("➡️ [FurnitureWipVM] loadPartialInfo noFurnitureWIP=$nf");
+      debugPrint("➡️ [PackingVM] loadPartialInfo NoBJ=$nbj");
 
       partialInfo = await repository.fetchPartialInfo(
-        noFurnitureWip: nf,
+        noBJ: nbj,
       );
     } catch (e) {
       partialError = e.toString();
       partialInfo = null;
-      debugPrint("❌ Error loadPartialInfo($nf): $partialError");
+      debugPrint("❌ Error loadPartialInfo($nbj): $partialError");
     } finally {
       isPartialLoading = false;
       notifyListeners();
     }
   }
 
-  // Screen lifecycle helper
   void resetForScreen() {
-    selectedNoFurnitureWip = null;
-    currentNoFurnitureWip = null;
+    selectedNoBJ = null;
+    currentNoBJ = null;
     partialInfo = null;
     partialError = null;
   }

@@ -1,4 +1,4 @@
-// lib/features/crusher/model/furniture_wip_header_model.dart
+// lib/features/crusher/model/packing_header_model.dart
 class CrusherHeader {
   // Core
   final String noCrusher;        // NoCrusher

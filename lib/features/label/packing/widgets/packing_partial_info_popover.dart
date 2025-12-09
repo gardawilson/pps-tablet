@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:pps_tablet/core/utils/date_formatter.dart';
 import 'package:provider/provider.dart';
 
-import '../view_model/furniture_wip_view_model.dart';
+import '../view_model/packing_view_model.dart';
 import './interactive_popover.dart';
 
-/// Show the partial info for Furniture WIP as an InteractivePopover with instant display
-Future<void> showFurnitureWipPartialInfoPopover({
+/// Show the partial info for Packing (Barang Jadi)
+/// as an InteractivePopover with instant display
+Future<void> showPackingPartialInfoPopover({
   required BuildContext context,
-  required FurnitureWipViewModel vm,
-  required String noFurnitureWip,
+  required PackingViewModel vm,
+  required String noBJ,
   required InteractivePopover popover,
   required Offset globalPosition,
 }) async {
@@ -28,39 +29,38 @@ Future<void> showFurnitureWipPartialInfoPopover({
     startOpacity: 0.0,
     child: ChangeNotifierProvider.value(
       value: vm,
-      child: _FurnitureWipPartialInfoCard(
-        noFurnitureWip: noFurnitureWip,
+      child: _PackingPartialInfoCard(
+        noBJ: noBJ,
         onClose: () => popover.hide(),
       ),
     ),
   );
 
   // 🟦 Baru fetch data (popover sudah tampil)
-  await vm.loadPartialInfo(noFurnitureWip: noFurnitureWip);
+  await vm.loadPartialInfo(noBJ: noBJ);
 }
 
-class _FurnitureWipPartialInfoCard extends StatefulWidget {
-  final String noFurnitureWip;
+class _PackingPartialInfoCard extends StatefulWidget {
+  final String noBJ;
   final VoidCallback onClose;
 
-  const _FurnitureWipPartialInfoCard({
-    required this.noFurnitureWip,
+  const _PackingPartialInfoCard({
+    required this.noBJ,
     required this.onClose,
   });
 
   @override
-  State<_FurnitureWipPartialInfoCard> createState() =>
-      _FurnitureWipPartialInfoCardState();
+  State<_PackingPartialInfoCard> createState() =>
+      _PackingPartialInfoCardState();
 }
 
-class _FurnitureWipPartialInfoCardState
-    extends State<_FurnitureWipPartialInfoCard> {
-  late FurnitureWipViewModel vm;
+class _PackingPartialInfoCardState extends State<_PackingPartialInfoCard> {
+  late PackingViewModel vm;
 
   @override
   void initState() {
     super.initState();
-    vm = context.read<FurnitureWipViewModel>();
+    vm = context.read<PackingViewModel>();
   }
 
   @override
@@ -68,7 +68,7 @@ class _FurnitureWipPartialInfoCardState
     final divider =
     Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
 
-    return Consumer<FurnitureWipViewModel>(
+    return Consumer<PackingViewModel>(
       builder: (ctx, vm, __) {
         final isLoading = vm.isPartialLoading;
         final hasError = vm.partialError != null;
@@ -125,7 +125,7 @@ class _FurnitureWipPartialInfoCardState
                           ),
                         ),
                         child: const Icon(
-                          Icons.event_note,
+                          Icons.inventory_2_outlined,
                           color: Colors.white,
                           size: 24,
                         ),
@@ -138,7 +138,7 @@ class _FurnitureWipPartialInfoCardState
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Partial Furniture WIP',
+                              'Partial Barang Jadi',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w700,
@@ -148,7 +148,7 @@ class _FurnitureWipPartialInfoCardState
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              widget.noFurnitureWip,
+                              widget.noBJ,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.white.withOpacity(0.9),
@@ -261,15 +261,19 @@ class _FurnitureWipPartialInfoCardState
                     itemBuilder: (_, i) {
                       final r = displayRows[i];
                       return _PartialRowItem(
-                        namaMesin: (r.namaMesin ?? '').isEmpty
+                        namaPembeli:
+                        (r.namaPembeli ?? '').isEmpty
                             ? '-'
-                            : r.namaMesin!,
-                        noProduksi: (r.noProduksi ?? '').isEmpty
+                            : r.namaPembeli!,
+                        noBJJual:
+                        (r.noBJJual ?? '').isEmpty
                             ? '-'
-                            : r.noProduksi!,
-                        tglProduksi: (r.tglProduksi ?? '').isEmpty
+                            : r.noBJJual!,
+                        tanggalJual:
+                        (r.tanggalJual ?? '').isEmpty
                             ? '-'
-                            : r.tglProduksi!,
+                            : r.tanggalJual!,
+                        remark: (r.remark ?? '').toString(),
                         pcs: r.pcs,
                       );
                     },
@@ -320,7 +324,7 @@ class _EmptyState extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Text(
-            'Tidak ada partial untuk Furniture WIP ini',
+            'Tidak ada partial untuk Barang Jadi ini',
             style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
           ),
         ),
@@ -331,15 +335,17 @@ class _EmptyState extends StatelessWidget {
 
 // ROW ITEM
 class _PartialRowItem extends StatelessWidget {
-  final String namaMesin;
-  final String noProduksi;
-  final String tglProduksi;
+  final String namaPembeli;
+  final String noBJJual;
+  final String tanggalJual; // yyyy-MM-dd atau '-'
+  final String remark;
   final double pcs;
 
   const _PartialRowItem({
-    required this.namaMesin,
-    required this.noProduksi,
-    required this.tglProduksi,
+    required this.namaPembeli,
+    required this.noBJJual,
+    required this.tanggalJual,
+    required this.remark,
     required this.pcs,
   });
 
@@ -347,14 +353,17 @@ class _PartialRowItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
+    final hasRemark =
+        remark.trim().isNotEmpty && remark.trim() != 'null';
+
     return InkWell(
       onTap: null, // read-only
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           children: [
-            Icon(Icons.remove_circle_outline,
-                color: Colors.red.shade600, size: 18),
+            Icon(Icons.shopping_cart_checkout,
+                color: Colors.green.shade600, size: 18),
             const SizedBox(width: 12),
 
             // Content
@@ -362,9 +371,9 @@ class _PartialRowItem extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Machine
+                  // Nama Pembeli
                   Text(
-                    namaMesin,
+                    namaPembeli,
                     style: textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                       color: Colors.black87,
@@ -373,14 +382,14 @@ class _PartialRowItem extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
 
-                  // NoProduksi
+                  // NoBJJual
                   Row(
                     children: [
                       const Icon(Icons.tag, size: 12, color: Colors.grey),
                       const SizedBox(width: 4),
                       Flexible(
                         child: Text(
-                          noProduksi,
+                          noBJJual,
                           style: textTheme.bodySmall?.copyWith(
                             color: Colors.grey.shade700,
                           ),
@@ -391,7 +400,7 @@ class _PartialRowItem extends StatelessWidget {
                     ],
                   ),
 
-                  // Date
+                  // Tanggal jual
                   Row(
                     children: [
                       const Icon(Icons.calendar_today,
@@ -399,9 +408,9 @@ class _PartialRowItem extends StatelessWidget {
                       const SizedBox(width: 4),
                       Flexible(
                         child: Text(
-                          tglProduksi == '-' || tglProduksi.isEmpty
+                          (tanggalJual == '-' || tanggalJual.isEmpty)
                               ? '-'
-                              : formatDateToFullId(tglProduksi),
+                              : formatDateToFullId(tanggalJual),
                           style: textTheme.bodySmall?.copyWith(
                             color: Colors.grey.shade700,
                           ),
@@ -411,6 +420,28 @@ class _PartialRowItem extends StatelessWidget {
                       ),
                     ],
                   ),
+
+                  // Remark (opsional)
+                  if (hasRemark) ...[
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.notes,
+                            size: 12, color: Colors.grey),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            remark,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: Colors.grey.shade700,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

@@ -1,4 +1,4 @@
-// lib/features/shared/hot_stamp_production/hot_stamp_production_view_model.dart
+// lib/features/shared/hot_stamp_production/packing_production_view_model.dart
 
 import 'package:flutter/foundation.dart';
 

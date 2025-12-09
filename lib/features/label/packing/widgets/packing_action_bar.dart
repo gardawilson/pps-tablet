@@ -4,13 +4,13 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/view_model/permission_view_model.dart';
 
-class FurnitureWipActionBar extends StatefulWidget {
+class PackingActionBar extends StatefulWidget {
   final TextEditingController controller;
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onClear;
   final VoidCallback onAddPressed;
 
-  const FurnitureWipActionBar({
+  const PackingActionBar({
     super.key,
     required this.controller,
     required this.onSearchChanged,
@@ -19,10 +19,10 @@ class FurnitureWipActionBar extends StatefulWidget {
   });
 
   @override
-  State<FurnitureWipActionBar> createState() => _FurnitureWipActionBarState();
+  State<PackingActionBar> createState() => _PackingActionBarState();
 }
 
-class _FurnitureWipActionBarState extends State<FurnitureWipActionBar> {
+class _PackingActionBarState extends State<PackingActionBar> {
   final FocusNode _searchFocus = FocusNode();
   bool _focused = false;
 
@@ -47,10 +47,13 @@ class _FurnitureWipActionBarState extends State<FurnitureWipActionBar> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    // Permissions – masih ikut 'label_crusher:*' sesuai routes backend
+    // Permissions
     final perm = context.watch<PermissionViewModel>();
+
+    // 👉 kalau sudah ada permission khusus packing, ganti ke 'label_packing:create'
     final canCreate = perm.can('label_crusher:create');
-    // Kalau nanti ada permission khusus, mis. 'label_furniturewip:create', tinggal ganti di sini.
+    // atau sementara:
+    // final canCreate = perm.can('label_crusher:create');
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
@@ -74,7 +77,7 @@ class _FurnitureWipActionBarState extends State<FurnitureWipActionBar> {
                   // Create button
                   Tooltip(
                     message: canCreate
-                        ? 'Create new Furniture WIP label'
+                        ? 'Create new Packing (Barang Jadi) label'
                         : 'You do not have permission to create labels',
                     waitDuration: const Duration(milliseconds: 400),
                     child: FilledButton.icon(
@@ -145,14 +148,15 @@ class _FurnitureWipActionBarState extends State<FurnitureWipActionBar> {
                               textInputAction: TextInputAction.search,
                               decoration: InputDecoration(
                                 hintText:
-                                'Search Furniture WIP No / Name / Location',
+                                'Search No BJ / Jenis / Lokasi / Mesin / Pembeli',
                                 hintStyle: TextStyle(
                                   color: Colors.grey.shade500,
                                 ),
                                 isCollapsed: true,
                                 border: InputBorder.none,
-                                contentPadding:
-                                const EdgeInsets.symmetric(vertical: 14),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                               ),
                             ),
                           ),
@@ -161,10 +165,9 @@ class _FurnitureWipActionBarState extends State<FurnitureWipActionBar> {
                             duration: const Duration(milliseconds: 140),
                             child: _hasText
                                 ? IconButton(
-                              key: const ValueKey('clear_on_fwip'),
+                              key: const ValueKey('clear_on_packing'),
                               tooltip: 'Clear',
-                              icon:
-                              const Icon(Icons.close_rounded),
+                              icon: const Icon(Icons.close_rounded),
                               onPressed: () {
                                 widget.controller.clear();
                                 setState(() {});
@@ -173,7 +176,7 @@ class _FurnitureWipActionBarState extends State<FurnitureWipActionBar> {
                               },
                             )
                                 : const SizedBox.shrink(
-                              key: ValueKey('clear_off_fwip'),
+                              key: ValueKey('clear_off_packing'),
                             ),
                           ),
                         ],

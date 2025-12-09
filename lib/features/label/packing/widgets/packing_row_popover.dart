@@ -4,17 +4,17 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/utils/pdf_print_service.dart';
 import '../../../../core/view_model/permission_view_model.dart';
-import '../model/furniture_wip_header_model.dart';
+import '../model/packing_header_model.dart';
 
-class FurnitureWipRowPopover extends StatelessWidget {
-  final FurnitureWipHeader header;
+class PackingRowPopover extends StatelessWidget {
+  final PackingHeader header;
 
   final VoidCallback onClose;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onPrint;
 
-  const FurnitureWipRowPopover({
+  const PackingRowPopover({
     super.key,
     required this.header,
     required this.onClose,
@@ -29,12 +29,12 @@ class FurnitureWipRowPopover extends StatelessWidget {
   }
 
   Future<void> _copyOnly(BuildContext context) async {
-    await Clipboard.setData(ClipboardData(text: header.noFurnitureWip));
+    await Clipboard.setData(ClipboardData(text: header.noBJ));
     final m = ScaffoldMessenger.maybeOf(context);
     m?.hideCurrentSnackBar();
     m?.showSnackBar(
       SnackBar(
-        content: Text('NoFurnitureWIP "${header.noFurnitureWip}" disalin'),
+        content: Text('NoBJ "${header.noBJ}" disalin'),
         duration: const Duration(milliseconds: 1200),
         behavior: SnackBarBehavior.floating,
       ),
@@ -49,6 +49,7 @@ class FurnitureWipRowPopover extends StatelessWidget {
     // ambil izin sekali
     final perm = context.watch<PermissionViewModel>();
     // sementara ikut permission yang sama dengan routes: 'label_crusher:*'
+    // kalau nanti punya permission khusus, ganti jadi 'label_packing:update/delete'
     final canEdit = perm.can('label_crusher:update');
     final canDelete = perm.can('label_crusher:delete');
 
@@ -84,7 +85,7 @@ class FurnitureWipRowPopover extends StatelessWidget {
                       ),
                     ),
                     child: const Icon(
-                      Icons.chair_alt, // sedikit lebih “furniture”
+                      Icons.inventory_2_outlined, // lebih “packing”
                       color: Colors.white,
                       size: 20,
                     ),
@@ -95,7 +96,7 @@ class FurnitureWipRowPopover extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          header.noFurnitureWip,
+                          header.noBJ,
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -105,7 +106,7 @@ class FurnitureWipRowPopover extends StatelessWidget {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          header.namaFurnitureWip ?? '-',
+                          header.namaBJ ?? '-',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
@@ -119,7 +120,7 @@ class FurnitureWipRowPopover extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    tooltip: 'Salin NoFurnitureWIP',
+                    tooltip: 'Salin NoBJ',
                     icon: Icon(
                       Icons.copy_outlined,
                       color: Colors.white.withOpacity(0.9),
@@ -161,13 +162,12 @@ class FurnitureWipRowPopover extends StatelessWidget {
                 );
 
                 // TODO: sesuaikan nama report dengan yang kamu pakai di backend
+                // misal: 'CrLabelPackingBJ' atau 'CrLabelBarangJadi'
                 await pdfService.printReport80mm(
                   context: rootCtx,
-                  reportName:
-                  'CrLabelFurnitureWIP', // ganti kalau namanya beda
-                  query: {'NoFurnitureWIP': header.noFurnitureWip},
-                  // system: 'pps',
-                  // saveNameHint: 'Label_${header.noFurnitureWip}.pdf',
+                  reportName: 'CrLabelBarangJadi',
+                  query: {'NoBJ': header.noBJ},
+                  // saveNameHint: 'Label_${header.noBJ}.pdf',
                 );
               }),
             ),

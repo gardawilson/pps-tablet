@@ -1,34 +1,32 @@
-// lib/features/furniture_wip/widgets/furniture_wip_header_table.dart
-
 import 'package:flutter/material.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 
 import '../../../../common/widgets/horizontal_paged_table.dart';
 import '../../../../common/widgets/table_column_spec.dart';
-import '../model/furniture_wip_header_model.dart';
+import '../model/packing_header_model.dart';
 import '../../../../core/utils/date_formatter.dart';
 
-class FurnitureWipHeaderTable extends StatelessWidget {
+class PackingHeaderTable extends StatelessWidget {
   /// Paging controller (dipegang di ViewModel / Screen)
-  final PagingController<int, FurnitureWipHeader> pagingController;
+  final PagingController<int, PackingHeader> pagingController;
 
-  /// NoFurnitureWIP yang sedang selected (untuk highlight row)
-  final String? selectedNoFurnitureWip;
+  /// NoBJ yang sedang selected (untuk highlight row)
+  final String? selectedNoBJ;
 
   /// Tap biasa pada row
-  final ValueChanged<FurnitureWipHeader>? onItemTap;
+  final ValueChanged<PackingHeader>? onItemTap;
 
   /// Long-press (dengan posisi global) – untuk context menu / popover row
-  final void Function(FurnitureWipHeader header, Offset globalPosition)?
+  final void Function(PackingHeader header, Offset globalPosition)?
   onItemLongPress;
 
   /// Callback saat row partial diklik (tanpa posisi tap)
-  final ValueChanged<FurnitureWipHeader>? onPartialTap;
+  final ValueChanged<PackingHeader>? onPartialTap;
 
-  const FurnitureWipHeaderTable({
+  const PackingHeaderTable({
     super.key,
     required this.pagingController,
-    this.selectedNoFurnitureWip,
+    this.selectedNoBJ,
     this.onItemTap,
     this.onItemLongPress,
     this.onPartialTap,
@@ -36,13 +34,13 @@ class FurnitureWipHeaderTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return HorizontalPagedTable<FurnitureWipHeader>(
+    return HorizontalPagedTable<PackingHeader>(
       pagingController: pagingController,
       widthMode: TableWidthMode.content, // atau fill/clamp sesuai selera
       rowHeight: 52,
       headerColor: const Color(0xFF1565C0),
       horizontalPadding: 16,
-      selectedPredicate: (row) => row.noFurnitureWip == selectedNoFurnitureWip,
+      selectedPredicate: (row) => row.noBJ == selectedNoBJ,
       onRowTap: (row) {
         // callback utama ke Screen
         onItemTap?.call(row);
@@ -59,12 +57,12 @@ class FurnitureWipHeaderTable extends StatelessWidget {
     );
   }
 
-  List<TableColumnSpec<FurnitureWipHeader>> _buildColumns() {
+  List<TableColumnSpec<PackingHeader>> _buildColumns() {
     return [
       // =========================
-      // NO. FURNITURE WIP
+      // NO. BJ (NO. LABEL)
       // =========================
-      TableColumnSpec<FurnitureWipHeader>(
+      TableColumnSpec<PackingHeader>(
         title: 'NO. LABEL',
         width: 170,
         headerAlign: TextAlign.left,
@@ -75,7 +73,7 @@ class FurnitureWipHeaderTable extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  item.noFurnitureWip,
+                  item.noBJ,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -99,7 +97,7 @@ class FurnitureWipHeaderTable extends StatelessWidget {
       // =========================
       // TANGGAL
       // =========================
-      TableColumnSpec<FurnitureWipHeader>(
+      TableColumnSpec<PackingHeader>(
         title: 'TANGGAL',
         width: 130,
         headerAlign: TextAlign.left,
@@ -114,16 +112,16 @@ class FurnitureWipHeaderTable extends StatelessWidget {
       ),
 
       // =========================
-      // JENIS (NamaFurnitureWIP)
+      // JENIS (NamaBJ)
       // =========================
-      TableColumnSpec<FurnitureWipHeader>(
+      TableColumnSpec<PackingHeader>(
         title: 'JENIS',
         width: 350,
         headerAlign: TextAlign.left,
         cellAlign: TextAlign.left,
         cellBuilder: (context, item) {
           return Text(
-            item.namaFurnitureWip ?? '-',
+            item.namaBJ ?? '-',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           );
@@ -131,9 +129,9 @@ class FurnitureWipHeaderTable extends StatelessWidget {
       ),
 
       // =========================
-      // OUTPUT (Kode + Nama Mesin/Pembeli/Bongkar)
+      // PROSES (Kode + Nama Mesin/Pembeli/Bongkar)
       // =========================
-      TableColumnSpec<FurnitureWipHeader>(
+      TableColumnSpec<PackingHeader>(
         title: 'PROSES',
         width: 170,
         headerAlign: TextAlign.left,
@@ -175,7 +173,7 @@ class FurnitureWipHeaderTable extends StatelessWidget {
       // =========================
       // PCS (right-align)
       // =========================
-      TableColumnSpec<FurnitureWipHeader>(
+      TableColumnSpec<PackingHeader>(
         title: 'PCS',
         width: 80,
         headerAlign: TextAlign.right,
@@ -187,8 +185,7 @@ class FurnitureWipHeaderTable extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontWeight:
-              item.isPartialBool ? FontWeight.bold : FontWeight.w500,
+              fontWeight: item.isPartialBool ? FontWeight.bold : FontWeight.w500,
               color: item.isPartialBool ? Colors.red : null,
             ),
           );
@@ -198,7 +195,7 @@ class FurnitureWipHeaderTable extends StatelessWidget {
       // =========================
       // BERAT (right-align)
       // =========================
-      TableColumnSpec<FurnitureWipHeader>(
+      TableColumnSpec<PackingHeader>(
         title: 'BERAT',
         width: 100,
         headerAlign: TextAlign.right,
@@ -214,9 +211,9 @@ class FurnitureWipHeaderTable extends StatelessWidget {
       ),
 
       // =========================
-      // LOKASI (center-align biar rapi)
+      // LOKASI (center-align)
       // =========================
-      TableColumnSpec<FurnitureWipHeader>(
+      TableColumnSpec<PackingHeader>(
         title: 'LOKASI',
         width: 110,
         headerAlign: TextAlign.center,

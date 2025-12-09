@@ -1,4 +1,4 @@
-// lib/features/gilingan/widgets/furniture_wip_action_bar.dart
+// lib/features/gilingan/widgets/packing_action_bar.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';

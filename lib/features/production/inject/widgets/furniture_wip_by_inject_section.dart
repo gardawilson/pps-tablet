@@ -49,15 +49,14 @@ class _FurnitureWipByInjectSectionState
     final vm = context.read<InjectProductionViewModel>();
     final noProd = widget.noProduksi?.trim();
 
+    // Kalau NoProduksi kosong → kosongkan state di VM
     if (noProd == null || noProd.isEmpty) {
-      vm.furnitureWipItems = [];
-      vm.furnitureWipError = '';
-      vm.isLoadingFurnitureWip = false;
-      vm.notifyListeners();
+      vm.clearFurnitureWip();
       _lastNoProduksi = null;
       return;
     }
 
+    // NoProduksi sama dengan sebelumnya → tidak usah fetch ulang
     if (_lastNoProduksi == noProd) return;
 
     _lastNoProduksi = noProd;
@@ -70,7 +69,7 @@ class _FurnitureWipByInjectSectionState
       builder: (context, vm, _) {
         final bool isLoading = vm.isLoadingFurnitureWip;
         final String error = vm.furnitureWipError;
-        final List<FurnitureWipByInjectProduction> items = vm.furnitureWipItems;
+        final List<FurnitureWipByInjectItem> items = vm.furnitureWipItems;
 
         return Container(
           margin: const EdgeInsets.symmetric(vertical: 8),
@@ -100,7 +99,10 @@ class _FurnitureWipByInjectSectionState
                   ),
                   if (items.isNotEmpty && !isLoading && error.isEmpty)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.blue.shade50,
                         borderRadius: BorderRadius.circular(12),
@@ -118,15 +120,20 @@ class _FurnitureWipByInjectSectionState
               ),
               const SizedBox(height: 12),
 
-              // Content
-              if (widget.noProduksi == null || widget.noProduksi!.trim().isEmpty)
-                _buildEmptyMessage('Pilih proses inject untuk melihat furniture WIP')
+              // Content (TANPA berat, hanya jenis)
+              if (widget.noProduksi == null ||
+                  widget.noProduksi!.trim().isEmpty)
+                _buildEmptyMessage(
+                  'Pilih proses inject untuk melihat furniture WIP',
+                )
               else if (isLoading)
                 _buildLoadingIndicator()
               else if (error.isNotEmpty)
                   _buildErrorMessage(error)
                 else if (items.isEmpty)
-                    _buildEmptyMessage('Tidak ada furniture WIP untuk NoProduksi ${widget.noProduksi}')
+                    _buildEmptyMessage(
+                      'Tidak ada furniture WIP untuk NoProduksi ${widget.noProduksi}',
+                    )
                   else
                     _buildFurnitureChips(items),
             ],
@@ -146,7 +153,9 @@ class _FurnitureWipByInjectSectionState
             height: 16,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.grey.shade600),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                Colors.grey.shade600,
+              ),
             ),
           ),
           const SizedBox(width: 10),
@@ -186,7 +195,7 @@ class _FurnitureWipByInjectSectionState
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            child: Text(
+            child: const Text(
               'Coba Lagi',
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
             ),
@@ -210,7 +219,7 @@ class _FurnitureWipByInjectSectionState
     );
   }
 
-  Widget _buildFurnitureChips(List<FurnitureWipByInjectProduction> items) {
+  Widget _buildFurnitureChips(List<FurnitureWipByInjectItem> items) {
     return Wrap(
       spacing: 8,
       runSpacing: 8,

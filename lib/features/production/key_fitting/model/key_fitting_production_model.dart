@@ -1,4 +1,4 @@
-// lib/features/shared/key_fitting_production/model/hot_stamp_production_model.dart
+// lib/features/shared/key_fitting_production/model/packing_production_model.dart
 
 class KeyFittingProduction {
   final String noProduksi;

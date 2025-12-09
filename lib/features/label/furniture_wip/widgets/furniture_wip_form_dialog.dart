@@ -13,6 +13,7 @@ import '../../../../common/widgets/app_date_field.dart';
 import '../../../production/hot_stamp/model/hot_stamp_production_model.dart';
 import '../../../production/hot_stamp/widgets/hot_stamp_production_dropdown.dart';
 import '../../../production/inject/model/inject_production_model.dart';
+import '../../../production/inject/view_model/inject_production_view_model.dart';
 import '../../../production/inject/widgets/furniture_wip_by_inject_section.dart';
 import '../../../production/inject/widgets/inject_production_dropdown.dart';
 
@@ -32,8 +33,6 @@ import 'furniture_wip_text_field.dart';
 // Jenis Furniture WIP
 import '../../../furniture_wip_type/model/furniture_wip_type_model.dart';
 import '../../../furniture_wip_type/widgets/furniture_wip_type_dropdown.dart';
-
-// Section display Furniture WIP by Inject
 
 class FurnitureWipFormDialog extends StatefulWidget {
   final FurnitureWipHeader? header;
@@ -100,9 +99,26 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
   String? _spannerError;
   String? _injectError;
 
+  bool get isEdit => widget.header != null;
+
   @override
   void initState() {
     super.initState();
+
+    // 🔹 Untuk CREATE/EDIT: handle cache inject
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      if (isEdit) {
+        // 🔹 EDIT mode inject: load data inject untuk auto-calc
+        if (_selectedMode == FurnitureWipInputMode.inject && _preInjectNoProduksi != null) {
+          _reloadInjectFurnitureWipAndRecalc();
+        }
+      } else {
+        // 🔹 CREATE mode: reset cache
+        context.read<InjectProductionViewModel>().clearFurnitureWip();
+      }
+    });
 
     noFurnitureWipCtrl = TextEditingController(
       text: widget.header?.noFurnitureWip ?? '',
@@ -133,6 +149,9 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
           : '',
     );
 
+    // 🔹 Listener untuk auto-hitungan berat saat PCS berubah (create + edit inject)
+    pcsCtrl.addListener(_onPcsChanged);
+
     // 🔹 Untuk EDIT: preselect dropdown berdasarkan OutputCode / OutputType
     if (isEdit && widget.header != null) {
       final code = (widget.header!.outputCode ?? '').trim();
@@ -154,7 +173,7 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
         } else if (type == 'RETUR' || code.startsWith('L.')) {
           _selectedMode = FurnitureWipInputMode.retur;
           _preReturNoRetur = code;
-          _preReturNamaPembeli = nama; // NamaPembeli
+          _preReturNamaPembeli = nama;
         } else if (type == 'SPANNER' || code.startsWith('BJ.')) {
           _selectedMode = FurnitureWipInputMode.spanner;
           _preSpannerNoProduksi = code;
@@ -170,6 +189,7 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
 
   @override
   void dispose() {
+    pcsCtrl.removeListener(_onPcsChanged);
     noFurnitureWipCtrl.dispose();
     dateCreatedCtrl.dispose();
     pcsCtrl.dispose();
@@ -177,7 +197,62 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
     super.dispose();
   }
 
-  bool get isEdit => widget.header != null;
+  Future<void> _reloadInjectFurnitureWipAndRecalc() async {
+    if (!mounted) return;
+    // 🔹 Auto-calc jalan untuk CREATE & EDIT
+    if (_selectedMode != FurnitureWipInputMode.inject) return;
+
+    final noProd = _selectedInject?.noProduksi ?? _preInjectNoProduksi;
+    if (noProd == null || noProd.trim().isEmpty) return;
+
+    final injectVm = context.read<InjectProductionViewModel>();
+
+    try {
+      // 🔹 Ambil ulang data furniture wip (berat + list) untuk Inject terpilih
+      await injectVm.fetchFurnitureWipByInjectProduction(noProd);
+    } catch (e) {
+      // optional: log atau dialog
+      // print('Error fetch furniture wip for inject: $e');
+    }
+
+    // 🔹 Setelah beratProdukHasilTimbang di VM update, hitung ulang berat
+    _onPcsChanged();
+  }
+
+  /// Listener: kalau mode = Inject, berat = PCS / BeratProdukHasilTimbang (Inject)
+  void _onPcsChanged() {
+    if (!mounted) return;
+
+    // 🔹 Aktif untuk CREATE DAN EDIT mode inject
+    final bool isInjectMode = _selectedMode == FurnitureWipInputMode.inject;
+    if (!isInjectMode) return;
+
+    final injectVm = context.read<InjectProductionViewModel>();
+    final totalBerat = injectVm.furnitureWipBeratProdukHasilTimbang;
+
+    if (totalBerat == null || totalBerat <= 0) {
+      // Tidak bisa hitung kalau berat total tidak ada / 0
+      return;
+    }
+
+    final raw = pcsCtrl.text.trim().replaceAll(',', '.');
+    if (raw.isEmpty) {
+      if (beratCtrl.text.isNotEmpty) {
+        beratCtrl.text = '';
+      }
+      return;
+    }
+
+    final pcs = double.tryParse(raw);
+    if (pcs == null) return;
+
+    final berat = (pcs / 1000) * totalBerat;
+    final text = berat.toStringAsFixed(2);
+
+    if (beratCtrl.text != text) {
+      beratCtrl.text = text;
+    }
+  }
 
   void _selectMode(FurnitureWipInputMode m) {
     setState(() {
@@ -196,6 +271,9 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
       _spannerError = null;
       _injectError = null;
     });
+
+    // Recalc berat kalau sudah ada PCS & data inject
+    _onPcsChanged();
   }
 
   Future<void> _submit() async {
@@ -372,6 +450,34 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
           return;
         }
 
+        // 🔹 VALIDASI untuk mode INJECT (CREATE & EDIT)
+        if (isInjectCreate || (isEdit && _selectedMode == FurnitureWipInputMode.inject)) {
+          final injectVm = context.read<InjectProductionViewModel>();
+          final totalBerat = injectVm.furnitureWipBeratProdukHasilTimbang;
+
+          if (totalBerat == null || totalBerat <= 0) {
+            DialogService.instance.showError(
+              title: 'DATA INJECT TIDAK LENGKAP',
+              message:
+              'Berat produk hasil timbang dari Inject belum tersedia atau 0.\n'
+                  'Pastikan data Inject sudah lengkap sebelum menyimpan Furniture WIP.',
+            );
+            return;
+          }
+
+          if (pcsVal == null || pcsVal <= 0) {
+            DialogService.instance.showError(
+              title: 'PCS TIDAK VALID',
+              message:
+              'PCS wajib diisi dan harus lebih besar dari 0 untuk perhitungan berat otomatis.',
+            );
+            return;
+          }
+
+          // 🔹 TIDAK PERLU HITUNG ULANG
+          // beratVal sudah correct dari beratCtrl.text (hasil _onPcsChanged)
+        }
+
         DialogService.instance.showLoading(message: 'Membuat label...');
 
         final res = await vm.createFromForm(
@@ -505,7 +611,6 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -582,6 +687,9 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
 
     final isInjectMode = _selectedMode == FurnitureWipInputMode.inject;
     final isCreateInjectMode = !isEdit && isInjectMode;
+
+    // 🔹 Field berat auto (disabled) untuk CREATE DAN EDIT inject
+    final bool isBeratAuto = _selectedMode == FurnitureWipInputMode.inject;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -685,6 +793,8 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
                                   _selectedInject = ip;
                                   _injectError = null;
                                 });
+                                // 🔹 Fetch furniture wip baru untuk Inject terpilih + recalc berat
+                                _reloadInjectFurnitureWipAndRecalc();
                               }
                                   : null,
                             ),
@@ -983,12 +1093,7 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
                   validator: (v) {
                     // Di CREATE Inject, dropdown tidak dipakai (kita sudah di branch lain)
                     // Di EDIT Inject, boleh saja kosong, biar backend pakai yang lama.
-                    if (_selectedMode == FurnitureWipInputMode.inject &&
-                        !isEdit) {
-                      return null;
-                    }
-                    if (_selectedMode == FurnitureWipInputMode.inject &&
-                        isEdit) {
+                    if (_selectedMode == FurnitureWipInputMode.inject) {
                       return null;
                     }
                     return v == null
@@ -1049,6 +1154,7 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
                     child: SizedBox(
                       child: TextFormField(
                         controller: beratCtrl,
+                        enabled: !isBeratAuto, // 🔹 disable saat mode INJECT
                         keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
                         inputFormatters: [
@@ -1058,7 +1164,7 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
                         ],
                         decoration: InputDecoration(
                           labelText: 'Berat (kg)',
-                          hintText: '0',
+                          hintText: isBeratAuto ? 'Auto dari PCS & Inject' : '0',
                           prefixIcon:
                           const Icon(Icons.monitor_weight_outlined),
                           suffixText: 'kg',
@@ -1068,6 +1174,10 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
                           isDense: true,
                         ),
                         validator: (val) {
+                          if (isBeratAuto) {
+                            // auto-calc, tidak perlu validasi manual
+                            return null;
+                          }
                           final raw = (val ?? '').trim();
                           if (raw.isEmpty) return null; // optional
                           final s = raw.replaceAll(',', '.');

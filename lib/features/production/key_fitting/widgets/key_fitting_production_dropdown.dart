@@ -1,4 +1,4 @@
-// lib/features/shared/key_fitting_production/widgets/hot_stamp_production_dropdown.dart
+// lib/features/shared/key_fitting_production/widgets/packing_production_dropdown.dart
 
 import 'package:flutter/material.dart';
 import 'package:flutter_vector_icons/flutter_vector_icons.dart';

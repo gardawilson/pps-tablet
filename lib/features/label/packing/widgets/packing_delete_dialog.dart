@@ -1,26 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:pps_tablet/core/utils/date_formatter.dart';
 
-import '../model/furniture_wip_header_model.dart';
+import '../model/packing_header_model.dart';
 
-class FurnitureWipDeleteDialog extends StatefulWidget {
-  final FurnitureWipHeader header;
+class PackingDeleteDialog extends StatefulWidget {
+  final PackingHeader header;
 
   /// Parent yang menutup dialog; widget ini TIDAK memanggil Navigator.pop.
   final Future<void> Function() onConfirm;
 
-  const FurnitureWipDeleteDialog({
+  const PackingDeleteDialog({
     super.key,
     required this.header,
     required this.onConfirm,
   });
 
   @override
-  State<FurnitureWipDeleteDialog> createState() =>
-      _FurnitureWipDeleteDialogState();
+  State<PackingDeleteDialog> createState() => _PackingDeleteDialogState();
 }
 
-class _FurnitureWipDeleteDialogState extends State<FurnitureWipDeleteDialog> {
+class _PackingDeleteDialogState extends State<PackingDeleteDialog> {
   bool _agree = false;
   bool _submitting = false;
 
@@ -47,14 +46,13 @@ class _FurnitureWipDeleteDialogState extends State<FurnitureWipDeleteDialog> {
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: cs.outlineVariant),
             ),
-            padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _InfoRow(
-                  label: 'No. Furniture WIP',
-                  value: widget.header.noFurnitureWip,
+                  label: 'No. BJ',
+                  value: widget.header.noBJ,
                 ),
                 const SizedBox(height: 6),
                 if (widget.header.dateCreate.isNotEmpty) ...[
@@ -119,7 +117,7 @@ class _FurnitureWipDeleteDialogState extends State<FurnitureWipDeleteDialog> {
               : () async {
             setState(() => _submitting = true);
             try {
-              await widget.onConfirm(); // parent closes the dialog
+              await widget.onConfirm(); // parent yang menutup dialog
             } finally {
               if (mounted) setState(() => _submitting = false);
             }
@@ -140,8 +138,8 @@ class _FurnitureWipDeleteDialogState extends State<FurnitureWipDeleteDialog> {
             foregroundColor: cs.onError,
             disabledBackgroundColor: cs.error.withOpacity(.4),
             disabledForegroundColor: cs.onError.withOpacity(.8),
-            padding: const EdgeInsets.symmetric(
-                horizontal: 18, vertical: 12),
+            padding:
+            const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
             ),
@@ -164,8 +162,7 @@ class _WarningBanner extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius:
-        const BorderRadius.vertical(top: Radius.circular(14)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
       ),
       padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
       child: Row(
@@ -206,7 +203,7 @@ class _InfoRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: 140, // sedikit lebih lebar
+          width: 140,
           child: Text(
             label,
             style: TextStyle(

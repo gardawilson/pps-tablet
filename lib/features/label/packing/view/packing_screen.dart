@@ -1,4 +1,4 @@
-// lib/features/packing/view/packing_screen.dart
+// lib/features/packing/view/reject_screen.dart
 
 import 'dart:async';
 import 'package:flutter/material.dart';

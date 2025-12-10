@@ -1,4 +1,4 @@
-// lib/features/furniture_wip/model/packing_partial_model.dart
+// lib/features/furniture_wip/model/reject_partial_model.dart
 
 class FurnitureWipPartialInfo {
   /// Total PCS partial (unique per NoFurnitureWIPPartial),

@@ -1,4 +1,4 @@
-// lib/features/packing_type/repository/packing_type_repository.dart
+// lib/features/packing_type/repository/reject_type_repository.dart
 
 import '../../../../core/network/api_client.dart';
 import '../model/packing_type_model.dart';

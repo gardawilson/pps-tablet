@@ -1,4 +1,4 @@
-// lib/features/furniture_wip/view/packing_screen.dart
+// lib/features/furniture_wip/view/reject_screen.dart
 
 import 'dart:async';
 import 'package:flutter/material.dart';

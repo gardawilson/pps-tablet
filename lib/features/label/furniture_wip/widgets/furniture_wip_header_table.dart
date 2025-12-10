@@ -1,4 +1,4 @@
-// lib/features/furniture_wip/widgets/packing_header_table.dart
+// lib/features/furniture_wip/widgets/reject_header_table.dart
 
 import 'package:flutter/material.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';

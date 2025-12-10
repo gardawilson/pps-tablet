@@ -1,4 +1,4 @@
-// lib/features/gilingan/model/packing_header_model.dart
+// lib/features/gilingan/model/reject_header_model.dart
 
 class GilinganHeader {
   // Core

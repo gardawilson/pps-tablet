@@ -1,4 +1,4 @@
-// lib/features/furniture_wip/model/packing_header_model.dart
+// lib/features/furniture_wip/model/reject_header_model.dart
 
 class FurnitureWipHeader {
   // Core

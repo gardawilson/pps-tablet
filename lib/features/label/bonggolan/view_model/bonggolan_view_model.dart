@@ -1,4 +1,4 @@
-// lib/features/bonggolan/view_model/packing_view_model.dart
+// lib/features/bonggolan/view_model/reject_view_model.dart
 import 'package:flutter/material.dart';
 import '../model/bonggolan_header_model.dart';
 import '../repository/bonggolan_repository.dart';

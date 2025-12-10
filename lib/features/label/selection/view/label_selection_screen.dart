@@ -122,6 +122,18 @@ class LabelSelectionScreen extends StatelessWidget {
                 ? () => Navigator.pushNamed(context, '/label/packing')
                 : null,
           ),
+
+          // 🔹 Card Label Reject
+          _buildLabelCard(
+            context,
+            title: 'Label Reject',
+            subtitle: 'Buat label untuk proses Reject',
+            icon: Icons.label,
+            enabled: canReadBroker,
+            onTap: canReadBroker
+                ? () => Navigator.pushNamed(context, '/label/reject')
+                : null,
+          ),
         ],
       ),
     );

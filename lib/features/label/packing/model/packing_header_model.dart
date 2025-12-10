@@ -1,4 +1,4 @@
-// lib/features/packing/model/packing_header_model.dart
+// lib/features/packing/model/reject_header_model.dart
 
 class PackingHeader {
   // Core

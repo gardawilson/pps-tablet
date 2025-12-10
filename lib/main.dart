@@ -26,6 +26,9 @@ import 'package:pps_tablet/features/label/mixer/view_model/mixer_view_model.dart
 import 'package:pps_tablet/features/label/packing/repository/packing_repository.dart';
 import 'package:pps_tablet/features/label/packing/view/packing_screen.dart';
 import 'package:pps_tablet/features/label/packing/view_model/packing_view_model.dart';
+import 'package:pps_tablet/features/label/reject/repository/reject_repository.dart';
+import 'package:pps_tablet/features/label/reject/view/reject_screen.dart';
+import 'package:pps_tablet/features/label/reject/view_model/reject_view_model.dart';
 import 'package:pps_tablet/features/mesin/repository/mesin_repository.dart';
 import 'package:pps_tablet/features/mesin/view_model/mesin_view_model.dart';
 import 'package:pps_tablet/features/mixer_type/repository/mixer_type_repository.dart';
@@ -57,11 +60,16 @@ import 'package:pps_tablet/features/production/packing/view_model/packing_produc
 import 'package:pps_tablet/features/production/return/repository/return_production_repository.dart';
 import 'package:pps_tablet/features/production/return/view_model/return_production_view_model.dart';
 import 'package:pps_tablet/features/production/selection/view/production_selection_screen.dart';
+import 'package:pps_tablet/features/production/sortir_reject/model/sortir_reject_production_model.dart';
+import 'package:pps_tablet/features/production/sortir_reject/repository/sortir_reject_production_repository.dart';
+import 'package:pps_tablet/features/production/sortir_reject/view_model/sortir_reject_production_view_model.dart';
 import 'package:pps_tablet/features/production/spanner/repository/spanner_production_repository.dart';
 import 'package:pps_tablet/features/production/spanner/view_model/spanner_production_view_model.dart';
 import 'package:pps_tablet/features/production/washing/repository/washing_production_input_repository.dart';
 import 'package:pps_tablet/features/production/washing/view/washing_production_screen.dart';
 import 'package:pps_tablet/features/production/washing/view_model/washing_production_input_view_model.dart';
+import 'package:pps_tablet/features/reject_type/repository/reject_type_repository.dart';
+import 'package:pps_tablet/features/reject_type/view_model/packing_type_view_model.dart';
 import 'package:pps_tablet/features/shared/bongkar_susun/bongkar_susun_repository.dart';
 import 'package:pps_tablet/features/shared/bongkar_susun/bongkar_susun_view_model.dart';
 import 'package:pps_tablet/features/production/broker/repository/broker_production_repository.dart';
@@ -258,6 +266,32 @@ class MyApp extends StatelessWidget {
         ),
 
 
+        ChangeNotifierProvider<RejectViewModel>(
+          create: (ctx) => RejectViewModel(
+            repository: RejectRepository(
+              api: ctx.read<ApiClient>(),
+            ),
+          ),
+        ),
+
+
+        ChangeNotifierProvider<RejectTypeViewModel>(
+          create: (ctx) => RejectTypeViewModel(
+            repository: RejectTypeRepository(
+              api: ctx.read<ApiClient>(),
+            ),
+          ),
+        ),
+
+
+        ChangeNotifierProvider<SortirRejectProductionViewModel>(
+          create: (ctx) => SortirRejectProductionViewModel(
+            repository: SortirRejectProductionRepository(
+              api: ctx.read<ApiClient>(),
+            ),
+          ),
+        ),
+
       ],
       child: MaterialApp(
         title: 'PPS Tablet',
@@ -327,6 +361,7 @@ class MyApp extends StatelessWidget {
           '/production/broker': (context) => BrokerProductionScreen(),
           '/production/crusher': (context) => CrusherProductionScreen(),
           '/label/packing': (context) => PackingScreen(),
+          '/label/reject': (context) => RejectScreen(),
 
         },
       ),

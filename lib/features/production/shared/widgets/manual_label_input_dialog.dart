@@ -51,7 +51,7 @@ class _ManualLabelInputDialogState extends State<ManualLabelInputDialog> {
 
   // B.1234567890 atau BF.1234567890, dll
   static final RegExp _regexOther =
-  RegExp(r'^(?:D|B|F|V|H|BF)\.[0-9]{10}$');
+  RegExp(r'^(?:D|B|F|M|V|H|BF|BB|BA)\.[0-9]{10}$');
 
   @override
   void initState() {
@@ -79,7 +79,7 @@ class _ManualLabelInputDialogState extends State<ManualLabelInputDialog> {
       return null;
     }
 
-    // prefix lain: D, B, F, V, H, BF
+    // prefix lain: D, B, F, M, V, H, BF, BB, BA
     if (!_regexOther.hasMatch(v)) {
       return 'Format tidak valid';
     }

@@ -12,8 +12,11 @@ import 'widgets/list_sections/ascend_item_section.dart';
 class StockOpnameAscendDetailScreen extends StatefulWidget {
   final String noSO;
   final String tgl;
+  final List<int> idWarehouses;
 
-  const StockOpnameAscendDetailScreen({super.key, required this.noSO, required this.tgl});
+
+  const StockOpnameAscendDetailScreen({super.key, required this.noSO, required this.tgl, required this.idWarehouses,
+  });
 
   @override
   State<StockOpnameAscendDetailScreen> createState() => _StockOpnameAscendDetailScreenState();
@@ -30,6 +33,8 @@ class _StockOpnameAscendDetailScreenState extends State<StockOpnameAscendDetailS
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      debugPrint("ASCEND DETAIL → noSO=${widget.noSO}, idWarehouses=${widget.idWarehouses}");
+
       context.read<StockOpnameFamilyViewModel>().fetchFamilies(widget.noSO);
     });
   }
@@ -109,6 +114,8 @@ class _StockOpnameAscendDetailScreenState extends State<StockOpnameAscendDetailS
                   AscendItemSection(
                     noSO: widget.noSO,
                     tgl: widget.tgl,
+                    idWarehouses: widget.idWarehouses,
+
                     qtyFoundControllers: _qtyFoundControllers,
                     remarkControllers: _remarkControllers,
                   ),

@@ -6,7 +6,7 @@ class ApiConstants {
 
 
   static String get changePassword => '$baseUrl/api/change-password';
-  static String get login => '$baseUrl/api/auth/login';
+  static String get login => '$baseUrl/api/auth/login2';
   static String get checkLabel => '$baseUrl/api/label-list/check';
   static String get saveChanges => '$baseUrl/api/label-list/save-changes';
   static String get listNoSO => '$baseUrl/api/no-stock-opname';
@@ -116,8 +116,15 @@ class ApiConstants {
   static String noStockOpnameAscendItems(String noSO, int familyID, {String keyword = ''}) =>
       '$baseUrl/api/no-stock-opname/$noSO/families/$familyID/ascend?keyword=$keyword';
 
-  static String noStockOpnameUsage(int itemID, String tglSO) =>
-      '$baseUrl/api/no-stock-opname/$itemID/usage?tglSO=$tglSO';
+  static Uri noStockOpnameUsage(int itemID, String tglSO, String wids) {
+    // ✅ pastikan aman untuk URL (kalau ada spasi, dll)
+    final safeTgl = Uri.encodeComponent(tglSO);
+    final safeWids = Uri.encodeComponent(wids);
+
+    final url = '$baseUrl/api/no-stock-opname/$itemID/usage/$safeTgl/$safeWids';
+    return Uri.parse(url);
+  }
+
 
   static String noStockOpnameSave(String noSO) =>
       '$baseUrl/api/no-stock-opname/$noSO/ascend/hasil';

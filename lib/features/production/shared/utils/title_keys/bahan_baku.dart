@@ -1,5 +1,6 @@
-import '../../../broker/model/broker_inputs_model.dart'; // atau arahkan ke model yang benar jika shared model terpisah
 
+
+import '../../models/bb_item.dart';
 
 String bbTitleKey(BbItem e) {
   if (e.isPartialRow) {

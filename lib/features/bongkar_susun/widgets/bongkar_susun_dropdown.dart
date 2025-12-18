@@ -3,9 +3,9 @@ import 'package:flutter_vector_icons/flutter_vector_icons.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:provider/provider.dart';
 
-import './bongkar_susun_view_model.dart';
-import './bongkar_susun_model.dart';
-import '../../../common/widgets/dropdown_field.dart';
+import '../view_model/bongkar_susun_view_model.dart';
+import '../model/bongkar_susun_model.dart';
+import '../../../../common/widgets/dropdown_field.dart';
 
 class BongkarSusunDropdown extends StatefulWidget {
   final String? preselectNoBongkarSusun;
@@ -132,7 +132,7 @@ class _BongkarSusunDropdownState extends State<BongkarSusunDropdown> {
           fieldHeight: 40,
           value: safeValue,
           items: vm.items,                          // <— langsung list of T
-          itemAsString: (e) => e.noBongkarSusun,    // <— tampilkan teks
+          itemAsString: (e) => e.displayText,    // <— tampilkan teks
           enabled: widget.enabled,
 
           isLoading: vm.isLoading,

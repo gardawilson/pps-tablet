@@ -1,5 +1,6 @@
 // features/production/shared/utils/title_keys/reject.dart
-import '../../../broker/model/broker_inputs_model.dart';
+
+import '../../models/reject_item.dart';
 
 String rejectTitleKey(RejectItem e) {
   if (e.isPartialRow) {

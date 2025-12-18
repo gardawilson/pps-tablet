@@ -7,6 +7,7 @@ import 'package:pps_tablet/features/crusher_type/widgets/crusher_type_dropdown.d
 import 'package:pps_tablet/features/production/crusher/widgets/crusher_production_dropdown.dart';
 import 'package:provider/provider.dart';
 
+import '../../../bongkar_susun/widgets/bongkar_susun_dropdown.dart';
 import '../../../crusher_type/model/crusher_type_model.dart';
 import 'crusher_text_field.dart';
 import '../../../../core/services/dialog_service.dart';
@@ -18,7 +19,6 @@ import 'package:pps_tablet/features/jenis_bonggolan/widgets/jenis_bonggolan_drop
 
 import '../../../production/broker/widgets/broker_production_dropdown.dart';
 import 'package:pps_tablet/features/production/inject/widgets/inject_production_dropdown.dart';
-import '../../../shared/bongkar_susun/bongkar_susun_dropdown.dart';
 
 import '../model/crusher_header_model.dart';
 import '../view_model/crusher_view_model.dart';

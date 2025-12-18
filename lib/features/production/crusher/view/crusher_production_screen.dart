@@ -333,7 +333,6 @@ class _CrusherProductionScreenState extends State<CrusherProductionScreen> {
           try {
             // await vm.createProduksi(draft);
             if (context.mounted) {
-              Navigator.of(context).pop(true); // signal success to caller
             }
           } catch (e) {
             // optional: show error
@@ -363,10 +362,6 @@ class _CrusherProductionScreenState extends State<CrusherProductionScreen> {
       barrierDismissible: false,
       builder: (ctx) => CrusherProductionFormDialog(
         header: row, // ← send current values here
-        onSave: (v) {
-          // return the saved/updated item to this screen
-          Navigator.of(ctx).pop(v);
-        },
       ),
     );
 

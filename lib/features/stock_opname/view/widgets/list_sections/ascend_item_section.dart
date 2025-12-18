@@ -5,6 +5,7 @@ import '../../../view_model/stock_opname_ascend_view_model.dart';
 class AscendItemSection extends StatelessWidget {
   final String noSO;
   final String tgl;
+  final List<int> idWarehouses;
   final Map<int, TextEditingController> qtyFoundControllers;
   final Map<int, TextEditingController> remarkControllers;
 
@@ -12,6 +13,7 @@ class AscendItemSection extends StatelessWidget {
     super.key,
     required this.noSO,
     required this.tgl,
+    required this.idWarehouses,
     required this.qtyFoundControllers,
     required this.remarkControllers,
   });
@@ -309,13 +311,11 @@ class AscendItemSection extends StatelessWidget {
                                         vm.resetQtyUsage(item.itemID);
                                       } else {
                                         if (!item.isUpdateUsage) {
-                                          debugPrint("QtyUsage LOG → fetch dipanggil, itemID=${item.itemID}, tgl=$tgl");
-                                          await vm.fetchQtyUsage(item.itemID, tgl);
+                                          debugPrint("QtyUsage LOG → fetch dipanggil, itemID=${item.itemID}, tgl=$tgl, idwarehouses=$idWarehouses");
+                                          await vm.fetchQtyUsage(item.itemID, tgl, idWarehouses);
                                         }
                                       }
                                     },
-
-
                                   ),
                                 ),
                               ),

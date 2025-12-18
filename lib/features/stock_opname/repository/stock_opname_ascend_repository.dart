@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/network/endpoints.dart';
 import '../../../../core/services/token_storage.dart';
@@ -26,19 +27,36 @@ class StockOpnameAscendRepository {
     throw Exception('Gagal mengambil data ascend (status: ${response.statusCode})');
   }
 
-  // 🔹 Fetch QtyUsage
-  Future<double> fetchQtyUsage(int itemID, String tglSO) async {
-    final token = await TokenStorage.getToken();
-    final url = Uri.parse(ApiConstants.noStockOpnameUsage(itemID, tglSO));
+// 🔹 Fetch QtyUsage
+// Tambahkan parameter String wids
+  Future<double> fetchQtyUsage(int itemID, String tglSO, List<int> idWarehouses) async {
+    final wids = idWarehouses.where((e) => e > 0).join(',');
+    if (wids.isEmpty) throw Exception('wids kosong');
 
-    final response = await http.get(url, headers: {'Authorization': 'Bearer $token'});
+    final token = await TokenStorage.getToken();
+    final url = ApiConstants.noStockOpnameUsage(itemID, tglSO, wids);
+
+    debugPrint("QtyUsage LOG → REQUEST URL: ${url.toString()}"); // ✅ ini
+
+    final response = await http.get(
+      url,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    debugPrint("QtyUsage LOG → RESPONSE: ${response.statusCode} ${response.reasonPhrase}");
+    // optional: debugPrint("QtyUsage LOG → BODY: ${response.body}");
 
     if (response.statusCode == 200) {
       final body = json.decode(response.body);
       return (body['qtyUsage'] as num?)?.toDouble() ?? 0.0;
+    } else {
+      final errorBody = json.decode(response.body);
+      final errorMessage = errorBody['message'] ?? 'Gagal ambil usage';
+      throw Exception('Gagal ambil usage (status: ${response.statusCode}, pesan: $errorMessage)');
     }
-    throw Exception('Gagal ambil usage (status: ${response.statusCode})');
   }
+
+
 
   // 🔹 Save items
   Future<bool> saveAscendItems(String noSO, List<StockOpnameAscendItem> items) async {

@@ -1,5 +1,6 @@
 // features/production/shared/utils/title_keys/broker.dart
-import '../../../broker/model/broker_inputs_model.dart';
+
+import '../../models/broker_item.dart';
 
 String brokerTitleKey(BrokerItem e) {
   // Untuk partial, gunakan noBrokerPartial sebagai key

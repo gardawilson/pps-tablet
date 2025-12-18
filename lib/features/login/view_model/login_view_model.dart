@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/services/permission_storage.dart';
 import '../model/user_model.dart';
 import '../../../core/network/endpoints.dart';
-import '../../../core/services/permission_storage.dart';
 
 class LoginResult {
   final bool success;

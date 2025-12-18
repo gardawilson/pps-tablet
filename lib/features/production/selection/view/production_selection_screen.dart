@@ -50,7 +50,7 @@ class ProductionSelectionScreen extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          // 🔹 Card Label Broker
+          // 🔹 Card Label Crusher
           _buildLabelCard(
             context,
             title: 'Proses Crusher',
@@ -59,6 +59,20 @@ class ProductionSelectionScreen extends StatelessWidget {
             enabled: canReadBroker,
             onTap: canReadBroker
                 ? () => Navigator.pushNamed(context, '/production/crusher')
+                : null,
+          ),
+
+          const SizedBox(height: 16),
+
+          // 🔹 Card Label Gilingan
+          _buildLabelCard(
+            context,
+            title: 'Proses Gilingan',
+            subtitle: 'Buat label untuk proses gilingan',
+            icon: Icons.inventory_2_outlined,
+            enabled: canReadBroker,
+            onTap: canReadBroker
+                ? () => Navigator.pushNamed(context, '/production/gilingan')
                 : null,
           ),
         ],

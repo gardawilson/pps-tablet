@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart'; // Tambahkan dependency ini di pubspec.yaml
+import '../../../core/services/permission_storage.dart';
+import '../../bongkar_susun/view/bongkar_susun_screen.dart';
 import '../view_model/user_profile_view_model.dart';
 import 'package:provider/provider.dart'; // ⬅️ wajib agar context.read bisa digunakan
 import '../../home/view/widgets/user_profile_dialog.dart';
 import '../../../core/services/token_storage.dart';
-import '../../../core/services/permission_storage.dart';
 import '../../../core/view_model/permission_view_model.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -210,6 +211,21 @@ class HomeScreen extends StatelessWidget {
           color: const Color(0xFF0D47A1), // BLUE PRIMARY
           onTap: () {
             Navigator.pushNamed(context, '/production');
+          },
+        ),
+        const SizedBox(height: 16),
+        _buildMenuCard(
+          context,
+          title: 'Bongkar Susun',
+          subtitle: 'Input data Bongkar Susun',
+          icon: Icons.production_quantity_limits_outlined,
+          color: const Color(0xFF0D47A1),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const BongkarSusunScreen(),
+              ),
+            );
           },
         ),
         const SizedBox(height: 16),

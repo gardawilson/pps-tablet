@@ -1,11 +1,11 @@
-// lib/features/shared/gilingan_production/widgets/packing_production_dropdown.dart
+// lib/features/shared/gilingan_production/widgets/gilingan_production_dropdown.dart
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../common/widgets/dropdown_field.dart';
 import '../view_model/gilingan_production_view_model.dart';
 import '../model/gilingan_production_model.dart';
-import '../../../../common/widgets/dropdown_field.dart';
 
 class GilinganProductionDropdown extends StatefulWidget {
   final String? preselectNoProduksi;
@@ -75,16 +75,17 @@ class _GilinganProductionDropdownState
         namaOperator: '',
         idMesin: 0,
         namaMesin: widget.preselectNamaMesin ?? '',
-        tanggal: DateTime.now().toUtc(),
-        jam: 0,
+        tglProduksi: DateTime.now().toUtc(),
         shift: widget.shiftFilter ?? 0,
-        createBy: null,
+        createBy: '',
         checkBy1: null,
         checkBy2: null,
         approveBy: null,
         jmlhAnggota: 0,
         hadir: 0,
         hourMeter: null,
+        hourStart: null,
+        hourEnd: null,
       );
 
       setState(() {
@@ -161,8 +162,12 @@ class _GilinganProductionDropdownState
 
           value: safeValue,
           items: base,
-          itemAsString: (e) =>
-          '${e.noProduksi} | ${e.namaMesin} (SHIFT ${e.shift})',
+          itemAsString: (e) {
+            // Tampilkan NoProduksi | NamaMesin | jam range (kalau ada) | SHIFT
+            final range =
+            (e.hourRangeText.isEmpty) ? '' : ' • ${e.hourRangeText}';
+            return '${e.noProduksi} | ${e.namaMesin}$range (SHIFT ${e.shift})';
+          },
           compareFn: (a, b) => a.noProduksi == b.noProduksi,
 
           onChanged: widget.enabled

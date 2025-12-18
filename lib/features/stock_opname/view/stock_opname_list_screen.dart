@@ -94,6 +94,7 @@ class StockOpnameListScreen extends StatelessWidget {
                   builder: (context) => StockOpnameAscendDetailScreen(
                     noSO: stockOpname.noSO,
                     tgl: stockOpname.tanggal,
+                    idWarehouses: stockOpname.idWarehouses,
                   ),
                 ),
               );

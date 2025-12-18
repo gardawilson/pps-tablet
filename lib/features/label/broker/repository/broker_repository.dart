@@ -91,7 +91,6 @@ class BrokerRepository {
           .map((d) => {
         'NoSak': d.noSak,
         'Berat': d.berat,
-        'IdLokasi': d.idLokasi?.toString() ?? '',
       })
           .toList(),
       refKey: refVal,

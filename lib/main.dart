@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:pps_tablet/core/view_model/permission_view_model.dart';
+import 'package:pps_tablet/features/bongkar_susun/repository/bongkar_susun_input_repository.dart';
+import 'package:pps_tablet/features/bongkar_susun/view_model/bongkar_susun_input_view_model.dart';
 import 'package:pps_tablet/features/crusher_type/repository/crusher_type_repository.dart';
 import 'package:pps_tablet/features/crusher_type/view_model/crusher_type_view_model.dart';
 import 'package:pps_tablet/features/furniture_wip_type/repository/furniture_wip_type_repository.dart';
@@ -45,6 +47,7 @@ import 'package:pps_tablet/features/production/crusher/view/crusher_production_s
 import 'package:pps_tablet/features/production/crusher/view_model/crusher_production_input_view_model.dart';
 import 'package:pps_tablet/features/production/crusher/view_model/crusher_production_view_model.dart';
 import 'package:pps_tablet/features/production/gilingan/repository/gilingan_production_repository.dart';
+import 'package:pps_tablet/features/production/gilingan/view/gilingan_production_screen.dart';
 import 'package:pps_tablet/features/production/gilingan/view_model/gilingan_production_view_model.dart';
 import 'package:pps_tablet/features/production/hot_stamp/model/hot_stamp_production_model.dart';
 import 'package:pps_tablet/features/production/hot_stamp/repository/hot_stamp_production_repository.dart';
@@ -70,8 +73,6 @@ import 'package:pps_tablet/features/production/washing/view/washing_production_s
 import 'package:pps_tablet/features/production/washing/view_model/washing_production_input_view_model.dart';
 import 'package:pps_tablet/features/reject_type/repository/reject_type_repository.dart';
 import 'package:pps_tablet/features/reject_type/view_model/packing_type_view_model.dart';
-import 'package:pps_tablet/features/shared/bongkar_susun/bongkar_susun_repository.dart';
-import 'package:pps_tablet/features/shared/bongkar_susun/bongkar_susun_view_model.dart';
 import 'package:pps_tablet/features/production/broker/repository/broker_production_repository.dart';
 import 'package:pps_tablet/features/production/broker/view_model/broker_production_view_model.dart';
 import 'package:pps_tablet/features/shared/lokasi/lokasi_repository.dart';
@@ -102,6 +103,8 @@ import 'package:pps_tablet/features/stock_opname/view_model/stock_opname_ascend_
 import 'package:pps_tablet/features/stock_opname/view_model/stock_opname_family_view_model.dart';
 import 'core/navigation/app_nav.dart';
 import 'core/network/api_client.dart';
+import 'features/bongkar_susun/repository/bongkar_susun_repository.dart';
+import 'features/bongkar_susun/view_model/bongkar_susun_view_model.dart';
 import 'features/label/crusher/repository/crusher_repository.dart';
 import 'features/label/crusher/view/crusher_screen.dart';
 import 'features/label/crusher/view_model/crusher_view_model.dart';
@@ -148,7 +151,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => LokasiViewModel(repository: LokasiRepository())),
         ChangeNotifierProvider(create: (_) => SocketManager()),
         ChangeNotifierProvider(create: (_) => LabelDetailViewModel()),
-        ChangeNotifierProvider(create: (_) => StockOpnameAscendViewModel(repository: StockOpnameAscendRepository())),
+        ChangeNotifierProvider(create: (_) => StockOpnameAscendViewModel(repository: StockOpnameAscendRepository()) ),
         ChangeNotifierProvider(create: (_) => StockOpnameFamilyViewModel(repository: StockOpnameFamilyRepository())),
         ChangeNotifierProvider(create: (_) => WashingViewModel(repository: WashingRepository())),
         ChangeNotifierProvider(create: (_) => JenisPlastikViewModel(repository: JenisPlastikRepository())),
@@ -181,9 +184,8 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => GilinganViewModel(repository: GilinganRepository())),
         ChangeNotifierProvider(create: (_) => GilinganTypeViewModel(repository: GilinganTypeRepository())),
         ChangeNotifierProvider(create: (_) => GilinganProductionViewModel(repository: GilinganProductionRepository())),
-
         ChangeNotifierProvider(create: (_) => FurnitureWipViewModel(repository: FurnitureWipRepository())),
-
+        ChangeNotifierProvider(create: (_) => BongkarSusunInputViewModel(repository: BongkarSusunInputRepository())),
 
         ChangeNotifierProvider<HotStampProductionViewModel>(
           create: (ctx) => HotStampProductionViewModel(
@@ -362,7 +364,7 @@ class MyApp extends StatelessWidget {
           '/production/crusher': (context) => CrusherProductionScreen(),
           '/label/packing': (context) => PackingScreen(),
           '/label/reject': (context) => RejectScreen(),
-
+          '/production/gilingan': (context) => GilinganProductionScreen(),
         },
       ),
 

@@ -1,4 +1,4 @@
-// lib/features/production/broker/model/broker_inputs_model.dart
+// lib/features/production/broker/model/bongkar_susun_inputs_model.dart
 
 import '../../shared/models/broker_item.dart';
 import '../../shared/models/bb_item.dart';

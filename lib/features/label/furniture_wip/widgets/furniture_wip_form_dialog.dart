@@ -10,6 +10,8 @@ import '../../../../core/services/dialog_service.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../common/widgets/app_date_field.dart';
 
+import '../../../bongkar_susun/widgets/bongkar_susun_dropdown.dart';
+import '../../../bongkar_susun/model/bongkar_susun_model.dart';
 import '../../../production/hot_stamp/model/hot_stamp_production_model.dart';
 import '../../../production/hot_stamp/widgets/hot_stamp_production_dropdown.dart';
 import '../../../production/inject/model/inject_production_model.dart';
@@ -23,8 +25,7 @@ import '../../../production/return/model/return_production_model.dart';
 import '../../../production/return/widgets/return_production_dropdown.dart';
 
 import '../../../production/spanner/widgets/spanner_production_dropdown.dart';
-import '../../../shared/bongkar_susun/bongkar_susun_model.dart';
-import '../../../shared/bongkar_susun/bongkar_susun_dropdown.dart';
+
 
 import '../model/furniture_wip_header_model.dart';
 import '../view_model/furniture_wip_view_model.dart';

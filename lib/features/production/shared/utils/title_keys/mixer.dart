@@ -1,5 +1,6 @@
 // features/production/shared/utils/title_keys/mixer.dart
-import '../../../broker/model/broker_inputs_model.dart';
+
+import '../../models/mixer_item.dart';
 
 String mixerTitleKey(MixerItem e) {
   // Untuk partial, gunakan noMixerPartial sebagai key

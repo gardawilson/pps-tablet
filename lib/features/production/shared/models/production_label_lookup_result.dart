@@ -7,7 +7,9 @@ import 'crusher_item.dart';
 import 'gilingan_item.dart';
 import 'mixer_item.dart';
 import 'reject_item.dart';
-import 'bonggolan_item.dart'; // ⬅️ pastikan path & nama file sesuai
+import 'bonggolan_item.dart';
+import 'furniture_wip_item.dart';
+import 'barang_jadi_item.dart';
 
 class ProductionLabelLookupResult {
   final bool found;
@@ -113,6 +115,18 @@ class ProductionLabelLookupResult {
     return data.map((json) => BonggolanItem.fromJson(json)).toList();
   }
 
+  /// Konversi data ke List<FurnitureWipItem>
+  List<FurnitureWipItem> get furnitureWipItems {
+    if (!found || data.isEmpty) return const [];
+    return data.map((json) => FurnitureWipItem.fromJson(json)).toList();
+  }
+
+  /// Konversi data ke List<BarangJadiItem>
+  List<BarangJadiItem> get barangJadiItems {
+    if (!found || data.isEmpty) return const [];
+    return data.map((json) => BarangJadiItem.fromJson(json)).toList();
+  }
+
   // ========== SMART GETTER BASED ON PREFIX ==========
 
   /// Mengembalikan list item yang sesuai berdasarkan prefix
@@ -124,21 +138,29 @@ class ProductionLabelLookupResult {
 
     switch (p) {
       case 'D.':
-        return brokerItems; // Broker_d
+        return brokerItems;
       case 'A.':
-        return bbItems; // BahanBaku_d
+        return bbItems;
       case 'B.':
-        return washingItems; // Washing_d
+        return washingItems;
       case 'F.':
-        return crusherItems; // Crusher
+        return crusherItems;
       case 'V.':
-        return gilinganItems; // Gilingan
+        return gilinganItems;
       case 'H.':
-        return mixerItems; // Mixer_d
+        return mixerItems;
       case 'BF.':
-        return rejectItems; // RejectV2
+        return rejectItems;
       case 'M.':
-        return bonggolanItems; // Bonggolan (Crusher Bonggol)
+        return bonggolanItems;
+      case 'BB.':
+        return furnitureWipItems;
+      case 'BC.':  // ✅ TAMBAHKAN: Partial FurnitureWIP
+        return furnitureWipItems;
+      case 'BA.':
+        return barangJadiItems;
+      case 'BL.':  // ✅ TAMBAHKAN: Partial BarangJadi
+        return barangJadiItems;
       default:
         return const [];
     }
@@ -166,6 +188,14 @@ class ProductionLabelLookupResult {
         return PrefixType.reject;
       case 'M.':
         return PrefixType.bonggolan;
+      case 'BB.':
+        return PrefixType.furnitureWip;
+      case 'BC.':  // ✅ TAMBAHKAN: Partial FurnitureWIP
+        return PrefixType.furnitureWip;
+      case 'BA.':
+        return PrefixType.barangJadi;
+      case 'BL.':  // ✅ TAMBAHKAN: Partial BarangJadi
+        return PrefixType.barangJadi;
       default:
         return PrefixType.unknown;
     }
@@ -236,8 +266,22 @@ class ProductionLabelLookupResult {
     } else if (row.containsKey('NoBonggolan') ||
         row.containsKey('noBonggolan')) {
       table = 'Bonggolan';
-      prefix = 'M.'; // prefix untuk bonggolan
+      prefix = 'M.';
       no = getValue('NoBonggolan', 'noBonggolan') ?? '-';
+    } else if (row.containsKey('NoFurnitureWIP') ||
+        row.containsKey('noFurnitureWIP') ||
+        row.containsKey('noFurnitureWip')) {
+      table = 'FurnitureWIP';
+      prefix = 'BB.';
+      no = getValue('NoFurnitureWIP', 'noFurnitureWIP') ??
+          getValue('noFurnitureWip', 'noFurnitureWip') ??
+          '-';
+    } else if (row.containsKey('NoBJ') ||
+        row.containsKey('noBJ') ||
+        row.containsKey('noBj')) {
+      table = 'BarangJadi';
+      prefix = 'BA.';
+      no = getValue('NoBJ', 'noBJ') ?? getValue('noBj', 'noBj') ?? '-';
     } else {
       // Fallback: gunakan info dari context
       table = this.tableName ?? '-';
@@ -252,7 +296,7 @@ class ProductionLabelLookupResult {
   }
 
   /// Generate unique key untuk UI selection (includes index and timestamps)
-  /// Format: prefix|table|no|sak|IDX:index|berat|id|createdAt|updatedAt
+  /// Format: prefix|table|no|sak|IDX:index|berat|pcs|id|createdAt|updatedAt
   ///
   /// Digunakan untuk:
   /// - Track selected rows di UI (pick/unpick)
@@ -268,13 +312,14 @@ class ProductionLabelLookupResult {
 
     final berat = getValue('Berat', 'berat');
     final beratKg = getValue('BeratKg', 'beratKg');
+    final pcs = getValue('Pcs', 'pcs');
     final id = getValue('Id', 'id');
     final idCaps = getValue('ID', 'iD'); // edge case
     final createdAt = getValue('CreatedAt', 'created_at');
     final updatedAt = getValue('UpdatedAt', 'updated_at');
 
     // Gabungkan semua field untuk uniqueness maksimal
-    return '$simpleKeyPart|IDX:$index|$berat$beratKg|$id$idCaps|$createdAt|$updatedAt';
+    return '$simpleKeyPart|IDX:$index|$berat$beratKg|$pcs|$id$idCaps|$createdAt|$updatedAt';
   }
 
   /// Alternative: Generate unique key dengan explicit index parameter
@@ -289,12 +334,13 @@ class ProductionLabelLookupResult {
 
     final berat = getValue('Berat', 'berat');
     final beratKg = getValue('BeratKg', 'beratKg');
+    final pcs = getValue('Pcs', 'pcs');
     final id = getValue('Id', 'id');
     final idCaps = getValue('ID', 'iD');
     final createdAt = getValue('CreatedAt', 'created_at');
     final updatedAt = getValue('UpdatedAt', 'updated_at');
 
-    return '$simpleKeyPart|IDX:$index|$berat$beratKg|$id$idCaps|$createdAt|$updatedAt';
+    return '$simpleKeyPart|IDX:$index|$berat$beratKg|$pcs|$id$idCaps|$createdAt|$updatedAt';
   }
 
   // ========== HELPER METHODS ==========
@@ -314,9 +360,13 @@ class ProductionLabelLookupResult {
         return mixerItems.any((item) => item.isPartialRow);
       case PrefixType.reject:
         return rejectItems.any((item) => item.isPartialRow);
+      case PrefixType.furnitureWip:
+        return furnitureWipItems.any((item) => item.isPartialRow);
+      case PrefixType.barangJadi:
+        return barangJadiItems.any((item) => item.isPartialRow);
       case PrefixType.washing:
       case PrefixType.crusher:
-      case PrefixType.bonggolan: // bonggolan tidak partial
+      case PrefixType.bonggolan:
       case PrefixType.unknown:
         return false;
     }
@@ -335,6 +385,19 @@ class ProductionLabelLookupResult {
       if (item is MixerItem) return sum + (item.berat ?? 0);
       if (item is RejectItem) return sum + (item.berat ?? 0);
       if (item is BonggolanItem) return sum + (item.berat ?? 0);
+      if (item is FurnitureWipItem) return sum + (item.berat ?? 0);
+      if (item is BarangJadiItem) return sum + (item.berat ?? 0);
+      return sum;
+    });
+  }
+
+  /// Hitung total pcs dari items (untuk FurnitureWIP & BarangJadi)
+  int get totalPcs {
+    if (!found || data.isEmpty) return 0;
+
+    return typedItems.fold<int>(0, (sum, item) {
+      if (item is FurnitureWipItem) return sum + (item.pcs ?? 0);
+      if (item is BarangJadiItem) return sum + (item.pcs ?? 0);
       return sum;
     });
   }
@@ -359,6 +422,14 @@ class ProductionLabelLookupResult {
         return row['NoReject'] != null || row['noReject'] != null;
       case PrefixType.bonggolan:
         return row['NoBonggolan'] != null || row['noBonggolan'] != null;
+      case PrefixType.furnitureWip:
+        return row['NoFurnitureWIP'] != null ||
+            row['noFurnitureWIP'] != null ||
+            row['noFurnitureWip'] != null;
+      case PrefixType.barangJadi:
+        return row['NoBJ'] != null ||
+            row['noBJ'] != null ||
+            row['noBj'] != null;
       case PrefixType.unknown:
         return false;
     }
@@ -394,14 +465,16 @@ class ProductionLabelLookupResult {
 
 /// Enum untuk tipe prefix yang dikenali sistem
 enum PrefixType {
-  broker,    // D.
-  bb,        // A.
-  washing,   // B.
-  crusher,   // F.
-  gilingan,  // V.
-  mixer,     // H.
-  reject,    // BF.
-  bonggolan, // M.
+  broker,      // D.
+  bb,          // A.
+  washing,     // B.
+  crusher,     // F.
+  gilingan,    // V.
+  mixer,       // H.
+  reject,      // BF.
+  bonggolan,   // M.
+  furnitureWip,// BB.
+  barangJadi,  // BA.
   unknown;
 
   String get displayName {
@@ -422,6 +495,10 @@ enum PrefixType {
         return 'Reject';
       case PrefixType.bonggolan:
         return 'Bonggolan';
+      case PrefixType.furnitureWip:
+        return 'Furniture WIP';
+      case PrefixType.barangJadi:
+        return 'Barang Jadi';
       case PrefixType.unknown:
         return 'Unknown';
     }
@@ -445,6 +522,10 @@ enum PrefixType {
         return 'BF.';
       case PrefixType.bonggolan:
         return 'M.';
+      case PrefixType.furnitureWip:
+        return 'BB.';
+      case PrefixType.barangJadi:
+        return 'BA.';
       case PrefixType.unknown:
         return '';
     }
@@ -453,42 +534,50 @@ enum PrefixType {
 
 // ====== TEMP PARTIAL CODE GENERATOR ======
 // Aturan: A. -> P.XXXXX, V. -> Y.XXX, H. -> T.XXXX, BF. -> BK.XXXX, D. -> Q.XXXXXXXXXX
+// BB. -> W.XXXXX (FurnitureWIP), BA. -> Z.XXXXX (BarangJadi)
 
 extension TempPartialFormat on PrefixType {
   /// Prefix huruf untuk partial sementara per kategori
   String get tempPartialLetter {
     switch (this) {
       case PrefixType.broker:
-        return 'Q'; // Broker
+        return 'Q';
       case PrefixType.bb:
-        return 'P'; // Bahan Baku
+        return 'P';
       case PrefixType.gilingan:
-        return 'Y'; // Gilingan
+        return 'Y';
       case PrefixType.mixer:
-        return 'T'; // Mixer
+        return 'T';
       case PrefixType.reject:
-        return 'BK'; // Reject
+        return 'BK';
+      case PrefixType.furnitureWip:
+        return 'BC';  // ✅ GANTI dari 'W' ke 'BC'
+      case PrefixType.barangJadi:
+        return 'BL';  // ✅ GANTI dari 'Z' ke 'BL'
       case PrefixType.washing:
       case PrefixType.crusher:
       case PrefixType.bonggolan:
       case PrefixType.unknown:
-        return ''; // lainnya tidak dipakai
+        return '';
     }
   }
 
-  /// Jumlah digit numeric setelah titik
   int get tempPartialDigits {
     switch (this) {
       case PrefixType.broker:
-        return 10; // Q.0000000087
+        return 10;
       case PrefixType.bb:
-        return 5; // P.00001
+        return 5;
       case PrefixType.gilingan:
-        return 3; // Y.001
+        return 3;
       case PrefixType.mixer:
-        return 4; // T.0001
+        return 4;
       case PrefixType.reject:
-        return 4; // BK.0001
+        return 4;
+      case PrefixType.furnitureWip:
+        return 10;  // ✅ GANTI dari 5 ke 10 (BC.0000003358)
+      case PrefixType.barangJadi:
+        return 10;  // ✅ GANTI dari 5 ke 10 (BL.0000001305)
       case PrefixType.washing:
       case PrefixType.crusher:
       case PrefixType.bonggolan:
@@ -497,13 +586,16 @@ extension TempPartialFormat on PrefixType {
     }
   }
 
+
   /// Apakah kategori ini mendukung temp-partial
   bool get supportsTempPartial {
     return this == PrefixType.broker ||
         this == PrefixType.bb ||
         this == PrefixType.gilingan ||
         this == PrefixType.mixer ||
-        this == PrefixType.reject;
+        this == PrefixType.reject ||
+        this == PrefixType.furnitureWip ||
+        this == PrefixType.barangJadi;
   }
 
   /// Bentuk kode temp-partial dari sequence (0-based atau 1-based sama saja; kamu kontrol dari luar)
@@ -511,6 +603,8 @@ extension TempPartialFormat on PrefixType {
   /// - broker (D.) seq=87 -> Q.0000000087
   /// - bb (A.) seq=1 -> P.00001
   /// - mixer (H.) seq=1 -> T.0001
+  /// - furnitureWip (BB.) seq=1 -> W.00001
+  /// - barangJadi (BA.) seq=1 -> Z.00001
   String formatTempPartial(int seq) {
     if (!supportsTempPartial) return '';
     final n = seq < 1 ? (seq + 1) : seq; // aman kalau kamu pakai 0-based

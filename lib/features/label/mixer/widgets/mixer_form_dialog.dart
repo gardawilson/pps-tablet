@@ -17,8 +17,8 @@ import '../../../../common/widgets/app_date_field.dart';
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
 
+import '../../../bongkar_susun/widgets/bongkar_susun_dropdown.dart';
 import '../../../production/inject/widgets/inject_production_dropdown.dart';
-import '../../../shared/bongkar_susun/bongkar_susun_dropdown.dart';
 import '../model/mixer_detail_model.dart';
 import '../model/mixer_header_model.dart';
 import 'mixer_text_field.dart';

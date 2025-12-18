@@ -321,10 +321,6 @@ class _WashingProductionScreenState extends State<WashingProductionScreen> {
       barrierDismissible: false,
       builder: (ctx) => WashingProductionFormDialog(
         header: null, // mode create
-        onSave: (saved) {
-          // kembalikan ke caller
-          Navigator.of(ctx).pop(saved);
-        },
       ),
     );
 
@@ -356,10 +352,6 @@ class _WashingProductionScreenState extends State<WashingProductionScreen> {
       barrierDismissible: false,
       builder: (ctx) => WashingProductionFormDialog(
         header: row, // ← send current values here
-        onSave: (v) {
-          // return the saved/updated item to this screen
-          Navigator.of(ctx).pop(v);
-        },
       ),
     );
 

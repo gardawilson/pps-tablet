@@ -34,28 +34,39 @@ class StockOpnameAscendViewModel extends ChangeNotifier {
     }
   }
 
+
+
   // Fetch usage
-  Future<void> fetchQtyUsage(int itemID, String tglSO) async {
+  Future<void> fetchQtyUsage(int itemID, String tglSO, List<int> idWarehouses) async {
     if (_loadingUsageItems.contains(itemID) || _fetchedUsageItems.contains(itemID)) return;
+
+    // kalau mau strict:
+    if (idWarehouses.isEmpty) {
+      debugPrint("QtyUsage LOG → wids kosong, skip fetch");
+      return;
+    }
 
     _loadingUsageItems.add(itemID);
     notifyListeners();
 
     try {
-      final usage = await repository.fetchQtyUsage(itemID, tglSO);
-      debugPrint("QtyUsage LOG → hasil fetch itemID=$itemID, usage=$usage");
+      final usage = await repository.fetchQtyUsage(itemID, tglSO, idWarehouses);
+
+      debugPrint("QtyUsage LOG → hasil fetch itemID=$itemID, wids=$idWarehouses, usage=$usage");
+
       final index = items.indexWhere((e) => e.itemID == itemID);
       if (index != -1) {
         items[index].qtyUsage = usage;
         items[index].isUpdateUsage = true;
-        debugPrint("QtyUsage LOG → update state: qtyUsage=${items[index].qtyUsage}, isUpdateUsage=${items[index].isUpdateUsage}");
       }
-    }
- finally {
+
+      _fetchedUsageItems.add(itemID); // ✅ biar tidak fetch berulang
+    } finally {
       _loadingUsageItems.remove(itemID);
       notifyListeners();
     }
   }
+
 
   // Save
   Future<bool> saveAscendItems(String noSO) async {

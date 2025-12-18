@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+
 import '../services/permission_storage.dart';
 
 class PermissionViewModel extends ChangeNotifier {

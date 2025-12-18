@@ -118,7 +118,6 @@ class WashingRepository {
       "details": details.map((d) => {
         "NoSak": d.noSak,
         "Berat": d.berat,
-        "IdLokasi": (d.idLokasi?.toString() ?? ""),  // kosongkan "" jika tidak ada
       }).toList(),
       refKey: refVal, // hanya satu dari keduanya yg dikirim
     };

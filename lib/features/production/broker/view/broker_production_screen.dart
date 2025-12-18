@@ -1,4 +1,4 @@
-// lib/features/production/broker/view/washing_production_screen.dart
+// lib/features/production/broker/view/bongkar_susun_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
@@ -281,7 +281,6 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
           try {
             // await vm.create(draft);      // implement in your VM/repo
             if (context.mounted) {
-              Navigator.of(context).pop(true); // signal success to caller
             }
           } catch (e) {
             // optional: show error
@@ -312,10 +311,6 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
       barrierDismissible: false,
       builder: (ctx) => BrokerProductionFormDialog(
         header: row, // ← send current values here
-        onSave: (v) {
-          // return the saved/updated item to this screen
-          Navigator.of(ctx).pop(v);
-        },
       ),
     );
 

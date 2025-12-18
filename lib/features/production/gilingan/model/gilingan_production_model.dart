@@ -1,89 +1,169 @@
-// lib/features/shared/gilingan_production/model/packing_production_model.dart
+import 'package:intl/intl.dart';
 
 class GilinganProduction {
   final String noProduksi;
   final int idOperator;
-  final String namaOperator; // backend not joined yet → keep empty for now
   final int idMesin;
   final String namaMesin;
-  final DateTime tanggal;    // from [GilinganProduksi_h].[Tanggal]
-  final int jam;
+  final String namaOperator;
+  final DateTime? tglProduksi;
   final int shift;
-  final String? createBy;
+  final String createBy;
+  final int? jmlhAnggota;
+  final int? hadir;
+  final int? hourMeter;
   final String? checkBy1;
   final String? checkBy2;
   final String? approveBy;
-  final int jmlhAnggota;
-  final int hadir;
-  final num? hourMeter;
 
-  GilinganProduction({
+  // Hanya pakai ini untuk jam kerja
+  final String? hourStart; // "HH:mm"
+  final String? hourEnd;   // "HH:mm"
+
+  const GilinganProduction({
     required this.noProduksi,
     required this.idOperator,
-    required this.namaOperator,
     required this.idMesin,
     required this.namaMesin,
-    required this.tanggal,
-    required this.jam,
+    required this.namaOperator,
+    required this.tglProduksi,
     required this.shift,
-    this.createBy,
+    required this.createBy,
+    this.jmlhAnggota,
+    this.hadir,
+    this.hourMeter,
     this.checkBy1,
     this.checkBy2,
     this.approveBy,
-    required this.jmlhAnggota,
-    required this.hadir,
-    this.hourMeter,
+    this.hourStart,
+    this.hourEnd,
   });
 
-  factory GilinganProduction.fromJson(Map<String, dynamic> j) {
-    T? _castNum<T extends num>(dynamic v) {
-      if (v == null) return null;
-      if (v is num) return v as T;
-      if (v is String) return num.tryParse(v) as T?;
-      return null;
-    }
+  // ---------- tolerant parsers (sama seperti Broker) ----------
+  static String _asString(dynamic v) => v?.toString() ?? '';
 
-    int _toInt(dynamic v) {
-      if (v == null) return 0;
-      if (v is num) return v.toInt();
-      if (v is String) return int.tryParse(v) ?? 0;
-      return 0;
-    }
+  static int _asIntRequired(dynamic v, {int fallback = 0}) {
+    final r = _asInt(v);
+    return r ?? fallback;
+  }
 
-    DateTime _parseDate(dynamic v) {
-      if (v == null) return DateTime.now();
-      if (v is DateTime) return v;
-      if (v is String) {
-        try {
-          return DateTime.parse(v);
-        } catch (_) {
-          // fallback if BE ever sends just 'YYYY-MM-DD'
-          try {
-            return DateTime.parse('${v}T00:00:00');
-          } catch (_) {
-            return DateTime.now();
-          }
-        }
+  static int? _asInt(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is double) return v.toInt();
+    if (v is String) return int.tryParse(v);
+    return null;
+  }
+
+  static DateTime? _asDateTime(dynamic v) {
+    if (v == null) return null;
+    if (v is DateTime) return v;
+    if (v is String) {
+      try {
+        return DateTime.tryParse(v);
+      } catch (_) {
+        return null;
       }
-      return DateTime.now();
+    }
+    if (v is int) {
+      return DateTime.fromMillisecondsSinceEpoch(v);
+    }
+    return null;
+  }
+
+  /// Normalisasi MSSQL TIME ke "HH:mm"
+  static String? _asTimeHHmm(dynamic v) {
+    if (v == null) return null;
+
+    // Kalau driver mapping TIME ke DateTime (1900-01-01 + time)
+    if (v is DateTime) {
+      return DateFormat('HH:mm').format(v.toLocal());
     }
 
+    // Kalau string: "HH:mm[:ss[.fff]]" atau "1900-01-01T07:30:00"
+    if (v is String) {
+      final s = v.trim();
+      if (s.isEmpty) return null;
+
+      final asDt = DateTime.tryParse(s);
+      if (asDt != null) {
+        return DateFormat('HH:mm').format(asDt.toLocal());
+      }
+
+      final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(s);
+      if (m != null) {
+        final hh = m.group(1)!.padLeft(2, '0');
+        final mm = m.group(2)!;
+        return '$hh:$mm';
+      }
+    }
+
+    return null;
+  }
+
+  factory GilinganProduction.fromJson(Map<String, dynamic> j) {
     return GilinganProduction(
-      noProduksi: (j['NoProduksi'] ?? '') as String,
-      idOperator: _toInt(j['IdOperator']),
-      namaOperator: (j['NamaOperator'] ?? '') as String, // if later you join operator name
-      idMesin: _toInt(j['IdMesin']),
-      namaMesin: (j['NamaMesin'] ?? '') as String,
-      tanggal: _parseDate(j['Tanggal']),       // 👈 from GilinganProduksi_h.Tanggal
-      jam: _toInt(j['Jam']),
-      shift: _toInt(j['Shift']),
-      createBy: j['CreateBy'] as String?,
-      checkBy1: j['CheckBy1'] as String?,
-      checkBy2: j['CheckBy2'] as String?,
-      approveBy: j['ApproveBy'] as String?,
-      jmlhAnggota: _toInt(j['JmlhAnggota']),
-      hadir: _toInt(j['Hadir']),
-      hourMeter: _castNum<num>(j['HourMeter']),
+      noProduksi: _asString(j['NoProduksi']),
+      idOperator: _asIntRequired(j['IdOperator']),
+      idMesin: _asIntRequired(j['IdMesin']),
+      namaMesin: _asString(j['NamaMesin']),
+      namaOperator: _asString(j['NamaOperator']),
+      tglProduksi: _asDateTime(j['TglProduksi']),
+      shift: _asIntRequired(j['Shift']),
+      createBy: _asString(j['CreateBy']),
+      checkBy1: j['CheckBy1'] == null || j['CheckBy1'] == ''
+          ? null
+          : _asString(j['CheckBy1']),
+      checkBy2: j['CheckBy2'] == null || j['CheckBy2'] == ''
+          ? null
+          : _asString(j['CheckBy2']),
+      approveBy: j['ApproveBy'] == null || j['ApproveBy'] == ''
+          ? null
+          : _asString(j['ApproveBy']),
+      jmlhAnggota: _asInt(j['JmlhAnggota']),
+      hadir: _asInt(j['Hadir']),
+      hourMeter: _asInt(j['HourMeter']),
+      hourStart: _asTimeHHmm(j['HourStart']),
+      hourEnd: _asTimeHHmm(j['HourEnd']),
     );
+  }
+
+  Map<String, dynamic> toJson({bool asDateOnly = true}) => {
+    'NoProduksi': noProduksi,
+    'IdOperator': idOperator,
+    'IdMesin': idMesin,
+    'NamaMesin': namaMesin,
+    'NamaOperator': namaOperator,
+    'TglProduksi': tglProduksi == null
+        ? null
+        : (asDateOnly
+        ? DateFormat('yyyy-MM-dd').format(tglProduksi!)
+        : tglProduksi!.toIso8601String()),
+    'Shift': shift,
+    'CreateBy': createBy,
+    'CheckBy1': checkBy1,
+    'CheckBy2': checkBy2,
+    'ApproveBy': approveBy,
+    'JmlhAnggota': jmlhAnggota,
+    'Hadir': hadir,
+    'HourMeter': hourMeter,
+    'HourStart': hourStart,
+    'HourEnd': hourEnd,
+  };
+
+  String get tglProduksiTextShort {
+    if (tglProduksi == null) return '';
+    return DateFormat('dd MMM yyyy', 'id_ID').format(tglProduksi!.toLocal());
+  }
+
+  String get tglProduksiTextFull {
+    if (tglProduksi == null) return '';
+    return DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(tglProduksi!.toLocal());
+  }
+
+  String get hourRangeText {
+    if ((hourStart == null || hourStart!.isEmpty) &&
+        (hourEnd == null || hourEnd!.isEmpty)) return '';
+    return '${hourStart ?? '--:--'} - ${hourEnd ?? '--:--'}';
   }
 }

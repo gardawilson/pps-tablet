@@ -1,7 +1,4 @@
 // lib/features/shared/bongkar_susun/repository/bongkar_susun_repository.dart
-import 'dart:async';
-import 'dart:convert';
-
 import '../../../../core/network/api_client.dart';
 import '../model/bongkar_susun_model.dart';
 import 'package:pps_tablet/core/utils/date_formatter.dart';
@@ -30,9 +27,7 @@ class BongkarSusunRepository {
           .toList();
     } on ApiException catch (e) {
       // Samakan behaviour lama: 404 dianggap tidak ada data → []
-      if (e.statusCode == 404) {
-        return <BongkarSusun>[];
-      }
+      if (e.statusCode == 404) return <BongkarSusun>[];
       rethrow;
     }
   }
@@ -62,9 +57,7 @@ class BongkarSusunRepository {
     final String? effectiveSearch =
     (noBongkarSusun != null && noBongkarSusun.trim().isNotEmpty)
         ? noBongkarSusun.trim()
-        : (search != null && search.trim().isNotEmpty
-        ? search.trim()
-        : null);
+        : (search != null && search.trim().isNotEmpty ? search.trim() : null);
 
     // Map dates: if range not provided but single `date` is set, use it for both from/to
     final String? df = dateFrom != null
@@ -82,32 +75,47 @@ class BongkarSusunRepository {
       if (df != null) 'dateFrom': df,
       if (dt != null) 'dateTo': dt,
       if (idUsername != null) 'idUsername': idUsername,
+      // exactNoBongkarSusun belum kepakai karena backend LIKE-only.
+      // Nanti kalau backend support exact match, baru kita kirim flag-nya.
     };
 
-    final body = await _apiClient.getJson(
-      '/api/bongkar-susun',
-      query: qp,
-    );
+    try {
+      final body = await _apiClient.getJson(
+        '/api/bongkar-susun',
+        query: qp,
+      );
 
-    final List dataList = (body['data'] ?? []) as List;
-    final items = dataList
-        .map((e) => BongkarSusun.fromJson(e as Map<String, dynamic>))
-        .toList();
+      final List dataList = (body['data'] ?? []) as List;
+      final items = dataList
+          .map((e) => BongkarSusun.fromJson(e as Map<String, dynamic>))
+          .toList();
 
-    final meta = (body['meta'] ?? {}) as Map<String, dynamic>;
-    final currentPage = (meta['page'] ?? page) as int;
-    final totalPages = (meta['totalPages'] ?? 1) as int;
-    final totalData = (body['totalData'] ?? meta['total'] ?? 0) as int;
+      final meta = (body['meta'] ?? {}) as Map<String, dynamic>;
+      final currentPage = (meta['page'] ?? page) as int;
+      final totalPages = (meta['totalPages'] ?? 1) as int;
+      final totalData = (body['totalData'] ?? meta['total'] ?? 0) as int;
 
-    print(
-        '✅ BongkarSusun parsed ${items.length} items (page $currentPage/$totalPages, total: $totalData)');
+      print(
+          '✅ BongkarSusun parsed ${items.length} items (page $currentPage/$totalPages, total: $totalData)');
 
-    return {
-      'items': items, // List<BongkarSusun>
-      'page': currentPage,
-      'totalPages': totalPages,
-      'total': totalData,
-    };
+      return {
+        'items': items, // List<BongkarSusun>
+        'page': currentPage,
+        'totalPages': totalPages,
+        'total': totalData,
+      };
+    } on ApiException catch (e) {
+      // optional: samakan UX kalau backend balikin 404 saat kosong
+      if (e.statusCode == 404) {
+        return {
+          'items': <BongkarSusun>[],
+          'page': page,
+          'totalPages': 1,
+          'total': 0,
+        };
+      }
+      rethrow;
+    }
   }
 
   /// Convenience jika hanya butuh list halaman tertentu
@@ -156,7 +164,6 @@ class BongkarSusunRepository {
     );
 
     final data = jsonResp['data'] as Map<String, dynamic>?;
-
     if (data == null) {
       throw Exception('Response tidak mengandung data header');
     }
@@ -172,7 +179,7 @@ class BongkarSusunRepository {
     DateTime? tanggal,
     String? note,
   }) async {
-    // karena ini UPDATE, semua boleh null → kita kirim hanya yang diisi
+    // karena ini UPDATE, semua boleh null → kirim hanya yang diisi
     final body = <String, dynamic>{};
 
     if (tanggal != null) {
@@ -180,7 +187,7 @@ class BongkarSusunRepository {
     }
 
     if (note != null) {
-      body['note'] = note; // boleh kosong string untuk clear jadi NULL
+      body['note'] = note; // boleh kosong string untuk clear jadi NULL (tergantung backend)
     }
 
     final jsonResp = await _apiClient.putJson(
@@ -189,7 +196,6 @@ class BongkarSusunRepository {
     );
 
     final data = jsonResp['data'] as Map<String, dynamic>?;
-
     if (data == null) {
       throw Exception('Response tidak mengandung data header');
     }

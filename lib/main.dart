@@ -48,6 +48,7 @@ import 'package:pps_tablet/features/production/crusher/view_model/crusher_produc
 import 'package:pps_tablet/features/production/crusher/view_model/crusher_production_view_model.dart';
 import 'package:pps_tablet/features/production/gilingan/repository/gilingan_production_repository.dart';
 import 'package:pps_tablet/features/production/gilingan/view/gilingan_production_screen.dart';
+import 'package:pps_tablet/features/production/gilingan/view_model/gilingan_production_input_view_model.dart';
 import 'package:pps_tablet/features/production/gilingan/view_model/gilingan_production_view_model.dart';
 import 'package:pps_tablet/features/production/hot_stamp/model/hot_stamp_production_model.dart';
 import 'package:pps_tablet/features/production/hot_stamp/repository/hot_stamp_production_repository.dart';
@@ -111,6 +112,7 @@ import 'features/label/crusher/view_model/crusher_view_model.dart';
 import 'features/label/gilingan/view/gilingan_screen.dart';
 import 'features/login/view/login_screen.dart';
 import 'features/production/broker/view/broker_production_screen.dart';
+import 'features/production/gilingan/repository/gilingan_production_input_repository.dart';
 import 'features/shared/lokasi/lokasi_view_model.dart';
 import 'features/stock_opname/view/stock_opname_list_screen.dart';
 import 'features/home/view/home_screen.dart';
@@ -293,6 +295,15 @@ class MyApp extends StatelessWidget {
             ),
           ),
         ),
+
+        ChangeNotifierProvider<GilinganProductionInputViewModel>(
+          create: (ctx) => GilinganProductionInputViewModel(
+            repository: GilinganProductionInputRepository(
+              apiClient: ctx.read<ApiClient>(),
+            ),
+          ),
+        ),
+
 
       ],
       child: MaterialApp(

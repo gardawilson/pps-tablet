@@ -1,7 +1,6 @@
 // lib/features/production/gilingan/view/gilingan_production_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/horizontal_paged_table.dart';
@@ -10,7 +9,6 @@ import '../../../../common/widgets/table_column_spec.dart';
 import '../../../../core/utils/date_formatter.dart';
 
 import '../model/gilingan_production_model.dart';
-import '../repository/gilingan_production_repository.dart';
 import '../view_model/gilingan_production_view_model.dart';
 
 // Action bar
@@ -18,6 +16,7 @@ import '../widgets/gilingan_production_action_bar.dart';
 import '../widgets/gilingan_production_delete_dialog.dart';
 import '../widgets/gilingan_production_form_dialog.dart';
 import '../widgets/gilingan_production_row_popover.dart';
+import 'gilingan_production_input_screen.dart';
 
 class GilinganProductionScreen extends StatefulWidget {
   const GilinganProductionScreen({super.key});
@@ -31,9 +30,31 @@ class _GilinganProductionScreenState extends State<GilinganProductionScreen> {
   final TextEditingController _searchCtl = TextEditingController();
   String? _selectedNoProduksi;
 
+  // ✅ Store VM instance as field
+  late final GilinganProductionViewModel _viewModel;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // ✅ Create VM once in initState
+    _viewModel = GilinganProductionViewModel();
+
+    debugPrint(
+      '🟦🟦🟦 [GILINGAN_SCREEN] initState: Created VM hash=${_viewModel.hashCode}',
+    );
+    debugPrint(
+      '🟦🟦🟦 [GILINGAN_SCREEN] initState: PagingController hash=${_viewModel.pagingController.hashCode}',
+    );
+
+    // Initialize first load
+    _viewModel.refreshPaged();
+  }
+
   @override
   void dispose() {
     _searchCtl.dispose();
+    _viewModel.dispose(); // ✅ Dispose VM
     super.dispose();
   }
 
@@ -53,10 +74,8 @@ class _GilinganProductionScreenState extends State<GilinganProductionScreen> {
       barrierDismissible: true,
       barrierColor: Colors.black26,
       builder: (dialogCtx) {
-        final safeLeft =
-        local.dx.clamp(8.0, overlay.size.width - 320.0);
-        final safeTop =
-        local.dy.clamp(8.0, overlay.size.height - 220.0);
+        final safeLeft = local.dx.clamp(8.0, overlay.size.width - 320.0);
+        final safeTop = local.dy.clamp(8.0, overlay.size.height - 220.0);
 
         return Stack(
           children: [
@@ -65,11 +84,17 @@ class _GilinganProductionScreenState extends State<GilinganProductionScreen> {
               top: safeTop,
               child: GilinganProductionRowPopover(
                 row: row,
-                // tutup popover pakai context dialog
                 onClose: () => Navigator.of(dialogCtx).pop(),
                 onInput: () {
-                  // TODO: kalau nanti ada screen input khusus gilingan, panggil di sini.
-                  // Sekarang biarkan kosong.
+                  Future.microtask(() {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => GilinganProductionInputScreen(
+                          noProduksi: row.noProduksi,
+                        ),
+                      ),
+                    );
+                  });
                 },
                 onEdit: () async {
                   await _openEditDialog(context, row);
@@ -82,19 +107,13 @@ class _GilinganProductionScreenState extends State<GilinganProductionScreen> {
                       return GilinganProductionDeleteDialog(
                         header: row,
                         onConfirm: () async {
-                          final vm =
-                          context.read<GilinganProductionViewModel>();
-
                           final success =
-                          await vm.deleteProduksi(row.noProduksi);
+                          await _viewModel.deleteProduksi(row.noProduksi);
 
-                          // tutup dialog konfirmasi
                           if (ctx.mounted) Navigator.of(ctx).pop();
-
                           if (!context.mounted) return;
 
                           if (success) {
-                            // dialog sukses
                             showDialog(
                               context: context,
                               builder: (_) => SuccessStatusDialog(
@@ -104,8 +123,8 @@ class _GilinganProductionScreenState extends State<GilinganProductionScreen> {
                               ),
                             );
                           } else {
-                            final rawMsg = vm.saveError ??
-                                'Gagal menghapus data';
+                            final rawMsg =
+                                _viewModel.saveError ?? 'Gagal menghapus data';
                             showDialog(
                               context: context,
                               builder: (_) => ErrorStatusDialog(
@@ -132,12 +151,18 @@ class _GilinganProductionScreenState extends State<GilinganProductionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => GilinganProductionViewModel(
-        repository: GilinganProductionRepository(),
-      )..refreshPaged(), // mulai dengan mode paged
+    // ✅ Use .value to provide existing VM instance
+    return ChangeNotifierProvider<GilinganProductionViewModel>.value(
+      value: _viewModel,
       child: Consumer<GilinganProductionViewModel>(
         builder: (context, vm, _) {
+          debugPrint(
+            '🟦 [GILINGAN_SCREEN] Consumer.builder() called, VM hash=${vm.hashCode}',
+          );
+          debugPrint(
+            '🟦 [GILINGAN_SCREEN] Consumer pagingController: hash=${vm.pagingController.hashCode}',
+          );
+
           final columns = <TableColumnSpec<GilinganProduction>>[
             TableColumnSpec(
               title: 'NO. PRODUKSI',
@@ -155,8 +180,7 @@ class _GilinganProductionScreenState extends State<GilinganProductionScreen> {
               width: 130,
               headerAlign: TextAlign.left,
               cellAlign: TextAlign.left,
-              cellBuilder: (_, r) =>
-                  Text(formatDateToShortId(r.tglProduksi)),
+              cellBuilder: (_, r) => Text(formatDateToShortId(r.tglProduksi)),
             ),
             TableColumnSpec(
               title: 'SHIFT',
@@ -183,7 +207,6 @@ class _GilinganProductionScreenState extends State<GilinganProductionScreen> {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            // ⬇️ Tidak ada JamKerja → pakai range HourStart–HourEnd
             TableColumnSpec(
               title: 'JAM',
               width: 140,
@@ -218,25 +241,26 @@ class _GilinganProductionScreenState extends State<GilinganProductionScreen> {
               actions: [
                 IconButton(
                   icon: const Icon(Icons.refresh),
-                  onPressed: vm.refreshPaged,
+                  onPressed: () {
+                    debugPrint(
+                      '🟦 [GILINGAN_SCREEN] Manual refresh button pressed, VM hash=${vm.hashCode}',
+                    );
+                    vm.refreshPaged();
+                  },
                 ),
               ],
             ),
             body: Column(
               children: [
-                // 🔹 ACTION BAR (search + create)
                 GilinganProductionActionBar(
                   controller: _searchCtl,
-                  onSearchChanged: (value) =>
-                      vm.setSearchDebounced(value),
+                  onSearchChanged: (value) => vm.setSearchDebounced(value),
                   onClear: () {
                     _searchCtl.clear();
                     vm.clearFilters();
                   },
                   onAddPressed: _openCreateDialog,
                 ),
-
-                // 🔹 TABLE PAGED
                 Expanded(
                   child: HorizontalPagedTable<GilinganProduction>(
                     pagingController: vm.pagingController,
@@ -264,23 +288,42 @@ class _GilinganProductionScreenState extends State<GilinganProductionScreen> {
   }
 
   Future<void> _openCreateDialog() async {
-    final created = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => GilinganProductionFormDialog(),
+    debugPrint('🟦 [GILINGAN_SCREEN] Opening create dialog...');
+    debugPrint('🟦 [GILINGAN_SCREEN] Using VM hash=${_viewModel.hashCode}');
+    debugPrint(
+      '🟦 [GILINGAN_SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
     );
 
     if (!mounted) return;
 
+    final created = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        debugPrint('🟦 [GILINGAN_SCREEN] Building create dialog...');
+
+        // ✅ Share the SAME VM instance using .value
+        return ChangeNotifierProvider<GilinganProductionViewModel>.value(
+          value: _viewModel,
+          child: const GilinganProductionFormDialog(),
+        );
+      },
+    );
+
+    debugPrint('🟦 [GILINGAN_SCREEN] Dialog closed, result: $created');
+
+    if (!mounted) return;
+
     if (created == true) {
-      // refresh list paged
-      final vm = context.read<GilinganProductionViewModel>();
-      vm.refreshPaged();
+      debugPrint('🟦 [GILINGAN_SCREEN] Success detected (create).');
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Produksi gilingan berhasil dibuat'),
         ),
       );
+    } else {
+      debugPrint('🟦 [GILINGAN_SCREEN] Result was null or false: $created');
     }
   }
 
@@ -288,20 +331,39 @@ class _GilinganProductionScreenState extends State<GilinganProductionScreen> {
       BuildContext context,
       GilinganProduction row,
       ) async {
+    debugPrint(
+        '🟦 [GILINGAN_SCREEN] Opening edit dialog for: ${row.noProduksi}');
+    debugPrint('🟦 [GILINGAN_SCREEN] Using VM hash=${_viewModel.hashCode}');
+    debugPrint(
+      '🟦 [GILINGAN_SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
+    );
+
+    if (!mounted) return;
+
     final updated = await showDialog<GilinganProduction>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => GilinganProductionFormDialog(
-        header: row,
-      ),
+      builder: (dialogContext) {
+        debugPrint('🟦 [GILINGAN_SCREEN] Building edit dialog...');
+
+        // ✅ Share the SAME VM instance
+        return ChangeNotifierProvider<GilinganProductionViewModel>.value(
+          value: _viewModel,
+          child: GilinganProductionFormDialog(
+            header: row,
+          ),
+        );
+      },
+    );
+
+    debugPrint(
+      '🟦 [GILINGAN_SCREEN] Edit dialog closed, result: ${updated?.noProduksi}',
     );
 
     if (!mounted) return;
 
     if (updated != null) {
-      // refresh paged list
-      final vm = context.read<GilinganProductionViewModel>();
-      vm.refreshPaged();
+      debugPrint('🟦 [GILINGAN_SCREEN] Success detected (update).');
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -310,6 +372,8 @@ class _GilinganProductionScreenState extends State<GilinganProductionScreen> {
           ),
         ),
       );
+    } else {
+      debugPrint('🟦 [GILINGAN_SCREEN] Result was null');
     }
   }
 }

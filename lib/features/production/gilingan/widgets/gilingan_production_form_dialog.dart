@@ -17,6 +17,7 @@ import '../../../shared/overlap/view_model/overlap_view_model.dart';
 import '../../../shared/shift/widgets/shift_dropdown.dart';
 import '../../shared/widgets/time_form_field.dart';
 
+import '../../../../core/utils/date_formatter.dart';
 import '../../../../common/widgets/app_date_field.dart';
 import '../model/gilingan_production_model.dart';
 import '../view_model/gilingan_production_view_model.dart';
@@ -49,17 +50,18 @@ class _GilinganProductionFormDialogState
   late final TextEditingController hadirCtrl;
   late final TextEditingController hourMeterCtrl;
 
-  // --- time controllers ---
-  late final TextEditingController hourStartCtrl;
-  late final TextEditingController hourEndCtrl;
-
   // State
   MstMesin? _selectedMesin;
   MstOperator? _selectedOperator;
   int? _selectedShift;
+
   int? _operatorPreselectId;
 
   DateTime _selectedDate = DateTime.now();
+
+  // --- time controllers ---
+  late final TextEditingController hourStartCtrl;
+  late final TextEditingController hourEndCtrl;
 
   // --- time state ---
   TimeOfDay? _startTime;
@@ -73,16 +75,10 @@ class _GilinganProductionFormDialogState
   @override
   void initState() {
     super.initState();
-    debugPrint('📝 [GILINGAN_FORM] initState()');
-
-    noProduction = TextEditingController(
-      text: widget.header?.noProduksi ?? '',
-    );
+    noProduction = TextEditingController(text: widget.header?.noProduksi ?? '');
 
     final DateTime seededDate = widget.header != null
-        ? (widget.header!.tglProduksi != null
-        ? widget.header!.tglProduksi!
-        : DateTime.now())
+        ? (parseAnyToDateTime(widget.header!.tglProduksi) ?? DateTime.now())
         : DateTime.now();
 
     _selectedDate = seededDate;
@@ -109,7 +105,6 @@ class _GilinganProductionFormDialogState
 
   @override
   void dispose() {
-    debugPrint('📝 [GILINGAN_FORM] dispose()');
     noProduction.dispose();
     dateCreatedCtrl.dispose();
     mesinCtrl.dispose();
@@ -128,7 +123,6 @@ class _GilinganProductionFormDialogState
     // cek overlap dulu
     final ovm = context.read<OverlapViewModel>();
     if (ovm.hasOverlap) {
-      debugPrint('❌ [GILINGAN_FORM] hasOverlap=true, abort save');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Tidak bisa simpan, ada overlap jam di mesin ini'),
@@ -137,10 +131,7 @@ class _GilinganProductionFormDialogState
       return;
     }
 
-    if (!_formKey.currentState!.validate()) {
-      debugPrint('❌ [GILINGAN_FORM] Form not valid, abort save');
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
     // pastikan ada mesin & operator & shift
     final mesinId = _selectedMesin?.idMesin ?? widget.header?.idMesin;
@@ -168,9 +159,8 @@ class _GilinganProductionFormDialogState
       return;
     }
 
-    // Pastikan jam mulai & selesai terisi (validator juga sudah cek)
-    if (hourStartCtrl.text.trim().isEmpty ||
-        hourEndCtrl.text.trim().isEmpty) {
+    // Pastikan jam mulai & selesai terisi
+    if (hourStartCtrl.text.trim().isEmpty || hourEndCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Jam mulai & selesai wajib diisi (HH:mm)'),
@@ -194,15 +184,15 @@ class _GilinganProductionFormDialogState
     final hadir = int.tryParse(hadirCtrl.text.trim());
     final hourMeter = double.tryParse(hourMeterCtrl.text.trim());
 
+    // ✅ Read VM from PARENT Screen context
     final prodVm = context.read<GilinganProductionViewModel>();
-
+    debugPrint('📝 [GILINGAN_FORM] Got VM from context: VM hash=${prodVm.hashCode}');
     debugPrint(
-      '📝 [GILINGAN_FORM] Calling VM.${isEdit ? 'updateProduksi' : 'createProduksi'} '
-          '(tgl=$_selectedDate, mesinId=$mesinId, operatorId=$operatorId, '
-          'shift=$_selectedShift, start=$hourStartSql, end=$hourEndSql)',
+      '📝 [GILINGAN_FORM] Got controller from VM: controller hash=${prodVm.pagingController.hashCode}',
     );
 
     // show loading
+    debugPrint('📝 [GILINGAN_FORM] Showing loading dialog...');
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -213,7 +203,7 @@ class _GilinganProductionFormDialogState
 
     try {
       if (isEdit) {
-        // 🔁 UPDATE
+        debugPrint('📝 [GILINGAN_FORM] Calling updateProduksi...');
         result = await prodVm.updateProduksi(
           noProduksi: widget.header!.noProduksi,
           tglProduksi: _selectedDate,
@@ -226,8 +216,11 @@ class _GilinganProductionFormDialogState
           hadir: hadir,
           hourMeter: hourMeter,
         );
+        debugPrint(
+          '📝 [GILINGAN_FORM] updateProduksi returned: ${result?.noProduksi}',
+        );
       } else {
-        // 🆕 CREATE
+        debugPrint('📝 [GILINGAN_FORM] Calling createProduksi...');
         result = await prodVm.createProduksi(
           tglProduksi: _selectedDate,
           idMesin: mesinId,
@@ -239,41 +232,57 @@ class _GilinganProductionFormDialogState
           hadir: hadir,
           hourMeter: hourMeter,
         );
-      }
-    } finally {
-      // pop loading
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-    }
-
-    if (result != null) {
-      debugPrint(
-        '✅ [GILINGAN_FORM] Save success, noProduksi=${result.noProduksi}',
-      );
-      widget.onSave?.call(result);
-      if (mounted) {
-        Navigator.of(context).pop(); // tutup dialog form
-      }
-    } else {
-      debugPrint(
-        '❌ [GILINGAN_FORM] Save failed, error=${prodVm.saveError}',
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              prodVm.saveError ?? 'Gagal menyimpan data',
-            ),
-          ),
+        debugPrint(
+          '📝 [GILINGAN_FORM] createProduksi returned: ${result?.noProduksi}',
         );
       }
+    } catch (e) {
+      debugPrint('❌ [GILINGAN_FORM] Exception during save: $e');
+    } finally {
+      debugPrint('📝 [GILINGAN_FORM] Popping loading dialog...');
+      if (mounted) {
+        Navigator.of(context).pop();
+        debugPrint('📝 [GILINGAN_FORM] Loading dialog popped');
+      }
     }
+
+    if (!mounted) {
+      debugPrint('📝 [GILINGAN_FORM] Widget not mounted after save, returning');
+      return;
+    }
+
+    debugPrint('📝 [GILINGAN_FORM] Checking result: ${result?.noProduksi}');
+
+    if (result != null) {
+      debugPrint('📝 [GILINGAN_FORM] Success detected: ${result.noProduksi}');
+
+      widget.onSave?.call(result);
+
+      if (isEdit) {
+        debugPrint('📝 [GILINGAN_FORM] Edit mode - closing with GilinganProduction result');
+        Navigator.of(context).pop(result);
+        debugPrint('📝 [GILINGAN_FORM] Dialog popped with result');
+      } else {
+        debugPrint('📝 [GILINGAN_FORM] Create mode - closing with true');
+        Navigator.of(context).pop(true);
+        debugPrint('📝 [GILINGAN_FORM] Dialog popped with true');
+      }
+    } else {
+      debugPrint('❌ [GILINGAN_FORM] Result is null, showing error');
+      debugPrint('❌ [GILINGAN_FORM] Error message: ${prodVm.saveError}');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(prodVm.saveError ?? 'Gagal menyimpan data'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      debugPrint('❌ [GILINGAN_FORM] SnackBar shown, keeping dialog open');
+    }
+
+    debugPrint('📝 [GILINGAN_FORM] _submit() completed');
   }
 
-  /// Panggil cek-overlap via ViewModel hanya jika input sudah lengkap:
-  /// - Jam Mulai & Jam Selesai terisi
-  /// - IdMesin tersedia
+  /// Panggil cek-overlap via ViewModel hanya jika input sudah lengkap
   Future<void> _checkOverlapIfReadyVM() async {
     final vm = context.read<OverlapViewModel>();
 
@@ -285,11 +294,6 @@ class _GilinganProductionFormDialogState
       vm.clear();
       return;
     }
-
-    debugPrint(
-      '🔍 [GILINGAN_FORM] checkOverlap(kind=$_kind, date=$_selectedDate, idMesin=$idMesin, '
-          'start=$start, end=$end, exclude=${isEdit ? widget.header!.noProduksi : null})',
-    );
 
     await vm.check(
       kind: _kind,
@@ -305,20 +309,19 @@ class _GilinganProductionFormDialogState
   Widget build(BuildContext context) {
     debugPrint('📝 [GILINGAN_FORM] build() called');
 
-    // ⚠️ Di sini kita HANYA membuat OverlapViewModel lokal.
-    // GilinganProductionViewModel diambil dari parent (screen).
-    return ChangeNotifierProvider<OverlapViewModel>(
-      create: (_) =>
-          OverlapViewModel(repository: OverlapRepository()),
+    // ✅ Verify we're using the correct VM
+    final vm = context.read<GilinganProductionViewModel>();
+    debugPrint('📝 [GILINGAN_FORM] VM from context: hash=${vm.hashCode}');
+    debugPrint(
+      '📝 [GILINGAN_FORM] Controller from VM: hash=${vm.pagingController.hashCode}',
+    );
+
+    return ChangeNotifierProvider(
+      create: (_) => OverlapViewModel(repository: OverlapRepository()),
       child: Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Container(
-          constraints: const BoxConstraints(
-            maxWidth: 600,
-            maxHeight: 700,
-          ),
+          constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -360,29 +363,25 @@ class _GilinganProductionFormDialogState
         const SizedBox(width: 12),
         Text(
           isEdit ? 'Edit Produksi Gilingan' : 'Tambah Produksi Gilingan',
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
       ],
     );
   }
 
   Widget _buildLeftColumn() {
-    final ovm = context.watch<OverlapViewModel>();
+    final vm = context.watch<OverlapViewModel>();
 
     // durasi lokal
-    final dur =
-    durationBetweenHHmmWrap(hourStartCtrl.text, hourEndCtrl.text);
+    final dur = durationBetweenHHmmWrap(hourStartCtrl.text, hourEndCtrl.text);
     final startFilled = hourStartCtrl.text.trim().isNotEmpty;
     final endFilled = hourEndCtrl.text.trim().isNotEmpty;
     final hasDurationError = startFilled && endFilled && dur == null;
 
     // overlap dari server
-    final hasOverlap = ovm.hasOverlap;
+    final hasOverlap = vm.hasOverlap;
     final overlapMsg =
-        ovm.overlapMessage ?? 'Jam ini bentrok dengan dokumen lain';
+        vm.overlapMessage ?? 'Jam ini bentrok dengan dokumen lain';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -398,18 +397,12 @@ class _GilinganProductionFormDialogState
             children: [
               Row(
                 children: [
-                  Icon(
-                    Icons.description,
-                    color: Colors.blue.shade700,
-                    size: 20,
-                  ),
+                  Icon(Icons.description,
+                      color: Colors.blue.shade700, size: 20),
                   const SizedBox(width: 8),
                   const Text(
                     'Header',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
@@ -435,10 +428,8 @@ class _GilinganProductionFormDialogState
                   if (d != null) {
                     setState(() {
                       _selectedDate = d;
-                      dateCreatedCtrl.text = DateFormat(
-                        'EEEE, dd MMM yyyy',
-                        'id_ID',
-                      ).format(d);
+                      dateCreatedCtrl.text =
+                          DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(d);
                     });
                     await _checkOverlapIfReadyVM();
                   }
@@ -449,13 +440,12 @@ class _GilinganProductionFormDialogState
 
               // Jenis Mesin
               MesinDropdown(
-                idBagianMesin: 3, // ID bagian untuk GILINGAN
+                idBagianMesin: 3, // TODO: sesuaikan ID bagian untuk GILINGAN
                 preselectId: widget.header?.idMesin,
                 label: 'Mesin Gilingan',
                 hint: 'Pilih mesin',
                 autovalidateMode: AutovalidateMode.onUserInteraction,
-                validator: (v) =>
-                v == null ? 'Wajib pilih mesin gilingan' : null,
+                validator: (v) => v == null ? 'Wajib pilih mesin gilingan' : null,
                 onChanged: (m) async {
                   _selectedMesin = m;
                   _operatorPreselectId = m?.defaultOperatorId;
@@ -469,17 +459,14 @@ class _GilinganProductionFormDialogState
 
               // Operator
               OperatorDropdown(
-                key: ValueKey(
-                  _operatorPreselectId ?? widget.header?.idOperator,
-                ),
+                key: ValueKey(_operatorPreselectId ?? widget.header?.idOperator),
                 preselectId: isEdit
                     ? widget.header?.idOperator
                     : _operatorPreselectId,
                 label: 'Operator',
                 hint: 'Pilih operator',
                 autovalidateMode: AutovalidateMode.onUserInteraction,
-                validator: (v) =>
-                v == null ? 'Wajib pilih operator' : null,
+                validator: (v) => v == null ? 'Wajib pilih operator' : null,
                 onChanged: (op) {
                   _selectedOperator = op;
                   setState(() {});
@@ -515,11 +502,8 @@ class _GilinganProductionFormDialogState
                           return 'Wajib isi jam mulai (HH:mm)';
                         }
                         final diff = durationBetweenHHmmWrap(
-                          hourStartCtrl.text,
-                          hourEndCtrl.text,
-                        );
-                        if (diff == null &&
-                            parseHHmm(hourEndCtrl.text) != null) {
+                            hourStartCtrl.text, hourEndCtrl.text);
+                        if (diff == null && parseHHmm(hourEndCtrl.text) != null) {
                           return 'Durasi tidak boleh 0 menit';
                         }
                         return null;
@@ -553,9 +537,7 @@ class _GilinganProductionFormDialogState
                         final s = parseHHmm(hourStartCtrl.text);
                         if (s != null) {
                           final diff = durationBetweenHHmmWrap(
-                            hourStartCtrl.text,
-                            hourEndCtrl.text,
-                          );
+                              hourStartCtrl.text, hourEndCtrl.text);
                           if (diff == null) {
                             return 'Durasi tidak boleh 0 menit';
                           }
@@ -587,8 +569,7 @@ class _GilinganProductionFormDialogState
                           _selectedShift = id;
                         });
                       },
-                      validator: (v) =>
-                      v == null ? 'Wajib pilih shift' : null,
+                      validator: (v) => v == null ? 'Wajib pilih shift' : null,
                       autovalidateMode: AutovalidateMode.onUserInteraction,
                     ),
                   ),
@@ -604,7 +585,7 @@ class _GilinganProductionFormDialogState
                       validator: (v) =>
                       (v == null || v.isEmpty) ? 'Wajib diisi' : null,
                     ),
-                  ),
+                  )
                 ],
               ),
 
@@ -652,7 +633,7 @@ class _GilinganProductionFormDialogState
     final ovm = context.watch<OverlapViewModel>();
     final hasOverlap = ovm.hasOverlap;
 
-    // ⚠️ Ambil VM Gilingan dari parent (bukan dari Provider di dialog)
+    // ✅ Watch VM from PARENT Screen context for isSaving state
     final prodVm = context.watch<GilinganProductionViewModel>();
     final isSaving = prodVm.isSaving;
 
@@ -661,10 +642,7 @@ class _GilinganProductionFormDialogState
       children: [
         OutlinedButton(
           onPressed: isSaving ? null : () => Navigator.pop(context),
-          child: const Text(
-            'BATAL',
-            style: TextStyle(fontSize: 15),
-          ),
+          child: const Text('BATAL', style: TextStyle(fontSize: 15)),
         ),
         const SizedBox(width: 12),
         ElevatedButton(
@@ -680,10 +658,7 @@ class _GilinganProductionFormDialogState
           ),
           child: Text(
             isSaving ? 'MENYIMPAN...' : 'SIMPAN',
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
           ),
         ),
       ],

@@ -11,12 +11,12 @@ import '../model/broker_inputs_model.dart';
 class BrokerProductionViewModel extends ChangeNotifier {
   final BrokerProductionRepository repository;
 
-  BrokerProductionViewModel({required this.repository}) {
-    pagingController = PagingController<int, BrokerProduction>(
-      getNextPageKey: (state) =>
-      state.lastPageIsEmpty ? null : state.nextIntPageKey,
-      fetchPage: _fetchPaged,
-    );
+  // ✅ Constructor dengan optional repository parameter
+  BrokerProductionViewModel({
+    BrokerProductionRepository? repository,
+  }) : repository = repository ?? BrokerProductionRepository() {
+    debugPrint('🟢 [BROKER_VM] ctor called, repository: ${this.repository}, VM hash=$hashCode');
+    _initializePagingController();
   }
 
   // =========================
@@ -39,7 +39,27 @@ class BrokerProductionViewModel extends ChangeNotifier {
   // =========================
   // MODE PAGED
   // =========================
-  late final PagingController<int, BrokerProduction> pagingController;
+  late final PagingController<int, BrokerProduction> _pagingController;
+  PagingController<int, BrokerProduction> get pagingController => _pagingController;
+
+  void _initializePagingController() {
+    debugPrint('🟢 [BROKER_VM] _initializePagingController: creating controller, VM hash=$hashCode');
+
+    _pagingController = PagingController<int, BrokerProduction>(
+      getNextPageKey: (state) {
+        debugPrint('🟢 [BROKER_VM] getNextPageKey called, VM hash=$hashCode');
+        return state.lastPageIsEmpty ? null : state.nextIntPageKey;
+      },
+      fetchPage: (pageKey) {
+        debugPrint('🟢 [BROKER_VM] fetchPage wrapper called for pageKey=$pageKey, VM hash=$hashCode');
+        return _fetchPaged(pageKey);
+      },
+    );
+
+    debugPrint(
+      '🟢 [BROKER_VM] pagingController created: hash=${_pagingController.hashCode}, VM hash=$hashCode',
+    );
+  }
 
   // Filters
   int pageSize = 20;
@@ -47,7 +67,7 @@ class BrokerProductionViewModel extends ChangeNotifier {
   /// Generic contains-search (backend searches **NoProduksi LIKE**)
   String _search = '';
 
-  /// “Exact” NoProduksi (convenience). Backend still does LIKE; we keep this
+  /// "Exact" NoProduksi (convenience). Backend still does LIKE; we keep this
   /// so UI can choose an exact flow (e.g., from a suggestion list).
   String? _noProduksi;
   bool _exactNoProduksi = false;
@@ -74,7 +94,6 @@ class BrokerProductionViewModel extends ChangeNotifier {
   int inputsCount(String noProduksi, String key) =>
       _inputsCache[noProduksi]?.summary[key] ?? 0;
 
-
   void clearInputsCache([String? noProduksi]) {
     if (noProduksi == null) {
       _inputsCache.clear();
@@ -90,14 +109,18 @@ class BrokerProductionViewModel extends ChangeNotifier {
 
   // ===== BY DATE =====
   Future<void> fetchByDate(DateTime date) async {
+    debugPrint('📅 [BROKER_VM] fetchByDate($date) dipanggil, VM hash=$hashCode');
     _isByDateMode = true;
     isLoading = true;
     error = '';
     notifyListeners();
     try {
       final data = await repository.fetchByDate(date);
+      debugPrint('📅 [BROKER_VM] fetchByDate success, items length = ${data.length}, VM hash=$hashCode');
       items = data;
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('❌ [BROKER_VM] fetchByDate error: $e, VM hash=$hashCode');
+      debugPrint('❌ [BROKER_VM] fetchByDate stack: $st');
       error = e.toString();
     } finally {
       isLoading = false;
@@ -106,24 +129,29 @@ class BrokerProductionViewModel extends ChangeNotifier {
   }
 
   void exitByDateModeAndRefreshPaged() {
+    debugPrint('🔁 [BROKER_VM] exitByDateModeAndRefreshPaged(), VM hash=$hashCode');
     if (_isByDateMode) {
       _isByDateMode = false;
       items = [];
       error = '';
       isLoading = false;
-      pagingController.refresh();
+      debugPrint('🔁 [BROKER_VM] exitByDateMode -> pagingController.refresh(), VM hash=$hashCode');
+      _pagingController.refresh();
       notifyListeners();
     }
   }
 
   // ====== FETCH per halaman (PagingController v5) ======
   Future<List<BrokerProduction>> _fetchPaged(int pageKey) async {
-    if (_isByDateMode) return const <BrokerProduction>[];
+    debugPrint(
+        '📡 [BROKER_VM] _fetchPaged(pageKey=$pageKey), isByDateMode=$_isByDateMode, VM hash=$hashCode');
+
+    if (_isByDateMode) {
+      debugPrint('📡 [BROKER_VM] _fetchPaged: isByDateMode=true, return empty, VM hash=$hashCode');
+      return const <BrokerProduction>[];
+    }
 
     // Decide what to send to repository:
-    // - If exactNoProduksi = true => send via noProduksi (plus exact flag)
-    // - Else if _noProduksi is set, send as generic search (contains)
-    // - Else use _search
     final String? searchContains = _exactNoProduksi
         ? null
         : ((_noProduksi?.trim().isNotEmpty ?? false)
@@ -134,22 +162,38 @@ class BrokerProductionViewModel extends ChangeNotifier {
         ? (_noProduksi?.trim().isNotEmpty == true ? _noProduksi!.trim() : null)
         : null;
 
-    final res = await repository.fetchAll(
-      page: pageKey,
-      pageSize: pageSize,
-      search: searchContains,
-      noProduksi: noProduksiExact,
-      exactNoProduksi: _exactNoProduksi,
-      shift: _shift,
-      date: _date,
-      // You can add dateFrom/dateTo/idMesin/idOperator pass-through here if needed
-    );
+    debugPrint(
+        '📡 [BROKER_VM] _fetchPaged filters -> searchContains="$searchContains", noProduksiExact="$noProduksiExact", shift=$_shift, date=$_date, pageSize=$pageSize, VM hash=$hashCode');
 
-    final items = res['items'] as List<BrokerProduction>;
-    final totalPages = (res['totalPages'] as int?) ?? 1;
+    try {
+      final res = await repository.fetchAll(
+        page: pageKey,
+        pageSize: pageSize,
+        search: searchContains,
+        noProduksi: noProduksiExact,
+        exactNoProduksi: _exactNoProduksi,
+        shift: _shift,
+        date: _date,
+      );
 
-    if (pageKey > totalPages) return const <BrokerProduction>[];
-    return items;
+      final items = res['items'] as List<BrokerProduction>;
+      final totalPages = (res['totalPages'] as int?) ?? 1;
+
+      debugPrint(
+          '📡 [BROKER_VM] _fetchPaged result: items.length=${items.length}, totalPages=$totalPages, currentPage=$pageKey, VM hash=$hashCode');
+
+      if (pageKey > totalPages) {
+        debugPrint('📡 [BROKER_VM] _fetchPaged: pageKey > totalPages, return empty, VM hash=$hashCode');
+        return const <BrokerProduction>[];
+      }
+
+      debugPrint('📡 [BROKER_VM] _fetchPaged: returning ${items.length} items, VM hash=$hashCode');
+      return items;
+    } catch (e, st) {
+      debugPrint('❌ [BROKER_VM] _fetchPaged error: $e, VM hash=$hashCode');
+      debugPrint('❌ [BROKER_VM] _fetchPaged stack: $st');
+      rethrow;
+    }
   }
 
   // ====== Filter helpers (mode paged) ======
@@ -161,6 +205,8 @@ class BrokerProductionViewModel extends ChangeNotifier {
     DateTime? date,
     int? newPageSize,
   }) {
+    debugPrint(
+        '🔍 [BROKER_VM] applyFilters(search="$search", shift=$shift, date=$date, newPageSize=$newPageSize), VM hash=$hashCode');
     _isByDateMode = false;
     if (newPageSize != null && newPageSize > 0) pageSize = newPageSize;
 
@@ -173,35 +219,37 @@ class BrokerProductionViewModel extends ChangeNotifier {
     _date = date;
 
     clearInputsCache();
-    pagingController.refresh();
+    debugPrint('🔍 [BROKER_VM] applyFilters -> pagingController.refresh(), VM hash=$hashCode');
+    _pagingController.refresh();
     notifyListeners();
   }
 
   /// Cari NoProduksi dengan contains (LIKE '%text%')
   void searchNoProduksiContains(String text) {
+    debugPrint('🔍 [BROKER_VM] searchNoProduksiContains("$text"), VM hash=$hashCode');
     _isByDateMode = false;
     _exactNoProduksi = false;
     _noProduksi = text;
     // Optional: keep _search in sync for UIs that only know 'search'
     _search = text;
     clearInputsCache();
-    pagingController.refresh();
+    _pagingController.refresh();
     notifyListeners();
   }
 
   /// Cari NoProduksi exact (persis sama).
-  /// Cocok untuk "Go to NoProduksi" atau saat user pilih dari suggestion list.
   void searchNoProduksiExact(String no) {
+    debugPrint('🔍 [BROKER_VM] searchNoProduksiExact("$no"), VM hash=$hashCode');
     _isByDateMode = false;
     _exactNoProduksi = true;
     _noProduksi = no;
-    // _search intentionally not set to avoid duplicate params
     clearInputsCache();
-    pagingController.refresh();
+    _pagingController.refresh();
     notifyListeners();
   }
 
   void clearFilters() {
+    debugPrint('🧹 [BROKER_VM] clearFilters(), VM hash=$hashCode');
     _isByDateMode = false;
     _search = '';
     _noProduksi = null;
@@ -210,26 +258,34 @@ class BrokerProductionViewModel extends ChangeNotifier {
     _date = null;
 
     clearInputsCache();
-    pagingController.refresh();
+    debugPrint('🧹 [BROKER_VM] clearFilters -> pagingController.refresh(), VM hash=$hashCode');
+    _pagingController.refresh();
     notifyListeners();
   }
 
   void refreshPaged() {
+    debugPrint('🔄 [BROKER_VM] refreshPaged() called, VM hash=$hashCode');
     _isByDateMode = false;
     clearInputsCache();
-    pagingController.refresh();
+    debugPrint('🔄 [BROKER_VM] Calling _pagingController.refresh(), VM hash=$hashCode');
+    _pagingController.refresh();
+    debugPrint('🔄 [BROKER_VM] _pagingController.refresh() completed, VM hash=$hashCode');
   }
 
   // ===== Optional: Debounced search helper =====
   Timer? _searchDebounce;
-  void setSearchDebounced(String text, {Duration delay = const Duration(milliseconds: 350)}) {
+  void setSearchDebounced(
+      String text, {
+        Duration delay = const Duration(milliseconds: 350),
+      }) {
+    debugPrint(
+        '⌛ [BROKER_VM] setSearchDebounced("$text", delay=${delay.inMilliseconds}ms), VM hash=$hashCode');
     _searchDebounce?.cancel();
     _searchDebounce = Timer(delay, () {
+      debugPrint('⌛ [BROKER_VM] debounce fired, applyFilters("$text"), VM hash=$hashCode');
       applyFilters(search: text);
     });
   }
-
-
 
   // ====== CREATE / SAVE ======
   Future<BrokerProduction?> createProduksi({
@@ -238,8 +294,8 @@ class BrokerProductionViewModel extends ChangeNotifier {
     required int idOperator,
     required dynamic jam, // int atau 'HH:mm-HH:mm'
     required int shift,
-    String? hourStart,    // ⬅️ baru
-    String? hourEnd,      // ⬅️ baru
+    String? hourStart,
+    String? hourEnd,
     String? checkBy1,
     String? checkBy2,
     String? approveBy,
@@ -247,6 +303,8 @@ class BrokerProductionViewModel extends ChangeNotifier {
     int? hadir,
     double? hourMeter,
   }) async {
+    debugPrint(
+        '🆕 [BROKER_VM] createProduksi(tglProduksi=$tglProduksi, idMesin=$idMesin, idOperator=$idOperator, jam=$jam, shift=$shift, hourStart=$hourStart, hourEnd=$hourEnd, jmlhAnggota=$jmlhAnggota, hadir=$hadir, hourMeter=$hourMeter), VM hash=$hashCode');
     isSaving = true;
     saveError = null;
     notifyListeners();
@@ -258,8 +316,8 @@ class BrokerProductionViewModel extends ChangeNotifier {
         idOperator: idOperator,
         jam: jam,
         shift: shift,
-        hourStart: hourStart,   // ⬅️ lempar ke repo
-        hourEnd: hourEnd,       // ⬅️ lempar ke repo
+        hourStart: hourStart,
+        hourEnd: hourEnd,
         checkBy1: checkBy1,
         checkBy2: checkBy2,
         approveBy: approveBy,
@@ -268,16 +326,23 @@ class BrokerProductionViewModel extends ChangeNotifier {
         hourMeter: hourMeter,
       );
 
-      // setelah create, refresh sesuai mode
+      debugPrint(
+          '🆕 [BROKER_VM] createProduksi success, noProduksi=${created?.noProduksi}, VM hash=$hashCode');
+
+      // 🔄 AUTO REFRESH LIST SETELAH CREATE
       if (_isByDateMode) {
+        debugPrint('🆕 [BROKER_VM] create in BY_DATE mode -> fetchByDate, VM hash=$hashCode');
         await fetchByDate(tglProduksi);
       } else {
+        debugPrint('🆕 [BROKER_VM] create in PAGED mode -> refreshPaged, VM hash=$hashCode');
         clearInputsCache();
-        pagingController.refresh();
+        refreshPaged();
       }
 
       return created;
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('❌ [BROKER_VM] createProduksi error: $e, VM hash=$hashCode');
+      debugPrint('❌ [BROKER_VM] createProduksi stack: $st');
       saveError = e.toString();
       return null;
     } finally {
@@ -285,7 +350,6 @@ class BrokerProductionViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
-
 
   // ====== UPDATE / SAVE ======
   Future<BrokerProduction?> updateProduksi({
@@ -304,6 +368,8 @@ class BrokerProductionViewModel extends ChangeNotifier {
     int? hadir,
     double? hourMeter,
   }) async {
+    debugPrint(
+        '✏️ [BROKER_VM] updateProduksi(noProduksi=$noProduksi, tglProduksi=$tglProduksi, idMesin=$idMesin, idOperator=$idOperator, jam=$jam, shift=$shift, hourStart=$hourStart, hourEnd=$hourEnd, jmlhAnggota=$jmlhAnggota, hadir=$hadir, hourMeter=$hourMeter), VM hash=$hashCode');
     isSaving = true;
     saveError = null;
     notifyListeners();
@@ -326,26 +392,35 @@ class BrokerProductionViewModel extends ChangeNotifier {
         hourMeter: hourMeter,
       );
 
-      // setelah update, refresh sesuai mode
+      debugPrint(
+          '✏️ [BROKER_VM] updateProduksi success, noProduksi=${updated?.noProduksi}, VM hash=$hashCode');
+
+      // 🔄 AUTO REFRESH LIST SETELAH UPDATE
       if (_isByDateMode) {
-        // kalau user lagi lihat per tanggal, kita ambil ulang tanggal itu
         if (tglProduksi != null) {
+          debugPrint(
+              '✏️ [BROKER_VM] update in BY_DATE mode, tglProduksi!=null -> fetchByDate($tglProduksi), VM hash=$hashCode');
           await fetchByDate(tglProduksi);
         } else if (_date != null) {
+          debugPrint(
+              '✏️ [BROKER_VM] update in BY_DATE mode, _date!=null -> fetchByDate($_date), VM hash=$hashCode');
           await fetchByDate(_date!);
         } else {
-          // fallback: refresh paged aja
+          debugPrint(
+              '✏️ [BROKER_VM] update in BY_DATE mode, no date info -> refreshPaged(), VM hash=$hashCode');
           clearInputsCache(noProduksi);
-          pagingController.refresh();
+          refreshPaged();
         }
       } else {
-        // mode paged
-        clearInputsCache(noProduksi); // biar inputs row itu ke-refresh
-        pagingController.refresh();
+        debugPrint('✏️ [BROKER_VM] update in PAGED mode -> refreshPaged(), VM hash=$hashCode');
+        clearInputsCache(noProduksi);
+        refreshPaged();
       }
 
       return updated;
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('❌ [BROKER_VM] updateProduksi error: $e, VM hash=$hashCode');
+      debugPrint('❌ [BROKER_VM] updateProduksi stack: $st');
       saveError = e.toString();
       return null;
     } finally {
@@ -355,35 +430,40 @@ class BrokerProductionViewModel extends ChangeNotifier {
   }
 
   Future<bool> deleteProduksi(String noProduksi) async {
+    debugPrint('🗑 [BROKER_VM] deleteProduksi(noProduksi=$noProduksi), VM hash=$hashCode');
     try {
-      saveError = null; // clear error sebelumnya
+      saveError = null;
       notifyListeners();
 
       await repository.deleteProduksi(noProduksi);
+      debugPrint('🗑 [BROKER_VM] deleteProduksi success, VM hash=$hashCode');
 
-      // refresh list
+      // 🔄 AUTO REFRESH LIST SETELAH DELETE
       if (isByDateMode) {
         if (date != null) {
+          debugPrint(
+              '🗑 [BROKER_VM] delete in BY_DATE mode -> fetchByDate($date), VM hash=$hashCode');
           await fetchByDate(date!);
         }
       } else {
+        debugPrint('🗑 [BROKER_VM] delete in PAGED mode -> refreshPaged(), VM hash=$hashCode');
         clearInputsCache(noProduksi);
-        pagingController.refresh();
+        refreshPaged();
       }
       return true;
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('❌ [BROKER_VM] deleteProduksi error: $e, VM hash=$hashCode');
+      debugPrint('❌ [BROKER_VM] deleteProduksi stack: $st');
+
       String msg = e.toString().replaceFirst('Exception: ', '').trim();
 
-      // 🔍 kalau msg kelihatan seperti JSON → coba ambil "message"
       if (msg.startsWith('{') && msg.endsWith('}')) {
         try {
           final decoded = jsonDecode(msg);
           if (decoded is Map && decoded['message'] != null) {
             msg = decoded['message'].toString();
           }
-        } catch (_) {
-          // kalau parsing gagal, biarkan msg apa adanya
-        }
+        } catch (_) {}
       }
 
       saveError = msg;
@@ -392,12 +472,11 @@ class BrokerProductionViewModel extends ChangeNotifier {
     }
   }
 
-
-
   @override
   void dispose() {
+    debugPrint('🔴 [BROKER_VM] dispose() dipanggil, VM hash=$hashCode');
     _searchDebounce?.cancel();
-    pagingController.dispose();
+    _pagingController.dispose();
     super.dispose();
   }
 }

@@ -33,6 +33,37 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
   /// - Partial info popover
   final InteractivePopover _popover = InteractivePopover();
 
+  bool _isPartialHeader(FurnitureWipHeader h) {
+    // sesuaikan kalau nama field berbeda (mis: isPartialBool / IsPartial)
+    return h.isPartial == 1;
+  }
+
+  Future<void> _onEditHeader(FurnitureWipHeader header) async {
+    if (_isPartialHeader(header)) {
+      await DialogService.instance.showError(
+        title: 'Tidak bisa edit',
+        message: 'Label ${header.noFurnitureWip} tidak bisa diedit karena statusnya PARTIAL.',
+      );
+      return;
+    }
+
+    _showFormDialog(header: header);
+  }
+
+  Future<void> _onDeleteHeader(FurnitureWipHeader header) async {
+    if (_isPartialHeader(header)) {
+      await DialogService.instance.showError(
+        title: 'Tidak bisa hapus',
+        message: 'Label ${header.noFurnitureWip} tidak bisa dihapus karena statusnya PARTIAL.',
+      );
+      return;
+    }
+
+    _confirmDelete(header);
+  }
+
+
+
   @override
   void initState() {
     super.initState();
@@ -108,14 +139,14 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
       child: FurnitureWipRowPopover(
         header: header,
         onClose: _closeContextMenu,
-        onEdit: () {
+        onEdit: () async {
           _closeContextMenu();
-          _showFormDialog(header: header);
+          await _onEditHeader(header);
         },
-        onDelete: () {
+        onDelete: () async {
           if (context.read<FurnitureWipViewModel>().isLoading) return;
           _closeContextMenu();
-          _confirmDelete(header);
+          await _onDeleteHeader(header);
         },
         onPrint: () {
           _closeContextMenu();

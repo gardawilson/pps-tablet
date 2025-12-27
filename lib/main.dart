@@ -57,7 +57,10 @@ import 'package:pps_tablet/features/production/inject/repository/inject_producti
 import 'package:pps_tablet/features/production/inject/view_model/inject_production_view_model.dart';
 import 'package:pps_tablet/features/production/key_fitting/repository/key_fitting_production_repository.dart';
 import 'package:pps_tablet/features/production/key_fitting/view_model/key_fitting_production_view_model.dart';
+import 'package:pps_tablet/features/production/mixer/repository/mixer_production_input_repository.dart';
 import 'package:pps_tablet/features/production/mixer/repository/mixer_production_repository.dart';
+import 'package:pps_tablet/features/production/mixer/view/mixer_production_screen.dart';
+import 'package:pps_tablet/features/production/mixer/view_model/mixer_production_input_view_model.dart';
 import 'package:pps_tablet/features/production/mixer/view_model/mixer_production_view_model.dart';
 import 'package:pps_tablet/features/production/packing/repository/packing_production_repository.dart';
 import 'package:pps_tablet/features/production/packing/view_model/packing_production_view_model.dart';
@@ -305,6 +308,14 @@ class MyApp extends StatelessWidget {
         ),
 
 
+        ChangeNotifierProvider<MixerProductionInputViewModel>(
+          create: (ctx) => MixerProductionInputViewModel(
+            repository: MixerProductionInputRepository(
+              apiClient: ctx.read<ApiClient>(),
+            ),
+          ),
+        ),
+
       ],
       child: MaterialApp(
         title: 'PPS Tablet',
@@ -376,6 +387,7 @@ class MyApp extends StatelessWidget {
           '/label/packing': (context) => PackingScreen(),
           '/label/reject': (context) => RejectScreen(),
           '/production/gilingan': (context) => GilinganProductionScreen(),
+          '/production/mixer': (context) => MixerProductionScreen(),
         },
       ),
 

@@ -33,6 +33,36 @@ class _PackingScreenState extends State<PackingScreen> {
   /// - Partial info popover
   final InteractivePopover _popover = InteractivePopover();
 
+  bool _isPartialHeader(PackingHeader h) {
+    // sesuaikan kalau nama field beda (mis: IsPartial / isPartialBool / partial)
+    return h.isPartial == 1;
+  }
+
+  Future<void> _onEditHeader(PackingHeader header) async {
+    if (_isPartialHeader(header)) {
+      await DialogService.instance.showError(
+        title: 'Edit Tidak Tersedia',
+        message: 'Label ini tidak dapat diedit karena telah di partial.',
+      );
+      return;
+    }
+
+    _showFormDialog(header: header);
+  }
+
+  Future<void> _onDeleteHeader(PackingHeader header) async {
+    if (_isPartialHeader(header)) {
+      await DialogService.instance.showError(
+        title: 'Delete Tidak Tersedia',
+        message: 'Label ${header.noBJ} tidak dapat dihapus karena telah di partial.',
+      );
+      return;
+    }
+
+    _confirmDelete(header);
+  }
+
+
   @override
   void initState() {
     super.initState();
@@ -106,15 +136,16 @@ class _PackingScreenState extends State<PackingScreen> {
       child: PackingRowPopover(
         header: header,
         onClose: _closeContextMenu,
-        onEdit: () {
+        onEdit: () async {
           _closeContextMenu();
-          _showFormDialog(header: header);
+          await _onEditHeader(header);
         },
-        onDelete: () {
+        onDelete: () async {
           if (context.read<PackingViewModel>().isLoading) return;
           _closeContextMenu();
-          _confirmDelete(header);
+          await _onDeleteHeader(header);
         },
+
         onPrint: () {
           _closeContextMenu();
           // printing sudah dihandle di dalam PackingRowPopover

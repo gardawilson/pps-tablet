@@ -75,6 +75,18 @@ class ProductionSelectionScreen extends StatelessWidget {
                 ? () => Navigator.pushNamed(context, '/production/gilingan')
                 : null,
           ),
+
+          // 🔹 Card Label Mixer
+          _buildLabelCard(
+            context,
+            title: 'Proses Mixer',
+            subtitle: 'Buat label untuk proses mixer',
+            icon: Icons.inventory_2_outlined,
+            enabled: canReadBroker,
+            onTap: canReadBroker
+                ? () => Navigator.pushNamed(context, '/production/mixer')
+                : null,
+          ),
         ],
       ),
     );

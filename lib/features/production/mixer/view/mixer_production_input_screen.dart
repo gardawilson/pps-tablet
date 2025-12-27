@@ -2,42 +2,49 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'package:pps_tablet/features/production/broker/view_model/broker_production_input_view_model.dart';
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/loading_dialog.dart';
 import '../../../../core/view_model/permission_view_model.dart';
+
+import '../../mixer/widgets/mixer_input_group_popover.dart';
+import '../../shared/models/bb_item.dart';
+import '../../shared/models/broker_item.dart';
+import '../../shared/models/crusher_item.dart';
+import '../../shared/models/gilingan_item.dart';
+import '../../shared/models/mixer_item.dart';
 import '../../shared/models/production_label_lookup_result.dart';
+import '../../shared/models/reject_item.dart';
+import '../../shared/models/washing_item.dart';
 import '../../shared/widgets/confirm_save_temp_dialog.dart';
 import '../../shared/widgets/unsaved_temp_warning_dialog.dart';
-import '../widgets/broker_input_group_popover.dart';
 import '../../shared/widgets/partial_mode_not_supported_dialog.dart';
 import '../../shared/widgets/save_button_with_badge.dart';
-import '../model/broker_inputs_model.dart';
-
 import 'package:pps_tablet/features/production/shared/shared.dart';
-import '../widgets/broker_lookup_label_dialog.dart';
-import '../widgets/broker_lookup_label_partial_dialog.dart';
 
-class BrokerProductionInputScreen extends StatefulWidget {
+import '../view_model/mixer_production_input_view_model.dart';
+import '../widgets/mixer_lookup_label_dialog.dart';
+import '../widgets/mixer_lookup_label_partial_dialog.dart';
+
+class MixerProductionInputScreen extends StatefulWidget {
   final String noProduksi;
 
-  const BrokerProductionInputScreen({
+  const MixerProductionInputScreen({
     super.key,
     required this.noProduksi,
   });
 
   @override
-  State<BrokerProductionInputScreen> createState() => _BrokerProductionInputScreenState();
+  State<MixerProductionInputScreen> createState() => _MixerProductionInputScreenState();
 }
 
-class _BrokerProductionInputScreenState extends State<BrokerProductionInputScreen> {
+class _MixerProductionInputScreenState extends State<MixerProductionInputScreen> {
   String _selectedMode = 'full';
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final vm = context.read<BrokerProductionInputViewModel>();
+      final vm = context.read<MixerProductionInputViewModel>();
       final already = vm.inputsOf(widget.noProduksi) != null;
       final loading = vm.isInputsLoading(widget.noProduksi);
       if (!already && !loading) {
@@ -48,7 +55,7 @@ class _BrokerProductionInputScreenState extends State<BrokerProductionInputScree
 
   // ✅ TAMBAHKAN: Method untuk handle back button
   Future<bool> _onWillPop() async {
-    final vm = context.read<BrokerProductionInputViewModel>();
+    final vm = context.read<MixerProductionInputViewModel>();
 
     // Tidak ada temp data, boleh keluar langsung
     if (vm.totalTempCount == 0) {
@@ -97,7 +104,7 @@ class _BrokerProductionInputScreenState extends State<BrokerProductionInputScree
 
   /// ✅ Handler untuk bulk delete
   Future<bool> _handleBulkDelete(List<dynamic> items) async {
-    final vm = context.read<BrokerProductionInputViewModel>();
+    final vm = context.read<MixerProductionInputViewModel>();
 
     final success = await vm.deleteItems(widget.noProduksi, items);
 
@@ -111,13 +118,12 @@ class _BrokerProductionInputScreenState extends State<BrokerProductionInputScree
         ),
       );
     }
-
     return success;
   }
 
 
   Future<void> _handleSave(BuildContext context) async {
-    final vm = context.read<BrokerProductionInputViewModel>();
+    final vm = context.read<MixerProductionInputViewModel>();
 
     if (vm.totalTempCount == 0) {
       _showSnack('Tidak ada data untuk disimpan', backgroundColor: Colors.orange);
@@ -159,7 +165,7 @@ class _BrokerProductionInputScreenState extends State<BrokerProductionInputScree
 
 
   Future<void> _onCodeReady(BuildContext context, String code) async {
-    final vm = context.read<BrokerProductionInputViewModel>();
+    final vm = context.read<MixerProductionInputViewModel>();
 
     // ✅ VALIDASI: Cek jika mode partial tidak support untuk washing/crusher
     if (_selectedMode == 'partial') {
@@ -218,7 +224,7 @@ class _BrokerProductionInputScreenState extends State<BrokerProductionInputScree
   /// MODE FULL: Langsung commit semua data tanpa dialog
   Future<void> _handleFullMode(
       BuildContext context,
-      BrokerProductionInputViewModel vm,
+      MixerProductionInputViewModel vm,
       ProductionLabelLookupResult res,
       ) async {
     final freshCount = vm.countNewRowsInLastLookup(widget.noProduksi);
@@ -251,7 +257,7 @@ class _BrokerProductionInputScreenState extends State<BrokerProductionInputScree
   /// MODE PARTIAL: Dialog khusus untuk partial dengan radio button (single selection)
   Future<void> _handlePartialMode(
       BuildContext context,
-      BrokerProductionInputViewModel vm,
+      MixerProductionInputViewModel vm,
       ProductionLabelLookupResult res,
       ) async {
     // ⬇️ PERBAIKAN: Tidak perlu filter karena dialog sudah menampilkan semua
@@ -269,7 +275,7 @@ class _BrokerProductionInputScreenState extends State<BrokerProductionInputScree
   /// MODE SELECT: Dialog dengan checkbox (default all selected untuk item baru)
   Future<void> _handleSelectMode(
       BuildContext context,
-      BrokerProductionInputViewModel vm,
+      MixerProductionInputViewModel vm,
       ProductionLabelLookupResult res,
       ) async {
     final freshCount = vm.countNewRowsInLastLookup(widget.noProduksi);
@@ -286,7 +292,7 @@ class _BrokerProductionInputScreenState extends State<BrokerProductionInputScree
     await showDialog(
       context: context,
       barrierDismissible: true,
-      builder: (_) => BrokerLookupLabelDialog(
+      builder: (_) => MixerLookupLabelDialog(
         noProduksi: widget.noProduksi,
         selectedMode: _selectedMode,
       ),
@@ -348,7 +354,7 @@ class _BrokerProductionInputScreenState extends State<BrokerProductionInputScree
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<BrokerProductionInputViewModel>(
+    return Consumer<MixerProductionInputViewModel>(
       builder: (context, vm, _) {
         final loading = vm.isInputsLoading(widget.noProduksi);
         final err = vm.inputsError(widget.noProduksi);
@@ -463,14 +469,6 @@ class _BrokerProductionInputScreenState extends State<BrokerProductionInputScree
                   ...vm.tempBbPartial.reversed,
                   ...?inputs?.bb,
                 ];
-                final washingAll = loading ? <WashingItem>[] : [
-                  ...vm.tempWashing,
-                  ...?inputs?.washing
-                ];
-                final crusherAll = loading ? <CrusherItem>[] : [
-                  ...vm.tempCrusher,
-                  ...?inputs?.crusher
-                ];
                 final gilinganAll = loading ? <GilinganItem>[] : [
                   ...vm.tempGilingan.reversed,
                   ...vm.tempGilinganPartial.reversed,
@@ -481,20 +479,12 @@ class _BrokerProductionInputScreenState extends State<BrokerProductionInputScree
                   ...vm.tempMixerPartial.reversed,
                   ...?inputs?.mixer,
                 ];
-                final rejectAll = loading ? <RejectItem>[] : [
-                  ...vm.tempReject.reversed,
-                  ...vm.tempRejectPartial.reversed,
-                  ...?inputs?.reject,
-                ];
 
                 // ===== GROUPED (key = titleKey yang sudah handle partial) =====
                 final brokerGroups = groupBy(brokerAll, brokerTitleKey);
                 final bbGroups = groupBy(bbAll, bbTitleKey);
-                final washingGroups = groupBy(washingAll, (WashingItem e) => e.noWashing ?? '-');
-                final crusherGroups = groupBy(crusherAll, (CrusherItem e) => e.noCrusher ?? '-');
                 final gilinganGroups = groupBy(gilinganAll, gilinganTitleKey);
                 final mixerGroups = groupBy(mixerAll, mixerTitleKey);
-                final rejectGroups = groupBy(rejectAll, rejectTitleKey);
 
                 return Padding(
                   padding: const EdgeInsets.all(12),
@@ -529,127 +519,6 @@ class _BrokerProductionInputScreenState extends State<BrokerProductionInputScree
                             Expanded(
                               child: Row(
                                 children: [
-                                  // BROKER
-                                  Expanded(
-                                    child: SectionCard(
-                                      title: 'Broker',
-                                      count: brokerGroups.length,
-                                      color: Colors.blue,
-                                      isLoading: loading, // ✅ TAMBAHKAN
-
-                                      summaryBuilder: () {
-                                        int totalSak = 0;
-                                        double totalBerat = 0.0;
-
-                                        // Loop semua groups
-                                        for (final entry in brokerGroups.entries) {
-                                          for (final item in entry.value) {
-                                            totalSak += 1; // Count item (atau item.jumlahSak jika ada)
-                                            totalBerat += (item.berat ?? 0.0);
-                                          }
-                                        }
-
-                                        return SectionSummary(
-                                          totalData: brokerGroups.length,
-                                          totalSak: totalSak,
-                                          totalBerat: totalBerat,
-                                        );
-                                      },
-
-                                      child: brokerGroups.isEmpty
-                                          ? const Center(child: Text('Tidak ada data', style: TextStyle(fontSize: 11)))
-                                          : ListView(
-                                        padding: const EdgeInsets.all(8),
-                                        children: brokerGroups.entries.map((entry) {
-                                          final hasPartial = entry.value.any((x) => x.isPartialRow);
-
-                                          late final List<String> headers;
-                                          late final List<int> columnFlexes;
-
-                                          if (hasPartial) {
-                                            headers = const ['Label', 'Sak', 'Berat', 'Action'];
-                                            columnFlexes = const [3, 1, 2];
-                                          } else {
-                                            headers = const ['Sak', 'Berat', 'Action'];
-                                            columnFlexes = const [1, 2];
-                                          }
-
-                                          return GroupTooltipAnchorTile(
-                                            title: entry.key,
-                                            headerSubtitle: (entry.value.isNotEmpty ? entry.value.first.namaJenis : '-') ?? '-',
-                                            color: Colors.blue,
-                                            tableHeaders: headers,
-                                            columnFlexes: columnFlexes,
-                                            canDelete: canDelete,
-                                            onBulkDelete: _handleBulkDelete, // ✅ PASS handler
-
-                                            summaryBuilder: () {
-                                              double totalBerat = 0.0;
-
-                                              for (final item in entry.value) {
-                                                totalBerat += (item.berat ?? 0.0);
-                                              }
-
-                                              return TooltipSummary(
-                                                totalBerat: totalBerat,
-                                              );
-                                            },
-
-                                            detailsBuilder: () {
-                                              final currentInputs = vm.inputsOf(widget.noProduksi);
-
-                                              final dbItems = currentInputs == null
-                                                  ? <BrokerItem>[]
-                                                  : currentInputs.broker.where((x) => brokerTitleKey(x) == entry.key);
-
-                                              final tempFull = vm.tempBroker.where((x) => brokerTitleKey(x) == entry.key);
-                                              final tempPart = vm.tempBrokerPartial.where((x) => brokerTitleKey(x) == entry.key);
-
-                                              final items = <BrokerItem>[
-                                                ...tempPart,
-                                                ...dbItems,
-                                                ...tempFull,
-                                              ];
-
-                                              return items.map((item) {
-                                                final bool isTemp = vm.tempBroker.contains(item) || vm.tempBrokerPartial.contains(item);
-
-                                                late final List<String> columns;
-
-                                                if (hasPartial) {
-                                                  columns = [
-                                                    item.isPartialRow ? item.noBroker.toString() : '-',
-                                                    '${item.noSak ?? '-'}',
-                                                    '${num2(item.berat)} kg',
-                                                  ];
-                                                } else {
-                                                  columns = [
-                                                    '${item.noSak ?? '-'}',
-                                                    '${num2(item.berat)} kg',
-                                                  ];
-                                                }
-
-                                                return TooltipTableRow(
-                                                  columns: columns,
-                                                  columnFlexes: columnFlexes,
-                                                  showDelete: isTemp,
-                                                  onDelete: isTemp
-                                                      ? () => vm.deleteTempBrokerItem(item)
-                                                      : null, // ✅ Existing tidak ada onDelete
-                                                  isTempRow: isTemp,
-                                                  isHighlighted: isTemp,
-                                                  isDisabled: !isTemp && !canDelete,
-                                                  itemData: item, // ✅ PASS item asli
-                                                );
-                                              }).toList();
-                                            },
-                                          );
-                                        }).toList(),
-                                      ),
-                                    ),
-                                  ),
-
-                                  const SizedBox(width: 8),
 
                                   // BAHAN BAKU
                                   Expanded(
@@ -772,13 +641,14 @@ class _BrokerProductionInputScreenState extends State<BrokerProductionInputScree
                                     ),
                                   ),
 
+
                                   const SizedBox(width: 8),
 
-                                  // WASHING
+// BROKER
                                   Expanded(
                                     child: SectionCard(
-                                      title: 'Washing',
-                                      count: washingGroups.length,
+                                      title: 'Broker',
+                                      count: brokerGroups.length,
                                       color: Colors.blue,
                                       isLoading: loading, // ✅ TAMBAHKAN
 
@@ -787,7 +657,7 @@ class _BrokerProductionInputScreenState extends State<BrokerProductionInputScree
                                         double totalBerat = 0.0;
 
                                         // Loop semua groups
-                                        for (final entry in washingGroups.entries) {
+                                        for (final entry in brokerGroups.entries) {
                                           for (final item in entry.value) {
                                             totalSak += 1; // Count item (atau item.jumlahSak jika ada)
                                             totalBerat += (item.berat ?? 0.0);
@@ -795,23 +665,35 @@ class _BrokerProductionInputScreenState extends State<BrokerProductionInputScree
                                         }
 
                                         return SectionSummary(
-                                          totalData: washingGroups.length,
+                                          totalData: brokerGroups.length,
                                           totalSak: totalSak,
                                           totalBerat: totalBerat,
                                         );
                                       },
 
-                                      child: washingGroups.isEmpty
+                                      child: brokerGroups.isEmpty
                                           ? const Center(child: Text('Tidak ada data', style: TextStyle(fontSize: 11)))
                                           : ListView(
                                         padding: const EdgeInsets.all(8),
-                                        children: washingGroups.entries.map((entry) {
-                                          late final List<int> columnFlexes = [1, 2];
+                                        children: brokerGroups.entries.map((entry) {
+                                          final hasPartial = entry.value.any((x) => x.isPartialRow);
+
+                                          late final List<String> headers;
+                                          late final List<int> columnFlexes;
+
+                                          if (hasPartial) {
+                                            headers = const ['Label', 'Sak', 'Berat', 'Action'];
+                                            columnFlexes = const [3, 1, 2];
+                                          } else {
+                                            headers = const ['Sak', 'Berat', 'Action'];
+                                            columnFlexes = const [1, 2];
+                                          }
+
                                           return GroupTooltipAnchorTile(
                                             title: entry.key,
                                             headerSubtitle: (entry.value.isNotEmpty ? entry.value.first.namaJenis : '-') ?? '-',
                                             color: Colors.blue,
-                                            tableHeaders: const ['Sak', 'Berat', 'Action'],
+                                            tableHeaders: headers,
                                             columnFlexes: columnFlexes,
                                             canDelete: canDelete,
                                             onBulkDelete: _handleBulkDelete, // ✅ PASS handler
@@ -830,21 +712,44 @@ class _BrokerProductionInputScreenState extends State<BrokerProductionInputScree
 
                                             detailsBuilder: () {
                                               final currentInputs = vm.inputsOf(widget.noProduksi);
-                                              final items = [
-                                                if (currentInputs != null) ...currentInputs.washing.where((x) => (x.noWashing ?? '-') == entry.key),
-                                                ...vm.tempWashing.where((x) => (x.noWashing ?? '-') == entry.key),
+
+                                              final dbItems = currentInputs == null
+                                                  ? <BrokerItem>[]
+                                                  : currentInputs.broker.where((x) => brokerTitleKey(x) == entry.key);
+
+                                              final tempFull = vm.tempBroker.where((x) => brokerTitleKey(x) == entry.key);
+                                              final tempPart = vm.tempBrokerPartial.where((x) => brokerTitleKey(x) == entry.key);
+
+                                              final items = <BrokerItem>[
+                                                ...tempPart,
+                                                ...dbItems,
+                                                ...tempFull,
                                               ];
+
                                               return items.map((item) {
-                                                final isTemp = vm.tempWashing.contains(item);
-                                                return TooltipTableRow(
-                                                  columns: [
-                                                    item.noSak?.toString() ?? '-',
+                                                final bool isTemp = vm.tempBroker.contains(item) || vm.tempBrokerPartial.contains(item);
+
+                                                late final List<String> columns;
+
+                                                if (hasPartial) {
+                                                  columns = [
+                                                    item.isPartialRow ? item.noBroker.toString() : '-',
+                                                    '${item.noSak ?? '-'}',
                                                     '${num2(item.berat)} kg',
-                                                  ],
-                                                  columnFlexes: [1, 2],
+                                                  ];
+                                                } else {
+                                                  columns = [
+                                                    '${item.noSak ?? '-'}',
+                                                    '${num2(item.berat)} kg',
+                                                  ];
+                                                }
+
+                                                return TooltipTableRow(
+                                                  columns: columns,
+                                                  columnFlexes: columnFlexes,
                                                   showDelete: isTemp,
                                                   onDelete: isTemp
-                                                      ? () => vm.deleteTempWashingItem(item)
+                                                      ? () => vm.deleteTempBrokerItem(item)
                                                       : null, // ✅ Existing tidak ada onDelete
                                                   isTempRow: isTemp,
                                                   isHighlighted: isTemp,
@@ -861,81 +766,6 @@ class _BrokerProductionInputScreenState extends State<BrokerProductionInputScree
 
                                   const SizedBox(width: 8),
 
-                                  // CRUSHER
-                                  Expanded(
-                                    child: SectionCard(
-                                      title: 'Crusher',
-                                      count: crusherGroups.length,
-                                      color: Colors.blue,
-                                      isLoading: loading, // ✅ TAMBAHKAN
-
-                                      summaryBuilder: () {
-                                        int totalSak = 0;
-                                        double totalBerat = 0.0;
-
-                                        // Loop semua groups
-                                        for (final entry in crusherGroups.entries) {
-                                          for (final item in entry.value) {
-                                            totalSak += 1; // Count item (atau item.jumlahSak jika ada)
-                                            totalBerat += (item.berat ?? 0.0);
-                                          }
-                                        }
-
-                                        return SectionSummary(
-                                          totalData: crusherGroups.length,
-                                          totalSak: totalSak,
-                                          totalBerat: totalBerat,
-                                        );
-                                      },
-
-                                      child: crusherGroups.isEmpty
-                                          ? const Center(child: Text('Tidak ada data', style: TextStyle(fontSize: 11)))
-                                          : ListView(
-                                        padding: const EdgeInsets.all(8),
-                                        children: crusherGroups.entries.map((entry) {
-                                          return GroupTooltipAnchorTile(
-                                            title: entry.key,
-                                            headerSubtitle: (entry.value.isNotEmpty ? entry.value.first.namaJenis : '-') ?? '-',
-                                            color: Colors.blue,
-                                            tableHeaders: const ['Berat', 'Action'],
-                                            canDelete: canDelete,
-                                            onBulkDelete: _handleBulkDelete, // ✅ PASS handler
-                                            detailsBuilder: () {
-                                              final currentInputs = vm.inputsOf(widget.noProduksi);
-                                              final items = [
-                                                if (currentInputs != null) ...currentInputs.crusher.where((x) => (x.noCrusher ?? '-') == entry.key),
-                                                ...vm.tempCrusher.where((x) => (x.noCrusher ?? '-') == entry.key),
-                                              ];
-                                              return items.map((item) {
-                                                final isTemp = vm.tempCrusher.contains(item);
-                                                return TooltipTableRow(
-                                                  columns: ['${num2(item.berat)} kg'],
-                                                  showDelete: isTemp,
-                                                  onDelete: isTemp
-                                                      ? () => vm.deleteTempCrusherItem(item)
-                                                      : null, // ✅ Existing tidak ada onDelete
-                                                  isTempRow: isTemp,
-                                                  isHighlighted: isTemp,
-                                                  isDisabled: !isTemp && !canDelete,
-                                                  itemData: item, // ✅ PASS item asli
-                                                );
-                                              }).toList();
-                                            },
-                                          );
-                                        }).toList(),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            const SizedBox(height: 12),
-
-                            // ROW BAWAH
-                            Expanded(
-                              child: Row(
-                                children: [
                                   // GILINGAN
                                   Expanded(
                                     child: SectionCard(
@@ -1140,116 +970,12 @@ class _BrokerProductionInputScreenState extends State<BrokerProductionInputScree
                                       ),
                                     ),
                                   ),
-
-                                  const SizedBox(width: 8),
-
-                                  // REJECT
-                                  Expanded(
-                                    child: SectionCard(
-                                      title: 'Reject',
-                                      count: rejectGroups.length,
-                                      color: Colors.blue,
-                                      isLoading: loading, // ✅ TAMBAHKAN
-
-                                      summaryBuilder: () {
-                                        int totalSak = 0;
-                                        double totalBerat = 0.0;
-
-                                        // Loop semua groups
-                                        for (final entry in rejectGroups.entries) {
-                                          for (final item in entry.value) {
-                                            totalSak += 1; // Count item (atau item.jumlahSak jika ada)
-                                            totalBerat += (item.berat ?? 0.0);
-                                          }
-                                        }
-
-                                        return SectionSummary(
-                                          totalData: rejectGroups.length,
-                                          totalSak: totalSak,
-                                          totalBerat: totalBerat,
-                                        );
-                                      },
-
-                                      child: rejectGroups.isEmpty
-                                          ? const Center(child: Text('Tidak ada data', style: TextStyle(fontSize: 11)))
-                                          : ListView(
-                                        padding: const EdgeInsets.all(8),
-                                        children: rejectGroups.entries.map((entry) {
-                                          final hasPartial = entry.value.any((x) => x.isPartialRow);
-
-                                          return GroupTooltipAnchorTile(
-                                            title: entry.key,
-                                            headerSubtitle: (entry.value.isNotEmpty ? entry.value.first.namaJenis : '-') ?? '-',
-                                            color: Colors.blue,
-                                            tableHeaders: hasPartial ? const ['Label', 'Berat', 'Action'] : const ['Berat', 'Action'],
-                                            canDelete: canDelete,
-                                            onBulkDelete: _handleBulkDelete, // ✅ PASS handler
-                                            detailsBuilder: () {
-                                              final currentInputs = vm.inputsOf(widget.noProduksi);
-
-                                              final dbItems = currentInputs == null ? <RejectItem>[] : currentInputs.reject.where((x) => rejectTitleKey(x) == entry.key);
-                                              final tempFull = vm.tempReject.where((x) => rejectTitleKey(x) == entry.key);
-                                              final tempPart = vm.tempRejectPartial.where((x) => rejectTitleKey(x) == entry.key);
-
-                                              final items = [
-                                                ...tempPart,
-                                                ...dbItems,
-                                                ...tempFull,
-                                              ];
-
-                                              return items.map((item) {
-                                                final isTemp = vm.tempReject.contains(item) || vm.tempRejectPartial.contains(item);
-
-                                                final columns = item.isPartialRow
-                                                    ? <String>[
-                                                  (item.noReject ?? '-'),
-                                                  '${num2(item.berat)} kg',
-                                                ]
-                                                    : <String>[
-                                                  '${num2(item.berat)} kg',
-                                                ];
-
-                                                return TooltipTableRow(
-                                                  columns: columns,
-                                                  showDelete: isTemp,
-                                                  onDelete: isTemp
-                                                      ? () => vm.deleteTempRejectItem(item)
-                                                      : null, // ✅ Existing tidak ada onDelete
-                                                  isTempRow: isTemp,
-                                                  isHighlighted: isTemp,
-                                                  isDisabled: !isTemp && !canDelete,
-                                                  itemData: item, // ✅ PASS item asli
-                                                );
-                                              }).toList();
-                                            },
-                                          );
-                                        }).toList(),
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Visibility(
-                                      visible: false,                 // 🔴 tidak kelihatan
-                                      maintainSize: true,             // ✅ tetap ambil space
-                                      maintainAnimation: true,
-                                      maintainState: true,
-                                      maintainSemantics: true,
-                                      child: SectionCard(
-                                        title: '',              // bisa juga '' kalau mau
-                                        count: 0,
-                                        color: Colors.blue,
-                                        isLoading: false,
-                                        child: const SizedBox.shrink(), // tidak ada isi
-                                      ),
-                                    ),
-                                  ),
                                 ],
                               ),
                             ),
                           ],
                         ),
-                      ),
-                    ],
+                      )],
                   ),
                 );
               },

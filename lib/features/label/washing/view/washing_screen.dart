@@ -27,6 +27,74 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
   bool _isLoadingMore = false;
   Timer? _debounce;
 
+  // di class _WashingTableScreenState
+
+  bool _isUsed(String? dateUsage) {
+    final s = (dateUsage ?? '').trim();
+    if (s.isEmpty) return false;
+    if (s.toLowerCase() == 'null') return false;
+    return true;
+  }
+
+  Future<void> _onEditHeader(WashingHeader header) async {
+    final vm = context.read<WashingViewModel>();
+
+    // pastikan selection benar
+    vm.setSelectedNoWashing(header.noWashing);
+
+    // ambil detail terbaru untuk header ini (biar valid)
+    DialogService.instance.showLoading(message: 'Cek detail ${header.noWashing}...');
+    await vm.fetchDetails(header.noWashing);
+    DialogService.instance.hideLoading();
+
+    if (!mounted) return;
+
+    // kalau ada sak yang sudah terpakai (DateUsage terisi) -> tidak boleh edit
+    final hasUsed = vm.details.any((d) => _isUsed(d.dateUsage));
+    if (hasUsed) {
+      await DialogService.instance.showError(
+        title: 'Edit tidak tersedia',
+        message: 'Tidak bisa edit karena ada Sak yang sudah dipakai',
+      );
+      return;
+    }
+
+    // aman -> buka form edit
+    _showFormDialog(
+      header: header,
+      details: vm.details,
+    );
+  }
+
+  Future<void> _onDeleteHeader(WashingHeader header) async {
+    final vm = context.read<WashingViewModel>();
+
+    // pastikan selection benar
+    vm.setSelectedNoWashing(header.noWashing);
+
+    // ambil detail terbaru untuk header ini (biar valid)
+    DialogService.instance.showLoading(message: 'Cek detail ${header.noWashing}...');
+    await vm.fetchDetails(header.noWashing);
+    DialogService.instance.hideLoading();
+
+    if (!mounted) return;
+
+    // kalau ada sak yang sudah terpakai (DateUsage terisi) -> tidak boleh delete
+    final hasUsed = vm.details.any((d) => _isUsed(d.dateUsage));
+    if (hasUsed) {
+      await DialogService.instance.showError(
+        title: 'Hapus tidak tersedia',
+        message: 'Tidak bisa hapus karena ada Sak yang sudah dipakai',
+      );
+      return;
+    }
+
+    // aman -> tampilkan konfirmasi delete
+    _confirmDelete(header);
+  }
+
+
+
   // Popover animasi (custom)
   final InteractivePopover _popover = InteractivePopover();
 
@@ -141,14 +209,14 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
       child: WashingRowPopover(
         header: header,
         onClose: _closeContextMenu,
-        onEdit: () {
+        onEdit: () async {
           _closeContextMenu();
-          _showFormDialog(header: header, details: vm.details);
+          await _onEditHeader(header);
         },
-        onDelete: () {
+        onDelete: () async {
           if (context.read<WashingViewModel>().isLoading) return;
           _closeContextMenu();
-          _confirmDelete(header);
+          await _onDeleteHeader(header);
         },
         onPrint: () {
           _closeContextMenu();

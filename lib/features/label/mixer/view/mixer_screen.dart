@@ -30,6 +30,81 @@ class _MixerScreenState extends State<MixerScreen> {
   // Popover animasi (custom)
   final InteractivePopover _popover = InteractivePopover();
 
+  bool _isUsed(String? dateUsage) {
+    final s = (dateUsage ?? '').trim();
+    if (s.isEmpty) return false;
+    if (s.toLowerCase() == 'null') return false;
+    return true;
+  }
+
+  Future<void> _onEditHeader(MixerHeader header) async {
+    final vm = context.read<MixerViewModel>();
+
+    // pastikan selection benar
+    vm.setSelectedNoMixer(header.noMixer);
+
+    // fetch detail terbaru untuk header ini
+    DialogService.instance.showLoading(message: 'Cek detail ${header.noMixer}...');
+    await vm.fetchDetails(header.noMixer);
+    DialogService.instance.hideLoading();
+
+    if (!mounted) return;
+
+    // RULE: tidak boleh edit jika ada DateUsage terisi atau ada isPartial = true
+    final hasUsed = vm.details.any((d) => _isUsed(d.dateUsage));
+    final hasPartial = vm.details.any((d) => d.isPartial == true);
+
+    if (hasUsed || hasPartial) {
+      final reason = [
+        if (hasUsed) 'ada Sak yang sudah dipakai',
+        if (hasPartial) 'ada Sak yang telah dipartial',
+      ].join(' dan ');
+
+      await DialogService.instance.showError(
+        title: 'Edit ditolak',
+        message: 'Tidak bisa edit karena $reason.',
+      );
+      return;
+    }
+
+    // aman -> buka form edit
+    _showFormDialog(header: header, details: vm.details);
+  }
+
+  Future<void> _onDeleteHeader(MixerHeader header) async {
+    final vm = context.read<MixerViewModel>();
+
+    // pastikan selection benar
+    vm.setSelectedNoMixer(header.noMixer);
+
+    // fetch detail terbaru untuk header ini (biar rule valid)
+    DialogService.instance.showLoading(message: 'Cek detail ${header.noMixer}...');
+    await vm.fetchDetails(header.noMixer);
+    DialogService.instance.hideLoading();
+
+    if (!mounted) return;
+
+    final hasUsed = vm.details.any((d) => _isUsed(d.dateUsage));
+    final hasPartial = vm.details.any((d) => d.isPartial == true);
+
+    if (hasUsed || hasPartial) {
+      final reason = [
+        if (hasUsed) 'ada Sak yang sudah dipakai',
+        if (hasPartial) 'ada Sak yang telah dipartial',
+      ].join(' dan ');
+
+      await DialogService.instance.showError(
+        title: 'Delete ditolak',
+        message: 'Tidak bisa delete karena $reason.',
+      );
+      return;
+    }
+
+    // aman -> lanjut confirm delete
+    _confirmDelete(header);
+  }
+
+
   @override
   void initState() {
     super.initState();
@@ -119,7 +194,6 @@ class _MixerScreenState extends State<MixerScreen> {
   }
 
 
-
   // Tutup popover (tidak mengubah selection — biarkan tetap menandai item aktif)
   void _closeContextMenu() {
     _popover.hide();
@@ -141,15 +215,17 @@ class _MixerScreenState extends State<MixerScreen> {
       child: MixerRowPopover(
         header: header,
         onClose: _closeContextMenu,
-        onEdit: () {
+        onEdit: () async {
           _closeContextMenu();
-          _showFormDialog(header: header, details: vm.details);
+          await _onEditHeader(header);
         },
-        onDelete: () {
+
+        onDelete: () async {
           if (context.read<MixerViewModel>().isLoading) return;
           _closeContextMenu();
-          _confirmDelete(header);
+          await _onDeleteHeader(header);
         },
+
         onPrint: () {
           _closeContextMenu();
           // TODO: print/preview

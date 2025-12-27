@@ -1,11 +1,11 @@
 // lib/view/widgets/mixer_detail_table.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../../common/widgets/info_line.dart';
 import '../view_model/mixer_view_model.dart';
 
-// ⬇️ interactive popover + our new partial-info popover
-import './interactive_popover.dart';                 // adjust path if needed
-import 'mixer_partial_info_popover.dart';           // <-- use this (not the sheet)
+import './interactive_popover.dart';
+import 'mixer_partial_info_popover.dart';
 
 class MixerDetailTable extends StatefulWidget {
   final ScrollController scrollController;
@@ -25,12 +25,12 @@ class _MixerDetailTableState extends State<MixerDetailTable> {
   @override
   void initState() {
     super.initState();
-    // Optional: hide popover when user scrolls the list
     widget.scrollController.addListener(_hidePopoverOnScroll);
   }
 
   void _hidePopoverOnScroll() {
-    if (_popover.isShown && widget.scrollController.position.isScrollingNotifier.value) {
+    if (_popover.isShown &&
+        widget.scrollController.position.isScrollingNotifier.value) {
       _popover.hide();
     }
   }
@@ -42,15 +42,48 @@ class _MixerDetailTableState extends State<MixerDetailTable> {
     super.dispose();
   }
 
+  bool _isUsed(String? dateUsage) {
+    final s = (dateUsage ?? '').trim();
+    if (s.isEmpty) return false;
+    if (s.toLowerCase() == 'null') return false;
+    return true;
+  }
+
+  double _sumBerat(Iterable items) {
+    double total = 0;
+    for (final d in items) {
+      total += (d.berat as double?) ?? 0.0;
+    }
+    return total;
+  }
+
+  String _kg(double v) => v.toStringAsFixed(2);
+
   @override
   Widget build(BuildContext context) {
     return Container(
       color: Colors.white,
       child: Consumer<MixerViewModel>(
         builder: (context, vm, _) {
+          final totalSak = vm.details.length;
+
+          // ✅ available = DateUsage null (partial tetap masuk sini selama dateUsage null)
+          final availableDetails =
+          vm.details.where((d) => !_isUsed(d.dateUsage)).toList();
+
+          final availableSak = availableDetails.length;
+
+          final totalBerat = _sumBerat(vm.details);
+          final availableBerat = _sumBerat(availableDetails);
+
           return Column(
             children: [
-              _buildHeader(),
+              _buildHeader(
+                availableSak: availableSak,
+                totalSak: totalSak,
+                availableBerat: availableBerat,
+                totalBerat: totalBerat,
+              ),
               if (vm.isDetailLoading) _buildLoadingState(),
               if (!vm.isDetailLoading && vm.details.isEmpty) _buildEmptyState(),
               if (!vm.isDetailLoading && vm.details.isNotEmpty)
@@ -69,22 +102,54 @@ class _MixerDetailTableState extends State<MixerDetailTable> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader({
+    required int availableSak,
+    required int totalSak,
+    required double availableBerat,
+    required double totalBerat,
+  }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
       ),
-      child: const Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'DETAIL',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
               letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: Column(
+              children: [
+                InfoLine(
+                  label: 'Jumlah Sak',
+                  value: '$availableSak/$totalSak',
+                  icon: Icons.inventory_2_outlined,
+                ),
+                const SizedBox(height: 10),
+                Divider(height: 1, thickness: 1, color: Colors.grey.shade300),
+                const SizedBox(height: 10),
+                InfoLine(
+                  label: 'Total Berat (kg)',
+                  value: '${_kg(availableBerat)}/${_kg(totalBerat)}',
+                  icon: Icons.monitor_weight_outlined,
+                ),
+              ],
             ),
           ),
         ],
@@ -104,11 +169,11 @@ class _MixerDetailTableState extends State<MixerDetailTable> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.inventory_2, size: 80, color: Colors.grey),
+            Icon(Icons.inventory_2, size: 80, color: Colors.grey.shade300),
             const SizedBox(height: 16),
             Text(
               'Pilih label untuk melihat detail',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
+              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
             ),
           ],
         ),
@@ -118,13 +183,13 @@ class _MixerDetailTableState extends State<MixerDetailTable> {
 
   Widget _buildTableHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: const Color(0xFF1565C0),
         border: Border(bottom: BorderSide(color: Colors.grey.shade300, width: 2)),
       ),
-      child: Row(
-        children: const [
+      child: const Row(
+        children: [
           SizedBox(
             width: 80,
             child: Text(
@@ -160,13 +225,25 @@ class _MixerDetailTableState extends State<MixerDetailTable> {
       itemBuilder: (context, index) {
         final d = vm.details[index];
         final isEven = index % 2 == 0;
-        final isPartial = d.isPartial == true;
+
+        final partial = d.isPartial == true;
+        final used = _isUsed(d.dateUsage); // ✅ disable only based on dateUsage
+
+        final bg = used
+            ? Colors.grey.shade100
+            : (isEven ? Colors.white : Colors.grey.shade50);
+
+        final sakColor = used ? Colors.grey.shade600 : Colors.black87;
+
+        // ✅ partial merah, tapi kalau used → pudar via opacity
+        final beratColor = partial ? Colors.red : Colors.grey.shade800;
+        final beratTextColor = used ? Colors.grey.shade500 : beratColor;
 
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
-          // klik baris → kalau partial, tampilkan popover
           onTapDown: (details) {
-            if (isPartial) {
+            // popover hanya partial & belum used
+            if (partial && !used) {
               showMixerPartialInfoPopover(
                 context: context,
                 vm: vm,
@@ -176,43 +253,39 @@ class _MixerDetailTableState extends State<MixerDetailTable> {
               );
             }
           },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: isEven ? Colors.white : Colors.grey.shade50,
-              border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-            ),
-            child: Row(
-              children: [
-                // Kolom SAK
-                SizedBox(
-                  width: 80,
-                  child: Text(
-                    d.noSak.toString(),
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
+          child: Opacity(
+            opacity: used ? 0.55 : 1,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: bg,
+                border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+              ),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 80,
+                    child: Text(
+                      d.noSak.toString(),
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: sakColor,
+                      ),
                     ),
                   ),
-                ),
-
-                // Kolom BERAT – merah kalau partial, tanpa icon
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.centerLeft,
+                  Expanded(
                     child: Text(
                       d.berat?.toStringAsFixed(2) ?? '-',
                       style: TextStyle(
                         fontSize: 15,
-                        fontWeight: isPartial ? FontWeight.bold : FontWeight.w500,
-                        color: isPartial
-                            ? Colors.red              // 🔴 partial
-                            : Colors.grey.shade800,   // normal
+                        fontWeight: partial ? FontWeight.w800 : FontWeight.w600,
+                        color: beratTextColor,
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );

@@ -1,9 +1,10 @@
-// lib/features/shared/mixer_production/widgets/packing_production_dropdown.dart
+// lib/features/shared/mixer_production/widgets/mixer_production_dropdown.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../view_model/mixer_production_view_model.dart';
-import '../model/mixer_production_model.dart';
+import '../model/mixer_production_model.dart';  // ✅ Updated import path
 import '../../../../common/widgets/dropdown_field.dart';
 
 class MixerProductionDropdown extends StatefulWidget {
@@ -70,15 +71,17 @@ class _MixerProductionDropdownState extends State<MixerProductionDropdown> {
         idMesin: 0,
         namaMesin: widget.preselectNamaMesin ?? '',
         tglProduksi: DateTime.now().toUtc(),
-        jam: 0,
+        jamKerja: 0,              // ✅ Updated from 'jam' to 'jamKerja'
         shift: widget.shiftFilter ?? 0,
-        createBy: null,
+        createBy: "",
         checkBy1: null,
         checkBy2: null,
         approveBy: null,
         jmlhAnggota: 0,
         hadir: 0,
         hourMeter: null,
+        hourStart: null,          // ✅ NEW field
+        hourEnd: null,            // ✅ NEW field
       );
 
       setState(() {

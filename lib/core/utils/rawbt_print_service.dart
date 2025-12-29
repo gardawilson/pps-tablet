@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
-import 'package:open_file/open_file.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 /// Service untuk print label via RawBT app
@@ -156,7 +156,7 @@ class RawBTPrintService {
       debugPrint('📱 Opening file with RawBT: $filePath');
 
       //Gunakan open_file package untuk trigger "Open with" dialog
-      final result = await OpenFile.open(
+      final result = await OpenFilex.open(
         filePath,
         type: 'application/pdf',
         linuxDesktopName: 'rawbt', // Hint untuk RawBT app

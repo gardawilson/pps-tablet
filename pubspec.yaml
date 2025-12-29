@@ -29,7 +29,6 @@ dependencies:
   fluttertoast: ^8.0.9
   smb_connect: ^0.0.9
   package_info_plus: ^8.0.0
-  open_file: ^3.3.1
   flutter_dotenv: ^5.2.1
   fl_chart: ^0.65.0
   lottie: ^2.7.0
@@ -39,6 +38,9 @@ dependencies:
   infinite_scroll_pagination: ^5.1.1
   material_design_icons_flutter: ^7.0.7296
   flutter_vector_icons: ^2.0.0
+  dio: ^5.7.0
+  open_filex: ^4.5.0
+
 
   # 🟢 THERMAL PRINTER ESC/POS
   flutter_blue_plus: ^1.32.0
@@ -68,6 +70,9 @@ flutter:
     - assets/sounds/accepted.mp3
     - assets/sounds/denied.mp3
     - assets/animations/loading.json
+    - assets/animations/success.json
+    - assets/animations/error.json
+    - assets/animations/scan.json
     - .env
 
 flutter_launcher_icons:

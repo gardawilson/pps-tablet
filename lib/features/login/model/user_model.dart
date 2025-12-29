@@ -1,14 +1,12 @@
+// lib/features/login/model/user_model.dart
 class User {
-  String username;
-  String password;
+  final String username;
+  final String password;
 
   User({required this.username, required this.password});
 
-  // Pastikan toJson mengembalikan data dalam format yang diinginkan
-  Map<String, dynamic> toJson() {
-    return {
-      'username': username,
-      'password': password,
-    };
-  }
+  Map<String, dynamic> toJson() => {
+    'username': username,
+    'password': password,
+  };
 }

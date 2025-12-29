@@ -20,6 +20,10 @@ class GilinganProduction {
   final String? hourStart; // "HH:mm"
   final String? hourEnd;   // "HH:mm"
 
+  // ✅ NEW: tutup transaksi flags
+  final DateTime? lastClosedDate; // date only
+  final bool isLocked;
+
   const GilinganProduction({
     required this.noProduksi,
     required this.idOperator,
@@ -37,9 +41,13 @@ class GilinganProduction {
     this.approveBy,
     this.hourStart,
     this.hourEnd,
+
+    // ✅ NEW
+    this.lastClosedDate,
+    this.isLocked = false,
   });
 
-  // ---------- tolerant parsers (sama seperti Broker) ----------
+  // ---------- tolerant parsers ----------
   static String _asString(dynamic v) => v?.toString() ?? '';
 
   static int _asIntRequired(dynamic v, {int fallback = 0}) {
@@ -55,19 +63,24 @@ class GilinganProduction {
     return null;
   }
 
+  static bool _asBool(dynamic v, {bool fallback = false}) {
+    if (v == null) return fallback;
+    if (v is bool) return v;
+    if (v is int) return v != 0;
+    if (v is double) return v != 0;
+    if (v is String) {
+      final s = v.trim().toLowerCase();
+      if (s == 'true' || s == '1' || s == 'yes') return true;
+      if (s == 'false' || s == '0' || s == 'no') return false;
+    }
+    return fallback;
+  }
+
   static DateTime? _asDateTime(dynamic v) {
     if (v == null) return null;
     if (v is DateTime) return v;
-    if (v is String) {
-      try {
-        return DateTime.tryParse(v);
-      } catch (_) {
-        return null;
-      }
-    }
-    if (v is int) {
-      return DateTime.fromMillisecondsSinceEpoch(v);
-    }
+    if (v is String) return DateTime.tryParse(v);
+    if (v is int) return DateTime.fromMillisecondsSinceEpoch(v);
     return null;
   }
 
@@ -75,12 +88,10 @@ class GilinganProduction {
   static String? _asTimeHHmm(dynamic v) {
     if (v == null) return null;
 
-    // Kalau driver mapping TIME ke DateTime (1900-01-01 + time)
     if (v is DateTime) {
       return DateFormat('HH:mm').format(v.toLocal());
     }
 
-    // Kalau string: "HH:mm[:ss[.fff]]" atau "1900-01-01T07:30:00"
     if (v is String) {
       final s = v.trim();
       if (s.isEmpty) return null;
@@ -111,13 +122,13 @@ class GilinganProduction {
       tglProduksi: _asDateTime(j['TglProduksi']),
       shift: _asIntRequired(j['Shift']),
       createBy: _asString(j['CreateBy']),
-      checkBy1: j['CheckBy1'] == null || j['CheckBy1'] == ''
+      checkBy1: (j['CheckBy1'] == null || j['CheckBy1'] == '')
           ? null
           : _asString(j['CheckBy1']),
-      checkBy2: j['CheckBy2'] == null || j['CheckBy2'] == ''
+      checkBy2: (j['CheckBy2'] == null || j['CheckBy2'] == '')
           ? null
           : _asString(j['CheckBy2']),
-      approveBy: j['ApproveBy'] == null || j['ApproveBy'] == ''
+      approveBy: (j['ApproveBy'] == null || j['ApproveBy'] == '')
           ? null
           : _asString(j['ApproveBy']),
       jmlhAnggota: _asInt(j['JmlhAnggota']),
@@ -125,6 +136,10 @@ class GilinganProduction {
       hourMeter: _asInt(j['HourMeter']),
       hourStart: _asTimeHHmm(j['HourStart']),
       hourEnd: _asTimeHHmm(j['HourEnd']),
+
+      // ✅ NEW: mapping dari backend
+      lastClosedDate: _asDateTime(j['LastClosedDate']),
+      isLocked: _asBool(j['IsLocked']),
     );
   }
 
@@ -149,6 +164,10 @@ class GilinganProduction {
     'HourMeter': hourMeter,
     'HourStart': hourStart,
     'HourEnd': hourEnd,
+
+    // biasanya read-only, tidak perlu dikirim balik
+    // 'LastClosedDate': lastClosedDate?.toIso8601String(),
+    // 'IsLocked': isLocked,
   };
 
   String get tglProduksiTextShort {
@@ -158,12 +177,21 @@ class GilinganProduction {
 
   String get tglProduksiTextFull {
     if (tglProduksi == null) return '';
-    return DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(tglProduksi!.toLocal());
+    return DateFormat('EEEE, dd MMM yyyy', 'id_ID')
+        .format(tglProduksi!.toLocal());
   }
 
   String get hourRangeText {
     if ((hourStart == null || hourStart!.isEmpty) &&
         (hourEnd == null || hourEnd!.isEmpty)) return '';
     return '${hourStart ?? '--:--'} - ${hourEnd ?? '--:--'}';
+  }
+
+  // Optional untuk UI
+  String get lockInfoText {
+    if (!isLocked) return '';
+    if (lastClosedDate == null) return 'Locked';
+    final d = DateFormat('dd MMM yyyy', 'id_ID').format(lastClosedDate!.toLocal());
+    return 'Locked (<= $d)';
   }
 }

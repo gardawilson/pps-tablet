@@ -30,6 +30,10 @@ class MixerProduction {
   final String? hourStart;
   final String? hourEnd;
 
+  // ✅ NEW: tutup transaksi flags
+  final DateTime? lastClosedDate; // date only
+  final bool isLocked;
+
   const MixerProduction({
     required this.noProduksi,
     required this.idOperator,
@@ -48,9 +52,13 @@ class MixerProduction {
     this.approveBy,
     this.hourStart,
     this.hourEnd,
+
+    // ✅ NEW
+    this.lastClosedDate,
+    this.isLocked = false,
   });
 
-  // ---------- tolerant parsers (meniru Gilingan) ----------
+  // ---------- tolerant parsers ----------
   static String _asString(dynamic v) => v?.toString() ?? '';
 
   static int _asIntRequired(dynamic v, {int fallback = 0}) {
@@ -65,6 +73,19 @@ class MixerProduction {
     if (v is num) return v.toInt();
     if (v is String) return int.tryParse(v);
     return null;
+  }
+
+  static bool _asBool(dynamic v, {bool fallback = false}) {
+    if (v == null) return fallback;
+    if (v is bool) return v;
+    if (v is int) return v != 0;
+    if (v is double) return v != 0;
+    if (v is String) {
+      final s = v.trim().toLowerCase();
+      if (s == 'true' || s == '1' || s == 'yes') return true;
+      if (s == 'false' || s == '0' || s == 'no') return false;
+    }
+    return fallback;
   }
 
   static DateTime? _asDateTime(dynamic v) {
@@ -130,12 +151,16 @@ class MixerProduction {
       hourMeter: _asInt(j['HourMeter']),
       hourStart: _asTimeHHmm(j['HourStart']),
       hourEnd: _asTimeHHmm(j['HourEnd']),
+
+      // ✅ NEW: mapping dari backend
+      lastClosedDate: _asDateTime(j['LastClosedDate']),
+      isLocked: _asBool(j['IsLocked']),
     );
   }
 
-  /// Default: output “format list/detail” (PascalCase) seperti Gilingan.
-  /// Kalau untuk create/update endpoint yang minta key kecil:
-  /// - set `forWritePayload: true` => pakai keys: noProduksi, idOperator, idMesin, tglProduksi, jam, shift, ...
+  /// Default: output “format list/detail” (PascalCase).
+  /// Untuk create/update endpoint yang minta key kecil:
+  /// - set `forWritePayload: true` => pakai keys kecil.
   Map<String, dynamic> toJson({
     bool asDateOnly = true,
     bool forWritePayload = false,
@@ -150,7 +175,7 @@ class MixerProduction {
             : (asDateOnly
             ? DateFormat('yyyy-MM-dd').format(tglProduksi!)
             : tglProduksi!.toIso8601String()),
-        'jam': jamKerja, // ✅ backend create/update biasanya pakai "jam"
+        'jam': jamKerja,
         'shift': shift,
         'checkBy1': checkBy1,
         'checkBy2': checkBy2,
@@ -185,10 +210,14 @@ class MixerProduction {
       'HourMeter': hourMeter,
       'HourStart': hourStart,
       'HourEnd': hourEnd,
+
+      // read-only: tidak perlu dikirim balik
+      // 'LastClosedDate': lastClosedDate?.toIso8601String(),
+      // 'IsLocked': isLocked,
     };
   }
 
-  // --- text helpers (meniru Gilingan) ---
+  // --- text helpers ---
   String get tglProduksiTextShort {
     if (tglProduksi == null) return '';
     return DateFormat('dd MMM yyyy', 'id_ID').format(tglProduksi!.toLocal());
@@ -204,6 +233,14 @@ class MixerProduction {
       return '';
     }
     return '${hourStart ?? '--:--'} - ${hourEnd ?? '--:--'}';
+  }
+
+  // ✅ Optional untuk UI
+  String get lockInfoText {
+    if (!isLocked) return '';
+    if (lastClosedDate == null) return 'Locked';
+    final d = DateFormat('dd MMM yyyy', 'id_ID').format(lastClosedDate!.toLocal());
+    return 'Locked (<= $d)';
   }
 
   MixerProduction copyWith({
@@ -224,6 +261,10 @@ class MixerProduction {
     String? approveBy,
     String? hourStart,
     String? hourEnd,
+
+    // ✅ NEW
+    DateTime? lastClosedDate,
+    bool? isLocked,
   }) {
     return MixerProduction(
       noProduksi: noProduksi ?? this.noProduksi,
@@ -243,6 +284,10 @@ class MixerProduction {
       approveBy: approveBy ?? this.approveBy,
       hourStart: hourStart ?? this.hourStart,
       hourEnd: hourEnd ?? this.hourEnd,
+
+      // ✅ NEW
+      lastClosedDate: lastClosedDate ?? this.lastClosedDate,
+      isLocked: isLocked ?? this.isLocked,
     );
   }
 }

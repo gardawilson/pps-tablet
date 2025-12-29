@@ -27,10 +27,14 @@ import '../widgets/mixer_lookup_label_partial_dialog.dart';
 
 class MixerProductionInputScreen extends StatefulWidget {
   final String noProduksi;
+  final bool? isLocked;
+  final DateTime? lastClosedDate;
 
   const MixerProductionInputScreen({
     super.key,
     required this.noProduksi,
+    this.isLocked,
+    this.lastClosedDate,
   });
 
   @override
@@ -360,8 +364,10 @@ class _MixerProductionInputScreenState extends State<MixerProductionInputScreen>
         final err = vm.inputsError(widget.noProduksi);
         final inputs = vm.inputsOf(widget.noProduksi);
         final perm = context.watch<PermissionViewModel>();
-        final canDelete = perm.can('label_broker:delete');
+        final locked = widget.isLocked == true;
 
+        final canDeleteByPerm = perm.can('label_washing:delete');
+        final canDelete = canDeleteByPerm && !locked;
         // ✅ WRAP dengan WillPopScope untuk intercept back button
         return WillPopScope(
           onWillPop: _onWillPop,
@@ -493,20 +499,21 @@ class _MixerProductionInputScreenState extends State<MixerProductionInputScreen>
                       // === SECTION KIRI: Scan / Manual ===
                       SizedBox(
                           width: 380,
-                          child: SectionInputCard(
-                            title: 'Input via Scan / Manual',
-                            modeLabel: 'Pilih Mode',
-                            modeItems: const [
-                              DropdownMenuItem(value: 'full', child: Text('FULL PALLET')),
-                              DropdownMenuItem(value: 'select', child: Text('SEBAGIAN PALLET')),
-                              DropdownMenuItem(value: 'partial', child: Text('PARTIAL')),
-                            ],
-                            selectedMode: _selectedMode,
-                            manualHint: 'X.XXXXXXXXXX',
-                            isProcessing: vm.isLookupLoading, // ✅ Pass processing state
-                            onModeChanged: (mode) => setState(() => _selectedMode = mode),
-                            onCodeScanned: (code) => _onCodeReady(context, code), // ✅ Single handler
-                          )
+                        child: SectionInputCard(
+                          title: 'Input via Scan / Manual',
+                          modeLabel: 'Pilih Mode',
+                          modeItems: const [
+                            DropdownMenuItem(value: 'full', child: Text('FULL PALLET')),
+                            DropdownMenuItem(value: 'select', child: Text('SEBAGIAN PALLET')),
+                            DropdownMenuItem(value: 'partial', child: Text('PARTIAL')),
+                          ],
+                          selectedMode: _selectedMode,
+                          manualHint: 'X.XXXXXXXXXX',
+                          isProcessing: vm.isLookupLoading,
+                          isLocked: locked,
+                          onModeChanged: (mode) => setState(() => _selectedMode = mode),
+                          onCodeScanned: (code) => _onCodeReady(context, code),
+                        ),
                       ),
 
                       const SizedBox(width: 12),

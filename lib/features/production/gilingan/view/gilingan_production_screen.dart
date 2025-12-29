@@ -91,6 +91,8 @@ class _GilinganProductionScreenState extends State<GilinganProductionScreen> {
                       MaterialPageRoute(
                         builder: (_) => GilinganProductionInputScreen(
                           noProduksi: row.noProduksi,
+                          isLocked: row.isLocked,
+                          lastClosedDate: row.lastClosedDate,
                         ),
                       ),
                     );

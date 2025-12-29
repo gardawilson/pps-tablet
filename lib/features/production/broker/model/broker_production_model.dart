@@ -17,9 +17,13 @@ class BrokerProduction {
   final String? checkBy2;
   final String? approveBy;
 
-  // ⬇️ NEW
+  // time range
   final String? hourStart; // "HH:mm"
   final String? hourEnd;   // "HH:mm"
+
+  // ✅ NEW: tutup transaksi flags
+  final DateTime? lastClosedDate; // date only
+  final bool isLocked;
 
   const BrokerProduction({
     required this.noProduksi,
@@ -37,9 +41,12 @@ class BrokerProduction {
     this.checkBy1,
     this.checkBy2,
     this.approveBy,
-    // ⬇️ NEW (optional)
     this.hourStart,
     this.hourEnd,
+
+    // ✅ NEW
+    this.lastClosedDate,
+    this.isLocked = false,
   });
 
   // ---------- tolerant parsers ----------
@@ -61,40 +68,41 @@ class BrokerProduction {
   static DateTime? _asDateTime(dynamic v) {
     if (v == null) return null;
     if (v is DateTime) return v;
-    if (v is String) {
-      try {
-        return DateTime.tryParse(v);
-      } catch (_) {
-        return null;
-      }
-    }
-    if (v is int) {
-      return DateTime.fromMillisecondsSinceEpoch(v);
-    }
+    if (v is String) return DateTime.tryParse(v);
+    if (v is int) return DateTime.fromMillisecondsSinceEpoch(v);
     return null;
   }
 
-  // ⬇️ NEW: normalize MSSQL TIME to "HH:mm"
+  static bool _asBool(dynamic v, {bool fallback = false}) {
+    if (v == null) return fallback;
+    if (v is bool) return v;
+    if (v is int) return v != 0;
+    if (v is double) return v != 0;
+    if (v is String) {
+      final s = v.trim().toLowerCase();
+      if (s == 'true' || s == '1' || s == 'yes') return true;
+      if (s == 'false' || s == '0' || s == 'no') return false;
+    }
+    return fallback;
+  }
+
+  // normalize MSSQL TIME to "HH:mm"
   static String? _asTimeHHmm(dynamic v) {
     if (v == null) return null;
 
-    // If driver mapped TIME to DateTime (often 1900-01-01 + time)
     if (v is DateTime) {
       return DateFormat('HH:mm').format(v.toLocal());
     }
 
-    // If string, accept several shapes: "HH:mm[:ss[.fff]]"
     if (v is String) {
       final s = v.trim();
       if (s.isEmpty) return null;
 
-      // Try parse as DateTime first (covers ISO like 1900-01-01T07:30:00)
       final asDt = DateTime.tryParse(s);
       if (asDt != null) {
         return DateFormat('HH:mm').format(asDt.toLocal());
       }
 
-      // Fallback: extract leading HH:mm from a TIME string
       final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(s);
       if (m != null) {
         final hh = m.group(1)!.padLeft(2, '0');
@@ -117,15 +125,18 @@ class BrokerProduction {
       jamKerja: _asIntRequired(j['JamKerja']),
       shift: _asIntRequired(j['Shift']),
       createBy: _asString(j['CreateBy']),
-      checkBy1: j['CheckBy1'] == null || j['CheckBy1'] == '' ? null : _asString(j['CheckBy1']),
-      checkBy2: j['CheckBy2'] == null || j['CheckBy2'] == '' ? null : _asString(j['CheckBy2']),
-      approveBy: j['ApproveBy'] == null || j['ApproveBy'] == '' ? null : _asString(j['ApproveBy']),
+      checkBy1: (j['CheckBy1'] == null || j['CheckBy1'] == '') ? null : _asString(j['CheckBy1']),
+      checkBy2: (j['CheckBy2'] == null || j['CheckBy2'] == '') ? null : _asString(j['CheckBy2']),
+      approveBy: (j['ApproveBy'] == null || j['ApproveBy'] == '') ? null : _asString(j['ApproveBy']),
       jmlhAnggota: _asInt(j['JmlhAnggota']),
       hadir: _asInt(j['Hadir']),
       hourMeter: _asInt(j['HourMeter']),
-      // ⬇️ NEW
       hourStart: _asTimeHHmm(j['HourStart']),
       hourEnd: _asTimeHHmm(j['HourEnd']),
+
+      // ✅ NEW: mapping dari backend
+      lastClosedDate: _asDateTime(j['LastClosedDate']),
+      isLocked: _asBool(j['IsLocked']),
     );
   }
 
@@ -149,9 +160,12 @@ class BrokerProduction {
     'JmlhAnggota': jmlhAnggota,
     'Hadir': hadir,
     'HourMeter': hourMeter,
-    // ⬇️ NEW: send back as "HH:mm" strings (backend can parse to TIME)
     'HourStart': hourStart,
     'HourEnd': hourEnd,
+
+    // biasanya ini tidak perlu dikirim balik (read-only)
+    // 'LastClosedDate': lastClosedDate?.toIso8601String(),
+    // 'IsLocked': isLocked,
   };
 
   String get tglProduksiTextShort {
@@ -164,10 +178,17 @@ class BrokerProduction {
     return DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(tglProduksi!.toLocal());
   }
 
-  // ⬇️ Optional helpers
   String get hourRangeText {
     if ((hourStart == null || hourStart!.isEmpty) &&
         (hourEnd == null || hourEnd!.isEmpty)) return '';
     return '${hourStart ?? '--:--'} - ${hourEnd ?? '--:--'}';
+  }
+
+  // ✅ Optional helper untuk UI: tampilkan info lock
+  String get lockInfoText {
+    if (!isLocked) return '';
+    if (lastClosedDate == null) return 'Locked';
+    final d = DateFormat('dd MMM yyyy', 'id_ID').format(lastClosedDate!.toLocal());
+    return 'Locked (<= $d)';
   }
 }

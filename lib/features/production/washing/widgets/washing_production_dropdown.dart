@@ -89,6 +89,10 @@ class _WashingProductionDropdownState extends State<WashingProductionDropdown> {
         hourMeter: 0,
         hourStart: '',
         hourEnd: '',
+
+        // ✅ NEW FIELDS (tutup transaksi)
+        isLocked: false,
+        lastClosedDate: null,
       );
 
       setState(() {

@@ -91,6 +91,8 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
                       MaterialPageRoute(
                         builder: (_) => BrokerProductionInputScreen(
                           noProduksi: row.noProduksi,
+                          isLocked: row.isLocked,
+                          lastClosedDate: row.lastClosedDate,
                         ),
                       ),
                     );

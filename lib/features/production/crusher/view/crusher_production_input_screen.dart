@@ -23,10 +23,14 @@ import '../widgets/crusher_lookup_label_partial_dialog.dart';
 
 class CrusherProductionInputScreen extends StatefulWidget {
   final String noCrusherProduksi;
+  final bool? isLocked;
+  final DateTime? lastClosedDate;
 
   const CrusherProductionInputScreen({
     super.key,
     required this.noCrusherProduksi,
+    this.isLocked,
+    this.lastClosedDate,
   });
 
   @override
@@ -319,8 +323,10 @@ class _CrusherProductionInputScreenState extends State<CrusherProductionInputScr
         final err = vm.inputsError(widget.noCrusherProduksi);
         final inputs = vm.inputsOf(widget.noCrusherProduksi);
         final perm = context.watch<PermissionViewModel>();
-        final canDelete = perm.can('label_crusher:delete');
+        final locked = widget.isLocked == true;
 
+        final canDeleteByPerm = perm.can('label_washing:delete');
+        final canDelete = canDeleteByPerm && !locked;
         return WillPopScope(
           onWillPop: _onWillPop,
           child: Scaffold(
@@ -431,6 +437,9 @@ class _CrusherProductionInputScreenState extends State<CrusherProductionInputScr
                 final bbGroups = groupBy(bbAll, bbTitleKey);
                 final bonggolGroups = groupBy(bonggolAll, (BonggolanItem e) => e.noBonggolan ?? '-');
 
+                final locked = widget.isLocked == true;
+                final closed = widget.lastClosedDate; // boleh null
+
                 return Padding(
                   padding: const EdgeInsets.all(12),
                   child: Row(
@@ -449,6 +458,7 @@ class _CrusherProductionInputScreenState extends State<CrusherProductionInputScr
                           selectedMode: _selectedMode,
                           manualHint: 'X.XXXXXXXXXX',
                           isProcessing: vm.isLookupLoading,
+                          isLocked: locked,
                           onModeChanged: (mode) => setState(() => _selectedMode = mode),
                           onCodeScanned: (code) => _onCodeReady(context, code),
                         ),

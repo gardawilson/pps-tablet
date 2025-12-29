@@ -27,10 +27,14 @@ import '../widgets/gilingan_lookup_label_partial_dialog.dart';
 
 class GilinganProductionInputScreen extends StatefulWidget {
   final String noProduksi;
+  final bool? isLocked;
+  final DateTime? lastClosedDate;
 
   const GilinganProductionInputScreen({
     super.key,
     required this.noProduksi,
+    this.isLocked,
+    this.lastClosedDate,
   });
 
   @override
@@ -307,7 +311,10 @@ class _GilinganProductionInputScreenState
         final inputs = vm.inputsOf(widget.noProduksi);
 
         final perm = context.watch<PermissionViewModel>();
-        final canDelete = perm.can('label_crusher:delete'); // ✅ sesuaikan key
+        final locked = widget.isLocked == true;
+
+        final canDeleteByPerm = perm.can('label_washing:delete');
+        final canDelete = canDeleteByPerm && !locked;
 
         return WillPopScope(
           onWillPop: _onWillPop,
@@ -452,18 +459,15 @@ class _GilinganProductionInputScreenState
                           title: 'Input via Scan / Manual',
                           modeLabel: 'Pilih Mode',
                           modeItems: const [
-                            DropdownMenuItem(
-                                value: 'full', child: Text('FULL PALLET')),
-                            DropdownMenuItem(
-                                value: 'select', child: Text('SEBAGIAN PALLET')),
-                            DropdownMenuItem(
-                                value: 'partial', child: Text('PARTIAL')),
+                            DropdownMenuItem(value: 'full', child: Text('FULL PALLET')),
+                            DropdownMenuItem(value: 'select', child: Text('SEBAGIAN PALLET')),
+                            DropdownMenuItem(value: 'partial', child: Text('PARTIAL')),
                           ],
                           selectedMode: _selectedMode,
                           manualHint: 'X.XXXXXXXXXX',
                           isProcessing: vm.isLookupLoading,
-                          onModeChanged: (mode) =>
-                              setState(() => _selectedMode = mode),
+                          isLocked: locked,
+                          onModeChanged: (mode) => setState(() => _selectedMode = mode),
                           onCodeScanned: (code) => _onCodeReady(context, code),
                         ),
                       ),

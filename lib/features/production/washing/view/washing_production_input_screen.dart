@@ -20,9 +20,14 @@ import '../../shared/widgets/unsaved_temp_warning_dialog.dart';
 class WashingProductionInputScreen extends StatefulWidget {
   final String noProduksi;
 
+  final bool? isLocked;
+  final DateTime? lastClosedDate;
+
   const WashingProductionInputScreen({
     super.key,
     required this.noProduksi,
+    this.isLocked,
+    this.lastClosedDate,
   });
 
   @override
@@ -347,7 +352,10 @@ class _WashingProductionInputScreenState extends State<WashingProductionInputScr
         final err = vm.inputsError(widget.noProduksi);
         final inputs = vm.inputsOf(widget.noProduksi);
         final perm = context.watch<PermissionViewModel>();
-        final canDelete = perm.can('label_washing:delete');
+        final locked = widget.isLocked == true;
+
+        final canDeleteByPerm = perm.can('label_washing:delete');
+        final canDelete = canDeleteByPerm && !locked;
 
         // ✅ WRAP dengan WillPopScope untuk intercept back button
         return WillPopScope(
@@ -466,28 +474,34 @@ class _WashingProductionInputScreenState extends State<WashingProductionInputScr
                 final washingGroups = groupBy(washingAll, (WashingItem e) => e.noWashing ?? '-');
                 final gilinganGroups = groupBy(gilinganAll, gilinganTitleKey);
 
+                final locked = widget.isLocked == true;
+                final closed = widget.lastClosedDate; // boleh null
+
                 return Padding(
                   padding: const EdgeInsets.all(12),
                   child: Row(
                     children: [
                       // === SECTION KIRI: Scan / Manual ===
                       SizedBox(
-                          width: 380,
-                          child: SectionInputCard(
-                            title: 'Input via Scan / Manual',
-                            modeLabel: 'Pilih Mode',
-                            modeItems: const [
-                              DropdownMenuItem(value: 'full', child: Text('FULL PALLET')),
-                              DropdownMenuItem(value: 'select', child: Text('SEBAGIAN PALLET')),
-                              DropdownMenuItem(value: 'partial', child: Text('PARTIAL')),
-                            ],
-                            selectedMode: _selectedMode,
-                            manualHint: 'X.XXXXXXXXXX',
-                            isProcessing: vm.isLookupLoading,
-                            onModeChanged: (mode) => setState(() => _selectedMode = mode),
-                            onCodeScanned: (code) => _onCodeReady(context, code),
-                          )
+                        width: 380,
+                        child: SectionInputCard(
+                          title: 'Input via Scan / Manual',
+                          modeLabel: 'Pilih Mode',
+                          modeItems: const [
+                            DropdownMenuItem(value: 'full', child: Text('FULL PALLET')),
+                            DropdownMenuItem(value: 'select', child: Text('SEBAGIAN PALLET')),
+                            DropdownMenuItem(value: 'partial', child: Text('PARTIAL')),
+                          ],
+                          selectedMode: _selectedMode,
+                          manualHint: 'X.XXXXXXXXXX',
+                          isProcessing: vm.isLookupLoading,
+                          isLocked: locked,
+                          onModeChanged: (mode) => setState(() => _selectedMode = mode),
+                          onCodeScanned: (code) => _onCodeReady(context, code),
+                        ),
                       ),
+
+
 
                       const SizedBox(width: 12),
 

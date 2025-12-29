@@ -93,6 +93,8 @@ class _BongkarSusunScreenState extends State<BongkarSusunScreen> {
                       MaterialPageRoute(
                         builder: (_) => BongkarSusunInputScreen(
                           noBongkarSusun: row.noBongkarSusun,
+                          isLocked: row.isLocked,
+                          lastClosedDate: row.lastClosedDate,
                         ),
                       ),
                     );

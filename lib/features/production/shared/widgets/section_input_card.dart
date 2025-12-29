@@ -20,6 +20,12 @@ class SectionInputCard extends StatefulWidget {
   /// Optional: Disable semua input (saat processing)
   final bool isProcessing;
 
+  /// Optional: Lock semua input (saat periode sudah ditutup)
+  final bool isLocked;
+
+  /// Optional: Tanggal terakhir periode ditutup
+  final DateTime? lastClosedDate;
+
   const SectionInputCard({
     super.key,
     required this.title,
@@ -30,6 +36,8 @@ class SectionInputCard extends StatefulWidget {
     required this.onModeChanged,
     required this.onCodeScanned,
     this.isProcessing = false,
+    this.isLocked = false,
+    this.lastClosedDate,
   });
 
   @override
@@ -40,7 +48,7 @@ class _SectionInputCardState extends State<SectionInputCard> {
   bool _scanActive = false;
 
   void _toggleScan() {
-    if (widget.isProcessing) return;
+    if (widget.isProcessing || widget.isLocked) return;
 
     setState(() {
       _scanActive = !_scanActive;
@@ -57,12 +65,15 @@ class _SectionInputCardState extends State<SectionInputCard> {
 
   /// Handle QR/Barcode detection dari scanner
   void _onScanDetected(String code) {
+    if (widget.isLocked) return;
     _stopScan();
     widget.onCodeScanned(code);
   }
 
   /// Show dialog untuk input manual
   Future<void> _showManualInputDialog() async {
+    if (widget.isLocked) return;
+
     // Stop scan dulu jika sedang aktif
     if (_scanActive) {
       _stopScan();
@@ -87,6 +98,10 @@ class _SectionInputCardState extends State<SectionInputCard> {
 
   /// Get caption text based on selected mode
   String _getModeCaption(String mode) {
+    if (widget.isLocked) {
+      return _getLockedCaption();
+    }
+
     switch (mode.toLowerCase()) {
       case 'full':
         return 'Scan dan langsung gunakan seluruh isi tanpa konfirmasi.';
@@ -99,8 +114,31 @@ class _SectionInputCardState extends State<SectionInputCard> {
     }
   }
 
+  /// Get locked caption with formatted date
+  String _getLockedCaption() {
+    if (widget.lastClosedDate == null) {
+      return 'Input tidak dapat dilakukan. Periode telah ditutup.';
+    }
+
+    final months = [
+      '', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+
+    final date = widget.lastClosedDate!;
+    final day = date.day;
+    final month = months[date.month];
+    final year = date.year;
+
+    return 'Periode telah ditutup pada $day $month $year. Input tidak dapat dilakukan.';
+  }
+
   /// Get color based on selected mode
   Color _getModeColor(BuildContext context) {
+    if (widget.isLocked) {
+      return Colors.grey.shade600;
+    }
+
     final theme = Theme.of(context);
     switch (widget.selectedMode.toLowerCase()) {
       case 'full':
@@ -116,6 +154,10 @@ class _SectionInputCardState extends State<SectionInputCard> {
 
   /// Build placeholder when scanner is not active
   Widget _buildIdlePlaceholder() {
+    if (widget.isLocked) {
+      return _buildLockedPlaceholder();
+    }
+
     return Container(
       height: 220,
       decoration: BoxDecoration(
@@ -155,10 +197,55 @@ class _SectionInputCardState extends State<SectionInputCard> {
     );
   }
 
+  /// Build locked placeholder
+  Widget _buildLockedPlaceholder() {
+    return Container(
+      height: 220,
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.red.shade200, width: 1.5),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.lock_outline,
+              size: 48,
+              color: Colors.red.shade400,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Input Terkunci',
+              style: TextStyle(
+                color: Colors.red.shade700,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                'Periode telah ditutup.\nInput tidak dapat dilakukan.',
+                style: TextStyle(
+                  color: Colors.red.shade600,
+                  fontSize: 12,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final modeColor = _getModeColor(context);
-    final bool disableControls = widget.isProcessing;
+    final bool disableControls = widget.isProcessing || widget.isLocked;
 
     return Card(
       elevation: _scanActive ? 4 : 2,
@@ -189,7 +276,12 @@ class _SectionInputCardState extends State<SectionInputCard> {
                     _getModeCaption(widget.selectedMode),
                     style: TextStyle(
                       fontSize: 11,
-                      color: Colors.grey.shade700,
+                      color: widget.isLocked
+                          ? Colors.red.shade700
+                          : Colors.grey.shade700,
+                      fontWeight: widget.isLocked
+                          ? FontWeight.w600
+                          : FontWeight.normal,
                     ),
                   ),
 
@@ -244,13 +336,19 @@ class _SectionInputCardState extends State<SectionInputCard> {
   }
 
   /// Build header section with gradient
+  /// Build header section with gradient
   Widget _buildHeader(bool disableControls) {
     return Container(
-      width: double.infinity,
+      // ❌ HAPUS: width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
+          colors: widget.isLocked
+              ? [
+            Colors.red.shade700,
+            Colors.red.shade700.withOpacity(0.7),
+          ]
+              : [
             const Color(0xFF1565C0),
             const Color(0xFF1565C0).withOpacity(0.7),
           ],
@@ -266,8 +364,8 @@ class _SectionInputCardState extends State<SectionInputCard> {
               color: Colors.white.withOpacity(0.15),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(
-              Icons.qr_code_scanner,
+            child: Icon(
+              widget.isLocked ? Icons.lock : Icons.qr_code_scanner,
               size: 20,
               color: Colors.white,
             ),
@@ -288,7 +386,9 @@ class _SectionInputCardState extends State<SectionInputCard> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  _scanActive
+                  widget.isLocked
+                      ? 'Terkunci • Periode telah ditutup.'
+                      : _scanActive
                       ? 'Kamera aktif • Arahkan ke QR / barcode.'
                       : widget.isProcessing
                       ? 'Memproses...'
@@ -341,13 +441,15 @@ class _SectionInputCardState extends State<SectionInputCard> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.tune,
+                widget.isLocked ? Icons.lock_outline : Icons.tune,
                 size: 13,
                 color: modeColor,
               ),
               const SizedBox(width: 4),
               Text(
-                widget.selectedMode.toUpperCase(),
+                widget.isLocked
+                    ? 'TERKUNCI'
+                    : widget.selectedMode.toUpperCase(),
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,

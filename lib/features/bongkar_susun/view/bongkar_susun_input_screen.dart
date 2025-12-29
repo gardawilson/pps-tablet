@@ -32,10 +32,14 @@ import '../widgets/bongkar_susun_lookup_label_partial_dialog.dart';
 
 class BongkarSusunInputScreen extends StatefulWidget {
   final String noBongkarSusun;
+  final bool? isLocked;
+  final DateTime? lastClosedDate;
 
   const BongkarSusunInputScreen({
     super.key,
     required this.noBongkarSusun,
+    this.isLocked,
+    this.lastClosedDate,
   });
 
   @override
@@ -361,7 +365,10 @@ class _BongkarSusunInputScreenState extends State<BongkarSusunInputScreen> {
         final err = vm.inputsError(widget.noBongkarSusun);
         final inputs = vm.inputsOf(widget.noBongkarSusun);
         final perm = context.watch<PermissionViewModel>();
-        final canDelete = perm.can('label_crusher:delete');
+        final locked = widget.isLocked == true;
+
+        final canDeleteByPerm = perm.can('label_washing:delete');
+        final canDelete = canDeleteByPerm && !locked;
 
         return WillPopScope(
           onWillPop: _onWillPop,
@@ -548,21 +555,16 @@ class _BongkarSusunInputScreenState extends State<BongkarSusunInputScreen> {
                           title: 'Input via Scan / Manual',
                           modeLabel: 'Pilih Mode',
                           modeItems: const [
-                            DropdownMenuItem(
-                                value: 'full', child: Text('FULL PALLET')),
-                            DropdownMenuItem(
-                                value: 'select',
-                                child: Text('SEBAGIAN PALLET')),
-                            DropdownMenuItem(
-                                value: 'partial', child: Text('PARTIAL')),
+                            DropdownMenuItem(value: 'full', child: Text('FULL PALLET')),
+                            DropdownMenuItem(value: 'select', child: Text('SEBAGIAN PALLET')),
+                            DropdownMenuItem(value: 'partial', child: Text('PARTIAL')),
                           ],
                           selectedMode: _selectedMode,
                           manualHint: 'X.XXXXXXXXXX',
                           isProcessing: vm.isLookupLoading,
-                          onModeChanged: (mode) =>
-                              setState(() => _selectedMode = mode),
-                          onCodeScanned: (code) =>
-                              _onCodeReady(context, code),
+                          isLocked: locked,
+                          onModeChanged: (mode) => setState(() => _selectedMode = mode),
+                          onCodeScanned: (code) => _onCodeReady(context, code),
                         ),
                       ),
 

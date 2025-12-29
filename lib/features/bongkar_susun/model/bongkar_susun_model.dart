@@ -6,8 +6,12 @@ class BongkarSusun {
   final int idUsername;
   final String? note;
 
-  // ⬅️ baru: diambil dari kolom Username (join MstUsername)
+  // join MstUsername
   final String? username;
+
+  // ✅ NEW: tutup transaksi flags
+  final DateTime? lastClosedDate; // date only
+  final bool isLocked;
 
   const BongkarSusun({
     required this.noBongkarSusun,
@@ -15,10 +19,13 @@ class BongkarSusun {
     required this.idUsername,
     this.note,
     this.username,
+
+    // ✅ NEW
+    this.lastClosedDate,
+    this.isLocked = false,
   });
 
-  // ---------- tolerant parsers (sama pola dengan BrokerProduction) ----------
-
+  // ---------- tolerant parsers ----------
   static String _asString(dynamic v) => v?.toString() ?? '';
 
   static int _asIntRequired(dynamic v, {int fallback = 0}) {
@@ -34,28 +41,30 @@ class BongkarSusun {
     return null;
   }
 
+  static bool _asBool(dynamic v, {bool fallback = false}) {
+    if (v == null) return fallback;
+    if (v is bool) return v;
+    if (v is int) return v != 0;
+    if (v is double) return v != 0;
+    if (v is String) {
+      final s = v.trim().toLowerCase();
+      if (s == 'true' || s == '1' || s == 'yes') return true;
+      if (s == 'false' || s == '0' || s == 'no') return false;
+    }
+    return fallback;
+  }
+
   static DateTime? _asDateTime(dynamic v) {
     if (v == null) return null;
     if (v is DateTime) return v;
-    if (v is String) {
-      try {
-        return DateTime.tryParse(v);
-      } catch (_) {
-        return null;
-      }
-    }
-    if (v is int) {
-      // misal dikirim sebagai millisecondsSinceEpoch
-      return DateTime.fromMillisecondsSinceEpoch(v);
-    }
+    if (v is String) return DateTime.tryParse(v);
+    if (v is int) return DateTime.fromMillisecondsSinceEpoch(v);
     return null;
   }
 
-  // 👇 Tetap: untuk dropdown text
+  // untuk dropdown text
   String get displayText {
-    if (note == null || note!.trim().isEmpty) {
-      return noBongkarSusun;
-    }
+    if (note == null || note!.trim().isEmpty) return noBongkarSusun;
     return '$noBongkarSusun | $note';
   }
 
@@ -67,14 +76,15 @@ class BongkarSusun {
       note: (j['Note'] == null || j['Note'].toString().trim().isEmpty)
           ? null
           : _asString(j['Note']),
-      // ⬅️ mapping dari response: "Username": "Marissa"
-      username: j['Username'] == null
-          ? null
-          : _asString(j['Username']),
+      username: j['Username'] == null ? null : _asString(j['Username']),
+
+      // ✅ NEW
+      lastClosedDate: _asDateTime(j['LastClosedDate']),
+      isLocked: _asBool(j['IsLocked']),
     );
   }
 
-  /// asDateOnly mengikuti pola BrokerProduction (yyyy-MM-dd) kalau true
+  /// asDateOnly: yyyy-MM-dd kalau true
   Map<String, dynamic> toJson({bool asDateOnly = true}) => {
     'NoBongkarSusun': noBongkarSusun,
     'Tanggal': tanggal == null
@@ -84,12 +94,23 @@ class BongkarSusun {
         : tanggal!.toIso8601String()),
     'IdUsername': idUsername,
     'Note': note,
-    // optional: kirim balik kalau mau, kalau tidak perlu bisa dihapus
     'Username': username,
+
+    // biasanya read-only, tidak perlu dikirim balik
+    // 'LastClosedDate': lastClosedDate?.toIso8601String(),
+    // 'IsLocked': isLocked,
   };
 
   String get tanggalText {
     if (tanggal == null) return '';
     return DateFormat('dd MMM yyyy', 'id_ID').format(tanggal!.toLocal());
+  }
+
+  // ✅ Optional untuk UI
+  String get lockInfoText {
+    if (!isLocked) return '';
+    if (lastClosedDate == null) return 'Locked';
+    final d = DateFormat('dd MMM yyyy', 'id_ID').format(lastClosedDate!.toLocal());
+    return 'Locked (<= $d)';
   }
 }

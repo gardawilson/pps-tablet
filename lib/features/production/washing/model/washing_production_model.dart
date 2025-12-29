@@ -20,6 +20,10 @@ class WashingProduction {
   final String? hourStart; // "HH:mm"
   final String? hourEnd;   // "HH:mm"
 
+  // ✅ Tutup transaksi flags
+  final bool isLocked;            // dari SQL: IsLocked (bit)
+  final DateTime? lastClosedDate; // dari SQL: LastClosedDate (date)
+
   const WashingProduction({
     required this.noProduksi,
     required this.idOperator,
@@ -38,6 +42,8 @@ class WashingProduction {
     this.hourMeter,
     this.hourStart,
     this.hourEnd,
+    required this.isLocked,
+    this.lastClosedDate,
   });
 
   // ---------- Tolerant parsers ----------
@@ -57,15 +63,35 @@ class WashingProduction {
     return null;
   }
 
+  static double? _asDouble(dynamic v) {
+    if (v == null) return null;
+    if (v is double) return v;
+    if (v is int) return v.toDouble();
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v);
+    return null;
+  }
+
+  static bool _asBool(dynamic v, {bool fallback = false}) {
+    if (v == null) return fallback;
+    if (v is bool) return v;
+    if (v is int) return v != 0;
+    if (v is num) return v != 0;
+    if (v is String) {
+      final s = v.trim().toLowerCase();
+      if (s == 'true' || s == '1' || s == 'yes' || s == 'y') return true;
+      if (s == 'false' || s == '0' || s == 'no' || s == 'n') return false;
+    }
+    return fallback;
+  }
+
   static DateTime? _asDateTime(dynamic v) {
     if (v == null) return null;
     if (v is DateTime) return v;
     if (v is String) {
-      try {
-        return DateTime.tryParse(v);
-      } catch (_) {
-        return null;
-      }
+      final s = v.trim();
+      if (s.isEmpty) return null;
+      return DateTime.tryParse(s);
     }
     if (v is int) {
       return DateTime.fromMillisecondsSinceEpoch(v);
@@ -82,18 +108,15 @@ class WashingProduction {
       return DateFormat('HH:mm').format(v.toLocal());
     }
 
-    // If string, accept several shapes: "HH:mm[:ss[.fff]]"
     if (v is String) {
       final s = v.trim();
       if (s.isEmpty) return null;
 
-      // Try parse as DateTime first (covers ISO like 1970-01-01T08:00:00)
       final asDt = DateTime.tryParse(s);
       if (asDt != null) {
         return DateFormat('HH:mm').format(asDt.toLocal());
       }
 
-      // Fallback: extract leading HH:mm from a TIME string like "08:00:00"
       final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(s);
       if (m != null) {
         final hh = m.group(1)!.padLeft(2, '0');
@@ -106,6 +129,8 @@ class WashingProduction {
   }
 
   factory WashingProduction.fromJson(Map<String, dynamic> j) {
+    final hm = _asDouble(j['HourMeter']); // kadang decimal
+
     return WashingProduction(
       noProduksi: _asString(j['NoProduksi']),
       idOperator: _asIntRequired(j['IdOperator']),
@@ -116,20 +141,25 @@ class WashingProduction {
       jamKerja: _asIntRequired(j['JamKerja']),
       shift: _asIntRequired(j['Shift']),
       createBy: _asString(j['CreateBy']),
-      checkBy1: j['CheckBy1'] == null || j['CheckBy1'] == ''
+      checkBy1: (j['CheckBy1'] == null || _asString(j['CheckBy1']).trim().isEmpty)
           ? null
           : _asString(j['CheckBy1']),
-      checkBy2: j['CheckBy2'] == null || j['CheckBy2'] == ''
+      checkBy2: (j['CheckBy2'] == null || _asString(j['CheckBy2']).trim().isEmpty)
           ? null
           : _asString(j['CheckBy2']),
-      approveBy: j['ApproveBy'] == null || j['ApproveBy'] == ''
+      approveBy: (j['ApproveBy'] == null || _asString(j['ApproveBy']).trim().isEmpty)
           ? null
           : _asString(j['ApproveBy']),
       jmlhAnggota: _asInt(j['JmlhAnggota']),
       hadir: _asInt(j['Hadir']),
-      hourMeter: _asInt(j['HourMeter']),
+      hourMeter: hm?.round(), // kalau kamu mau tetap int
+      // kalau mau simpan double, ganti field hourMeter jadi double? di model
       hourStart: _asTimeHHmm(j['HourStart']),
       hourEnd: _asTimeHHmm(j['HourEnd']),
+
+      // ✅ new fields
+      isLocked: _asBool(j['IsLocked'], fallback: false),
+      lastClosedDate: _asDateTime(j['LastClosedDate']),
     );
   }
 
@@ -155,12 +185,21 @@ class WashingProduction {
     'HourMeter': hourMeter,
     'HourStart': hourStart,
     'HourEnd': hourEnd,
+
+    // biasanya tidak perlu dikirim ke server,
+    // tapi aman kalau disertakan untuk cache/local state
+    'IsLocked': isLocked,
+    'LastClosedDate': lastClosedDate == null
+        ? null
+        : DateFormat('yyyy-MM-dd').format(lastClosedDate!),
   };
 
   // ---------- Display helpers ----------
   String get tglProduksiTextShort {
     if (tglProduksi == null) return '';
     return DateFormat('dd MMM yyyy', 'id_ID').format(tglProduksi!.toLocal());
+    // NOTE: kalau server kirim "2025-12-28T00:00:00.000Z", toLocal bisa jadi jam 07:00.
+    // Kalau kamu ingin benar-benar date-only tampilan, bisa format dari UTC (lihat catatan di bawah).
   }
 
   String get tglProduksiTextFull {
@@ -172,5 +211,25 @@ class WashingProduction {
     if ((hourStart == null || hourStart!.isEmpty) &&
         (hourEnd == null || hourEnd!.isEmpty)) return '';
     return '${hourStart ?? '--:--'} - ${hourEnd ?? '--:--'}';
+  }
+
+  // ✅ helper untuk UI: badge tutup transaksi
+  String get lockBadgeText {
+    if (!isLocked) return '';
+    if (lastClosedDate == null) return 'Tutup Transaksi';
+    final s = DateFormat('dd MMM yyyy', 'id_ID').format(lastClosedDate!.toLocal());
+    return 'Tutup s/d $s';
+  }
+
+  bool get canEdit => !isLocked;
+  bool get canDelete => !isLocked;
+  bool get canManageInputs => !isLocked;
+
+  // (Opsional) Kalau kamu mau tampilan date-only yang tidak pernah “geser”
+  // gunakan UTC (karena server kamu sudah normalize date-only).
+  String get tglProduksiTextShortUtc {
+    if (tglProduksi == null) return '';
+    final d = tglProduksi!.toUtc();
+    return DateFormat('dd MMM yyyy', 'id_ID').format(d);
   }
 }

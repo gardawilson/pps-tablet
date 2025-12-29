@@ -77,6 +77,8 @@ class _CrusherProductionScreenState extends State<CrusherProductionScreen> {
                       MaterialPageRoute(
                         builder: (_) => CrusherProductionInputScreen(
                           noCrusherProduksi: row.noCrusherProduksi,
+                          isLocked: row.isLocked,
+                          lastClosedDate: row.lastClosedDate,
                         ),
                       ),
                     );

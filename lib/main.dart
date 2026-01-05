@@ -51,7 +51,10 @@ import 'package:pps_tablet/features/production/gilingan/view/gilingan_production
 import 'package:pps_tablet/features/production/gilingan/view_model/gilingan_production_input_view_model.dart';
 import 'package:pps_tablet/features/production/gilingan/view_model/gilingan_production_view_model.dart';
 import 'package:pps_tablet/features/production/hot_stamp/model/hot_stamp_production_model.dart';
+import 'package:pps_tablet/features/production/hot_stamp/repository/hot_stamp_production_input_repository.dart';
 import 'package:pps_tablet/features/production/hot_stamp/repository/hot_stamp_production_repository.dart';
+import 'package:pps_tablet/features/production/hot_stamp/view/hot_stamp_production_screen.dart';
+import 'package:pps_tablet/features/production/hot_stamp/view_model/hot_stamp_production_input_view_model.dart';
 import 'package:pps_tablet/features/production/hot_stamp/view_model/hot_stamp_production_view_model.dart';
 import 'package:pps_tablet/features/production/inject/repository/inject_production_repository.dart';
 import 'package:pps_tablet/features/production/inject/view_model/inject_production_view_model.dart';
@@ -197,6 +200,12 @@ class MyApp extends StatelessWidget {
             repository: HotStampProductionRepository(
               api: ctx.read<ApiClient>(),
             ),
+          ),
+        ),
+
+        ChangeNotifierProvider<HotStampingProductionInputViewModel>(
+          create: (ctx) => HotStampingProductionInputViewModel(
+            repository: HotStampingProductionInputRepository(),
           ),
         ),
 
@@ -388,6 +397,7 @@ class MyApp extends StatelessWidget {
           '/label/reject': (context) => RejectScreen(),
           '/production/gilingan': (context) => GilinganProductionScreen(),
           '/production/mixer': (context) => MixerProductionScreen(),
+          '/production/hot-stamp': (context) => HotStampProductionScreen(),
         },
       ),
 

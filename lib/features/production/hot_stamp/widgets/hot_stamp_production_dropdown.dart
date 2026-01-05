@@ -70,18 +70,22 @@ class _HotStampProductionDropdownState
       // EDIT MODE → synthetic single item
       final item = HotStampProduction(
         noProduksi: pre,
-        tanggal: DateTime.now().toUtc(),
+        tglProduksi: DateTime.now().toUtc(), // ✅ renamed from tanggal
         idMesin: 0,
-        namaMesin: widget.preselectNamaMesin ?? '',
         idOperator: 0,
+        namaMesin: widget.preselectNamaMesin ?? '',
         namaOperator: '',
         shift: widget.shiftFilter ?? 0,
+        createBy: '', // ✅ required field, beri empty string
         jamKerja: 0,
-        createBy: null,
+        hourMeter: null,
         checkBy1: null,
         checkBy2: null,
         approveBy: null,
-        hourMeter: null,
+        hourStart: null, // ✅ added
+        hourEnd: null,   // ✅ added
+        lastClosedDate: null, // ✅ added
+        isLocked: false,      // ✅ added (default false untuk edit mode)
       );
 
       setState(() {

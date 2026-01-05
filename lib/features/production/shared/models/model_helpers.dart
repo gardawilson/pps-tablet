@@ -2,6 +2,16 @@
 
 /* ===================== PARSER HELPERS (PUBLIC - tanpa underscore) ===================== */
 
+num? pickN(Map<String, dynamic> j, List<String> keys) {
+  for (final k in keys) {
+    final v = j[k];
+    if (v == null) continue;
+    if (v is num) return v;
+    if (v is String) return num.tryParse(v);
+  }
+  return null;
+}
+
 String? asString(dynamic v) {
   if (v == null) return null;
   final s = v.toString();

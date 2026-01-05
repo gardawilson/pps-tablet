@@ -134,44 +134,126 @@ class ProductionLabelLookupResult {
   List<dynamic> get typedItems {
     if (!found || data.isEmpty) return const [];
 
-    final p = (prefix ?? '').toUpperCase();
+    final type = prefixType;
 
-    switch (p) {
-      case 'D.':
+    switch (type) {
+      case PrefixType.broker:
         return brokerItems;
-      case 'A.':
+      case PrefixType.bb:
         return bbItems;
-      case 'B.':
+      case PrefixType.washing:
         return washingItems;
-      case 'F.':
+      case PrefixType.crusher:
         return crusherItems;
-      case 'V.':
+      case PrefixType.gilingan:
         return gilinganItems;
-      case 'H.':
+      case PrefixType.mixer:
         return mixerItems;
-      case 'BF.':
+      case PrefixType.reject:
         return rejectItems;
-      case 'M.':
+      case PrefixType.bonggolan:
         return bonggolanItems;
-      case 'BB.':
+      case PrefixType.furnitureWip:
         return furnitureWipItems;
-      case 'BC.':  // ✅ TAMBAHKAN: Partial FurnitureWIP
-        return furnitureWipItems;
-      case 'BA.':
+      case PrefixType.barangJadi:
         return barangJadiItems;
-      case 'BL.':  // ✅ TAMBAHKAN: Partial BarangJadi
-        return barangJadiItems;
-      default:
+      case PrefixType.unknown:
         return const [];
     }
   }
 
-  // ========== PREFIX TYPE ENUM ==========
+  // ========== PREFIX TYPE ENUM WITH FALLBACK ==========
 
   /// Enum untuk tipe prefix yang dikenali
+  /// PRIORITAS:
+  /// 1. Cek prefix dari response
+  /// 2. Extract prefix dari data pertama
+  /// 3. Fallback ke tableName
   PrefixType get prefixType {
+    // ✅ PRIORITAS 1: Cek prefix dari response
     final p = (prefix ?? '').toUpperCase();
-    switch (p) {
+
+    if (p.isNotEmpty) {
+      final typeFromPrefix = _prefixTypeFromString(p);
+      if (typeFromPrefix != PrefixType.unknown) {
+        return typeFromPrefix;
+      }
+    }
+
+    // ✅ PRIORITAS 2: Extract dari data pertama
+    if (data.isNotEmpty) {
+      final extractedPrefix = _extractPrefixFromRow(data.first);
+      if (extractedPrefix.isNotEmpty) {
+        final typeFromExtracted = _prefixTypeFromString(extractedPrefix);
+        if (typeFromExtracted != PrefixType.unknown) {
+          return typeFromExtracted;
+        }
+      }
+    }
+
+    // ✅ PRIORITAS 3: Fallback ke tableName
+    final t = (tableName ?? '').toLowerCase();
+    return _prefixTypeFromTableName(t);
+  }
+
+  /// Helper: Extract prefix dari row data
+  String _extractPrefixFromRow(Map<String, dynamic> row) {
+    // List field yang mungkin punya prefix (urutan penting!)
+    final candidates = [
+      // FurnitureWIP
+      row['NoFurnitureWIP'],
+      row['noFurnitureWIP'],
+      row['noFurnitureWip'],
+      // Broker
+      row['NoBroker'],
+      row['noBroker'],
+      // Bahan Baku
+      row['NoBahanBaku'],
+      row['noBahanBaku'],
+      // Washing
+      row['NoWashing'],
+      row['noWashing'],
+      // Crusher
+      row['NoCrusher'],
+      row['noCrusher'],
+      // Gilingan
+      row['NoGilingan'],
+      row['noGilingan'],
+      // Mixer
+      row['NoMixer'],
+      row['noMixer'],
+      // Reject
+      row['NoReject'],
+      row['noReject'],
+      // Bonggolan
+      row['NoBonggolan'],
+      row['noBonggolan'],
+      // Barang Jadi
+      row['NoBJ'],
+      row['noBJ'],
+      row['noBj'],
+    ];
+
+    for (final candidate in candidates) {
+      if (candidate == null) continue;
+
+      final str = candidate.toString().trim();
+      if (str.isEmpty) continue;
+
+      // Extract prefix (XX. atau X.)
+      // Pattern: 1-2 huruf diikuti titik (case insensitive)
+      final match = RegExp(r'^([A-Z]{1,2}\.)').firstMatch(str.toUpperCase());
+      if (match != null) {
+        return match.group(1)!;
+      }
+    }
+
+    return '';
+  }
+
+  /// Helper: Convert prefix string to PrefixType
+  PrefixType _prefixTypeFromString(String p) {
+    switch (p.toUpperCase()) {
       case 'D.':
         return PrefixType.broker;
       case 'A.':
@@ -189,12 +271,46 @@ class ProductionLabelLookupResult {
       case 'M.':
         return PrefixType.bonggolan;
       case 'BB.':
-        return PrefixType.furnitureWip;
-      case 'BC.':  // ✅ TAMBAHKAN: Partial FurnitureWIP
+      case 'BC.':  // Partial FurnitureWIP
         return PrefixType.furnitureWip;
       case 'BA.':
+      case 'BL.':  // Partial BarangJadi
         return PrefixType.barangJadi;
-      case 'BL.':  // ✅ TAMBAHKAN: Partial BarangJadi
+      default:
+        return PrefixType.unknown;
+    }
+  }
+
+  /// Helper: Convert tableName to PrefixType
+  PrefixType _prefixTypeFromTableName(String t) {
+    switch (t.toLowerCase()) {
+      case 'broker_d':
+      case 'broker':
+        return PrefixType.broker;
+      case 'bahanbaku_d':
+      case 'bahanbaku':
+      case 'bahan_baku':
+        return PrefixType.bb;
+      case 'washing_d':
+      case 'washing':
+        return PrefixType.washing;
+      case 'crusher':
+        return PrefixType.crusher;
+      case 'gilingan':
+        return PrefixType.gilingan;
+      case 'mixer_d':
+      case 'mixer':
+        return PrefixType.mixer;
+      case 'rejectv2':
+      case 'reject':
+        return PrefixType.reject;
+      case 'bonggolan':
+        return PrefixType.bonggolan;
+      case 'furniturewip':  // ✅ MATCH dengan "FurnitureWIP"
+      case 'furniture_wip':
+        return PrefixType.furnitureWip;
+      case 'barangjadi':
+      case 'barang_jadi':
         return PrefixType.barangJadi;
       default:
         return PrefixType.unknown;
@@ -442,7 +558,7 @@ class ProductionLabelLookupResult {
 
     for (int i = 0; i < data.length; i++) {
       final row = data[i];
-      final key = simpleKey(row); // Gunakan simpleKey untuk analisis duplikat
+      final key = simpleKey(row);
 
       if (keyToIndices.containsKey(key)) {
         keyToIndices[key]!.add(i);
@@ -533,8 +649,6 @@ enum PrefixType {
 }
 
 // ====== TEMP PARTIAL CODE GENERATOR ======
-// Aturan: A. -> P.XXXXX, V. -> Y.XXX, H. -> T.XXXX, BF. -> BK.XXXX, D. -> Q.XXXXXXXXXX
-// BB. -> W.XXXXX (FurnitureWIP), BA. -> Z.XXXXX (BarangJadi)
 
 extension TempPartialFormat on PrefixType {
   /// Prefix huruf untuk partial sementara per kategori
@@ -551,9 +665,9 @@ extension TempPartialFormat on PrefixType {
       case PrefixType.reject:
         return 'BK';
       case PrefixType.furnitureWip:
-        return 'BC';  // ✅ GANTI dari 'W' ke 'BC'
+        return 'BC';
       case PrefixType.barangJadi:
-        return 'BL';  // ✅ GANTI dari 'Z' ke 'BL'
+        return 'BL';
       case PrefixType.washing:
       case PrefixType.crusher:
       case PrefixType.bonggolan:
@@ -575,9 +689,9 @@ extension TempPartialFormat on PrefixType {
       case PrefixType.reject:
         return 4;
       case PrefixType.furnitureWip:
-        return 10;  // ✅ GANTI dari 5 ke 10 (BC.0000003358)
+        return 10;
       case PrefixType.barangJadi:
-        return 10;  // ✅ GANTI dari 5 ke 10 (BL.0000001305)
+        return 10;
       case PrefixType.washing:
       case PrefixType.crusher:
       case PrefixType.bonggolan:
@@ -585,7 +699,6 @@ extension TempPartialFormat on PrefixType {
         return 0;
     }
   }
-
 
   /// Apakah kategori ini mendukung temp-partial
   bool get supportsTempPartial {
@@ -598,16 +711,16 @@ extension TempPartialFormat on PrefixType {
         this == PrefixType.barangJadi;
   }
 
-  /// Bentuk kode temp-partial dari sequence (0-based atau 1-based sama saja; kamu kontrol dari luar)
+  /// Bentuk kode temp-partial dari sequence
   /// Contoh:
   /// - broker (D.) seq=87 -> Q.0000000087
-  /// - bb (A.) seq=1 -> P.00001
+  /// - bb (A.) seq=1 -> P.0000000001
   /// - mixer (H.) seq=1 -> T.0001
-  /// - furnitureWip (BB.) seq=1 -> W.00001
-  /// - barangJadi (BA.) seq=1 -> Z.00001
+  /// - furnitureWip (BB.) seq=1 -> BC.0000000001
+  /// - barangJadi (BA.) seq=1 -> BL.0000000001
   String formatTempPartial(int seq) {
     if (!supportsTempPartial) return '';
-    final n = seq < 1 ? (seq + 1) : seq; // aman kalau kamu pakai 0-based
+    final n = seq < 1 ? (seq + 1) : seq;
     final pad = tempPartialDigits;
     final numStr = n.toString().padLeft(pad, '0');
     return '$tempPartialLetter.$numStr';

@@ -6,7 +6,7 @@ import '../model/reject_header_model.dart';
 class RejectDeleteDialog extends StatefulWidget {
   final RejectHeader header;
 
-  /// Parent yang menutup dialog; widget ini TIDAK memanggil Navigator.pop.
+  /// Parent yang menutup dialog; widgets ini TIDAK memanggil Navigator.pop.
   final Future<void> Function() onConfirm;
 
   const RejectDeleteDialog({

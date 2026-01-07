@@ -6,12 +6,13 @@ import 'package:provider/provider.dart';
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 
+import '../../shared/widgets/add_cabinet_material_dialog.dart';
+import '../../shared/widgets/cabinet_material_card.dart';
 import '../widgets/hot_stamp_input_group_popover.dart';
 import '../../shared/models/production_label_lookup_result.dart';
 import '../view_model/hot_stamp_production_input_view_model.dart';
 import '../widgets/hot_stamp_lookup_label_dialog.dart';
 import '../widgets/hot_stamp_lookup_label_partial_dialog.dart';
-import '../widgets/cabinet_material_card.dart'; // ✅ Import CabinetMaterialCard
 import '../model/hot_stamping_inputs_model.dart';
 import '../../shared/widgets/confirm_save_temp_dialog.dart';
 import '../../shared/widgets/unsaved_temp_warning_dialog.dart';
@@ -491,8 +492,7 @@ class _HotStampingProductionInputScreenState
 
                                     return GroupTooltipAnchorTile(
                                       title: entry.key,
-                                      headerSubtitle: 'Furniture WIP',
-                                      color: Colors.blue,
+                                      headerSubtitle: (entry.value.isNotEmpty ? entry.value.first.namaJenis : '-') ?? '-',                                      color: Colors.blue,
                                       tableHeaders: headers,
                                       columnFlexes: columnFlexes,
                                       canDelete: canDelete,
@@ -595,13 +595,108 @@ class _HotStampingProductionInputScreenState
                             // ===== CABINET MATERIAL (USING CARD) =====
                             Expanded(
                               flex: 2,
-                              child: CabinetMaterialCard(
-                                noProduksi: widget.noProduksi,
-                                idWarehouse: 5, // ✅ TODO: Get from production header or inputs
-                                locked: locked,
-                                canDelete: canDelete,
+                              child: Builder(
+                                builder: (context) {
+                                  // ambil inputs terbaru
+                                  final currentInputs = vm.inputsOf(widget.noProduksi);
+
+                                  // list TEMP + DB (screen yg merge)
+                                  final tempList = vm.tempCabinetMaterial;
+                                  final dbList = currentInputs?.cabinetMaterial ?? const <CabinetMaterialItem>[];
+
+                                  final materialAll = <CabinetMaterialItem>[
+                                    ...tempList,
+                                    ...dbList,
+                                  ];
+
+                                  // penanda TEMP by ID (kalau temp item belum punya Id, kamu bisa pakai fallback lain)
+                                  final tempIds = tempList
+                                      .map((x) => x.IdCabinetMaterial ?? 0)
+                                      .where((id) => id > 0)
+                                      .toSet();
+
+                                  return CabinetMaterialCard(
+                                    items: materialAll,
+                                    tempIds: tempIds,
+                                    locked: locked,
+                                    canDelete: canDelete,
+
+                                    onAdd: locked
+                                        ? null
+                                        : () {
+                                      final vm = context.read<HotStampingProductionInputViewModel>();
+
+                                      showDialog(
+                                        context: context,
+                                        builder: (_) => AddCabinetMaterialDialog(
+                                          idWarehouse: 5,
+                                          loadMaterials: ({required idWarehouse, bool force = false}) {
+                                            return vm.loadMasterCabinetMaterials(idWarehouse: idWarehouse, force: force);
+                                          },
+                                          isAlreadyInTemp: (id) => vm.hasCabinetMaterialInTemp(id),
+                                          onAddTemp: ({required masterItem, required jumlah}) {
+                                            vm.addTempCabinetMaterialFromMaster(masterItem: masterItem, Jumlah: jumlah);
+                                          },
+                                        ),
+                                      );
+                                    },
+
+                                    onDeleteTemp: (item) {
+                                      vm.deleteTempCabinetMaterialItem(item);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('✅ Material TEMP dihapus'),
+                                          behavior: SnackBarBehavior.floating,
+                                          backgroundColor: Colors.green,
+                                        ),
+                                      );
+                                    },
+
+                                    onDeleteExisting: (item) async {
+                                      final name = item.Nama ?? 'Material';
+
+                                      final confirmed = await showDialog<bool>(
+                                        context: context,
+                                        builder: (ctx) => AlertDialog(
+                                          title: const Text('Hapus Material?'),
+                                          content: Text('Yakin ingin menghapus $name?'),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(ctx, false),
+                                              child: const Text('Batal'),
+                                            ),
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(ctx, true),
+                                              style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                              child: const Text('Hapus'),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+
+                                      if (confirmed != true) return;
+
+                                      final success = await vm.deleteItems(widget.noProduksi, [item]);
+
+                                      if (!context.mounted) return;
+
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            success
+                                                ? '✅ Material berhasil dihapus'
+                                                : (vm.deleteError ?? 'Gagal menghapus material'),
+                                          ),
+                                          behavior: SnackBarBehavior.floating,
+                                          backgroundColor: success ? Colors.green : Colors.red,
+                                        ),
+                                      );
+                                    },
+                                  );
+                                },
                               ),
                             ),
+
                           ],
                         ),
                       ),

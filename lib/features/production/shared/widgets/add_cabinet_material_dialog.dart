@@ -1,18 +1,38 @@
-// lib/features/production/hot_stamping/widgets/add_cabinet_material_dialog.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
 
-import '../view_model/hot_stamp_production_input_view_model.dart';
-import '../../shared/models/cabinet_material_item.dart';
+import '../models/cabinet_material_item.dart';
+
+typedef LoadCabinetMaterials = Future<List<CabinetMaterialItem>> Function({
+required int idWarehouse,
+bool force,
+});
+
+typedef IsCabinetMaterialInTemp = bool Function(int idCabinetMaterial);
+
+typedef AddTempCabinetMaterial = void Function({
+required CabinetMaterialItem masterItem,
+required num jumlah,
+});
 
 class AddCabinetMaterialDialog extends StatefulWidget {
   final int idWarehouse;
 
+  /// ✅ Screen yang supply cara load data master
+  final LoadCabinetMaterials loadMaterials;
+
+  /// ✅ Screen yang supply cara cek duplikat TEMP
+  final IsCabinetMaterialInTemp isAlreadyInTemp;
+
+  /// ✅ Screen yang supply cara add TEMP
+  final AddTempCabinetMaterial onAddTemp;
+
   const AddCabinetMaterialDialog({
     super.key,
     required this.idWarehouse,
+    required this.loadMaterials,
+    required this.isAlreadyInTemp,
+    required this.onAddTemp,
   });
 
   @override
@@ -39,18 +59,16 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
     super.dispose();
   }
 
-  Future<void> _loadMasterMaterials() async {
+  Future<void> _loadMasterMaterials({bool force = false}) async {
     setState(() {
       _isLoading = true;
       _loadError = null;
     });
 
     try {
-      final vm = context.read<HotStampingProductionInputViewModel>();
-
-      final items = await vm.loadMasterCabinetMaterials(
+      final items = await widget.loadMaterials(
         idWarehouse: widget.idWarehouse,
-        force: false,
+        force: force,
       );
 
       if (!mounted) return;
@@ -78,8 +96,6 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
   }
 
   void _handleSubmit() {
-    final vm = context.read<HotStampingProductionInputViewModel>();
-
     final selected = _selected;
     if (selected == null || (selected.IdCabinetMaterial ?? 0) <= 0) {
       _showSnack('Pilih material terlebih dahulu', isError: true);
@@ -88,7 +104,7 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
 
     final id = selected.IdCabinetMaterial ?? 0;
 
-    if (vm.hasCabinetMaterialInTemp(id)) {
+    if (widget.isAlreadyInTemp(id)) {
       _showSnack('${selected.Nama ?? "Material"} sudah ada di TEMP', isError: true);
       return;
     }
@@ -108,9 +124,9 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
       return;
     }
 
-    vm.addTempCabinetMaterialFromMaster(
+    widget.onAddTemp(
       masterItem: selected,
-      Jumlah: jumlah,
+      jumlah: jumlah,
     );
 
     Navigator.pop(context);
@@ -211,7 +227,6 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // ===== ERROR MESSAGE =====
                   if (_loadError != null) ...[
                     Container(
                       padding: const EdgeInsets.all(14),
@@ -244,7 +259,7 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
                             ),
                           ),
                           IconButton(
-                            onPressed: _isLoading ? null : _loadMasterMaterials,
+                            onPressed: _isLoading ? null : () => _loadMasterMaterials(force: true),
                             icon: Icon(Icons.refresh, color: Colors.red.shade700),
                             tooltip: 'Coba lagi',
                           ),
@@ -254,7 +269,6 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
                     const SizedBox(height: 20),
                   ],
 
-                  // ===== EMPTY STATE =====
                   if (!_isLoading && _loadError == null && _materials.isEmpty) ...[
                     Container(
                       padding: const EdgeInsets.all(16),
@@ -280,7 +294,6 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
                     const SizedBox(height: 20),
                   ],
 
-                  // ===== DROPDOWN MATERIAL =====
                   DropdownButtonFormField<int>(
                     decoration: InputDecoration(
                       labelText: 'Material',
@@ -317,10 +330,7 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
                             Expanded(
                               child: Text(
                                 name,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -362,9 +372,9 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
                       setState(() => _selected = picked);
                     },
                   ),
+
                   const SizedBox(height: 16),
 
-                  // ===== STOCK INFO (COMPACT) =====
                   if (_selected != null)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -380,13 +390,7 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
                             color: selectedStock > 0 ? Colors.green.shade700 : Colors.red.shade700,
                           ),
                           const SizedBox(width: 10),
-                          Text(
-                            'Stok tersedia: ',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
+                          Text('Stok tersedia: ', style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
                           Text(
                             '$selectedStock $selectedUom',
                             style: TextStyle(
@@ -401,7 +405,6 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
 
                   const SizedBox(height: 16),
 
-                  // ===== INPUT JUMLAH =====
                   TextField(
                     controller: _jumlahController,
                     keyboardType: TextInputType.number,
@@ -432,7 +435,7 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
               ),
             ),
 
-            // ===== FOOTER BUTTONS =====
+            // ===== FOOTER =====
             Container(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
               child: Row(
@@ -443,9 +446,7 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         side: BorderSide(color: Colors.grey.shade300),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: const Text('Batal'),
                     ),
@@ -460,9 +461,7 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         backgroundColor: Colors.deepPurple.shade600,
                         disabledBackgroundColor: Colors.grey.shade300,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
                   ),

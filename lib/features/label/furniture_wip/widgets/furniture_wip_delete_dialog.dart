@@ -6,7 +6,7 @@ import '../model/furniture_wip_header_model.dart';
 class FurnitureWipDeleteDialog extends StatefulWidget {
   final FurnitureWipHeader header;
 
-  /// Parent yang menutup dialog; widget ini TIDAK memanggil Navigator.pop.
+  /// Parent yang menutup dialog; widgets ini TIDAK memanggil Navigator.pop.
   final Future<void> Function() onConfirm;
 
   const FurnitureWipDeleteDialog({

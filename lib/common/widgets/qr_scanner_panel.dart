@@ -24,7 +24,7 @@ class QrScannerPanel extends StatefulWidget {
   final ValueChanged<String> onDetected;
 
   /// If true, will stop emitting after first successful detection
-  /// until caller rebuilds/resets the widget.
+  /// until caller rebuilds/resets the widgets.
   final bool scanOnce;
 
   /// Debounce window to ignore subsequent detections (ms).

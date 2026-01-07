@@ -105,7 +105,7 @@ class _DropdownPlainFieldState<T> extends State<DropdownPlainField<T>>
       key: ValueKey(widget.value), // ✅ sinkron bila value berubah dari parent
       validator: widget.validator,
       autovalidateMode: widget.autovalidateMode,
-      initialValue: widget.value,  // hanya utk validator, tampilan pakai widget.value
+      initialValue: widget.value,  // hanya utk validator, tampilan pakai widgets.value
       builder: (field) {
         final mergedError = widget.errorText ?? field.errorText;
 

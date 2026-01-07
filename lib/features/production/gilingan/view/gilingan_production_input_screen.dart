@@ -18,7 +18,7 @@ import '../../shared/utils/format.dart';
 import '../view_model/gilingan_production_input_view_model.dart';
 import '../model/gilingan_inputs_model.dart';
 
-// ✅ ganti ke widget popover gilingan kamu (hasil copy dari broker, tapi type VM = GilinganProductionInputViewModel)
+// ✅ ganti ke widgets popover gilingan kamu (hasil copy dari broker, tapi type VM = GilinganProductionInputViewModel)
 import '../widgets/gilingan_input_group_popover.dart';
 
 // ✅ ganti ke dialog lookup gilingan versi kamu

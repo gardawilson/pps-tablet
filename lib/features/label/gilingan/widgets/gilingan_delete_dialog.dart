@@ -5,7 +5,7 @@ import '../model/gilingan_header_model.dart';
 class GilinganDeleteDialog extends StatefulWidget {
   final GilinganHeader header;
 
-  /// The parent closes the dialog; this widget does NOT call Navigator.pop.
+  /// The parent closes the dialog; this widgets does NOT call Navigator.pop.
   final Future<void> Function() onConfirm;
 
   const GilinganDeleteDialog({

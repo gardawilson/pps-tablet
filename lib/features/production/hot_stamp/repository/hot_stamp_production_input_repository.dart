@@ -79,7 +79,7 @@ class HotStampingProductionInputRepository {
       return _cabinetMasterCache[idWarehouse]!;
     }
 
-    final path = '/api/production/hot-stamp/cabinet-materials';
+    final path = '/api/mst-furniture-material/cabinet-materials';
 
     final body = await api.getJson(path, query: {
       'idWarehouse': idWarehouse.toString(),

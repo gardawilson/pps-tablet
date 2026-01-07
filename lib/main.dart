@@ -56,7 +56,10 @@ import 'package:pps_tablet/features/production/hot_stamp/repository/hot_stamp_pr
 import 'package:pps_tablet/features/production/hot_stamp/view/hot_stamp_production_screen.dart';
 import 'package:pps_tablet/features/production/hot_stamp/view_model/hot_stamp_production_input_view_model.dart';
 import 'package:pps_tablet/features/production/hot_stamp/view_model/hot_stamp_production_view_model.dart';
+import 'package:pps_tablet/features/production/inject/repository/inject_production_input_repository.dart';
 import 'package:pps_tablet/features/production/inject/repository/inject_production_repository.dart';
+import 'package:pps_tablet/features/production/inject/view/inject_production_screen.dart';
+import 'package:pps_tablet/features/production/inject/view_model/inject_production_input_view_model.dart';
 import 'package:pps_tablet/features/production/inject/view_model/inject_production_view_model.dart';
 import 'package:pps_tablet/features/production/key_fitting/repository/key_fitting_production_repository.dart';
 import 'package:pps_tablet/features/production/key_fitting/view_model/key_fitting_production_view_model.dart';
@@ -209,6 +212,11 @@ class MyApp extends StatelessWidget {
           ),
         ),
 
+        ChangeNotifierProvider<InjectProductionInputViewModel>(
+          create: (ctx) => InjectProductionInputViewModel(
+            repository: InjectProductionInputRepository(),
+          ),
+        ),
 
         ChangeNotifierProvider<SpannerProductionViewModel>(
           create: (ctx) => SpannerProductionViewModel(
@@ -276,7 +284,6 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider<InjectProductionViewModel>(
           create: (ctx) => InjectProductionViewModel(
             repository: InjectProductionRepository(
-              api: ctx.read<ApiClient>(),
             ),
           ),
         ),
@@ -364,7 +371,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
 
-        // ⬇️ Aktifkan localization supaya showDatePicker & widget lain pakai bahasa Indo
+        // ⬇️ Aktifkan localization supaya showDatePicker & widgets lain pakai bahasa Indo
         localizationsDelegates: const [
           GlobalMaterialLocalizations.delegate,
           GlobalWidgetsLocalizations.delegate,
@@ -398,6 +405,7 @@ class MyApp extends StatelessWidget {
           '/production/gilingan': (context) => GilinganProductionScreen(),
           '/production/mixer': (context) => MixerProductionScreen(),
           '/production/hot-stamp': (context) => HotStampProductionScreen(),
+          '/production/inject': (context) => InjectProductionScreen(),
         },
       ),
 

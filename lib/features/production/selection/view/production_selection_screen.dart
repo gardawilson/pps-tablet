@@ -87,6 +87,19 @@ class ProductionSelectionScreen extends StatelessWidget {
                 ? () => Navigator.pushNamed(context, '/production/mixer')
                 : null,
           ),
+
+          // 🔹 Card Label Mixer
+          _buildLabelCard(
+            context,
+            title: 'Proses Inject',
+            subtitle: 'Buat label untuk proses inject',
+            icon: Icons.inventory_2_outlined,
+            enabled: canReadBroker,
+            onTap: canReadBroker
+                ? () => Navigator.pushNamed(context, '/production/inject')
+                : null,
+          ),
+
           // 🔹 Card Label HotStamping
           _buildLabelCard(
             context,

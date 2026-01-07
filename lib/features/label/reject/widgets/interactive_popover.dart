@@ -163,7 +163,7 @@ class _PopoverShellState extends State<_PopoverShell>
     super.initState();
     _ac = AnimationController(vsync: this, duration: widget.duration);
 
-    // SCALE boleh overshoot (mis. easeOutBack yang kamu kirim via widget.curve)
+    // SCALE boleh overshoot (mis. easeOutBack yang kamu kirim via widgets.curve)
     final scaleCurved = CurvedAnimation(
       parent: _ac,
       curve: widget.curve,

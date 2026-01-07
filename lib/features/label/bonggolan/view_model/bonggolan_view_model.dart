@@ -96,7 +96,7 @@ class BonggolanViewModel extends ChangeNotifier {
   // === CREATE (POST /api/labels/bonggolan) ===
   String? lastCreatedNoBonggolan;
 
-  /// Validate the inputs that used to live in the widget.
+  /// Validate the inputs that used to live in the widgets.
   /// Returns `null` if OK, otherwise the error message.
   String? validateCreate({
     required int? idBonggolan,

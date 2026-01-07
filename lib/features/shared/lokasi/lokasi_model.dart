@@ -35,7 +35,7 @@ class Lokasi {
   String get searchKey =>
       ('$blok$idLokasi').toLowerCase().replaceAll(RegExp(r'[\s\-_]'), '');
 
-  /// Bantu dropdown/filter: banyak widget pakai toString() saat search
+  /// Bantu dropdown/filter: banyak widgets pakai toString() saat search
   @override
   String toString() => '$blok$idLokasi';
 

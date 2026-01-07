@@ -62,31 +62,49 @@ class _InjectProductionDropdownState extends State<InjectProductionDropdown> {
 
   Future<void> _primeOrFetch() async {
     final pre = (widget.preselectNoProduksi ?? '').trim();
+
     if (pre.isNotEmpty) {
-      // EDIT MODE: build single local item
+      // EDIT MODE: build single local item (local stub)
+      final now = DateTime.now(); // local time is fine for stub
+
       final item = InjectProduction(
         noProduksi: pre,
+
+        // stub values (akan terisi real saat fetch detail / open screen)
+        tglProduksi: now,
+        idMesin: 0,
+        namaMesin: (widget.preselectNamaMesin ?? '').trim(),
         idOperator: 0,
         namaOperator: '',
-        idMesin: 0,
-        namaMesin: widget.preselectNamaMesin ?? '',
-        tglProduksi: DateTime.now().toUtc(),
+
         jam: 0,
         shift: widget.shiftFilter ?? 0,
+
         createBy: null,
         checkBy1: null,
         checkBy2: null,
         approveBy: null,
+
         jmlhAnggota: 0,
         hadir: 0,
+
         hourMeter: null,
         idCetakan: null,
         idWarna: null,
-        enableOffset: null,
+
+        // ✅ model baru: wajib non-null
+        enableOffset: false,
         offsetCurrent: null,
         offsetNext: null,
+
         idFurnitureMaterial: null,
         beratProdukHasilTimbang: null,
+
+        // ✅ field baru dari GET ALL
+        hourStart: null,
+        hourEnd: null,
+        lastClosedDate: null,
+        isLocked: false,
       );
 
       setState(() {
@@ -100,6 +118,7 @@ class _InjectProductionDropdownState extends State<InjectProductionDropdown> {
 
     await _fetchForCurrentDate();
   }
+
 
   Future<void> _fetchForCurrentDate() async {
     final vm = context.read<InjectProductionViewModel>();

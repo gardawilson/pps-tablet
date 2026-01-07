@@ -18,7 +18,7 @@ import '../../../shared/shift/widgets/shift_dropdown.dart';
 import '../../shared/widgets/time_form_field.dart';
 import '../model/crusher_production_model.dart';
 import '../view_model/crusher_production_view_model.dart';
-import 'crusher_text_field.dart'; // TODO: Buat widget ini (copy dari reject_text_field.dart)
+import 'crusher_text_field.dart'; // TODO: Buat widgets ini (copy dari reject_text_field.dart)
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../common/widgets/app_date_field.dart';
 

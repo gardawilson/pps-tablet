@@ -130,7 +130,7 @@ class _SearchDropdownFieldState<T> extends State<SearchDropdownField<T>>
       key: ValueKey(widget.value),        // ✅ sinkron saat value berubah dari parent
       validator: widget.validator,
       autovalidateMode: widget.autovalidateMode,
-      initialValue: widget.value,         // hanya utk validator; UI pakai widget.value
+      initialValue: widget.value,         // hanya utk validator; UI pakai widgets.value
       builder: (field) {
         final mergedError = widget.errorText ?? field.errorText;
 

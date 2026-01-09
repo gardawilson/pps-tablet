@@ -123,6 +123,18 @@ class ProductionSelectionScreen extends StatelessWidget {
                 ? () => Navigator.pushNamed(context, '/production/key-fitting')
                 : null,
           ),
+
+          // 🔹 Card Label Spanner
+          _buildLabelCard(
+            context,
+            title: 'Proses Spanner',
+            subtitle: 'Buat label untuk proses Spanner',
+            icon: Icons.inventory_2_outlined,
+            enabled: canReadBroker,
+            onTap: canReadBroker
+                ? () => Navigator.pushNamed(context, '/production/spanner')
+                : null,
+          ),
         ],
       ),
     );

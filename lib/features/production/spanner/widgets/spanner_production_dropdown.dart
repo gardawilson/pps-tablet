@@ -70,18 +70,34 @@ class _SpannerProductionDropdownState
       // EDIT MODE → buat satu synthetic item lokal
       final item = SpannerProduction(
         noProduksi: pre,
-        tanggal: DateTime.now().toUtc(),
         idMesin: 0,
-        namaMesin: widget.preselectNamaMesin ?? '',
         idOperator: 0,
+        namaMesin: widget.preselectNamaMesin ?? '',
         namaOperator: '',
+
+        // model pakai tglProduksi (nullable)
+        tglProduksi: DateTime.now().toUtc(),
         shift: widget.shiftFilter ?? 0,
+
+        // nullable in model, jadi boleh null / 0
         jamKerja: 0,
-        createBy: null,
+
+        // createBy di model REQUIRED string (bukan nullable)
+        // kalau edit mode tidak punya value, kasih default aman
+        createBy: '',
+
         checkBy1: null,
         checkBy2: null,
         approveBy: null,
         hourMeter: null,
+
+        // optional time range
+        hourStart: null,
+        hourEnd: null,
+
+        // optional lock flags
+        lastClosedDate: null,
+        isLocked: false,
       );
 
       setState(() {

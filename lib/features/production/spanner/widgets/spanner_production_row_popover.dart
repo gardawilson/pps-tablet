@@ -5,17 +5,17 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/view_model/permission_view_model.dart';
-import '../model/key_fitting_production_model.dart';
+import '../model/spanner_production_model.dart';
 
-class KeyFittingProductionRowPopover extends StatelessWidget {
-  final KeyFittingProduction row;
+class SpannerProductionRowPopover extends StatelessWidget {
+  final SpannerProduction row;
   final VoidCallback onClose;
   final VoidCallback onInput;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onPrint;
 
-  const KeyFittingProductionRowPopover({
+  const SpannerProductionRowPopover({
     super.key,
     required this.row,
     required this.onClose,

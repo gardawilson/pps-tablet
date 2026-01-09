@@ -79,7 +79,10 @@ import 'package:pps_tablet/features/production/selection/view/production_selecti
 import 'package:pps_tablet/features/production/sortir_reject/model/sortir_reject_production_model.dart';
 import 'package:pps_tablet/features/production/sortir_reject/repository/sortir_reject_production_repository.dart';
 import 'package:pps_tablet/features/production/sortir_reject/view_model/sortir_reject_production_view_model.dart';
+import 'package:pps_tablet/features/production/spanner/repository/spanner_production_input_repository.dart';
 import 'package:pps_tablet/features/production/spanner/repository/spanner_production_repository.dart';
+import 'package:pps_tablet/features/production/spanner/view/spanner_production_screen.dart';
+import 'package:pps_tablet/features/production/spanner/view_model/spanner_production_input_view_model.dart';
 import 'package:pps_tablet/features/production/spanner/view_model/spanner_production_view_model.dart';
 import 'package:pps_tablet/features/production/washing/repository/washing_production_input_repository.dart';
 import 'package:pps_tablet/features/production/washing/view/washing_production_screen.dart';
@@ -226,6 +229,12 @@ class MyApp extends StatelessWidget {
             repository: SpannerProductionRepository(
               api: ctx.read<ApiClient>(),
             ),
+          ),
+        ),
+
+        ChangeNotifierProvider<SpannerProductionInputViewModel>(
+          create: (ctx) => SpannerProductionInputViewModel(
+            repository: SpannerProductionInputRepository(),
           ),
         ),
 
@@ -416,6 +425,7 @@ class MyApp extends StatelessWidget {
           '/production/hot-stamp': (context) => HotStampProductionScreen(),
           '/production/inject': (context) => InjectProductionScreen(),
           '/production/key-fitting': (context) => KeyFittingProductionScreen(),
+          '/production/spanner': (context) => SpannerProductionScreen(),
         },
       ),
 

@@ -1,4 +1,4 @@
-// lib/features/production/key_fitting/repository/key_fitting_production_input_repository.dart
+// lib/features/production/spanner/repository/spanner_production_input_repository.dart
 
 import 'dart:async';
 import 'dart:convert';
@@ -7,15 +7,15 @@ import 'package:flutter/foundation.dart';
 import '../../../../core/network/api_client.dart';
 import '../../shared/models/production_label_lookup_result.dart';
 import '../../shared/models/cabinet_material_item.dart';
-import '../model/key_fitting_inputs_model.dart';
+import '../model/spanner_inputs_model.dart';
 
-class KeyFittingProductionInputRepository {
+class SpannerProductionInputRepository {
   final ApiClient api;
 
-  KeyFittingProductionInputRepository({ApiClient? apiClient})
+  SpannerProductionInputRepository({ApiClient? apiClient})
       : api = apiClient ?? ApiClient();
 
-  final Map<String, KeyFittingInputs> _inputsCache = {};
+  final Map<String, SpannerInputs> _inputsCache = {};
 
   // cache master cabinet material per warehouse
   final Map<int, List<CabinetMaterialItem>> _cabinetMasterCache = {};
@@ -24,15 +24,16 @@ class KeyFittingProductionInputRepository {
    * GET INPUTS
    * ============================= */
 
-  static KeyFittingInputs _parseInputs(Map<String, dynamic> body) {
+  static SpannerInputs _parseInputs(Map<String, dynamic> body) {
     final data = body['data'] as Map<String, dynamic>?;
     if (data == null) {
       throw FormatException('Response tidak valid: field data kosong');
     }
-    return KeyFittingInputs.fromJson(data);
+    return SpannerInputs.fromJson(data);
   }
 
-  Future<KeyFittingInputs> fetchInputs(
+  /// GET /api/spanner/spanner/:noProduksi/inputs
+  Future<SpannerInputs> fetchInputs(
       String noProduksi, {
         bool force = false,
       }) async {
@@ -40,7 +41,9 @@ class KeyFittingProductionInputRepository {
       return _inputsCache[noProduksi]!;
     }
 
-    final path = '/api/production/key-fitting/$noProduksi/inputs';
+    // ✅ sesuai backend kamu:
+    // router.get('/spanner/:noProduksi/inputs', ...)
+    final path = '/api/production/spanner/$noProduksi/inputs';
 
     final body = await api.getJson(path);
     final inputs = await compute(_parseInputs, body);
@@ -57,7 +60,8 @@ class KeyFittingProductionInputRepository {
    * ============================= */
 
   static List<CabinetMaterialItem> _parseCabinetMaterials(
-      Map<String, dynamic> body) {
+      Map<String, dynamic> body,
+      ) {
     final data = body['data'];
 
     if (data == null) return <CabinetMaterialItem>[];
@@ -101,7 +105,12 @@ class KeyFittingProductionInputRepository {
    * VALIDATE / LOOKUP FURNITURE WIP LABEL
    * ============================= */
 
-  /// GET /api/production/key-fitting/validate-fwip/:labelCode
+  /// ✅ Kamu bisa bikin endpoint ini nanti:
+  /// GET /api/spanner/spanner/validate-fwip/:labelCode
+  ///
+  /// Kalau belum ada di backend, kamu bisa:
+  /// - copy pattern key-fitting validate-fwip
+  /// - table mapping spanner: SpannerInputLabelFWIP / SpannerInputLabelFWIPPartial
   Future<ProductionLabelLookupResult> lookupFwipLabel(String labelCode) async {
     final code = labelCode.trim();
     if (code.isEmpty) throw ArgumentError('labelCode tidak boleh kosong');
@@ -130,12 +139,20 @@ class KeyFittingProductionInputRepository {
    * POST SUBMIT INPUTS & PARTIALS
    * ============================= */
 
-  /// POST /api/production/key-fitting/:noProduksi/inputs
+  /// ✅ Buat endpoint backend:
+  /// POST /api/spanner/spanner/:noProduksi/inputs
+  ///
+  /// Payload shape (samakan dengan key fitting):
+  /// {
+  ///   "furnitureWip": [{ "noFurnitureWip": "BB...." }],
+  ///   "cabinetMaterial": [{ "idCabinetMaterial": 1, "jumlah": 10 }],
+  ///   "furnitureWipPartialNew": [{ "noFurnitureWip": "BB....", "pcs": 5 }]
+  /// }
   Future<Map<String, dynamic>> submitInputsAndPartials(
       String noProduksi,
       Map<String, dynamic> payload,
       ) async {
-    final path = '/api/production/key-fitting/$noProduksi/inputs';
+    final path = '/api/production/spanner/$noProduksi/inputs';
 
     try {
       final body = await api.postJson(path, body: payload);
@@ -165,12 +182,20 @@ class KeyFittingProductionInputRepository {
    * DELETE INPUTS & PARTIALS
    * ============================= */
 
-  /// DELETE /api/production/key-fitting/:noProduksi/inputs
+  /// ✅ Buat endpoint backend:
+  /// DELETE /api/spanner/spanner/:noProduksi/inputs
+  ///
+  /// Payload shape (samakan):
+  /// {
+  ///   "furnitureWip": [{ "noFurnitureWip": "BB...." }],
+  ///   "cabinetMaterial": [{ "idCabinetMaterial": 1 }],
+  ///   "furnitureWipPartial": [{ "noFurnitureWipPartial": "BC...." }]
+  /// }
   Future<Map<String, dynamic>> deleteInputsAndPartials(
       String noProduksi,
       Map<String, dynamic> payload,
       ) async {
-    final path = '/api/production/key-fitting/$noProduksi/inputs';
+    final path = '/api/production/spanner/$noProduksi/inputs';
 
     try {
       final body = await api.deleteJson(path, body: payload);
@@ -193,7 +218,8 @@ class KeyFittingProductionInputRepository {
 
       if (e.statusCode == 400) {
         throw Exception(
-            msg.isNotEmpty ? msg : 'Request delete inputs tidak valid');
+          msg.isNotEmpty ? msg : 'Request delete inputs tidak valid',
+        );
       }
 
       throw Exception(msg);

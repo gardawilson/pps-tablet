@@ -61,7 +61,10 @@ import 'package:pps_tablet/features/production/inject/repository/inject_producti
 import 'package:pps_tablet/features/production/inject/view/inject_production_screen.dart';
 import 'package:pps_tablet/features/production/inject/view_model/inject_production_input_view_model.dart';
 import 'package:pps_tablet/features/production/inject/view_model/inject_production_view_model.dart';
+import 'package:pps_tablet/features/production/key_fitting/repository/key_fitting_production_input_repository.dart';
 import 'package:pps_tablet/features/production/key_fitting/repository/key_fitting_production_repository.dart';
+import 'package:pps_tablet/features/production/key_fitting/view/key_fitting_production_screen.dart';
+import 'package:pps_tablet/features/production/key_fitting/view_model/key_fitting_production_input_view_model.dart';
 import 'package:pps_tablet/features/production/key_fitting/view_model/key_fitting_production_view_model.dart';
 import 'package:pps_tablet/features/production/mixer/repository/mixer_production_input_repository.dart';
 import 'package:pps_tablet/features/production/mixer/repository/mixer_production_repository.dart';
@@ -232,6 +235,12 @@ class MyApp extends StatelessWidget {
             repository: KeyFittingProductionRepository(
               api: ctx.read<ApiClient>(),
             ),
+          ),
+        ),
+
+        ChangeNotifierProvider<KeyFittingProductionInputViewModel>(
+          create: (ctx) => KeyFittingProductionInputViewModel(
+            repository: KeyFittingProductionInputRepository(),
           ),
         ),
 
@@ -406,6 +415,7 @@ class MyApp extends StatelessWidget {
           '/production/mixer': (context) => MixerProductionScreen(),
           '/production/hot-stamp': (context) => HotStampProductionScreen(),
           '/production/inject': (context) => InjectProductionScreen(),
+          '/production/key-fitting': (context) => KeyFittingProductionScreen(),
         },
       ),
 

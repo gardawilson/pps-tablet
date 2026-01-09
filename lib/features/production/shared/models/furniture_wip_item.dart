@@ -5,25 +5,40 @@ import 'model_helpers.dart';
 class FurnitureWipItem {
   final String? noFurnitureWIP;
   final String? noFurnitureWIPPartial;
+
   final DateTime? dateCreate;
   final String? jam;
+
   final int? pcs;
   final int? idJenis; // IDFurnitureWIP
   final String? namaJenis;
+
   final double? berat;
+
   final DateTime? dateUsage;
   final int? idWarehouse;
   final int? idWarna;
+
   final String? createBy;
   final DateTime? dateTimeCreate;
+
   final String? blok;
   final int? idLokasi;
+
+  /// Backend meaning: label ini "bisa dipartial" (bukan berarti baris ini partial row)
   final bool? isPartial;
 
-  /// Row dianggap "partial" jika ada kode partial ATAU flag isPartial = true
+  /// Backend meaning: baris ini memang partial row (paling akurat untuk deteksi)
+  final bool? isPartialRowFlag;
+
+  /// ✅ Row dianggap "partial row" hanya jika:
+  /// - ada kode partial, ATAU
+  /// - backend menandai isPartialRow = true
+  ///
+  /// ❗ Jangan pakai isPartial untuk deteksi partial-row, karena header/full FWIP juga bisa isPartial=true.
   bool get isPartialRow =>
       (noFurnitureWIPPartial?.trim().isNotEmpty ?? false) ||
-          (isPartial == true);
+          (isPartialRowFlag == true);
 
   FurnitureWipItem({
     this.noFurnitureWIP,
@@ -42,36 +57,52 @@ class FurnitureWipItem {
     this.blok,
     this.idLokasi,
     this.isPartial,
+    this.isPartialRowFlag,
   });
 
-  factory FurnitureWipItem.fromJson(Map<String, dynamic> j) =>
-      FurnitureWipItem(
-        noFurnitureWIP: pickS(j, [
-          'noFurnitureWIP',
-          'noFurnitureWip',
-          'NoFurnitureWIP'
-        ]),
-        noFurnitureWIPPartial: pickS(j, [
-          'noFurnitureWIPPartial',
-          'NoFurnitureWIPPartial',
-          'no_furniture_wip_partial'
-        ]),
-        dateCreate: pickDT(j, ['dateCreate', 'DateCreate', 'date_create']),
-        jam: pickS(j, ['jam', 'Jam']),
-        pcs: pickI(j, ['pcs', 'Pcs']),
-        idJenis: pickI(j, ['idJenis', 'IdJenis', 'id_jenis']),
-        namaJenis: pickS(j, ['namaJenis', 'NamaJenis', 'nama_jenis']),
-        berat: pickD(j, ['berat', 'Berat']),
-        dateUsage: pickDT(j, ['dateUsage', 'DateUsage', 'date_usage']),
-        idWarehouse: pickI(j, ['idWarehouse', 'IdWarehouse', 'id_warehouse']),
-        idWarna: pickI(j, ['idWarna', 'IdWarna', 'id_warna']),
-        createBy: pickS(j, ['createBy', 'CreateBy', 'create_by']),
-        dateTimeCreate:
-        pickDT(j, ['dateTimeCreate', 'DateTimeCreate', 'date_time_create']),
-        blok: pickS(j, ['blok', 'Blok']),
-        idLokasi: pickI(j, ['idLokasi', 'IdLokasi', 'id_lokasi']),
-        isPartial: pickB(j, ['isPartial', 'IsPartial', 'is_partial']),
-      );
+  factory FurnitureWipItem.fromJson(Map<String, dynamic> j) => FurnitureWipItem(
+    // ✅ handle variasi key backend
+    noFurnitureWIP: pickS(j, [
+      'noFurnitureWIP',
+      'noFurnitureWip',
+      'NoFurnitureWIP',
+      'no_furniture_wip',
+    ]),
+    noFurnitureWIPPartial: pickS(j, [
+      'noFurnitureWipPartial', // backend kamu
+      'noFurnitureWIPPartial',
+      'NoFurnitureWIPPartial',
+      'no_furniture_wip_partial',
+    ]),
+
+    dateCreate: pickDT(j, ['dateCreate', 'DateCreate', 'date_create']),
+    jam: pickS(j, ['jam', 'Jam']),
+
+    pcs: pickI(j, ['pcs', 'Pcs']),
+    idJenis: pickI(j, ['idJenis', 'IdJenis', 'id_jenis']),
+    namaJenis: pickS(j, ['namaJenis', 'NamaJenis', 'nama_jenis']),
+
+    berat: pickD(j, ['berat', 'Berat']),
+
+    dateUsage: pickDT(j, ['dateUsage', 'DateUsage', 'date_usage']),
+    idWarehouse: pickI(j, ['idWarehouse', 'IdWarehouse', 'id_warehouse']),
+    idWarna: pickI(j, ['idWarna', 'IdWarna', 'id_warna']),
+
+    createBy: pickS(j, ['createBy', 'CreateBy', 'create_by']),
+    dateTimeCreate: pickDT(
+      j,
+      ['dateTimeCreate', 'DateTimeCreate', 'date_time_create', 'datetimeInput'],
+    ),
+
+    blok: pickS(j, ['blok', 'Blok']),
+    idLokasi: pickI(j, ['idLokasi', 'IdLokasi', 'id_lokasi']),
+
+    // ✅ keep for info (partial-able)
+    isPartial: pickB(j, ['isPartial', 'IsPartial', 'is_partial']),
+
+    // ✅ in response kamu ada "isPartialRow": true
+    isPartialRowFlag: pickB(j, ['isPartialRow', 'IsPartialRow', 'is_partial_row']),
+  );
 
   FurnitureWipItem copyWith({
     String? noFurnitureWIP,
@@ -90,11 +121,11 @@ class FurnitureWipItem {
     String? blok,
     int? idLokasi,
     bool? isPartial,
+    bool? isPartialRowFlag,
   }) {
     return FurnitureWipItem(
       noFurnitureWIP: noFurnitureWIP ?? this.noFurnitureWIP,
-      noFurnitureWIPPartial:
-      noFurnitureWIPPartial ?? this.noFurnitureWIPPartial,
+      noFurnitureWIPPartial: noFurnitureWIPPartial ?? this.noFurnitureWIPPartial,
       dateCreate: dateCreate ?? this.dateCreate,
       jam: jam ?? this.jam,
       pcs: pcs ?? this.pcs,
@@ -109,6 +140,7 @@ class FurnitureWipItem {
       blok: blok ?? this.blok,
       idLokasi: idLokasi ?? this.idLokasi,
       isPartial: isPartial ?? this.isPartial,
+      isPartialRowFlag: isPartialRowFlag ?? this.isPartialRowFlag,
     );
   }
 

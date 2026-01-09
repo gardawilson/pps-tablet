@@ -10,8 +10,12 @@ class FurnitureMaterialDropdown extends StatefulWidget {
   final int? idCetakan;
   final int? idWarna;
 
+  /// if you want auto-pick a specific id (when list has more than 1 later)
   final int? preselectId;
 
+  /// IMPORTANT:
+  /// - when user picks "Tidak ada" => onChanged(null)
+  /// - when user picks real item    => onChanged(item)
   final ValueChanged<FurnitureMaterialLookupResult?>? onChanged;
 
   final String label;
@@ -34,7 +38,8 @@ class FurnitureMaterialDropdown extends StatefulWidget {
   });
 
   @override
-  State<FurnitureMaterialDropdown> createState() => _FurnitureMaterialDropdownState();
+  State<FurnitureMaterialDropdown> createState() =>
+      _FurnitureMaterialDropdownState();
 }
 
 class _FurnitureMaterialDropdownState extends State<FurnitureMaterialDropdown> {
@@ -43,11 +48,16 @@ class _FurnitureMaterialDropdownState extends State<FurnitureMaterialDropdown> {
   int? _lastCetakan;
   int? _lastWarna;
 
-  // ✅ placeholder "tidak ada data"
+  // =========================================================
+  // ✅ HARD-CODED DEFAULT ITEM: "Tidak ada"
+  // - keep ID sentinel (0) because model id is non-nullable int
+  // - whenever selected => send null to form/payload
+  // =========================================================
   static const int _noneId = 0;
-  static const FurnitureMaterialLookupResult _noneItem = FurnitureMaterialLookupResult(
+  static const FurnitureMaterialLookupResult _noneItem =
+  FurnitureMaterialLookupResult(
     idFurnitureMaterial: _noneId,
-    nama: 'Tidak ada Furniture Material untuk cetakan & warna ini',
+    nama: 'Tidak ada',
     itemCode: null,
     enable: false,
   );
@@ -82,12 +92,14 @@ class _FurnitureMaterialDropdownState extends State<FurnitureMaterialDropdown> {
 
     final vm = context.read<FurnitureMaterialLookupViewModel>();
 
+    // If parents not selected yet => clear VM and select "Tidak ada" (payload null)
     if (idCetakan == null || idWarna == null) {
       _lastCetakan = null;
       _lastWarna = null;
       vm.clear();
+
       if (!mounted) return;
-      setState(() => _selected = null);
+      setState(() => _selected = _noneItem);
       widget.onChanged?.call(null);
       return;
     }
@@ -105,68 +117,72 @@ class _FurnitureMaterialDropdownState extends State<FurnitureMaterialDropdown> {
   void _applyAutoSelectFromVm() {
     final vm = context.read<FurnitureMaterialLookupViewModel>();
 
-    // ✅ kalau empty => pilih placeholder & kirim null ke form (payload null)
-    if (vm.isEmpty && vm.error.isEmpty) {
-      setState(() => _selected = _noneItem);
-      widget.onChanged?.call(null);
-      return;
-    }
-
-    // ✅ kalau error => kosong (biar field bisa retry)
+    // ✅ If error => clear selection (let user retry / show error)
     if (vm.error.isNotEmpty) {
       setState(() => _selected = null);
       widget.onChanged?.call(null);
       return;
     }
 
-    // ✅ normal
-    final items = <FurnitureMaterialLookupResult>[];
+    // ✅ Build list:
+    // Always include "Tidak ada" at the top.
+    final items = <FurnitureMaterialLookupResult>[_noneItem];
     if (vm.result != null) items.add(vm.result!);
 
-    FurnitureMaterialLookupResult? pick;
-    if (items.isEmpty) {
-      pick = null;
-    } else if (widget.preselectId != null) {
+    FurnitureMaterialLookupResult pick;
+
+    // ✅ If preselectId provided and exists => select it, else default to "Tidak ada"
+    if (widget.preselectId != null) {
       pick = items.firstWhere(
             (e) => e.idFurnitureMaterial == widget.preselectId,
-        orElse: () => items.first,
+        orElse: () => _noneItem,
       );
     } else {
-      pick = items.first;
+      // Default selection is "Tidak ada" (payload null)
+      pick = _noneItem;
     }
 
     setState(() => _selected = pick);
-    widget.onChanged?.call(pick);
+
+    // ✅ If "Tidak ada" => send null
+    if (pick.idFurnitureMaterial == _noneId) {
+      widget.onChanged?.call(null);
+    } else {
+      widget.onChanged?.call(pick);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<FurnitureMaterialLookupViewModel>(
       builder: (_, vm, __) {
-        // ✅ susun items:
-        // - error: items kosong (biar komponen tampil error+retry)
-        // - empty: items = [placeholder] (tanpa merah)
-        // - ok: items = [result]
+        // ✅ items always include "Tidak ada"
+        // if error => items empty so field can show retry UI (depending on your DropdownPlainField impl)
         final items = <FurnitureMaterialLookupResult>[];
-        if (vm.error.isEmpty && vm.isEmpty && !vm.isLoading) {
+
+        final hasError = vm.error.isNotEmpty;
+        if (!hasError) {
           items.add(_noneItem);
-        } else if (vm.result != null) {
-          items.add(vm.result!);
+          if (vm.result != null) items.add(vm.result!);
         }
 
-        final isEmptyMode = vm.error.isEmpty && vm.isEmpty && !vm.isLoading;
+        // ✅ enabled rules:
+        // - must be widget.enabled
+        // - not loading
+        // - if error, keep enabled false (user uses retry button)
+        final effectiveEnabled = widget.enabled && !vm.isLoading && !hasError;
 
         return DropdownPlainField<FurnitureMaterialLookupResult>(
           items: items,
           value: _selected,
 
-          // ✅ kalau emptyMode, dropdown tampil tapi tidak bisa dipilih (biar tidak misleading)
-          enabled: widget.enabled && !vm.isLoading && vm.error.isEmpty && !isEmptyMode,
+          enabled: effectiveEnabled,
 
-          onChanged: (widget.enabled && !isEmptyMode)
+          onChanged: effectiveEnabled
               ? (val) {
             setState(() => _selected = val);
-            // kalau yang dipilih placeholder => kirim null
+
+            // ✅ map "Tidak ada" -> null payload
             if (val == null || val.idFurnitureMaterial == _noneId) {
               widget.onChanged?.call(null);
             } else {
@@ -179,8 +195,6 @@ class _FurnitureMaterialDropdownState extends State<FurnitureMaterialDropdown> {
           compareFn: (a, b) => a.idFurnitureMaterial == b.idFurnitureMaterial,
 
           label: widget.label,
-
-          // ✅ kalau emptyMode, hint tidak dipakai karena ada selected value placeholder
           hint: widget.hint,
 
           validator: widget.validator,
@@ -188,9 +202,9 @@ class _FurnitureMaterialDropdownState extends State<FurnitureMaterialDropdown> {
 
           isLoading: vm.isLoading,
 
-          // ✅ merah hanya kalau error beneran
-          fetchError: vm.error.isNotEmpty,
-          fetchErrorText: vm.error.isNotEmpty ? vm.error : null,
+          // ✅ error UI
+          fetchError: hasError,
+          fetchErrorText: hasError ? vm.error : null,
           onRetry: () => _maybeFetch(force: true),
         );
       },

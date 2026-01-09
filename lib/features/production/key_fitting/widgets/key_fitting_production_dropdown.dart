@@ -68,21 +68,24 @@ class _KeyFittingProductionDropdownState
     final pre = (widget.preselectNoProduksi ?? '').trim();
 
     if (pre.isNotEmpty) {
-      // EDIT MODE → synthetic single item
       final item = KeyFittingProduction(
         noProduksi: pre,
-        tanggal: DateTime.now().toUtc(),
         idMesin: 0,
-        namaMesin: widget.preselectNamaMesin ?? '',
         idOperator: 0,
+        namaMesin: widget.preselectNamaMesin ?? '',
         namaOperator: '',
+        tglProduksi: null, // ✅ biarkan null, karena ini cuma placeholder
         shift: widget.shiftFilter ?? 0,
-        jamKerja: 0,
-        createBy: null,
+        jamKerja: null,    // ✅ biarkan null
+        createBy: '',      // ✅ createBy di model baru required non-null
+        hourMeter: null,
         checkBy1: null,
         checkBy2: null,
         approveBy: null,
-        hourMeter: null,
+        hourStart: null,
+        hourEnd: null,
+        lastClosedDate: null,
+        isLocked: false,
       );
 
       setState(() {
@@ -96,6 +99,7 @@ class _KeyFittingProductionDropdownState
 
     await _fetchForCurrentDate();
   }
+
 
   Future<void> _fetchForCurrentDate() async {
     final vm = context.read<KeyFittingProductionViewModel>();

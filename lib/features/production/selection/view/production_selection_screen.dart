@@ -111,6 +111,18 @@ class ProductionSelectionScreen extends StatelessWidget {
                 ? () => Navigator.pushNamed(context, '/production/hot-stamp')
                 : null,
           ),
+
+          // 🔹 Card Label PasangKunci
+          _buildLabelCard(
+            context,
+            title: 'Proses Pasang Kunci',
+            subtitle: 'Buat label untuk proses pasang kunci',
+            icon: Icons.inventory_2_outlined,
+            enabled: canReadBroker,
+            onTap: canReadBroker
+                ? () => Navigator.pushNamed(context, '/production/key-fitting')
+                : null,
+          ),
         ],
       ),
     );

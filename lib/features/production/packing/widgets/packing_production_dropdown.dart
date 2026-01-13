@@ -71,20 +71,32 @@ class _PackingProductionDropdownState
       // EDIT MODE → synthetic single item
       final item = PackingProduction(
         noPacking: pre,
-        tanggal: DateTime.now().toUtc(),
+
+        // use whatever you have; if you don't, keep null
+        tglProduksi: DateTime.now().toUtc(),
+
         idMesin: 0,
-        namaMesin: widget.preselectNamaMesin ?? '',
         idOperator: 0,
+
+        namaMesin: widget.preselectNamaMesin ?? '',
         namaOperator: '',
+
         shift: widget.shiftFilter ?? 0,
-        jamKerja: 0,
-        createBy: null,
+        createBy: 'system', // required by model; can be placeholder
+
+        jamKerja: null,
+        hourMeter: null,
+
         checkBy1: null,
         checkBy2: null,
         approveBy: null,
-        hourMeter: null,
-        hourStart: null,
-        hourEnd: null,
+
+        hourStart: null, // "HH:mm"
+        hourEnd: null,   // "HH:mm"
+
+        // optional lock flags
+        lastClosedDate: null,
+        isLocked: false,
       );
 
       setState(() {

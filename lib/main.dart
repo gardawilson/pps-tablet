@@ -71,7 +71,10 @@ import 'package:pps_tablet/features/production/mixer/repository/mixer_production
 import 'package:pps_tablet/features/production/mixer/view/mixer_production_screen.dart';
 import 'package:pps_tablet/features/production/mixer/view_model/mixer_production_input_view_model.dart';
 import 'package:pps_tablet/features/production/mixer/view_model/mixer_production_view_model.dart';
+import 'package:pps_tablet/features/production/packing/repository/packing_production_input_repository.dart';
 import 'package:pps_tablet/features/production/packing/repository/packing_production_repository.dart';
+import 'package:pps_tablet/features/production/packing/view/packing_production_screen.dart';
+import 'package:pps_tablet/features/production/packing/view_model/packing_production_input_view_model.dart';
 import 'package:pps_tablet/features/production/packing/view_model/packing_production_view_model.dart';
 import 'package:pps_tablet/features/production/return/repository/return_production_repository.dart';
 import 'package:pps_tablet/features/production/return/view_model/return_production_view_model.dart';
@@ -289,6 +292,14 @@ class MyApp extends StatelessWidget {
           ),
         ),
 
+        ChangeNotifierProvider<PackingProductionInputViewModel>(
+          create: (ctx) => PackingProductionInputViewModel(
+            repository: PackingProductionInputRepository(
+              apiClient: ctx.read<ApiClient>(),
+            ),
+          ),
+        ),
+
 
         ChangeNotifierProvider<PackingTypeViewModel>(
           create: (ctx) => PackingTypeViewModel(
@@ -426,6 +437,7 @@ class MyApp extends StatelessWidget {
           '/production/inject': (context) => InjectProductionScreen(),
           '/production/key-fitting': (context) => KeyFittingProductionScreen(),
           '/production/spanner': (context) => SpannerProductionScreen(),
+          '/production/packing': (context) => PackingProductionScreen(),
         },
       ),
 

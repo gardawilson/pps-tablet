@@ -135,6 +135,18 @@ class ProductionSelectionScreen extends StatelessWidget {
                 ? () => Navigator.pushNamed(context, '/production/spanner')
                 : null,
           ),
+
+          // 🔹 Card Label Packing
+          _buildLabelCard(
+            context,
+            title: 'Proses Packing',
+            subtitle: 'Buat label untuk proses Packing',
+            icon: Icons.inventory_2_outlined,
+            enabled: canReadBroker,
+            onTap: canReadBroker
+                ? () => Navigator.pushNamed(context, '/production/packing')
+                : null,
+          ),
         ],
       ),
     );

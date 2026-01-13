@@ -556,8 +556,6 @@ class _BongkarSusunInputScreenState extends State<BongkarSusunInputScreen> {
                           modeLabel: 'Pilih Mode',
                           modeItems: const [
                             DropdownMenuItem(value: 'full', child: Text('FULL PALLET')),
-                            DropdownMenuItem(value: 'select', child: Text('SEBAGIAN PALLET')),
-                            DropdownMenuItem(value: 'partial', child: Text('PARTIAL')),
                           ],
                           selectedMode: _selectedMode,
                           manualHint: 'X.XXXXXXXXXX',

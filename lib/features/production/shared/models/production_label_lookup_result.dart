@@ -467,19 +467,19 @@ class ProductionLabelLookupResult {
 
     switch (prefixType) {
       case PrefixType.broker:
-        return brokerItems.any((item) => item.isPartialRow);
+        return brokerItems.any((item) => item.isPartialRow == true);
       case PrefixType.bb:
-        return bbItems.any((item) => item.isPartialRow);
+        return bbItems.any((item) => item.isPartialRow == true);
       case PrefixType.gilingan:
-        return gilinganItems.any((item) => item.isPartialRow);
+        return gilinganItems.any((item) => item.isPartialRow == true);
       case PrefixType.mixer:
-        return mixerItems.any((item) => item.isPartialRow);
+        return mixerItems.any((item) => item.isPartialRow == true);
       case PrefixType.reject:
-        return rejectItems.any((item) => item.isPartialRow);
+        return rejectItems.any((item) => item.isPartialRow == true);
       case PrefixType.furnitureWip:
-        return furnitureWipItems.any((item) => item.isPartialRow);
+        return furnitureWipItems.any((item) => item.isPartialRow == true);
       case PrefixType.barangJadi:
-        return barangJadiItems.any((item) => item.isPartialRow);
+        return barangJadiItems.any((item) => item.isPartialRow == true);
       case PrefixType.washing:
       case PrefixType.crusher:
       case PrefixType.bonggolan:
@@ -487,6 +487,7 @@ class ProductionLabelLookupResult {
         return false;
     }
   }
+
 
   /// Hitung total berat dari items
   double get totalBerat {

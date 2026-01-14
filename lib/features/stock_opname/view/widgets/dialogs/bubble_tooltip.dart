@@ -174,6 +174,8 @@ class _BubbleTooltipState extends State<BubbleTooltip>
         return 'Furniture WIP';
       case 'BA':
         return 'Barang Jadi';
+      case 'BF':
+        return 'Reject';
       default:
         return 'Unknown';
     }

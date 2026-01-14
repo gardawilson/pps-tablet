@@ -51,32 +51,44 @@ class LabelDetailModel {
 
   factory LabelDetailModel.fromJson(Map<String, dynamic> json) {
     return LabelDetailModel(
-      labelType: json['LabelType'],
-      nomorLabel: json['NomorLabel'],
-      namaJenisPlastik: json['NamaJenisPlastik'],
-      namaWarehouse: json['NamaWarehouse'],
-      keterangan: json['Keterangan'],
-      berat: (json['Berat'] as num?)?.toDouble() ??
-          (json['TotalBerat'] as num?)?.toDouble(),
+      labelType: json['LabelType']?.toString(),
+      nomorLabel: json['NomorLabel']?.toString(),
+      namaJenisPlastik: json['NamaJenisPlastik']?.toString(),
+      namaWarehouse: json['NamaWarehouse']?.toString(),
+      keterangan: json['Keterangan']?.toString(),
+
+      berat: (json['Berat'] as num?)?.toDouble()
+          ?? (json['TotalBerat'] as num?)?.toDouble(),
+
       jumlahSak: (json['JumlahSak'] as num?)?.toInt(),
       totalBerat: (json['TotalBerat'] as num?)?.toDouble(),
       moisture: (json['Moisture'] as num?)?.toDouble(),
       meltingIndex: (json['MeltingIndex'] as num?)?.toDouble(),
       elasticity: (json['Elasticity'] as num?)?.toDouble(),
+
       tenggelam: json['Tenggelam'] != null ? json['Tenggelam'] == 1 : null,
-      namaCrusher: json['NamaCrusher'],
-      namaBonggolan: json['NamaBonggolan'],
-      namaGilingan: json['NamaGilingan'],
-      namaMixer: json['NamaMixer'],
-      namaFurnitureWIP: json['Nama'],
-      namaBJ: json['NamaBJ'],
-      namaReject: json['NamaReject'],
+
+      namaCrusher: json['NamaCrusher']?.toString(),
+      namaBonggolan: json['NamaBonggolan']?.toString(),
+      namaGilingan: json['NamaGilingan']?.toString(),
+      namaMixer: json['NamaMixer']?.toString(),
+
+      namaFurnitureWIP: json['Nama']?.toString(),
+      namaBJ: json['NamaBJ']?.toString(),
+      namaReject: json['NamaReject']?.toString(),
+
       pcs: (json['Pcs'] as num?)?.toInt(),
+
       isPartial: json['IsPartial'] != null
           ? (json['IsPartial'] == true || json['IsPartial'] == 1)
           : null,
-      dateCreate: json['DateCreate'],
-      idLokasi: json['IdLokasi'],
+
+      dateCreate: json['DateCreate']?.toString(),
+
+      // pilih salah satu:
+      idLokasi: json['IdLokasi']?.toString(),
+      // atau kalau ubah tipe jadi int?:
+      // idLokasi: (json['IdLokasi'] as num?)?.toInt(),
     );
   }
 }

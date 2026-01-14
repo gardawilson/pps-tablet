@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:pps_tablet/core/view_model/permission_view_model.dart';
+import 'package:pps_tablet/features/bj_jual/repository/bj_jual_input_repository.dart';
+import 'package:pps_tablet/features/bj_jual/view_model/bj_jual_input_view_model.dart';
 import 'package:pps_tablet/features/bongkar_susun/repository/bongkar_susun_input_repository.dart';
 import 'package:pps_tablet/features/bongkar_susun/view_model/bongkar_susun_input_view_model.dart';
 import 'package:pps_tablet/features/crusher_type/repository/crusher_type_repository.dart';
@@ -39,6 +41,8 @@ import 'package:pps_tablet/features/operator/repository/operator_repository.dart
 import 'package:pps_tablet/features/operator/view_model/operator_view_model.dart';
 import 'package:pps_tablet/features/packing_type/repository/packing_type_repository.dart';
 import 'package:pps_tablet/features/packing_type/view_model/packing_type_view_model.dart';
+import 'package:pps_tablet/features/pembeli/repository/pembeli_repository.dart';
+import 'package:pps_tablet/features/pembeli/view_model/pembeli_view_model.dart';
 import 'package:pps_tablet/features/production/broker/repository/broker_production_input_repository.dart';
 import 'package:pps_tablet/features/production/broker/view_model/broker_production_input_view_model.dart';
 import 'package:pps_tablet/features/production/crusher/repository/crusher_production_input_repository.dart';
@@ -197,6 +201,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => CrusherTypeViewModel(repository: CrusherTypeRepository())),
         ChangeNotifierProvider(create: (_) => MesinViewModel(repository: MesinRepository())),
         ChangeNotifierProvider(create: (_) => OperatorViewModel(repository: OperatorRepository())),
+        ChangeNotifierProvider(create: (_) => PembeliViewModel(repository: PembeliRepository())),
         ChangeNotifierProvider(create: (_) => OverlapViewModel(repository: OverlapRepository())),
         ChangeNotifierProvider(create: (_) => MixerViewModel(repository: MixerRepository())),
         ChangeNotifierProvider(create: (_) => MixerProductionViewModel(repository: MixerProductionRepository())),
@@ -295,6 +300,15 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider<PackingProductionInputViewModel>(
           create: (ctx) => PackingProductionInputViewModel(
             repository: PackingProductionInputRepository(
+              apiClient: ctx.read<ApiClient>(),
+            ),
+          ),
+        ),
+
+
+        ChangeNotifierProvider<BJJualInputViewModel>(
+          create: (ctx) => BJJualInputViewModel(
+            repository: BJJualInputRepository(
               apiClient: ctx.read<ApiClient>(),
             ),
           ),

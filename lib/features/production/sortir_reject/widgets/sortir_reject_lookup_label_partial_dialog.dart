@@ -1,30 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../production/shared/models/production_label_lookup_result.dart';
-import '../../production/shared/utils/format.dart';
-
-import '../view_model/bj_jual_input_view_model.dart';
+import '../../shared/models/production_label_lookup_result.dart';
+import '../../shared/utils/format.dart';
+import '../view_model/sortir_reject_production_input_view_model.dart';
 
 enum _Presence { none, temp }
 
-class BJJualLookupLabelPartialDialog extends StatefulWidget {
-  final String noBJJual;
+class SortirRejectLookupLabelDialogPartial extends StatefulWidget {
+  final String noBJSortir;
   final String selectedMode;
 
-  const BJJualLookupLabelPartialDialog({
+  const SortirRejectLookupLabelDialogPartial({
     super.key,
-    required this.noBJJual,
+    required this.noBJSortir,
     required this.selectedMode,
   });
 
   @override
-  State<BJJualLookupLabelPartialDialog> createState() =>
-      _BJJualLookupLabelPartialDialogState();
+  State<SortirRejectLookupLabelDialogPartial> createState() =>
+      _SortirRejectLookupLabelDialogPartialState();
 }
 
-class _BJJualLookupLabelPartialDialogState
-    extends State<BJJualLookupLabelPartialDialog> {
+class _SortirRejectLookupLabelDialogPartialState
+    extends State<SortirRejectLookupLabelDialogPartial> {
   int? _selectedIndex; // index pada list result (ALL items)
   int? _editedPcs;
   bool _inputsReady = false;
@@ -36,7 +35,7 @@ class _BJJualLookupLabelPartialDialogState
     _editedPcs = null;
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final vm = context.read<BJJualInputViewModel>();
+      final vm = context.read<SortirRejectInputViewModel>();
 
       // Refresh lookup based on first item label code
       final lastLookup = vm.lastLookup;
@@ -48,8 +47,8 @@ class _BJJualLookupLabelPartialDialogState
         }
       }
 
-      if (vm.inputsOf(widget.noBJJual) == null) {
-        await vm.loadInputs(widget.noBJJual);
+      if (vm.inputsOf(widget.noBJSortir) == null) {
+        await vm.loadInputs(widget.noBJSortir);
       }
       _inputsReady = true;
 
@@ -58,7 +57,7 @@ class _BJJualLookupLabelPartialDialogState
   }
 
   _Presence _presenceForRow(
-      BJJualInputViewModel vm,
+      SortirRejectInputViewModel vm,
       Map<String, dynamic> row,
       ProductionLabelLookupResult ctx,
       ) {
@@ -82,7 +81,7 @@ class _BJJualLookupLabelPartialDialogState
   }
 
   void _commitSelection(
-      BJJualInputViewModel vm,
+      SortirRejectInputViewModel vm,
       ProductionLabelLookupResult result,
       Map<String, dynamic> selectedRow,
       ) {
@@ -100,9 +99,9 @@ class _BJJualLookupLabelPartialDialogState
     vm.clearPicks();
     vm.togglePick(selectedRow);
 
-    final r = vm.commitPickedToTemp(noBJJual: widget.noBJJual);
+    final r = vm.commitPickedToTemp(noBJSortir: widget.noBJSortir);
 
-    // restore row value biar gak “mengotori” cache lookup
+    // restore row value biar gak "mengotori" cache lookup
     if (_editedPcs != null) {
       selectedRow['pcs'] = originalPcs;
       selectedRow['Pcs'] = originalPcs;
@@ -128,7 +127,7 @@ class _BJJualLookupLabelPartialDialogState
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<BJJualInputViewModel>(
+    return Consumer<SortirRejectInputViewModel>(
       builder: (context, vm, _) {
         final result = vm.lastLookup;
         if (result == null) {
@@ -149,7 +148,7 @@ class _BJJualLookupLabelPartialDialogState
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const CircularProgressIndicator(color: Colors.amber),
+                  const CircularProgressIndicator(color: Colors.blue),
                   const SizedBox(height: 16),
                   Text(
                     'Memuat data...',
@@ -222,7 +221,7 @@ class _BJJualLookupLabelPartialDialogState
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [Colors.amber.shade600, Colors.amber.shade700],
+                      colors: [Colors.blue.shade600, Colors.blue.shade700],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -456,11 +455,11 @@ class _BJJualLookupLabelPartialDialogState
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
                                     color: isSelected && !isDisabled
-                                        ? Colors.amber.shade50
+                                        ? Colors.blue.shade50
                                         : Colors.white,
                                     border: Border.all(
                                       color: isSelected && !isDisabled
-                                          ? Colors.amber.shade400
+                                          ? Colors.blue.shade400
                                           : Colors.grey.shade200,
                                       width: isSelected && !isDisabled ? 2 : 1,
                                     ),
@@ -468,7 +467,7 @@ class _BJJualLookupLabelPartialDialogState
                                     boxShadow: isSelected && !isDisabled
                                         ? [
                                       BoxShadow(
-                                        color: Colors.amber.withOpacity(0.2),
+                                        color: Colors.blue.withOpacity(0.2),
                                         blurRadius: 8,
                                         offset: const Offset(0, 2),
                                       ),
@@ -485,7 +484,7 @@ class _BJJualLookupLabelPartialDialogState
                                         child: Radio<int>(
                                           value: idx,
                                           groupValue: _selectedIndex,
-                                          activeColor: Colors.amber,
+                                          activeColor: Colors.blue,
                                           onChanged: isDisabled
                                               ? null
                                               : (_) => _toggleRow(idx, rawRow, isDisabled),
@@ -544,8 +543,8 @@ class _BJJualLookupLabelPartialDialogState
                                               gradient: LinearGradient(
                                                 colors: isPcsEdited
                                                     ? [
-                                                  Colors.amber.shade300,
-                                                  Colors.amber.shade400
+                                                  Colors.blue.shade300,
+                                                  Colors.blue.shade400
                                                 ]
                                                     : statusText != null
                                                     ? [
@@ -565,7 +564,7 @@ class _BJJualLookupLabelPartialDialogState
                                                 fontSize: 13,
                                                 fontWeight: FontWeight.bold,
                                                 color: isPcsEdited
-                                                    ? Colors.amber.shade900
+                                                    ? Colors.blue.shade900
                                                     : statusText != null
                                                     ? statusColor
                                                     : Colors.green.shade800,
@@ -593,7 +592,7 @@ class _BJJualLookupLabelPartialDialogState
                                                       vertical: 4,
                                                     ),
                                                     side: BorderSide(
-                                                      color: Colors.amber.shade600,
+                                                      color: Colors.blue.shade600,
                                                       width: 1.5,
                                                     ),
                                                     shape: RoundedRectangleBorder(
@@ -603,14 +602,14 @@ class _BJJualLookupLabelPartialDialogState
                                                   icon: Icon(
                                                     Icons.edit_outlined,
                                                     size: 14,
-                                                    color: Colors.amber.shade700,
+                                                    color: Colors.blue.shade700,
                                                   ),
                                                   label: Text(
                                                     'Edit',
                                                     style: TextStyle(
                                                       fontSize: 11,
                                                       fontWeight: FontWeight.w600,
-                                                      color: Colors.amber.shade700,
+                                                      color: Colors.blue.shade700,
                                                     ),
                                                   ),
                                                   onPressed: () async {
@@ -633,7 +632,7 @@ class _BJJualLookupLabelPartialDialogState
                                             if (statusText != null)
                                               _badge(statusText, statusColor!)
                                             else if (isPcsEdited)
-                                              _badge('EDITED', Colors.amber.shade700)
+                                              _badge('EDITED', Colors.blue.shade700)
                                             else if (isOriginalPartial)
                                                 _badge('PARTIAL', Colors.orange.shade700),
                                           ],
@@ -687,14 +686,14 @@ class _BJJualLookupLabelPartialDialogState
                           margin: const EdgeInsets.only(right: 12),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
-                              colors: [Colors.amber.shade100, Colors.amber.shade200],
+                              colors: [Colors.blue.shade100, Colors.blue.shade200],
                             ),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
                             '1 item${_editedPcs != null ? ' • Diubah' : ''}',
                             style: TextStyle(
-                              color: Colors.amber.shade900,
+                              color: Colors.blue.shade900,
                               fontWeight: FontWeight.bold,
                               fontSize: 13,
                             ),
@@ -710,7 +709,7 @@ class _BJJualLookupLabelPartialDialogState
                         icon: const Icon(Icons.check_circle, size: 18),
                         label: Text(_selectedIndex == null ? 'Pilih Item' : 'Tambahkan'),
                         style: FilledButton.styleFrom(
-                          backgroundColor: Colors.amber.shade600,
+                          backgroundColor: Colors.blue.shade600,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 20,
@@ -777,20 +776,12 @@ class _BJJualLookupLabelPartialDialogState
       row['NoLabel'],
       row['noBJ'],
       row['NoBJ'],
-      row['noBroker'],
-      row['NoBroker'],
-      row['noBahanBaku'],
-      row['NoBahanBaku'],
-      row['noGilingan'],
-      row['NoGilingan'],
-      row['noMixer'],
-      row['NoMixer'],
       row['noReject'],
       row['NoReject'],
-      row['noWashing'],
-      row['NoWashing'],
-      row['noCrusher'],
-      row['NoCrusher'],
+      row['noFurnitureWip'],
+      row['NoFurnitureWip'],
+      row['noFurnitureWIP'],
+      row['NoFurnitureWIP'],
     ];
 
     for (final c in candidates) {
@@ -801,7 +792,11 @@ class _BJJualLookupLabelPartialDialogState
     // Fallback: try common typed fields via dynamic (safe try/catch)
     try {
       final dyn = item as dynamic;
-      final s = (dyn.noBJPartial ?? dyn.noBJ ?? dyn.noBroker ?? dyn.noWashing ?? dyn.noCrusher ?? dyn.noGilingan ?? dyn.noMixer ?? dyn.noReject ?? '')
+      final s = (dyn.noBJ ??
+          dyn.noReject ??
+          dyn.noFurnitureWip ??
+          dyn.noFurnitureWIP ??
+          '')
           .toString()
           .trim();
       if (s.isNotEmpty) return s;
@@ -812,7 +807,12 @@ class _BJJualLookupLabelPartialDialogState
 
   static String _detailTextOf(dynamic item, Map<String, dynamic> row, int? pcs) {
     // Prefer a meaningful identifier
-    final ref = (row['ref1'] ?? row['Ref1'] ?? row['noSak'] ?? row['NoSak'] ?? row['noPallet'] ?? row['NoPallet'])
+    final ref = (row['ref1'] ??
+        row['Ref1'] ??
+        row['noSak'] ??
+        row['NoSak'] ??
+        row['noPallet'] ??
+        row['NoPallet'])
         ?.toString()
         .trim();
 

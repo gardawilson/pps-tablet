@@ -1,55 +1,43 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../production/shared/models/production_label_lookup_result.dart';
-import '../../production/shared/utils/format.dart';
-
-import '../view_model/bj_jual_input_view_model.dart';
+import '../../shared/models/production_label_lookup_result.dart';
+import '../../shared/utils/format.dart';
+import '../view_model/sortir_reject_production_input_view_model.dart';
 
 enum _Presence { none, temp }
 
-class BJJualLookupLabelPartialDialog extends StatefulWidget {
-  final String noBJJual;
+class SortirRejectLookupLabelDialog extends StatefulWidget {
+  final String noBJSortir;
   final String selectedMode;
 
-  const BJJualLookupLabelPartialDialog({
+  const SortirRejectLookupLabelDialog({
     super.key,
-    required this.noBJJual,
+    required this.noBJSortir,
     required this.selectedMode,
   });
 
   @override
-  State<BJJualLookupLabelPartialDialog> createState() =>
-      _BJJualLookupLabelPartialDialogState();
+  State<SortirRejectLookupLabelDialog> createState() =>
+      _SortirRejectLookupLabelDialogState();
 }
 
-class _BJJualLookupLabelPartialDialogState
-    extends State<BJJualLookupLabelPartialDialog> {
-  int? _selectedIndex; // index pada list result (ALL items)
-  int? _editedPcs;
+class _SortirRejectLookupLabelDialogState
+    extends State<SortirRejectLookupLabelDialog> {
+  int? _selectedIndex; // pilih 1 item (radio)
   bool _inputsReady = false;
 
   @override
   void initState() {
     super.initState();
     _selectedIndex = null;
-    _editedPcs = null;
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final vm = context.read<BJJualInputViewModel>();
+      final vm = context.read<SortirRejectInputViewModel>();
 
-      // Refresh lookup based on first item label code
-      final lastLookup = vm.lastLookup;
-      if (lastLookup != null && lastLookup.typedItems.isNotEmpty) {
-        final firstItem = lastLookup.typedItems.first;
-        final labelCode = _labelCodeOf(firstItem, lastLookup.data.first);
-        if (labelCode != '-') {
-          await vm.lookupLabel(labelCode, force: true);
-        }
-      }
-
-      if (vm.inputsOf(widget.noBJJual) == null) {
-        await vm.loadInputs(widget.noBJJual);
+      // kalau inputs belum ada, load dulu supaya delete/summary aman
+      if (vm.inputsOf(widget.noBJSortir) == null) {
+        await vm.loadInputs(widget.noBJSortir);
       }
       _inputsReady = true;
 
@@ -58,7 +46,7 @@ class _BJJualLookupLabelPartialDialogState
   }
 
   _Presence _presenceForRow(
-      BJJualInputViewModel vm,
+      SortirRejectInputViewModel vm,
       Map<String, dynamic> row,
       ProductionLabelLookupResult ctx,
       ) {
@@ -67,48 +55,22 @@ class _BJJualLookupLabelPartialDialogState
     return _Presence.none;
   }
 
-  void _toggleRow(int idx, Map<String, dynamic> row, bool isDisabled) {
+  void _toggleRow(int idx, bool isDisabled) {
     if (isDisabled) return;
-
     setState(() {
-      if (_selectedIndex == idx) {
-        _selectedIndex = null;
-        _editedPcs = null;
-      } else {
-        _selectedIndex = idx;
-        _editedPcs = _pcsFromRow(row);
-      }
+      _selectedIndex = (_selectedIndex == idx) ? null : idx;
     });
   }
 
   void _commitSelection(
-      BJJualInputViewModel vm,
+      SortirRejectInputViewModel vm,
       ProductionLabelLookupResult result,
       Map<String, dynamic> selectedRow,
       ) {
-    final originalPcs = selectedRow['pcs'];
-    final originalIsPartial = selectedRow['isPartial'];
-
-    // paksa jadi partial + pcs edited (kalau user edit)
-    if (_editedPcs != null) {
-      selectedRow['isPartial'] = true;
-      selectedRow['IsPartial'] = true;
-      selectedRow['pcs'] = _editedPcs;
-      selectedRow['Pcs'] = _editedPcs;
-    }
-
     vm.clearPicks();
     vm.togglePick(selectedRow);
 
-    final r = vm.commitPickedToTemp(noBJJual: widget.noBJJual);
-
-    // restore row value biar gak “mengotori” cache lookup
-    if (_editedPcs != null) {
-      selectedRow['pcs'] = originalPcs;
-      selectedRow['Pcs'] = originalPcs;
-      selectedRow['isPartial'] = originalIsPartial;
-      selectedRow['IsPartial'] = originalIsPartial;
-    }
+    final r = vm.commitPickedToTemp(noBJSortir: widget.noBJSortir);
 
     Navigator.pop(context);
 
@@ -128,7 +90,7 @@ class _BJJualLookupLabelPartialDialogState
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<BJJualInputViewModel>(
+    return Consumer<SortirRejectInputViewModel>(
       builder: (context, vm, _) {
         final result = vm.lastLookup;
         if (result == null) {
@@ -142,14 +104,15 @@ class _BJJualLookupLabelPartialDialogState
 
         if (!_inputsReady) {
           return Dialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: Container(
               height: 160,
               padding: const EdgeInsets.all(24),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const CircularProgressIndicator(color: Colors.amber),
+                  const CircularProgressIndicator(color: Colors.blue),
                   const SizedBox(height: 16),
                   Text(
                     'Memuat data...',
@@ -169,13 +132,15 @@ class _BJJualLookupLabelPartialDialogState
 
         if (allTypedItems.isEmpty) {
           return Dialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: Container(
               padding: const EdgeInsets.all(28),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.info_outline, size: 44, color: Colors.orange.shade700),
+                  Icon(Icons.info_outline,
+                      size: 44, color: Colors.orange.shade700),
                   const SizedBox(height: 12),
                   const Text(
                     'Tidak ada data',
@@ -222,7 +187,7 @@ class _BJJualLookupLabelPartialDialogState
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [Colors.amber.shade600, Colors.amber.shade700],
+                      colors: [Colors.blue.shade600, Colors.blue.shade700],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -247,35 +212,13 @@ class _BJJualLookupLabelPartialDialogState
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                Text(
-                                  labelCode,
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.3),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: const Text(
-                                    'PARTIAL',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w900,
-                                      color: Colors.white,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            Text(
+                              labelCode,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
                             const SizedBox(height: 4),
                             Text(
@@ -315,26 +258,26 @@ class _BJJualLookupLabelPartialDialogState
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [Colors.blue.shade50, Colors.blue.shade100],
+                      colors: [Colors.green.shade50, Colors.green.shade100],
                     ),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue.shade200),
+                    border: Border.all(color: Colors.green.shade200),
                   ),
                   child: Row(
                     children: [
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.blue.shade200,
+                          color: Colors.green.shade200,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Icon(Icons.lightbulb_outline,
-                            size: 20, color: Colors.blue.shade700),
+                        child: Icon(Icons.info_outline,
+                            size: 20, color: Colors.green.shade700),
                       ),
                       const SizedBox(width: 12),
                       const Expanded(
                         child: Text(
-                          'Pilih SATU item, lalu klik Edit untuk mengubah pcs (jika tersedia)',
+                          'Pilih SATU item untuk ditambahkan ke TEMP.',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -346,9 +289,10 @@ class _BJJualLookupLabelPartialDialogState
                   ),
                 ),
 
-                // COLUMN HEADERS (generic)
+                // COLUMN HEADERS
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade50,
                     border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
@@ -399,7 +343,7 @@ class _BJJualLookupLabelPartialDialogState
                   ),
                 ),
 
-                // LIST (ALL)
+                // LIST
                 Expanded(
                   child: ListView.builder(
                     padding: const EdgeInsets.all(12),
@@ -410,24 +354,13 @@ class _BJJualLookupLabelPartialDialogState
 
                       final presence = _presenceForRow(vm, rawRow, result);
                       final isDisabled = presence == _Presence.temp;
-
                       final isSelected = _selectedIndex == idx;
 
-                      final originalPcs = _pcsFromRow(rawRow);
                       final originalBerat = _beratFromRow(rawRow);
+                      final beratText =
+                      originalBerat == null ? '-' : num2(originalBerat);
 
-                      final displayPcs =
-                      isSelected && _editedPcs != null ? _editedPcs : originalPcs;
-
-                      final detailText = _detailTextOf(item, rawRow, displayPcs);
-
-                      final beratText = originalBerat == null ? '-' : num2(originalBerat);
-
-                      final isOriginalPartial = _isPartialOf(rawRow);
-                      final isPcsEdited = isSelected &&
-                          _editedPcs != null &&
-                          originalPcs != null &&
-                          _editedPcs != originalPcs;
+                      final detailText = _detailTextOf(item, rawRow);
 
                       String? statusText;
                       Color? statusColor;
@@ -435,8 +368,6 @@ class _BJJualLookupLabelPartialDialogState
                         statusText = 'Sudah Input';
                         statusColor = Colors.orange;
                       }
-
-                      final canEditPcs = (originalPcs != null && originalPcs > 0);
 
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 8),
@@ -451,16 +382,16 @@ class _BJJualLookupLabelPartialDialogState
                                 borderRadius: BorderRadius.circular(12),
                                 onTap: isDisabled
                                     ? null
-                                    : () => _toggleRow(idx, rawRow, isDisabled),
+                                    : () => _toggleRow(idx, isDisabled),
                                 child: Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
                                     color: isSelected && !isDisabled
-                                        ? Colors.amber.shade50
+                                        ? Colors.blue.shade50
                                         : Colors.white,
                                     border: Border.all(
                                       color: isSelected && !isDisabled
-                                          ? Colors.amber.shade400
+                                          ? Colors.blue.shade400
                                           : Colors.grey.shade200,
                                       width: isSelected && !isDisabled ? 2 : 1,
                                     ),
@@ -468,7 +399,7 @@ class _BJJualLookupLabelPartialDialogState
                                     boxShadow: isSelected && !isDisabled
                                         ? [
                                       BoxShadow(
-                                        color: Colors.amber.withOpacity(0.2),
+                                        color: Colors.blue.withOpacity(0.2),
                                         blurRadius: 8,
                                         offset: const Offset(0, 2),
                                       ),
@@ -485,10 +416,10 @@ class _BJJualLookupLabelPartialDialogState
                                         child: Radio<int>(
                                           value: idx,
                                           groupValue: _selectedIndex,
-                                          activeColor: Colors.amber,
+                                          activeColor: Colors.blue,
                                           onChanged: isDisabled
                                               ? null
-                                              : (_) => _toggleRow(idx, rawRow, isDisabled),
+                                              : (_) => _toggleRow(idx, isDisabled),
                                           materialTapTargetSize:
                                           MaterialTapTargetSize.shrinkWrap,
                                         ),
@@ -497,36 +428,15 @@ class _BJJualLookupLabelPartialDialogState
                                       // Detail
                                       Expanded(
                                         flex: 2,
-                                        child: Row(
-                                          children: [
-                                            if (isOriginalPartial) ...[
-                                              Container(
-                                                padding: const EdgeInsets.all(4),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.orange.withOpacity(0.2),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                ),
-                                                child: const Icon(
-                                                  Icons.content_cut,
-                                                  size: 14,
-                                                  color: Colors.orange,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                            ],
-                                            Expanded(
-                                              child: Text(
-                                                detailText,
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: 15,
-                                                  color: isDisabled
-                                                      ? Colors.grey.shade400
-                                                      : Colors.black87,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
+                                        child: Text(
+                                          detailText,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 15,
+                                            color: isDisabled
+                                                ? Colors.grey.shade400
+                                                : Colors.black87,
+                                          ),
                                         ),
                                       ),
 
@@ -542,12 +452,7 @@ class _BJJualLookupLabelPartialDialogState
                                             ),
                                             decoration: BoxDecoration(
                                               gradient: LinearGradient(
-                                                colors: isPcsEdited
-                                                    ? [
-                                                  Colors.amber.shade300,
-                                                  Colors.amber.shade400
-                                                ]
-                                                    : statusText != null
+                                                colors: statusText != null
                                                     ? [
                                                   statusColor!.withOpacity(0.2),
                                                   statusColor.withOpacity(0.3)
@@ -564,9 +469,7 @@ class _BJJualLookupLabelPartialDialogState
                                               style: TextStyle(
                                                 fontSize: 13,
                                                 fontWeight: FontWeight.bold,
-                                                color: isPcsEdited
-                                                    ? Colors.amber.shade900
-                                                    : statusText != null
+                                                color: statusText != null
                                                     ? statusColor
                                                     : Colors.green.shade800,
                                               ),
@@ -577,66 +480,13 @@ class _BJJualLookupLabelPartialDialogState
 
                                       const SizedBox(width: 12),
 
-                                      // Status + Edit
+                                      // Status badge
                                       SizedBox(
                                         width: 140,
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.end,
-                                          children: [
-                                            if (isSelected && !isDisabled && canEditPcs)
-                                              SizedBox(
-                                                height: 32,
-                                                child: OutlinedButton.icon(
-                                                  style: OutlinedButton.styleFrom(
-                                                    padding: const EdgeInsets.symmetric(
-                                                      horizontal: 10,
-                                                      vertical: 4,
-                                                    ),
-                                                    side: BorderSide(
-                                                      color: Colors.amber.shade600,
-                                                      width: 1.5,
-                                                    ),
-                                                    shape: RoundedRectangleBorder(
-                                                      borderRadius: BorderRadius.circular(8),
-                                                    ),
-                                                  ),
-                                                  icon: Icon(
-                                                    Icons.edit_outlined,
-                                                    size: 14,
-                                                    color: Colors.amber.shade700,
-                                                  ),
-                                                  label: Text(
-                                                    'Edit',
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      fontWeight: FontWeight.w600,
-                                                      color: Colors.amber.shade700,
-                                                    ),
-                                                  ),
-                                                  onPressed: () async {
-                                                    final maxPcs = originalPcs!;
-                                                    final newPcs = await _showPcsInputDialog(
-                                                      context,
-                                                      maxPcs: maxPcs,
-                                                      currentPcs: _editedPcs,
-                                                    );
-                                                    if (newPcs != null && mounted) {
-                                                      setState(() => _editedPcs = newPcs);
-                                                    }
-                                                  },
-                                                ),
-                                              ),
-
-                                            if (isSelected && !isDisabled && canEditPcs)
-                                              const SizedBox(width: 8),
-
-                                            if (statusText != null)
-                                              _badge(statusText, statusColor!)
-                                            else if (isPcsEdited)
-                                              _badge('EDITED', Colors.amber.shade700)
-                                            else if (isOriginalPartial)
-                                                _badge('PARTIAL', Colors.orange.shade700),
-                                          ],
+                                        child: Center(
+                                          child: statusText != null
+                                              ? _badge(statusText, statusColor!)
+                                              : const SizedBox.shrink(),
                                         ),
                                       ),
                                     ],
@@ -666,10 +516,7 @@ class _BJJualLookupLabelPartialDialogState
                     children: [
                       TextButton.icon(
                         onPressed: _selectedIndex != null
-                            ? () => setState(() {
-                          _selectedIndex = null;
-                          _editedPcs = null;
-                        })
+                            ? () => setState(() => _selectedIndex = null)
                             : null,
                         icon: const Icon(Icons.clear, size: 18),
                         label: const Text('Batal'),
@@ -687,14 +534,14 @@ class _BJJualLookupLabelPartialDialogState
                           margin: const EdgeInsets.only(right: 12),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
-                              colors: [Colors.amber.shade100, Colors.amber.shade200],
+                              colors: [Colors.blue.shade100, Colors.blue.shade200],
                             ),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            '1 item${_editedPcs != null ? ' • Diubah' : ''}',
+                            '1 item dipilih',
                             style: TextStyle(
-                              color: Colors.amber.shade900,
+                              color: Colors.blue.shade900,
                               fontWeight: FontWeight.bold,
                               fontSize: 13,
                             ),
@@ -710,7 +557,7 @@ class _BJJualLookupLabelPartialDialogState
                         icon: const Icon(Icons.check_circle, size: 18),
                         label: Text(_selectedIndex == null ? 'Pilih Item' : 'Tambahkan'),
                         style: FilledButton.styleFrom(
-                          backgroundColor: Colors.amber.shade600,
+                          backgroundColor: Colors.blue.shade600,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 20,
@@ -754,13 +601,6 @@ class _BJJualLookupLabelPartialDialogState
   }
 
   // ===== DATA HELPERS =====
-  int? _pcsFromRow(Map<String, dynamic> row) {
-    final pcs = row['pcs'] ?? row['Pcs'];
-    if (pcs is num) return pcs.toInt();
-    if (pcs is String) return int.tryParse(pcs);
-    return null;
-  }
-
   double? _beratFromRow(Map<String, dynamic> row) {
     final v = row['berat'] ?? row['Berat'];
     if (v is num) return v.toDouble();
@@ -769,7 +609,7 @@ class _BJJualLookupLabelPartialDialogState
   }
 
   static String _labelCodeOf(dynamic item, Map<String, dynamic> row) {
-    // Try row first (more universal)
+    // Try row first
     final candidates = [
       row['labelCode'],
       row['LabelCode'],
@@ -777,20 +617,12 @@ class _BJJualLookupLabelPartialDialogState
       row['NoLabel'],
       row['noBJ'],
       row['NoBJ'],
-      row['noBroker'],
-      row['NoBroker'],
-      row['noBahanBaku'],
-      row['NoBahanBaku'],
-      row['noGilingan'],
-      row['NoGilingan'],
-      row['noMixer'],
-      row['NoMixer'],
       row['noReject'],
       row['NoReject'],
-      row['noWashing'],
-      row['NoWashing'],
-      row['noCrusher'],
-      row['NoCrusher'],
+      row['noFurnitureWip'],
+      row['NoFurnitureWip'],
+      row['noFurnitureWIP'],
+      row['NoFurnitureWIP'],
     ];
 
     for (final c in candidates) {
@@ -798,10 +630,14 @@ class _BJJualLookupLabelPartialDialogState
       if (s.isNotEmpty && s.toLowerCase() != 'null') return s;
     }
 
-    // Fallback: try common typed fields via dynamic (safe try/catch)
+    // Fallback typed
     try {
       final dyn = item as dynamic;
-      final s = (dyn.noBJPartial ?? dyn.noBJ ?? dyn.noBroker ?? dyn.noWashing ?? dyn.noCrusher ?? dyn.noGilingan ?? dyn.noMixer ?? dyn.noReject ?? '')
+      final s = (dyn.noBJ ??
+          dyn.noReject ??
+          dyn.noFurnitureWip ??
+          dyn.noFurnitureWIP ??
+          '')
           .toString()
           .trim();
       if (s.isNotEmpty) return s;
@@ -810,90 +646,22 @@ class _BJJualLookupLabelPartialDialogState
     return '-';
   }
 
-  static String _detailTextOf(dynamic item, Map<String, dynamic> row, int? pcs) {
-    // Prefer a meaningful identifier
-    final ref = (row['ref1'] ?? row['Ref1'] ?? row['noSak'] ?? row['NoSak'] ?? row['noPallet'] ?? row['NoPallet'])
+  static String _detailTextOf(dynamic item, Map<String, dynamic> row) {
+    final ref = (row['ref1'] ??
+        row['Ref1'] ??
+        row['noSak'] ??
+        row['NoSak'] ??
+        row['noPallet'] ??
+        row['NoPallet'])
         ?.toString()
         .trim();
 
     if (ref != null && ref.isNotEmpty && ref.toLowerCase() != 'null') return ref;
 
-    if (pcs != null) return '$pcs pcs';
+    // fallback: show pcs if exists
+    final pcs = row['pcs'] ?? row['Pcs'];
+    if (pcs != null) return '${pcs.toString()} pcs';
 
-    // last fallback: label code
     return _labelCodeOf(item, row);
-  }
-
-  static bool _boolish(dynamic v) {
-    if (v == null) return false;
-    if (v is bool) return v;
-    final s = v.toString().trim().toLowerCase();
-    return s == '1' || s == 'true' || s == 't' || s == 'yes' || s == 'y';
-  }
-
-  static bool _isPartialOf(Map<String, dynamic> row) {
-    if (_boolish(row['isPartial']) || _boolish(row['IsPartial'])) return true;
-    return false;
-  }
-
-  Future<int?> _showPcsInputDialog(
-      BuildContext context, {
-        required int maxPcs,
-        int? currentPcs,
-      }) async {
-    final controller = TextEditingController(text: currentPcs?.toString() ?? '');
-
-    return showDialog<int>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Edit Pcs'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Maksimal: $maxPcs pcs'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'Pcs',
-                border: OutlineInputBorder(),
-                suffixText: 'pcs',
-              ),
-              onSubmitted: (_) {
-                final val = int.tryParse(controller.text.trim());
-                if (val != null && val > 0 && val <= maxPcs) {
-                  Navigator.of(ctx).pop(val);
-                }
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Batal'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final val = int.tryParse(controller.text.trim());
-              if (val != null && val > 0 && val <= maxPcs) {
-                Navigator.of(ctx).pop(val);
-              } else {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  SnackBar(
-                    content: Text('Pcs harus antara 1 - $maxPcs'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-            child: const Text('Simpan'),
-          ),
-        ],
-      ),
-    );
   }
 }

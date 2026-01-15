@@ -147,6 +147,17 @@ class ProductionSelectionScreen extends StatelessWidget {
                 ? () => Navigator.pushNamed(context, '/production/packing')
                 : null,
           ),
+          // 🔹 Card Label Sortir Reject
+          _buildLabelCard(
+            context,
+            title: 'Proses Sortir Reject',
+            subtitle: 'Buat label untuk proses Packing',
+            icon: Icons.inventory_2_outlined,
+            enabled: canReadBroker,
+            onTap: canReadBroker
+                ? () => Navigator.pushNamed(context, '/production/sortir-reject')
+                : null,
+          ),
         ],
       ),
     );

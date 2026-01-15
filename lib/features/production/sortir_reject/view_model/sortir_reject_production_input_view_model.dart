@@ -1,11 +1,8 @@
-// lib/features/production/bj_jual/view_model/bj_jual_input_view_model.dart
-
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
-import '../repository/bj_jual_input_repository.dart';
-import '../model/bj_jual_inputs_model.dart';
+import '../model/sortir_reject_inputs_model.dart';
 
 // shared lookup result model (dipakai untuk lookup label)
 import 'package:pps_tablet/features/production/shared/models/production_label_lookup_result.dart';
@@ -14,6 +11,8 @@ import 'package:pps_tablet/features/production/shared/models/production_label_lo
 import 'package:pps_tablet/features/production/shared/models/furniture_wip_item.dart';
 import 'package:pps_tablet/features/production/shared/models/cabinet_material_item.dart';
 import 'package:pps_tablet/features/production/shared/models/barang_jadi_item.dart';
+
+import '../repository/sortir_reject_production_input_repository.dart';
 
 // -----------------------------------------------------------------------------
 // Small value objects
@@ -63,9 +62,9 @@ class TempItemsByLabel {
 // -----------------------------------------------------------------------------
 // ViewModel
 // -----------------------------------------------------------------------------
-class BJJualInputViewModel extends ChangeNotifier {
-  final BJJualInputRepository repository;
-  BJJualInputViewModel({required this.repository});
+class SortirRejectInputViewModel extends ChangeNotifier {
+  final SortirRejectInputRepository repository;
+  SortirRejectInputViewModel({required this.repository});
 
   // ---------------------------------------------------------------------------
   // Debug control
@@ -73,7 +72,7 @@ class BJJualInputViewModel extends ChangeNotifier {
   static const bool _verbose = true;
 
   void _d(String message) {
-    if (kDebugMode && _verbose) debugPrint('[BJJualInputVM] $message');
+    if (kDebugMode && _verbose) debugPrint('[SortirRejectInputVM] $message');
   }
 
   String _nn(Object? v) =>
@@ -202,22 +201,23 @@ class BJJualInputViewModel extends ChangeNotifier {
   }
 
   // ---------------------------------------------------------------------------
-  // Inputs per row (cache, loading & error per NoBJJual)
+  // Inputs per row (cache, loading & error per NoBJSortir)
   // ---------------------------------------------------------------------------
-  final Map<String, BJJualInputs> _inputsCache = {};
+  final Map<String, SortirRejectInputs> _inputsCache = {};
   final Map<String, bool> _inputsLoading = {};
   final Map<String, String?> _inputsError = {};
-  final Map<String, Future<BJJualInputs>> _inflight = {};
+  final Map<String, Future<SortirRejectInputs>> _inflight = {};
 
-  bool isInputsLoading(String noBJJual) => _inputsLoading[noBJJual] == true;
-  String? inputsError(String noBJJual) => _inputsError[noBJJual];
-  BJJualInputs? inputsOf(String noBJJual) => _inputsCache[noBJJual];
+  bool isInputsLoading(String noBJSortir) => _inputsLoading[noBJSortir] == true;
+  String? inputsError(String noBJSortir) => _inputsError[noBJSortir];
+  SortirRejectInputs? inputsOf(String noBJSortir) => _inputsCache[noBJSortir];
 
-  int inputsCount(String noBJJual, String key) =>
-      _inputsCache[noBJJual]?.summary[key] ?? 0;
+  int inputsCount(String noBJSortir, String key) =>
+      _inputsCache[noBJSortir]?.summary[key] ?? 0;
 
-  Future<BJJualInputs?> loadInputs(String noBJJual, {bool force = false}) async {
-    final key = noBJJual.trim();
+  Future<SortirRejectInputs?> loadInputs(String noBJSortir,
+      {bool force = false}) async {
+    final key = noBJSortir.trim();
     if (key.isEmpty) return null;
 
     if (!force && _inputsCache.containsKey(key)) return _inputsCache[key];
@@ -248,13 +248,13 @@ class BJJualInputViewModel extends ChangeNotifier {
     }
   }
 
-  void clearInputsCache([String? noBJJual]) {
-    if (noBJJual == null) {
+  void clearInputsCache([String? noBJSortir]) {
+    if (noBJSortir == null) {
       _inputsCache.clear();
       _inputsLoading.clear();
       _inputsError.clear();
     } else {
-      final key = noBJJual.trim();
+      final key = noBJSortir.trim();
       _inputsCache.remove(key);
       _inputsLoading.remove(key);
       _inputsError.remove(key);
@@ -392,10 +392,18 @@ class BJJualInputViewModel extends ChangeNotifier {
     if (t == null || t.isEmpty) return 'Tidak ada data temporary';
 
     final s = <String>[];
-    if (t.barangJadiItems.isNotEmpty) s.add('${t.barangJadiItems.length} BJ (full)');
-    if (t.barangJadiPartials.isNotEmpty) s.add('${t.barangJadiPartials.length} BJ Partial');
-    if (t.furnitureWipItems.isNotEmpty) s.add('${t.furnitureWipItems.length} FWIP (full)');
-    if (t.furnitureWipPartials.isNotEmpty) s.add('${t.furnitureWipPartials.length} FWIP Partial');
+    if (t.barangJadiItems.isNotEmpty) {
+      s.add('${t.barangJadiItems.length} BJ (full)');
+    }
+    if (t.barangJadiPartials.isNotEmpty) {
+      s.add('${t.barangJadiPartials.length} BJ Partial');
+    }
+    if (t.furnitureWipItems.isNotEmpty) {
+      s.add('${t.furnitureWipItems.length} FWIP (full)');
+    }
+    if (t.furnitureWipPartials.isNotEmpty) {
+      s.add('${t.furnitureWipPartials.length} FWIP Partial');
+    }
     return s.join(', ');
   }
 
@@ -405,7 +413,8 @@ class BJJualInputViewModel extends ChangeNotifier {
     if (t != null && !t.isEmpty) onShowTemporaryDataDialog?.call(t);
   }
 
-  void removeTemporaryItemsForLabel(String labelCode, List<dynamic> itemsToRemove) {
+  void removeTemporaryItemsForLabel(
+      String labelCode, List<dynamic> itemsToRemove) {
     final code = _normLabel(labelCode);
     final t = _tempItemsByLabel[code];
     if (t == null) return;
@@ -430,7 +439,8 @@ class BJJualInputViewModel extends ChangeNotifier {
     final fwFull = tempFurnitureWip.where(match).toList();
     final fwPart = tempFurnitureWipPartial.where(match).toList();
 
-    final allEmpty = bjFull.isEmpty && bjPart.isEmpty && fwFull.isEmpty && fwPart.isEmpty;
+    final allEmpty =
+        bjFull.isEmpty && bjPart.isEmpty && fwFull.isEmpty && fwPart.isEmpty;
     if (allEmpty) {
       _tempItemsByLabel.remove(code);
       return;
@@ -508,21 +518,21 @@ class BJJualInputViewModel extends ChangeNotifier {
   // ---------------------------------------------------------------------------
   // Duplicate helpers (TEMP-ONLY, meniru Broker)
   // ---------------------------------------------------------------------------
-  bool isRowAlreadyPresent(Map<String, dynamic> row, String noBJJual) {
+  bool isRowAlreadyPresent(Map<String, dynamic> row, String noBJSortir) {
     final ctx = lastLookup;
     if (ctx == null) return false;
     final sk = ctx.simpleKey(row).trim();
     return _tempKeys.contains(sk);
   }
 
-  bool willBeDuplicate(Map<String, dynamic> row, String noBJJual) {
+  bool willBeDuplicate(Map<String, dynamic> row, String noBJSortir) {
     final ctx = lastLookup;
     if (ctx == null) return false;
     final sk = ctx.simpleKey(row).trim();
     return _tempKeys.contains(sk);
   }
 
-  int countNewRowsInLastLookup(String noBJJual) {
+  int countNewRowsInLastLookup(String noBJSortir) {
     final ctx = lastLookup;
     if (ctx == null) return 0;
 
@@ -582,7 +592,7 @@ class BJJualInputViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void pickAllNew(String noBJJual) {
+  void pickAllNew(String noBJSortir) {
     final ctx = lastLookup;
     if (ctx == null) return;
 
@@ -614,8 +624,10 @@ class BJJualInputViewModel extends ChangeNotifier {
   int _nextSeqBJ() => ++_tempPartialSeqBJ;
   int _nextSeqFW() => ++_tempPartialSeqFW;
 
-  String _formatTempPartialBJ(int seq) => 'BL.XXXXXX ($seq)'; // BJ partial display
-  String _formatTempPartialFW(int seq) => 'BC.XXXXXX ($seq)'; // FWIP partial display
+  String _formatTempPartialBJ(int seq) =>
+      'BL.XXXXXX ($seq)'; // BJ partial display
+  String _formatTempPartialFW(int seq) =>
+      'BC.XXXXXX ($seq)'; // FWIP partial display
 
   BarangJadiItem _withTempPartialBJIfNeeded(BarangJadiItem item) {
     final already = (item.noBJPartial ?? '').trim().isNotEmpty;
@@ -635,7 +647,12 @@ class BJJualInputViewModel extends ChangeNotifier {
   }
 
   bool _rowIsPartial(Map<String, dynamic> row, PrefixType t) {
-    const candKeys = ['IsPartial', 'isPartial', 'IsPartialRow', 'isPartialRow'];
+    const candKeys = [
+      'IsPartial',
+      'isPartial',
+      'IsPartialRow',
+      'isPartialRow'
+    ];
     for (final k in candKeys) {
       final v = row[k];
       if (v is bool && v) return true;
@@ -660,7 +677,7 @@ class BJJualInputViewModel extends ChangeNotifier {
   // ---------------------------------------------------------------------------
   // Commit picked → TEMP (FIX KEY MAPPING)
   // ---------------------------------------------------------------------------
-  TempCommitResult commitPickedToTemp({required String noBJJual}) {
+  TempCommitResult commitPickedToTemp({required String noBJSortir}) {
     final ctx = lastLookup;
     if (ctx == null || _pickedRows.isEmpty) {
       return const TempCommitResult(0, 0);
@@ -829,7 +846,8 @@ class BJJualInputViewModel extends ChangeNotifier {
         if (sk != null) _tempKeys.remove(sk);
       }
     } else if (item is FurnitureWipItem) {
-      ok = tempFurnitureWip.remove(item) || tempFurnitureWipPartial.remove(item);
+      ok = tempFurnitureWip.remove(item) ||
+          tempFurnitureWipPartial.remove(item);
 
       if (ok) {
         final pk = _payloadKeyFromFurnitureWipItem(item);
@@ -914,7 +932,8 @@ class BJJualInputViewModel extends ChangeNotifier {
     final payload = <String, dynamic>{};
 
     if (tempBarangJadi.isNotEmpty) {
-      payload['barangJadi'] = tempBarangJadi.map((e) => {'noBJ': e.noBJ}).toList();
+      payload['barangJadi'] =
+          tempBarangJadi.map((e) => {'noBJ': e.noBJ}).toList();
     }
 
     if (tempBarangJadiPartial.isNotEmpty) {
@@ -927,8 +946,9 @@ class BJJualInputViewModel extends ChangeNotifier {
     }
 
     if (tempFurnitureWip.isNotEmpty) {
-      payload['furnitureWip'] =
-          tempFurnitureWip.map((e) => {'noFurnitureWip': e.noFurnitureWIP}).toList();
+      payload['furnitureWip'] = tempFurnitureWip
+          .map((e) => {'noFurnitureWip': e.noFurnitureWIP})
+          .toList();
     }
 
     if (tempFurnitureWipPartial.isNotEmpty) {
@@ -952,7 +972,7 @@ class BJJualInputViewModel extends ChangeNotifier {
     return payload;
   }
 
-  Future<bool> submitTempItems(String noBJJual) async {
+  Future<bool> submitTempItems(String noBJSortir) async {
     if (totalTempCount == 0) {
       submitError = 'Tidak ada data untuk disubmit';
       notifyListeners();
@@ -965,10 +985,11 @@ class BJJualInputViewModel extends ChangeNotifier {
 
     try {
       final payload = _buildPayload();
-      _d('Submitting temp items to $noBJJual');
+      _d('Submitting temp items to $noBJSortir');
       _d('Payload: ${json.encode(payload)}');
 
-      final response = await repository.submitInputsAndPartials(noBJJual, payload);
+      // ✅ IMPORTANT: Sortir Reject pakai submitInputs (sama seperti BJJual submitInputsAndPartials)
+      final response = await repository.submitInputs(noBJSortir, payload);
       _d('Submit response: ${json.encode(response)}');
 
       final success = response['success'] as bool? ?? false;
@@ -979,8 +1000,8 @@ class BJJualInputViewModel extends ChangeNotifier {
 
       clearAllTempItems();
       clearLookupCache();
-      clearInputsCache(noBJJual);
-      await loadInputs(noBJJual, force: true);
+      clearInputsCache(noBJSortir);
+      await loadInputs(noBJSortir, force: true);
 
       return true;
     } catch (e) {
@@ -997,11 +1018,21 @@ class BJJualInputViewModel extends ChangeNotifier {
     if (totalTempCount == 0) return 'Tidak ada data';
 
     final parts = <String>[];
-    if (tempBarangJadi.isNotEmpty) parts.add('${tempBarangJadi.length} BJ (full)');
-    if (tempBarangJadiPartial.isNotEmpty) parts.add('${tempBarangJadiPartial.length} BJ Partial');
-    if (tempFurnitureWip.isNotEmpty) parts.add('${tempFurnitureWip.length} FWIP (full)');
-    if (tempFurnitureWipPartial.isNotEmpty) parts.add('${tempFurnitureWipPartial.length} FWIP Partial');
-    if (tempCabinetMaterial.isNotEmpty) parts.add('${tempCabinetMaterial.length} Cabinet Material');
+    if (tempBarangJadi.isNotEmpty) {
+      parts.add('${tempBarangJadi.length} BJ (full)');
+    }
+    if (tempBarangJadiPartial.isNotEmpty) {
+      parts.add('${tempBarangJadiPartial.length} BJ Partial');
+    }
+    if (tempFurnitureWip.isNotEmpty) {
+      parts.add('${tempFurnitureWip.length} FWIP (full)');
+    }
+    if (tempFurnitureWipPartial.isNotEmpty) {
+      parts.add('${tempFurnitureWipPartial.length} FWIP Partial');
+    }
+    if (tempCabinetMaterial.isNotEmpty) {
+      parts.add('${tempCabinetMaterial.length} Cabinet Material');
+    }
 
     return 'Total $totalTempCount items:\n${parts.join(', ')}';
   }
@@ -1049,7 +1080,7 @@ class BJJualInputViewModel extends ChangeNotifier {
     return payload;
   }
 
-  Future<bool> deleteItems(String noBJJual, List<dynamic> items) async {
+  Future<bool> deleteItems(String noBJSortir, List<dynamic> items) async {
     if (items.isEmpty) {
       deleteError = 'Tidak ada data yang dipilih untuk dihapus';
       notifyListeners();
@@ -1083,10 +1114,11 @@ class BJJualInputViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _d('deleteItems: calling deleteInputsAndPartials for $noBJJual');
+      _d('deleteItems: calling deleteInputs for $noBJSortir');
       _d('Delete payload: ${json.encode(payload)}');
 
-      final res = await repository.deleteInputsAndPartials(noBJJual, payload);
+      // ✅ IMPORTANT: Sortir Reject pakai deleteInputs (sama seperti BJJual deleteInputsAndPartials)
+      final res = await repository.deleteInputs(noBJSortir, payload);
       lastDeleteResult = res;
 
       final success = res['success'] == true;
@@ -1099,8 +1131,8 @@ class BJJualInputViewModel extends ChangeNotifier {
         return false;
       }
 
-      clearInputsCache(noBJJual);
-      await loadInputs(noBJJual, force: true);
+      clearInputsCache(noBJSortir);
+      await loadInputs(noBJSortir, force: true);
 
       return true;
     } catch (e) {

@@ -84,7 +84,10 @@ import 'package:pps_tablet/features/production/return/repository/return_producti
 import 'package:pps_tablet/features/production/return/view_model/return_production_view_model.dart';
 import 'package:pps_tablet/features/production/selection/view/production_selection_screen.dart';
 import 'package:pps_tablet/features/production/sortir_reject/model/sortir_reject_production_model.dart';
+import 'package:pps_tablet/features/production/sortir_reject/repository/sortir_reject_production_input_repository.dart';
 import 'package:pps_tablet/features/production/sortir_reject/repository/sortir_reject_production_repository.dart';
+import 'package:pps_tablet/features/production/sortir_reject/view/sortir_reject_production_screen.dart';
+import 'package:pps_tablet/features/production/sortir_reject/view_model/sortir_reject_production_input_view_model.dart';
 import 'package:pps_tablet/features/production/sortir_reject/view_model/sortir_reject_production_view_model.dart';
 import 'package:pps_tablet/features/production/spanner/repository/spanner_production_input_repository.dart';
 import 'package:pps_tablet/features/production/spanner/repository/spanner_production_repository.dart';
@@ -105,6 +108,8 @@ import 'package:pps_tablet/features/production/washing/repository/washing_produc
 import 'package:pps_tablet/features/production/washing/view_model/washing_production_view_model.dart';
 import 'package:pps_tablet/features/shared/overlap/repository/overlap_repository.dart';
 import 'package:pps_tablet/features/shared/overlap/view_model/overlap_view_model.dart';
+import 'package:pps_tablet/features/warehouse/repository/warehouse_repository.dart';
+import 'package:pps_tablet/features/warehouse/view_model/warehouse_view_model.dart';
 import 'package:provider/provider.dart';
 
 // ⬇️ Tambahan untuk locale & tanggal Indonesia
@@ -202,6 +207,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => MesinViewModel(repository: MesinRepository())),
         ChangeNotifierProvider(create: (_) => OperatorViewModel(repository: OperatorRepository())),
         ChangeNotifierProvider(create: (_) => PembeliViewModel(repository: PembeliRepository())),
+        ChangeNotifierProvider(create: (_) => WarehouseViewModel(repository: WarehouseRepository())),
         ChangeNotifierProvider(create: (_) => OverlapViewModel(repository: OverlapRepository())),
         ChangeNotifierProvider(create: (_) => MixerViewModel(repository: MixerRepository())),
         ChangeNotifierProvider(create: (_) => MixerProductionViewModel(repository: MixerProductionRepository())),
@@ -358,6 +364,14 @@ class MyApp extends StatelessWidget {
           ),
         ),
 
+        ChangeNotifierProvider<SortirRejectInputViewModel>(
+          create: (ctx) => SortirRejectInputViewModel(
+            repository: SortirRejectInputRepository(
+              apiClient: ctx.read<ApiClient>(),
+            ),
+          ),
+        ),
+
         ChangeNotifierProvider<GilinganProductionInputViewModel>(
           create: (ctx) => GilinganProductionInputViewModel(
             repository: GilinganProductionInputRepository(
@@ -452,6 +466,7 @@ class MyApp extends StatelessWidget {
           '/production/key-fitting': (context) => KeyFittingProductionScreen(),
           '/production/spanner': (context) => SpannerProductionScreen(),
           '/production/packing': (context) => PackingProductionScreen(),
+          '/production/sortir-reject': (context) => SortirRejectProductionScreen(),
         },
       ),
 

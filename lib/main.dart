@@ -81,6 +81,7 @@ import 'package:pps_tablet/features/production/packing/view/packing_production_s
 import 'package:pps_tablet/features/production/packing/view_model/packing_production_input_view_model.dart';
 import 'package:pps_tablet/features/production/packing/view_model/packing_production_view_model.dart';
 import 'package:pps_tablet/features/production/return/repository/return_production_repository.dart';
+import 'package:pps_tablet/features/production/return/view/return_production_screen.dart';
 import 'package:pps_tablet/features/production/return/view_model/return_production_view_model.dart';
 import 'package:pps_tablet/features/production/selection/view/production_selection_screen.dart';
 import 'package:pps_tablet/features/production/sortir_reject/model/sortir_reject_production_model.dart';
@@ -467,6 +468,7 @@ class MyApp extends StatelessWidget {
           '/production/spanner': (context) => SpannerProductionScreen(),
           '/production/packing': (context) => PackingProductionScreen(),
           '/production/sortir-reject': (context) => SortirRejectProductionScreen(),
+          '/production/return': (context) => ReturnProductionScreen(),
         },
       ),
 

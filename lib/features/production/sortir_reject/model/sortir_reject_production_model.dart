@@ -12,8 +12,11 @@ class SortirRejectProduction {
   /// backend: Username (atau NamaUser)
   final String username;
 
-  /// backend: IdWarehouse (opsional, tapi sekarang BE sudah SELECT)
+  /// backend: IdWarehouse
   final int? idWarehouse;
+
+  /// backend: NamaWarehouse
+  final String namaWarehouse;
 
   // ✅ Tutup transaksi flags (optional from backend)
   final DateTime? lastClosedDate; // date only
@@ -24,7 +27,8 @@ class SortirRejectProduction {
     required this.tanggal,
     required this.idUsername,
     required this.username,
-    this.idWarehouse,
+    required this.idWarehouse,
+    required this.namaWarehouse,
     this.lastClosedDate,
     this.isLocked = false,
   });
@@ -79,6 +83,9 @@ class SortirRejectProduction {
       username: _asString(j['Username'] ?? j['NamaUser']),
       idWarehouse: _asInt(j['IdWarehouse']),
 
+      // ✅ new from backend join
+      namaWarehouse: _asString(j['NamaWarehouse']),
+
       // ✅ optional lock flags if backend sends
       lastClosedDate: _asDateTime(j['LastClosedDate']),
       isLocked: _asBool(j['IsLocked']),
@@ -101,6 +108,7 @@ class SortirRejectProduction {
             : tanggal!.toIso8601String()),
         'idUsername': idUsername,
         'idWarehouse': idWarehouse,
+        // NOTE: namaWarehouse tidak perlu dikirim ke backend
       };
     }
 
@@ -114,6 +122,10 @@ class SortirRejectProduction {
       'IdUsername': idUsername,
       'Username': username,
       'IdWarehouse': idWarehouse,
+
+      // ✅ new
+      'NamaWarehouse': namaWarehouse,
+
       'LastClosedDate': lastClosedDate == null
           ? null
           : DateFormat('yyyy-MM-dd').format(lastClosedDate!),
@@ -130,7 +142,8 @@ class SortirRejectProduction {
   String get lockInfoText {
     if (!isLocked) return '';
     if (lastClosedDate == null) return 'Locked';
-    final d = DateFormat('dd MMM yyyy', 'id_ID').format(lastClosedDate!.toLocal());
+    final d =
+    DateFormat('dd MMM yyyy', 'id_ID').format(lastClosedDate!.toLocal());
     return 'Locked (<= $d)';
   }
 
@@ -151,6 +164,7 @@ class SortirRejectProduction {
     int? idUsername,
     String? username,
     int? idWarehouse,
+    String? namaWarehouse,
     DateTime? lastClosedDate,
     bool? isLocked,
   }) {
@@ -160,6 +174,7 @@ class SortirRejectProduction {
       idUsername: idUsername ?? this.idUsername,
       username: username ?? this.username,
       idWarehouse: idWarehouse ?? this.idWarehouse,
+      namaWarehouse: namaWarehouse ?? this.namaWarehouse,
       lastClosedDate: lastClosedDate ?? this.lastClosedDate,
       isLocked: isLocked ?? this.isLocked,
     );

@@ -1,5 +1,6 @@
+// lib/features/shared/return_production/view/return_production_screen.dart
+
 import 'package:flutter/material.dart';
-import 'package:pps_tablet/features/production/sortir_reject/view/sortir_reject_input_screen.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
@@ -7,43 +8,42 @@ import '../../../../common/widgets/horizontal_paged_table.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
 import '../../../../common/widgets/table_column_spec.dart';
 import '../../../../core/utils/date_formatter.dart';
-import '../model/sortir_reject_production_model.dart';
-import '../view_model/sortir_reject_production_view_model.dart';
-import '../widgets/sortir_reject_production_action_bar.dart';
-import '../widgets/sortir_reject_production_delete_dialog.dart';
-import '../widgets/sortir_reject_production_form_dialog.dart';
-import '../widgets/sortir_reject_production_row_popover.dart';
+
+import '../model/return_production_model.dart';
+import '../view_model/return_production_view_model.dart';
+
+// ✅ create these widgets similar to sortir reject
+import '../widgets/return_production_action_bar.dart';
+import '../widgets/return_production_delete_dialog.dart';
+import '../widgets/return_production_form_dialog.dart';
+import '../widgets/return_production_row_popover.dart';
 
 
-// TODO: ganti ke input screen sortir reject kamu
-// import 'sortir_reject_production_input_screen.dart';
 
-class SortirRejectProductionScreen extends StatefulWidget {
-  const SortirRejectProductionScreen({super.key});
+class ReturnProductionScreen extends StatefulWidget {
+  const ReturnProductionScreen({super.key});
 
   @override
-  State<SortirRejectProductionScreen> createState() =>
-      _SortirRejectProductionScreenState();
+  State<ReturnProductionScreen> createState() => _ReturnProductionScreenState();
 }
 
-class _SortirRejectProductionScreenState
-    extends State<SortirRejectProductionScreen> {
+class _ReturnProductionScreenState extends State<ReturnProductionScreen> {
   final TextEditingController _searchCtl = TextEditingController();
-  String? _selectedNoBJSortir;
+  String? _selectedNoRetur;
 
-  late final SortirRejectProductionViewModel _viewModel;
+  late final ReturnProductionViewModel _viewModel;
 
   @override
   void initState() {
     super.initState();
 
-    _viewModel = SortirRejectProductionViewModel();
+    _viewModel = ReturnProductionViewModel();
 
     debugPrint(
-      '🟩🟩🟩 [SORTIR_REJECT_SCREEN] initState: Created VM hash=${_viewModel.hashCode}',
+      '🟩🟩🟩 [RETURN_SCREEN] initState: Created VM hash=${_viewModel.hashCode}',
     );
     debugPrint(
-      '🟩🟩🟩 [SORTIR_REJECT_SCREEN] initState: PagingController hash=${_viewModel.pagingController.hashCode}',
+      '🟩🟩🟩 [RETURN_SCREEN] initState: PagingController hash=${_viewModel.pagingController.hashCode}',
     );
 
     _viewModel.refreshPaged();
@@ -58,7 +58,7 @@ class _SortirRejectProductionScreenState
 
   Future<void> _showRowPopover({
     required BuildContext context,
-    required SortirRejectProduction row,
+    required ReturnProduction row,
     required Offset globalPos,
   }) async {
     final overlay =
@@ -80,24 +80,9 @@ class _SortirRejectProductionScreenState
             Positioned(
               left: safeLeft,
               top: safeTop,
-              child: SortirRejectProductionRowPopover(
+              child: ReturnProductionRowPopover(
                 row: row,
                 onClose: () => Navigator.of(dialogCtx).pop(),
-
-                onInput: () {
-                  // TODO: arahkan ke input screen sortir reject kalau sudah ada
-                  Future.microtask(() {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => SortirRejectInputScreen(
-                          noBJSortir: row.noBJSortir,
-                          isLocked: row.isLocked,
-                          lastClosedDate: row.lastClosedDate,
-                        ),
-                      ),
-                    );
-                  });
-                },
 
                 onEdit: () async {
                   await _openEditDialog(context, row);
@@ -108,11 +93,11 @@ class _SortirRejectProductionScreenState
                     context: context,
                     barrierDismissible: false,
                     builder: (ctx) {
-                      return SortirRejectProductionDeleteDialog(
+                      return ReturnProductionDeleteDialog(
                         header: row,
                         onConfirm: () async {
                           final success =
-                          await _viewModel.deleteSortirReject(row.noBJSortir);
+                          await _viewModel.deleteReturn(row.noRetur);
 
                           if (ctx.mounted) Navigator.of(ctx).pop();
                           if (!context.mounted) return;
@@ -123,7 +108,7 @@ class _SortirRejectProductionScreenState
                               builder: (_) => SuccessStatusDialog(
                                 title: 'Berhasil Menghapus',
                                 message:
-                                'No. BJ Sortir ${row.noBJSortir} berhasil dihapus.',
+                                'No. Retur ${row.noRetur} berhasil dihapus.',
                               ),
                             );
                           } else {
@@ -152,25 +137,25 @@ class _SortirRejectProductionScreenState
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider<SortirRejectProductionViewModel>.value(
+    return ChangeNotifierProvider<ReturnProductionViewModel>.value(
       value: _viewModel,
-      child: Consumer<SortirRejectProductionViewModel>(
+      child: Consumer<ReturnProductionViewModel>(
         builder: (context, vm, _) {
           debugPrint(
-            '🟩 [SORTIR_REJECT_SCREEN] Consumer.builder() called, VM hash=${vm.hashCode}',
+            '🟩 [RETURN_SCREEN] Consumer.builder() called, VM hash=${vm.hashCode}',
           );
           debugPrint(
-            '🟩 [SORTIR_REJECT_SCREEN] Consumer pagingController: hash=${vm.pagingController.hashCode}',
+            '🟩 [RETURN_SCREEN] Consumer pagingController: hash=${vm.pagingController.hashCode}',
           );
 
-          final columns = <TableColumnSpec<SortirRejectProduction>>[
+          final columns = <TableColumnSpec<ReturnProduction>>[
             TableColumnSpec(
-              title: 'NO. BJ SORTIR',
-              width: 170,
+              title: 'NO. RETUR',
+              width: 160,
               headerAlign: TextAlign.left,
               cellAlign: TextAlign.left,
               cellBuilder: (_, r) => Text(
-                r.noBJSortir,
+                r.noRetur,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -183,23 +168,34 @@ class _SortirRejectProductionScreenState
               cellBuilder: (_, r) => Text(formatDateToShortId(r.tanggal)),
             ),
             TableColumnSpec(
-              title: 'WAREHOUSE',
-              width: 140,
+              title: 'INVOICE',
+              width: 160,
               headerAlign: TextAlign.left,
               cellAlign: TextAlign.left,
               cellBuilder: (_, r) => Text(
-                r.namaWarehouse ?? '-',
+                (r.invoice).trim().isNotEmpty ? r.invoice.trim() : '-',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
             TableColumnSpec(
-              title: 'USER',
-              width: 160,
+              title: 'PEMBELI',
+              width: 220,
               headerAlign: TextAlign.left,
               cellAlign: TextAlign.left,
               cellBuilder: (_, r) => Text(
-                r.username.isNotEmpty ? r.username : '-',
+                r.namaPembeli.isNotEmpty ? r.namaPembeli : '-',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            TableColumnSpec(
+              title: 'NO. BJ SORTIR',
+              width: 170,
+              headerAlign: TextAlign.left,
+              cellAlign: TextAlign.left,
+              cellBuilder: (_, r) => Text(
+                (r.noBJSortir).trim().isNotEmpty ? r.noBJSortir.trim() : '-',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -208,13 +204,13 @@ class _SortirRejectProductionScreenState
 
           return Scaffold(
             appBar: AppBar(
-              title: const Text('Sortir Reject'),
+              title: const Text('Return'),
               actions: [
                 IconButton(
                   icon: const Icon(Icons.refresh),
                   onPressed: () {
                     debugPrint(
-                      '🟩 [SORTIR_REJECT_SCREEN] Manual refresh pressed, VM hash=${vm.hashCode}',
+                      '🟩 [RETURN_SCREEN] Manual refresh pressed, VM hash=${vm.hashCode}',
                     );
                     vm.refreshPaged();
                   },
@@ -223,7 +219,7 @@ class _SortirRejectProductionScreenState
             ),
             body: Column(
               children: [
-                SortirRejectProductionActionBar(
+                ReturnProductionActionBar(
                   controller: _searchCtl,
                   onSearchChanged: (value) => vm.setSearchDebounced(value),
                   onClear: () {
@@ -233,13 +229,12 @@ class _SortirRejectProductionScreenState
                   onAddPressed: _openCreateDialog,
                 ),
                 Expanded(
-                  child: HorizontalPagedTable<SortirRejectProduction>(
+                  child: HorizontalPagedTable<ReturnProduction>(
                     pagingController: vm.pagingController,
                     columns: columns,
                     horizontalPadding: 16,
-                    selectedPredicate: (r) => r.noBJSortir == _selectedNoBJSortir,
-                    onRowTap: (r) =>
-                        setState(() => _selectedNoBJSortir = r.noBJSortir),
+                    selectedPredicate: (r) => r.noRetur == _selectedNoRetur,
+                    onRowTap: (r) => setState(() => _selectedNoRetur = r.noRetur),
                     onRowLongPress: (r, globalPos) async {
                       await _showRowPopover(
                         context: context,
@@ -258,35 +253,34 @@ class _SortirRejectProductionScreenState
   }
 
   Future<void> _openCreateDialog() async {
-    debugPrint('🟩 [SORTIR_REJECT_SCREEN] Opening create dialog...');
-    debugPrint('🟩 [SORTIR_REJECT_SCREEN] Using VM hash=${_viewModel.hashCode}');
+    debugPrint('🟩 [RETURN_SCREEN] Opening create dialog...');
+    debugPrint('🟩 [RETURN_SCREEN] Using VM hash=${_viewModel.hashCode}');
     debugPrint(
-      '🟩 [SORTIR_REJECT_SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
+      '🟩 [RETURN_SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
     );
 
     if (!mounted) return;
 
-    final created = await showDialog<SortirRejectProduction>(
+    final created = await showDialog<ReturnProduction>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
-        debugPrint('🟩 [SORTIR_REJECT_SCREEN] Building create dialog...');
-        return ChangeNotifierProvider<SortirRejectProductionViewModel>.value(
+        debugPrint('🟩 [RETURN_SCREEN] Building create dialog...');
+        return ChangeNotifierProvider<ReturnProductionViewModel>.value(
           value: _viewModel,
-          child: const SortirRejectProductionFormDialog(),
+          child: const ReturnProductionFormDialog(),
         );
       },
     );
 
-    debugPrint('🟩 [SORTIR_REJECT_SCREEN] Dialog closed, result: $created');
+    debugPrint('🟩 [RETURN_SCREEN] Dialog closed, result: $created');
 
     if (!mounted) return;
 
     if (created != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content:
-          Text('Sortir Reject ${created.noBJSortir} berhasil dibuat'),
+          content: Text('Return ${created.noRetur} berhasil dibuat'),
         ),
       );
     }
@@ -294,30 +288,30 @@ class _SortirRejectProductionScreenState
 
   Future<void> _openEditDialog(
       BuildContext context,
-      SortirRejectProduction row,
+      ReturnProduction row,
       ) async {
-    debugPrint('🟩 [SORTIR_REJECT_SCREEN] Opening edit dialog: ${row.noBJSortir}');
-    debugPrint('🟩 [SORTIR_REJECT_SCREEN] Using VM hash=${_viewModel.hashCode}');
+    debugPrint('🟩 [RETURN_SCREEN] Opening edit dialog: ${row.noRetur}');
+    debugPrint('🟩 [RETURN_SCREEN] Using VM hash=${_viewModel.hashCode}');
     debugPrint(
-      '🟩 [SORTIR_REJECT_SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
+      '🟩 [RETURN_SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
     );
 
     if (!mounted) return;
 
-    final updated = await showDialog<SortirRejectProduction>(
+    final updated = await showDialog<ReturnProduction>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
-        debugPrint('🟩 [SORTIR_REJECT_SCREEN] Building edit dialog...');
-        return ChangeNotifierProvider<SortirRejectProductionViewModel>.value(
+        debugPrint('🟩 [RETURN_SCREEN] Building edit dialog...');
+        return ChangeNotifierProvider<ReturnProductionViewModel>.value(
           value: _viewModel,
-          child: SortirRejectProductionFormDialog(header: row),
+          child: ReturnProductionFormDialog(header: row),
         );
       },
     );
 
     debugPrint(
-      '🟩 [SORTIR_REJECT_SCREEN] Edit dialog closed: ${updated?.noBJSortir}',
+      '🟩 [RETURN_SCREEN] Edit dialog closed: ${updated?.noRetur}',
     );
 
     if (!mounted) return;
@@ -325,7 +319,7 @@ class _SortirRejectProductionScreenState
     if (updated != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('No. BJ Sortir ${updated.noBJSortir} berhasil diperbarui'),
+          content: Text('No. Retur ${updated.noRetur} berhasil diperbarui'),
         ),
       );
     }

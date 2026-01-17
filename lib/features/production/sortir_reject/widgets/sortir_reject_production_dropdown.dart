@@ -75,6 +75,8 @@ class _SortirRejectProductionDropdownState
         tanggal: DateTime.now().toUtc(),
         idUsername: 0,
         username: widget.preselectUsername ?? '',
+        idWarehouse: null,
+        namaWarehouse: '',
       );
 
       setState(() {

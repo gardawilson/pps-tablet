@@ -2,7 +2,7 @@ name: pps_tablet
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 1.0.27+1
+version: 1.0.29+1
 
 environment:
   sdk: ^3.8.0
@@ -40,6 +40,8 @@ dependencies:
   flutter_vector_icons: ^2.0.0
   dio: ^5.7.0
   open_filex: ^4.5.0
+
+
 
 
   # 🟢 THERMAL PRINTER ESC/POS

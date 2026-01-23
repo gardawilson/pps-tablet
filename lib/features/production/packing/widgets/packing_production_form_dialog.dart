@@ -402,7 +402,7 @@ class _PackingProductionFormDialogState extends State<PackingProductionFormDialo
               const SizedBox(height: 16),
 
               MesinDropdown(
-                idBagianMesin: 10, // ✅ TODO: set bagian mesin untuk PACKING
+                idBagianMesin: 6, // ✅ TODO: set bagian mesin untuk PACKING
                 preselectId: widget.header?.idMesin,
                 label: 'Mesin Packing',
                 hint: 'Pilih mesin',

@@ -13,6 +13,9 @@ class WashingRowPopover extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onPrint;
 
+  /// NEW: History action
+  final VoidCallback onHistory;
+
   const WashingRowPopover({
     super.key,
     required this.header,
@@ -20,6 +23,7 @@ class WashingRowPopover extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onPrint,
+    required this.onHistory,
   });
 
   void _runAndClose(VoidCallback action) {
@@ -42,12 +46,15 @@ class WashingRowPopover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final divider = Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
+    final divider =
+    Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
 
     // ambil izin sekali
     final perm = context.watch<PermissionViewModel>();
-    final canEdit   = perm.can('label_washing:update');
+    final canEdit = perm.can('label_washing:update');
     final canDelete = perm.can('label_washing:delete');
+    // NEW: permission history (kalau belum ada, boleh pakai read)
+    final canHistory = perm.can('audit:read') || perm.can('label_washing:read');
 
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 220, maxWidth: 280),
@@ -69,11 +76,15 @@ class WashingRowPopover extends StatelessWidget {
               child: Row(
                 children: [
                   Container(
-                    width: 40, height: 40,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.25),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.3),
+                        width: 1,
+                      ),
                     ),
                     child: const Icon(Icons.label, color: Colors.white, size: 20),
                   ),
@@ -84,14 +95,23 @@ class WashingRowPopover extends StatelessWidget {
                       children: [
                         Text(
                           header.noWashing,
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 3),
                         Text(
                           header.namaJenisPlastik,
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.white.withOpacity(0.95)),
-                          overflow: TextOverflow.ellipsis, maxLines: 1,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withOpacity(0.95),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
                       ],
                     ),
@@ -99,13 +119,24 @@ class WashingRowPopover extends StatelessWidget {
                   const SizedBox(width: 8),
                   IconButton(
                     tooltip: 'Salin NoWashing',
-                    icon: Icon(Icons.copy_outlined, color: Colors.white.withOpacity(0.9)),
+                    icon: Icon(Icons.copy_outlined,
+                        color: Colors.white.withOpacity(0.9)),
                     onPressed: () => _copyOnly(context),
                     constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
                     padding: EdgeInsets.zero,
                   ),
                 ],
               ),
+            ),
+            divider,
+
+            // NEW: History
+            _MenuTile(
+              icon: Icons.history,
+              label: 'History',
+              enabled: canHistory,
+              tooltipWhenDisabled: 'Tidak punya izin lihat history',
+              onTap: () => _runAndClose(onHistory),
             ),
             divider,
 
@@ -132,15 +163,11 @@ class WashingRowPopover extends StatelessWidget {
                   defaultSystem: 'pps',
                 );
 
-                // klik Print:
                 await pdfService.printReport80mm(
                   context: rootCtx,
                   reportName: 'CrLabelPalletWashing',
                   query: {'NoWashing': header.noWashing},
-                  // system: 'pps', // opsional kalau mau override
-                  // saveNameHint: 'Label_${header.noWashing}.pdf', // opsional; kalau kosong akan di-infer
                 );
-
               }),
             ),
             divider,
@@ -152,7 +179,9 @@ class WashingRowPopover extends StatelessWidget {
               enabled: canDelete,
               tooltipWhenDisabled: 'Tidak punya izin hapus',
               iconColor: canDelete ? Colors.red.shade600 : null,
-              textStyle: TextStyle(color: canDelete ? Colors.red.shade600 : Colors.grey),
+              textStyle: TextStyle(
+                color: canDelete ? Colors.red.shade600 : Colors.grey,
+              ),
               onTap: () => _runAndClose(onDelete),
             ),
           ],
@@ -185,9 +214,12 @@ class _MenuTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final effectiveIconColor = enabled ? (iconColor ?? theme.iconTheme.color) : Colors.grey;
-    final effectiveTextStyle = (textStyle ?? theme.textTheme.bodyMedium)?.copyWith(
-      color: enabled ? (textStyle?.color ?? theme.textTheme.bodyMedium?.color) : Colors.grey,
+    final effectiveIconColor =
+    enabled ? (iconColor ?? theme.iconTheme.color) : Colors.grey;
+
+    final baseText = textStyle ?? theme.textTheme.bodyMedium;
+    final effectiveTextStyle = baseText?.copyWith(
+      color: enabled ? (baseText?.color ?? Colors.black87) : Colors.grey,
     );
 
     final tile = InkWell(
@@ -199,7 +231,11 @@ class _MenuTile extends StatelessWidget {
             Icon(icon, color: effectiveIconColor),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(label, style: effectiveTextStyle, overflow: TextOverflow.ellipsis),
+              child: Text(
+                label,
+                style: effectiveTextStyle,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),
@@ -207,7 +243,10 @@ class _MenuTile extends StatelessWidget {
     );
 
     if (!enabled && (tooltipWhenDisabled?.isNotEmpty ?? false)) {
-      return Tooltip(message: tooltipWhenDisabled!, child: Opacity(opacity: 0.55, child: tile));
+      return Tooltip(
+        message: tooltipWhenDisabled!,
+        child: Opacity(opacity: 0.55, child: tile),
+      );
     }
     return tile;
   }

@@ -434,26 +434,68 @@ class _InjectProductionFormDialogState
 
     if (idCetakan == null || idWarna == null) {
       lvm.clear();
+      if (!mounted) return;
       setState(() => _selectedFurnitureMaterial = _noneFurnitureMaterial);
       idFurnitureMaterialCtrl.text = '';
       return;
     }
 
     await lvm.resolve(idCetakan: idCetakan, idWarna: idWarna);
-
     if (!mounted) return;
 
-    final found = lvm.result;
-
-    if (found == null) {
-      // ✅ no data => placeholder, bukan error
+    // ✅ kalau error, jangan auto set apa-apa (biarkan UI handle error)
+    if (lvm.error.isNotEmpty) {
       setState(() => _selectedFurnitureMaterial = _noneFurnitureMaterial);
       idFurnitureMaterialCtrl.text = '';
       return;
     }
 
-    setState(() => _selectedFurnitureMaterial = found);
-    idFurnitureMaterialCtrl.text = found.idFurnitureMaterial.toString();
+    final list = lvm.items; // ✅ LIST
+
+    // ✅ tidak ada mapping => pilih "Tidak ada"
+    if (list.isEmpty) {
+      setState(() => _selectedFurnitureMaterial = _noneFurnitureMaterial);
+      idFurnitureMaterialCtrl.text = '';
+      return;
+    }
+
+    // =========================================================
+    // ✅ strategi pilih (pick)
+    // prioritas:
+    // 1) kalau sedang edit: header sudah punya idFurnitureMaterial -> cari itu
+    // 2) kalau user sudah sempat pilih -> pertahankan kalau masih ada
+    // 3) kalau list cuma 1 -> auto pilih
+    // 4) fallback -> "Tidak ada"
+    // =========================================================
+    final headerId = widget.header?.idFurnitureMaterial; // <-- pastikan field ini ada
+    final currentId = _selectedFurnitureMaterial?.idFurnitureMaterial;
+
+    FurnitureMaterialLookupResult pick;
+
+    if (headerId != null) {
+      pick = list.firstWhere(
+            (e) => e.idFurnitureMaterial == headerId,
+        orElse: () => list.length == 1 ? list.first : _noneFurnitureMaterial,
+      );
+    } else if (currentId != null && currentId != _noneFurnitureMaterial.idFurnitureMaterial) {
+      pick = list.firstWhere(
+            (e) => e.idFurnitureMaterial == currentId,
+        orElse: () => list.length == 1 ? list.first : _noneFurnitureMaterial,
+      );
+    } else if (list.length == 1) {
+      pick = list.first;
+    } else {
+      pick = _noneFurnitureMaterial;
+    }
+
+    setState(() => _selectedFurnitureMaterial = pick);
+
+    // ✅ kalau "Tidak ada" => kosongkan controller
+    if (pick.idFurnitureMaterial == _noneFurnitureMaterial.idFurnitureMaterial) {
+      idFurnitureMaterialCtrl.text = '';
+    } else {
+      idFurnitureMaterialCtrl.text = pick.idFurnitureMaterial.toString();
+    }
   }
 
   @override
@@ -553,10 +595,10 @@ class _InjectProductionFormDialogState
     final idWarna = _selectedWarna?.idWarna ?? widget.header?.idWarna;
 
     final fmVm = context.watch<FurnitureMaterialLookupViewModel>();
-    final hasData = fmVm.result != null;
 
-    // ✅ enable dropdown hanya kalau sudah pilih cetakan+warna dan ada data
-    final furnitureDropdownEnabled = idCetakan != null && idWarna != null && hasData;
+    final furnitureDropdownEnabled =
+        idCetakan != null && idWarna != null && fmVm.items.isNotEmpty && !fmVm.isLoading && fmVm.error.isEmpty;
+
 
     return Container(
       padding: const EdgeInsets.all(16),

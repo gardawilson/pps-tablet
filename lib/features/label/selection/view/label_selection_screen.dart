@@ -22,6 +22,17 @@ class LabelSelectionScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
+          // 🔹 Card Label Bahan Baku
+          _buildLabelCard(
+            context,
+            title: 'Label Bahan Baku',
+            subtitle: 'Buat label untuk Bahan Baku',
+            icon: Icons.label,
+            enabled: canReadWashing,
+            onTap: canReadWashing
+                ? () => Navigator.pushNamed(context, '/label/bahan-baku')
+                : null,
+          ),
           // 🔹 Card Label Washing
           _buildLabelCard(
             context,

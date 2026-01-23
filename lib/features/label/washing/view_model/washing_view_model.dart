@@ -1,16 +1,29 @@
+// lib/features/label/washing/view_model/washing_view_model.dart
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
 import '../model/washing_header_model.dart';
 import '../model/washing_detail_model.dart';
+import '../model/washing_history_model.dart';
+import '../repository/washing_audit_repository.dart';
 import '../repository/washing_repository.dart';
+
 import '../../../shared/plastic_type/jenis_plastik_model.dart';
 import '../../../shared/plastic_type/jenis_plastik_repository.dart';
 
 class WashingViewModel extends ChangeNotifier {
-  final WashingRepository repository;
-
   WashingViewModel({required this.repository});
 
-  // === HEADER STATE ===
+  // =============================
+  // Dependencies
+  // =============================
+  final WashingRepository repository;
+  final WashingAuditRepository _auditRepo = WashingAuditRepository();
+  final JenisPlastikRepository jenisRepo = JenisPlastikRepository();
+
+  // =============================
+  // Header list state
+  // =============================
   List<WashingHeader> items = [];
   bool isLoading = false;
   bool isFetchingMore = false;
@@ -21,36 +34,49 @@ class WashingViewModel extends ChangeNotifier {
   int _total = 0;
   String _search = '';
 
-  /// Public getter for total rows from the API
   int get totalCount => _total;
+  bool get hasMore => _page < _totalPages;
 
-  // === DETAIL STATE ===
-  String? selectedNoWashing; // ⬅️ satu-satunya sumber highlight
+  // =============================
+  // Selection + detail state
+  // =============================
+  String? selectedNoWashing; // single source of truth highlight
   List<WashingDetail> details = [];
   bool isDetailLoading = false;
   String detailError = '';
 
-  // === JENIS PLASTIK STATE ===
-  final JenisPlastikRepository jenisRepo = JenisPlastikRepository();
+  // =============================
+  // Jenis plastik state
+  // =============================
   List<JenisPlastik> jenisList = [];
   JenisPlastik? selectedJenisPlastik;
   bool isJenisLoading = false;
   String jenisError = '';
 
+  // =============================
+  // Create result
+  // =============================
   String? lastCreatedNoWashing;
 
   // =============================
-  //  Highlight helpers
+  // Audit history state
   // =============================
+  List<WashingHistorySession> history = [];
+  bool isHistoryLoading = false;
+  String historyError = '';
 
-  /// Set / pindahkan highlight ke [no] (atau null untuk clear) tanpa memuat detail.
-  void setSelectedNoWashing(String? no) { // ⬅️ baru
+  // =============================
+  // Highlight helpers
+  // =============================
+  void setSelectedNoWashing(String? no) {
     if (selectedNoWashing == no) return;
     selectedNoWashing = no;
     notifyListeners();
   }
 
-  // WashingViewModel
+  // =============================
+  // Jenis Plastik
+  // =============================
   Future<void> loadJenisPlastik({int? preselectId}) async {
     isJenisLoading = true;
     jenisError = '';
@@ -71,29 +97,36 @@ class WashingViewModel extends ChangeNotifier {
               (e) => e.idJenisPlastik == preselectId,
           orElse: () => jenisList.first,
         );
-      } else if (jenisList.isNotEmpty) {
-        // optional auto-select pertama
-        // selectedJenisPlastik = jenisList.first;
       }
-    } catch (e) {
+    } catch (e, st) {
       jenisError = e.toString();
       jenisList = [];
       selectedJenisPlastik = null;
+      debugPrint('❌ loadJenisPlastik error: $e');
+      debugPrint('$st');
     } finally {
       isJenisLoading = false;
       notifyListeners();
     }
   }
 
-  // === FETCH HEADER (RESET) ===
+  // =============================
+  // Fetch headers (reset)
+  // =============================
   Future<void> fetchWashingHeaders({String search = ''}) async {
     _page = 1;
     _search = search;
+
     items = [];
     errorMessage = '';
     isLoading = true;
-    // ⬅️ reset selection saat daftar di-refresh supaya warna kembali default
+
+    // reset selection & detail
     selectedNoWashing = null;
+    details = [];
+    detailError = '';
+    isDetailLoading = false;
+
     notifyListeners();
 
     try {
@@ -103,21 +136,24 @@ class WashingViewModel extends ChangeNotifier {
         search: _search,
       );
 
-      items = result['items'] as List<WashingHeader>;
-      _totalPages = result['totalPages'] ?? 1;
-      _total = result['total'] ?? 0;
+      items = (result['items'] as List<WashingHeader>);
+      _totalPages = (result['totalPages'] ?? 1) as int;
+      _total = (result['total'] ?? items.length) as int;
 
-      debugPrint("✅ Page $_page loaded, total items: ${items.length}");
-    } catch (e) {
+      debugPrint('✅ fetchWashingHeaders page=$_page items=${items.length} total=$_total');
+    } catch (e, st) {
       errorMessage = e.toString();
-      debugPrint("❌ Error fetchWashingHeaders: $errorMessage");
+      debugPrint('❌ fetchWashingHeaders error: $e');
+      debugPrint('$st');
     } finally {
       isLoading = false;
       notifyListeners();
     }
   }
 
-  // === LOAD MORE (PAGINATION) ===
+  // =============================
+  // Load more (pagination)
+  // =============================
   Future<void> loadMore() async {
     if (isFetchingMore || _page >= _totalPages) return;
 
@@ -132,25 +168,24 @@ class WashingViewModel extends ChangeNotifier {
         search: _search,
       );
 
-      final moreItems = result['items'] as List<WashingHeader>;
+      final moreItems = (result['items'] as List<WashingHeader>);
       items.addAll(moreItems);
 
-      debugPrint("📥 Load more page $_page, total items: ${items.length}");
-    } catch (e) {
+      debugPrint('📥 loadMore page=$_page add=${moreItems.length} totalNow=${items.length}');
+    } catch (e, st) {
       errorMessage = e.toString();
-      debugPrint("❌ Error loadMore: $errorMessage");
+      debugPrint('❌ loadMore error: $e');
+      debugPrint('$st');
     } finally {
       isFetchingMore = false;
       notifyListeners();
     }
   }
 
-  bool get hasMore => _page < _totalPages;
-
-
-  // === FETCH DETAIL ===
+  // =============================
+  // Fetch details
+  // =============================
   Future<void> fetchDetails(String noWashing) async {
-    // ⬅️ pastikan highlight pindah ke item yang dimuat detailnya
     setSelectedNoWashing(noWashing);
 
     details = [];
@@ -160,39 +195,46 @@ class WashingViewModel extends ChangeNotifier {
 
     try {
       details = await repository.fetchDetails(noWashing);
-      debugPrint("✅ Details loaded for $noWashing, count: ${details.length}");
-    } catch (e) {
+      debugPrint('✅ fetchDetails $noWashing count=${details.length}');
+    } catch (e, st) {
       detailError = e.toString();
-      debugPrint("❌ Error fetchDetails($noWashing): $detailError");
+      debugPrint('❌ fetchDetails($noWashing) error: $e');
+      debugPrint('$st');
     } finally {
       isDetailLoading = false;
       notifyListeners();
     }
   }
 
+  // =============================
+  // Create
+  // =============================
   Future<Map<String, dynamic>?> createWashing(
       WashingHeader header,
-      List<WashingDetail> details,
+      List<WashingDetail> detailsData,
       ) async {
     try {
       isLoading = true;
+      errorMessage = '';
       notifyListeners();
 
-      final res = await repository.createWashing(header: header, details: details);
+      final res = await repository.createWashing(header: header, details: detailsData);
 
       lastCreatedNoWashing = res['data']?['header']?['NoWashing'] as String?;
 
       // refresh list
       await fetchWashingHeaders(search: _search);
 
-      // ⬅️ opsional: auto-highlight hasil create
+      // optional: auto highlight created
       if (lastCreatedNoWashing != null) {
         setSelectedNoWashing(lastCreatedNoWashing);
       }
+
       return res;
-    } catch (e) {
+    } catch (e, st) {
       errorMessage = e.toString();
-      debugPrint("❌ Error createWashing: $errorMessage");
+      debugPrint('❌ createWashing error: $e');
+      debugPrint('$st');
       return null;
     } finally {
       isLoading = false;
@@ -200,32 +242,36 @@ class WashingViewModel extends ChangeNotifier {
     }
   }
 
-
+  // =============================
+  // Update
+  // =============================
   Future<Map<String, dynamic>?> updateWashing(
       String noWashing,
       WashingHeader header,
-      List<WashingDetail> details,
+      List<WashingDetail> detailsData,
       ) async {
     try {
       isLoading = true;
+      errorMessage = '';
       notifyListeners();
 
       final res = await repository.updateWashing(
         noWashing: noWashing,
         header: header,
-        details: details,
+        details: detailsData,
       );
 
-      // Refresh list agar data terbaru tampil
+      // refresh list
       await fetchWashingHeaders(search: _search);
 
-      // Auto highlight yang barusan diupdate
+      // keep highlight
       setSelectedNoWashing(noWashing);
 
       return res;
-    } catch (e) {
+    } catch (e, st) {
       errorMessage = e.toString();
-      debugPrint("❌ Error updateWashing: $errorMessage");
+      debugPrint('❌ updateWashing error: $e');
+      debugPrint('$st');
       return null;
     } finally {
       isLoading = false;
@@ -233,26 +279,30 @@ class WashingViewModel extends ChangeNotifier {
     }
   }
 
-
+  // =============================
+  // Delete
+  // =============================
   Future<bool> deleteWashing(String noWashing) async {
     try {
       isLoading = true;
+      errorMessage = '';
       notifyListeners();
 
       await repository.deleteWashing(noWashing);
 
       await fetchWashingHeaders(search: _search);
 
-      // ⬇️ pastikan detail dibersihkan setelah delete
+      // clear detail & selection
       details = [];
       detailError = '';
       selectedNoWashing = null;
-      notifyListeners();
 
+      notifyListeners();
       return true;
-    } catch (e) {
+    } catch (e, st) {
       errorMessage = e.toString();
-      debugPrint("❌ Error deleteWashing: $errorMessage");
+      debugPrint('❌ deleteWashing error: $e');
+      debugPrint('$st');
       return false;
     } finally {
       isLoading = false;
@@ -260,12 +310,47 @@ class WashingViewModel extends ChangeNotifier {
     }
   }
 
-
+  // =============================
+  // Reset screen state
+  // =============================
   void resetForScreen() {
-    // panggil ini saat masuk/keluar screen
     selectedNoWashing = null;
+
     details = [];
     detailError = '';
-    // items tetap dibiarkan; akan diisi fetchWashingHeaders
+    isDetailLoading = false;
+
+    history = [];
+    historyError = '';
+    isHistoryLoading = false;
+
+    errorMessage = '';
+    notifyListeners();
+  }
+
+  // =============================
+  // Fetch history (audit)
+  // =============================
+  Future<bool> fetchHistory(String noWashing) async {
+    try {
+      isHistoryLoading = true;
+      historyError = '';
+      notifyListeners();
+
+      history = await _auditRepo.fetchHistory(noWashing);
+
+      // optional debug
+      debugPrint('✅ fetchHistory $noWashing sessions=${history.length}');
+      return true;
+    } catch (e, st) {
+      historyError = e.toString();
+      history = [];
+      debugPrint('❌ fetchHistory($noWashing) error: $e');
+      debugPrint('$st');
+      return false;
+    } finally {
+      isHistoryLoading = false;
+      notifyListeners();
+    }
   }
 }

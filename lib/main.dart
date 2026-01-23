@@ -13,6 +13,9 @@ import 'package:pps_tablet/features/gilingan_type/repository/gilingan_type_repos
 import 'package:pps_tablet/features/gilingan_type/view_model/gilingan_type_view_model.dart';
 import 'package:pps_tablet/features/jenis_bonggolan/repository/jenis_bonggolan_repository.dart';
 import 'package:pps_tablet/features/jenis_bonggolan/view_model/jenis_bonggolan_view_model.dart';
+import 'package:pps_tablet/features/label/bahan_baku/repository/bahan_baku_repository.dart';
+import 'package:pps_tablet/features/label/bahan_baku/view/bahan_baku_screen.dart';
+import 'package:pps_tablet/features/label/bahan_baku/view_model/bahan_baku_view_model.dart';
 import 'package:pps_tablet/features/label/bonggolan/repository/bonggolan_repository.dart';
 import 'package:pps_tablet/features/label/bonggolan/view/bonggolan_screen.dart';
 import 'package:pps_tablet/features/label/bonggolan/view_model/bonggolan_view_model.dart';
@@ -190,6 +193,13 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => BongkarSusunViewModel(repository: BongkarSusunRepository())),
         Provider<MaxSakService>(create: (_) => MaxSakService(MaxSakRepository())),
         ChangeNotifierProvider(create: (_) => PermissionViewModel()..loadPermissions()),
+        ChangeNotifierProvider<BahanBakuViewModel>(
+          create: (ctx) => BahanBakuViewModel(
+            repository: BahanBakuRepository(
+              api: ctx.read<ApiClient>(),
+            ),
+          ),
+        ),
         ChangeNotifierProvider<BrokerViewModel>(
           create: (ctx) => BrokerViewModel(
             repository: BrokerRepository(
@@ -447,6 +457,7 @@ class MyApp extends StatelessWidget {
           '/home': (context) => HomeScreen(),
           '/stockopname': (context) => StockOpnameListScreen(),
           '/label': (context) => LabelSelectionScreen(),
+          '/label/bahan-baku': (context) => BahanBakuScreen(),
           '/label/washing': (context) => WashingTableScreen(),
           '/label/broker': (context) => BrokerScreen(),
           '/label/bonggolan': (context) => BonggolanScreen(),

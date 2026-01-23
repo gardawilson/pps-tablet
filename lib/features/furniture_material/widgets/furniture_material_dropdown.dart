@@ -10,7 +10,7 @@ class FurnitureMaterialDropdown extends StatefulWidget {
   final int? idCetakan;
   final int? idWarna;
 
-  /// if you want auto-pick a specific id (when list has more than 1 later)
+  /// if you want auto-pick a specific id (when list has more than 1)
   final int? preselectId;
 
   /// IMPORTANT:
@@ -65,24 +65,27 @@ class _FurnitureMaterialDropdownState extends State<FurnitureMaterialDropdown> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeFetch(force: true));
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _maybeFetch(force: true));
   }
 
   @override
   void didUpdateWidget(covariant FurnitureMaterialDropdown oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    final changed =
-        oldWidget.idCetakan != widget.idCetakan || oldWidget.idWarna != widget.idWarna;
+    final changed = oldWidget.idCetakan != widget.idCetakan ||
+        oldWidget.idWarna != widget.idWarna;
 
     if (changed) {
       _selected = null;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _maybeFetch(force: true));
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _maybeFetch(force: true));
     }
 
     if (oldWidget.preselectId != widget.preselectId) {
       _selected = null;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _applyAutoSelectFromVm());
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _applyAutoSelectFromVm());
     }
   }
 
@@ -105,6 +108,7 @@ class _FurnitureMaterialDropdownState extends State<FurnitureMaterialDropdown> {
     }
 
     if (!force && _lastCetakan == idCetakan && _lastWarna == idWarna) return;
+
     _lastCetakan = idCetakan;
     _lastWarna = idWarna;
 
@@ -119,15 +123,14 @@ class _FurnitureMaterialDropdownState extends State<FurnitureMaterialDropdown> {
 
     // ✅ If error => clear selection (let user retry / show error)
     if (vm.error.isNotEmpty) {
+      if (!mounted) return;
       setState(() => _selected = null);
       widget.onChanged?.call(null);
       return;
     }
 
-    // ✅ Build list:
-    // Always include "Tidak ada" at the top.
-    final items = <FurnitureMaterialLookupResult>[_noneItem];
-    if (vm.result != null) items.add(vm.result!);
+    // ✅ Build list from VM (LIST)
+    final items = <FurnitureMaterialLookupResult>[_noneItem, ...vm.items];
 
     FurnitureMaterialLookupResult pick;
 
@@ -142,6 +145,7 @@ class _FurnitureMaterialDropdownState extends State<FurnitureMaterialDropdown> {
       pick = _noneItem;
     }
 
+    if (!mounted) return;
     setState(() => _selected = pick);
 
     // ✅ If "Tidak ada" => send null
@@ -156,15 +160,21 @@ class _FurnitureMaterialDropdownState extends State<FurnitureMaterialDropdown> {
   Widget build(BuildContext context) {
     return Consumer<FurnitureMaterialLookupViewModel>(
       builder: (_, vm, __) {
-        // ✅ items always include "Tidak ada"
-        // if error => items empty so field can show retry UI (depending on your DropdownPlainField impl)
-        final items = <FurnitureMaterialLookupResult>[];
-
         final hasError = vm.error.isNotEmpty;
+
+        // ✅ items always include "Tidak ada" (when not error)
+        final items = <FurnitureMaterialLookupResult>[];
         if (!hasError) {
           items.add(_noneItem);
-          if (vm.result != null) items.add(vm.result!);
+          items.addAll(vm.items); // ✅ LIST
         }
+
+        // ✅ Safety: kalau _selected tidak ada di items (mis. data berubah),
+        // set null supaya Dropdown tidak error "value not in items".
+        final value = (_selected != null &&
+            items.any((e) => e.idFurnitureMaterial == _selected!.idFurnitureMaterial))
+            ? _selected
+            : null;
 
         // ✅ enabled rules:
         // - must be widget.enabled
@@ -174,7 +184,7 @@ class _FurnitureMaterialDropdownState extends State<FurnitureMaterialDropdown> {
 
         return DropdownPlainField<FurnitureMaterialLookupResult>(
           items: items,
-          value: _selected,
+          value: value,
 
           enabled: effectiveEnabled,
 

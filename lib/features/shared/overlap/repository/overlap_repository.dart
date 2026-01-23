@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../../core/network/endpoints.dart';
@@ -24,11 +25,19 @@ class OverlapConflict {
   factory OverlapConflict.fromJson(Map<String, dynamic> j) {
     DateTime? _parse(String? s) {
       if (s == null) return null;
-      try { return DateTime.parse(s); } catch (_) { return null; }
+      try {
+        return DateTime.parse(s);
+      } catch (_) {
+        return null;
+      }
     }
 
     return OverlapConflict(
-      noDoc: (j['NoDoc'] ?? j['NoProduksi'] ?? j['NoCrusherProduksi'] ?? '').toString(),
+      noDoc: (j['NoDoc'] ??
+          j['NoProduksi'] ??
+          j['NoCrusherProduksi'] ??
+          '')
+          .toString(),
       hourStart: (j['HourStart'] ?? '').toString(),
       hourEnd: (j['HourEnd'] ?? '').toString(),
       startDT: _parse(j['StartDT']?.toString()),
@@ -47,7 +56,9 @@ class OverlapResult {
     final list = (j['conflicts'] as List?) ?? const [];
     return OverlapResult(
       isOverlap: j['isOverlap'] == true,
-      conflicts: list.map((e) => OverlapConflict.fromJson(e as Map<String, dynamic>)).toList(),
+      conflicts: list
+          .map((e) => OverlapConflict.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
   }
 }
@@ -55,37 +66,58 @@ class OverlapResult {
 class OverlapRepository {
   static const _timeout = Duration(seconds: 20);
 
-  final String _base = ApiConstants.baseUrl.replaceFirst(RegExp(r'/*$'), '');
+  final String _base =
+  ApiConstants.baseUrl.replaceFirst(RegExp(r'/*$'), '');
+
+  void _log(String msg) {
+    if (kDebugMode) {
+      debugPrint('🟩 [OVERLAP-REPO] $msg');
+    }
+  }
 
   Future<OverlapResult> check({
-    required String kind, // 'broker' | 'crusher' | 'washing' | 'gilingan'
+    required String kind, // 'broker' | 'crusher' | 'washing' | 'gilingan' | 'mixer'
     required DateTime date,
     required int idMesin,
-    required String hourStart, // "HH:mm" (detik opsional aman)
+    required String hourStart, // "HH:mm"
     required String hourEnd,   // "HH:mm"
-    String? excludeNo,         // No dokumen saat edit
+    String? excludeNo,
   }) async {
     final token = await TokenStorage.getToken();
     final ymd = toDbDateString(date); // YYYY-MM-DD
 
-    final uri = Uri.parse('$_base/api/production/$kind/overlap').replace(queryParameters: {
+    final uri = Uri.parse('$_base/api/production/$kind/overlap')
+        .replace(queryParameters: {
       'date': ymd,
       'idMesin': idMesin.toString(),
       'start': hourStart,
       'end': hourEnd,
-      if (excludeNo != null && excludeNo.isNotEmpty) 'exclude': excludeNo,
+      if (excludeNo != null && excludeNo.isNotEmpty)
+        'exclude': excludeNo,
     });
 
-    final res = await http.get(
+    // ✅ LOG ENDPOINT SETIAP KALI DI-HIT
+    _log('HTTP GET → $uri');
+    _log('headers: Authorization=Bearer ***');
+    _log('timeout: ${_timeout.inSeconds}s');
+
+    final res = await http
+        .get(
       uri,
       headers: {
         'Authorization': 'Bearer $token',
         'Accept': 'application/json',
       },
-    ).timeout(_timeout);
+    )
+        .timeout(_timeout);
+
+    _log('response status=${res.statusCode}');
 
     if (res.statusCode != 200) {
-      throw Exception('Overlap check failed (${res.statusCode}): ${res.body}');
+      _log('ERROR BODY: ${res.body}');
+      throw Exception(
+        'Overlap check failed (${res.statusCode}): ${res.body}',
+      );
     }
 
     final map = json.decode(res.body) as Map<String, dynamic>;

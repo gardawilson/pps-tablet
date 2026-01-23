@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart'; // Tambahkan dependency ini di pubspec.yaml
 import 'package:pps_tablet/features/bj_jual/view/bj_jual_screen.dart';
+import 'package:pps_tablet/features/report/view/report_list_screen.dart';
 import '../../../core/services/permission_storage.dart';
 import '../../bongkar_susun/view/bongkar_susun_screen.dart';
 import '../view_model/user_profile_view_model.dart';
@@ -251,6 +252,21 @@ class HomeScreen extends StatelessWidget {
             Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => const BJJualScreen(),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        _buildMenuCard(
+          context,
+          title: 'Laporan',
+          subtitle: 'Lihat laporan',
+          icon: Icons.newspaper_outlined,
+          color: const Color(0xFF0D47A1), // BLUE PRIMARY
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const ReportListScreen(),
               ),
             );
           },

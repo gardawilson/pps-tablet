@@ -411,7 +411,7 @@ class _SpannerProductionFormDialogState
               const SizedBox(height: 16),
 
               MesinDropdown(
-                idBagianMesin: 10, // ✅ TODO: sesuaikan ID bagian untuk SPANNER
+                idBagianMesin: 9, // ✅ TODO: sesuaikan ID bagian untuk SPANNER
                 preselectId: widget.header?.idMesin,
                 label: 'Mesin Spanner',
                 hint: 'Pilih mesin',

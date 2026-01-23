@@ -9,14 +9,10 @@ class FurnitureMaterialLookupViewModel extends ChangeNotifier {
   FurnitureMaterialLookupViewModel({required this.repository});
 
   bool isLoading = false;
-
-  /// error hanya untuk error beneran (exception / server / network)
   String error = '';
-
-  /// ✅ true kalau mapping/data memang tidak ada (bukan error)
   bool isEmpty = false;
 
-  FurnitureMaterialLookupResult? result;
+  List<FurnitureMaterialLookupResult> items = [];
 
   int? _lastCetakan;
   int? _lastWarna;
@@ -25,10 +21,9 @@ class FurnitureMaterialLookupViewModel extends ChangeNotifier {
     required int idCetakan,
     required int idWarna,
   }) async {
-    // avoid duplicate (kalau sudah pernah resolve untuk kombinasi sama)
     if (_lastCetakan == idCetakan &&
         _lastWarna == idWarna &&
-        (result != null || error.isNotEmpty || isEmpty)) {
+        (items.isNotEmpty || error.isNotEmpty || isEmpty)) {
       return;
     }
 
@@ -38,27 +33,20 @@ class FurnitureMaterialLookupViewModel extends ChangeNotifier {
     isLoading = true;
     error = '';
     isEmpty = false;
-    result = null;
+    items = [];
     notifyListeners();
 
     try {
-      final r = await repository.fetchByCetakanWarna(
+      final list = await repository.fetchByCetakanWarna(
         idCetakan: idCetakan,
         idWarna: idWarna,
       );
 
-      if (r == null) {
-        // ✅ ini bukan error, hanya tidak ada data
-        isEmpty = true;
-        result = null;
-      } else {
-        result = r;
-        isEmpty = false;
-      }
+      items = list;
+      isEmpty = list.isEmpty;
     } catch (e) {
-      // ✅ ini baru error (merah)
       error = e.toString();
-      result = null;
+      items = [];
       isEmpty = false;
     } finally {
       isLoading = false;
@@ -70,7 +58,7 @@ class FurnitureMaterialLookupViewModel extends ChangeNotifier {
     isLoading = false;
     error = '';
     isEmpty = false;
-    result = null;
+    items = [];
     _lastCetakan = null;
     _lastWarna = null;
     notifyListeners();

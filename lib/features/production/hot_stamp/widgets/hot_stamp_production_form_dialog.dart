@@ -473,9 +473,9 @@ class _HotStampProductionFormDialogState
 
               // Jenis Mesin
               MesinDropdown(
-                idBagianMesin: 10, // ✅ TODO: sesuaikan ID bagian untuk HOT_STAMP
+                idBagianMesin: 8, // ✅ TODO: sesuaikan ID bagian untuk HOT_STAMP
                 preselectId: widget.header?.idMesin,
-                label: 'Mesin Hot Stamp',
+                label: 'Mesin',
                 hint: 'Pilih mesin',
                 autovalidateMode: AutovalidateMode.onUserInteraction,
                 validator: (v) => v == null ? 'Wajib pilih mesin hot stamp' : null,

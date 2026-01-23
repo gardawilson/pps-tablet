@@ -22,7 +22,7 @@ class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _usernameFocusNode = FocusNode();
+  final _usernameFocusNode = FocusNode(); 
   final _passwordFocusNode = FocusNode();
 
   final LoginViewModel _viewModel = LoginViewModel();

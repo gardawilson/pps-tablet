@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart'; // Tambahkan dependency ini di pubspec.yaml
+import 'package:pps_tablet/features/audit/view/audit_screen.dart';
 import 'package:pps_tablet/features/bj_jual/view/bj_jual_screen.dart';
 import 'package:pps_tablet/features/report/view/report_list_screen.dart';
 import '../../../core/services/permission_storage.dart';
@@ -271,6 +272,22 @@ class HomeScreen extends StatelessWidget {
             );
           },
         ),
+        const SizedBox(height: 12),
+        _buildMenuCard(
+          context,
+          title: 'Audit',
+          subtitle: 'Lihat history',
+          icon: Icons.newspaper_outlined,
+          color: const Color(0xFF0D47A1), // BLUE PRIMARY
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const AuditScreen(),
+              ),
+            );
+          },
+        ),
+
         const SizedBox(height: 12),
         _buildMenuCard(
           context,

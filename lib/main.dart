@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:pps_tablet/core/view_model/permission_view_model.dart';
+import 'package:pps_tablet/features/audit/repository/audit_repository.dart';
+import 'package:pps_tablet/features/audit/view_model/audit_view_model.dart';
 import 'package:pps_tablet/features/bj_jual/repository/bj_jual_input_repository.dart';
 import 'package:pps_tablet/features/bj_jual/view_model/bj_jual_input_view_model.dart';
 import 'package:pps_tablet/features/bongkar_susun/repository/bongkar_susun_input_repository.dart';
@@ -229,6 +231,8 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => FurnitureWipViewModel(repository: FurnitureWipRepository())),
         ChangeNotifierProvider(create: (_) => BongkarSusunInputViewModel(repository: BongkarSusunInputRepository())),
 
+
+
         ChangeNotifierProvider<HotStampProductionViewModel>(
           create: (ctx) => HotStampProductionViewModel(
             repository: HotStampProductionRepository(
@@ -399,6 +403,8 @@ class MyApp extends StatelessWidget {
             ),
           ),
         ),
+
+
 
       ],
       child: MaterialApp(

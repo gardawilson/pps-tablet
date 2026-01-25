@@ -4,8 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../model/washing_header_model.dart';
 import '../model/washing_detail_model.dart';
-import '../model/washing_history_model.dart';
-import '../repository/washing_audit_repository.dart';
 import '../repository/washing_repository.dart';
 
 import '../../../shared/plastic_type/jenis_plastik_model.dart';
@@ -18,7 +16,6 @@ class WashingViewModel extends ChangeNotifier {
   // Dependencies
   // =============================
   final WashingRepository repository;
-  final WashingAuditRepository _auditRepo = WashingAuditRepository();
   final JenisPlastikRepository jenisRepo = JenisPlastikRepository();
 
   // =============================
@@ -57,13 +54,6 @@ class WashingViewModel extends ChangeNotifier {
   // Create result
   // =============================
   String? lastCreatedNoWashing;
-
-  // =============================
-  // Audit history state
-  // =============================
-  List<WashingHistorySession> history = [];
-  bool isHistoryLoading = false;
-  String historyError = '';
 
   // =============================
   // Highlight helpers
@@ -320,37 +310,7 @@ class WashingViewModel extends ChangeNotifier {
     detailError = '';
     isDetailLoading = false;
 
-    history = [];
-    historyError = '';
-    isHistoryLoading = false;
-
     errorMessage = '';
     notifyListeners();
-  }
-
-  // =============================
-  // Fetch history (audit)
-  // =============================
-  Future<bool> fetchHistory(String noWashing) async {
-    try {
-      isHistoryLoading = true;
-      historyError = '';
-      notifyListeners();
-
-      history = await _auditRepo.fetchHistory(noWashing);
-
-      // optional debug
-      debugPrint('✅ fetchHistory $noWashing sessions=${history.length}');
-      return true;
-    } catch (e, st) {
-      historyError = e.toString();
-      history = [];
-      debugPrint('❌ fetchHistory($noWashing) error: $e');
-      debugPrint('$st');
-      return false;
-    } finally {
-      isHistoryLoading = false;
-      notifyListeners();
-    }
   }
 }

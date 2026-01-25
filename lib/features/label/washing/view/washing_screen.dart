@@ -157,37 +157,6 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
     _confirmDelete(header);
   }
 
-  // NEW: open history dialog
-  Future<void> _onHistoryHeader(WashingHeader header) async {
-    final vm = context.read<WashingViewModel>();
-    final noWashing = header.noWashing;
-
-    _closeContextMenu();
-
-    DialogService.instance.showLoading(message: 'Memuat history $noWashing...');
-    final ok = await vm.fetchHistory(noWashing);
-    DialogService.instance.hideLoading();
-
-    if (!mounted) return;
-
-    if (!ok) {
-      await DialogService.instance.showError(
-        title: 'Gagal',
-        message: vm.errorMessage ?? 'Tidak dapat memuat history.',
-      );
-      return;
-    }
-
-    // Show dialog history (widget ini kamu buat)
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (_) => WashingHistoryDialog(
-        noWashing: noWashing,
-      ),
-    );
-  }
-
   void _confirmDelete(WashingHeader header) {
     showDialog(
       context: context,
@@ -239,9 +208,6 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
       child: WashingRowPopover(
         header: header,
         onClose: _closeContextMenu,
-        onHistory: () async {
-          await _onHistoryHeader(header);
-        },
         onEdit: () async {
           _closeContextMenu();
           await _onEditHeader(header);

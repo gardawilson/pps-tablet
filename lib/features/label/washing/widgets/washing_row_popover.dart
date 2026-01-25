@@ -13,9 +13,6 @@ class WashingRowPopover extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onPrint;
 
-  /// NEW: History action
-  final VoidCallback onHistory;
-
   const WashingRowPopover({
     super.key,
     required this.header,
@@ -23,7 +20,6 @@ class WashingRowPopover extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onPrint,
-    required this.onHistory,
   });
 
   void _runAndClose(VoidCallback action) {
@@ -127,16 +123,6 @@ class WashingRowPopover extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
-            divider,
-
-            // NEW: History
-            _MenuTile(
-              icon: Icons.history,
-              label: 'History',
-              enabled: canHistory,
-              tooltipWhenDisabled: 'Tidak punya izin lihat history',
-              onTap: () => _runAndClose(onHistory),
             ),
             divider,
 

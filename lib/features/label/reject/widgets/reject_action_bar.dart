@@ -51,7 +51,7 @@ class _RejectActionBarState extends State<RejectActionBar> {
     final perm = context.watch<PermissionViewModel>();
 
     // sementara ikut permission yang sama dengan routes Reject: 'label_crusher:create'
-    final canCreate = perm.can('label_crusher:create');
+    final canCreate = perm.can('label_reject:create');
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),

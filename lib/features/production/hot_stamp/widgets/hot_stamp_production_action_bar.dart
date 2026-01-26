@@ -79,7 +79,7 @@ class _HotStampProductionActionBarState
 
     // ✅ Permission key untuk hot stamp production
     final perm = context.watch<PermissionViewModel>();
-    final canCreate = perm.can('label_crusher:create'); // ✅ Hot stamp permission key
+    final canCreate = perm.can('hotstamping:create'); // ✅ Hot stamp permission key
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),

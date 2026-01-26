@@ -51,7 +51,7 @@ class _PackingActionBarState extends State<PackingActionBar> {
     final perm = context.watch<PermissionViewModel>();
 
     // 👉 kalau sudah ada permission khusus packing, ganti ke 'label_packing:create'
-    final canCreate = perm.can('label_crusher:create');
+    final canCreate = perm.can('label_barangjadi:create');
     // atau sementara:
     // final canCreate = perm.can('label_crusher:create');
 

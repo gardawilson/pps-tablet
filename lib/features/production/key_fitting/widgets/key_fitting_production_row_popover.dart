@@ -51,8 +51,8 @@ class KeyFittingProductionRowPopover extends StatelessWidget {
     final perm = context.watch<PermissionViewModel>();
 
     // ✅ ganti permission key sesuai sistem kamu
-    final canEdit = perm.can('label_crusher:update') && !row.isLocked;
-    final canDelete = perm.can('label_crusher:delete') && !row.isLocked;
+    final canEdit = perm.can('pasangkunci:update') && !row.isLocked;
+    final canDelete = perm.can('pasangkunci:delete') && !row.isLocked;
 
     final String? lockHint = row.isLocked ? row.lockStatusMessage : null;
 

@@ -79,7 +79,7 @@ class _MixerProductionActionBarState
 
     // ✅ Permission key untuk mixer production
     final perm = context.watch<PermissionViewModel>();
-    final canCreate = perm.can('label_crusher:create'); // ✅ Updated permission key
+    final canCreate = perm.can('produksi_mixer:create'); // ✅ Updated permission key
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),

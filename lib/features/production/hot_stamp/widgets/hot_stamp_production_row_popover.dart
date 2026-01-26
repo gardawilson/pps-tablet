@@ -50,8 +50,8 @@ class HotStampProductionRowPopover extends StatelessWidget {
 
     // ✅ Permissions untuk hot stamp production
     final perm = context.watch<PermissionViewModel>();
-    final canEdit = perm.can('label_crusher:update') && !row.isLocked;
-    final canDelete = perm.can('label_crusher:delete') && !row.isLocked;
+    final canEdit = perm.can('hotstamping:update') && !row.isLocked;
+    final canDelete = perm.can('hotstamping:delete') && !row.isLocked;
 
     // ✅ Lock status message
     final String? lockHint = row.isLocked ? row.lockStatusMessage : null;

@@ -50,8 +50,8 @@ class MixerProductionRowPopover extends StatelessWidget {
 
     // ✅ Permissions untuk mixer production
     final perm = context.watch<PermissionViewModel>();
-    final canEdit = perm.can('label_crusher:update');
-    final canDelete = perm.can('label_crusher:delete');
+    final canEdit = perm.can('produksi_mixer:update');
+    final canDelete = perm.can('produksi_mixer:delete');
 
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 240, maxWidth: 320),

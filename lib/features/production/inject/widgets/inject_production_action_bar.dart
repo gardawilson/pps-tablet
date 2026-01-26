@@ -76,7 +76,7 @@ class _InjectProductionActionBarState extends State<InjectProductionActionBar> {
 
     // ✅ Permission key untuk inject production (GANTI sesuai key kamu)
     final perm = context.watch<PermissionViewModel>();
-    final canCreate = perm.can('label_crusher:create'); // <-- TODO: sesuaikan
+    final canCreate = perm.can('injectproduksi:create'); // <-- TODO: sesuaikan
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),

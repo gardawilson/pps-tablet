@@ -49,7 +49,7 @@ class _GilinganActionBarState extends State<GilinganActionBar> {
 
     // Permissions (for now still following label_crusher:* like your routes)
     final perm = context.watch<PermissionViewModel>();
-    final canCreate = perm.can('label_crusher:create');
+    final canCreate = perm.can('label_gilingan:create');
     // ❗ If you later create separate permissions, change to 'label_gilingan:create'
 
     return Container(

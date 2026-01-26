@@ -47,9 +47,8 @@ class _FurnitureWipActionBarState extends State<FurnitureWipActionBar> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    // Permissions – masih ikut 'label_crusher:*' sesuai routes backend
     final perm = context.watch<PermissionViewModel>();
-    final canCreate = perm.can('label_crusher:create');
+    final canCreate = perm.can('label_furniturewip:create');
     // Kalau nanti ada permission khusus, mis. 'label_furniturewip:create', tinggal ganti di sini.
 
     return Container(

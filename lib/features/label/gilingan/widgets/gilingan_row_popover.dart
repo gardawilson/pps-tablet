@@ -50,8 +50,8 @@ class GilinganRowPopover extends StatelessWidget {
     final perm = context.watch<PermissionViewModel>();
     // NOTE: sementara ikut route-mu yang masih pakai 'label_crusher:*'
     // kalau nanti sudah ada permission 'label_gilingan:*', tinggal ganti.
-    final canEdit = perm.can('label_crusher:update');
-    final canDelete = perm.can('label_crusher:delete');
+    final canEdit = perm.can('label_gilingan:update');
+    final canDelete = perm.can('label_gilingan:delete');
 
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 220, maxWidth: 280),

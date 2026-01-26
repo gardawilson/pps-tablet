@@ -50,8 +50,8 @@ class InjectProductionRowPopover extends StatelessWidget {
 
     // ✅ Permissions untuk inject production
     final perm = context.watch<PermissionViewModel>();
-    final canEdit = perm.can('label_crusher:update'); // TODO: sesuaikan dengan inject permission
-    final canDelete = perm.can('label_crusher:delete'); // TODO: sesuaikan dengan inject permission
+    final canEdit = perm.can('injectproduksi:update'); // TODO: sesuaikan dengan inject permission
+    final canDelete = perm.can('injectproduksi:delete'); // TODO: sesuaikan dengan inject permission
 
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 240, maxWidth: 320),

@@ -438,6 +438,9 @@ class _DetailsChangesSection extends StatelessWidget {
     final oldList = session.detailsOldList ?? [];
     final newList = session.detailsNewList ?? [];
 
+    // ✅ Build comparison data by NoSak
+    final comparisonData = _buildComparisonData(oldList, newList);
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -456,10 +459,120 @@ class _DetailsChangesSection extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
+            // Change summary
+            _buildChangeSummary(comparisonData),
+            const SizedBox(height: 16),
+
             // Table
-            if (oldList.isNotEmpty || newList.isNotEmpty)
-              _buildDetailsTable(oldList, newList),
+            if (comparisonData.isNotEmpty)
+              _buildDetailsTable(comparisonData),
           ],
+        ),
+      ),
+    );
+  }
+
+  // ✅ Build comparison data structure
+  List<_DetailComparison> _buildComparisonData(
+      List<Map<String, dynamic>> oldList,
+      List<Map<String, dynamic>> newList,
+      ) {
+    final comparisons = <_DetailComparison>[];
+
+    // Create maps by NoSak for easy lookup
+    final oldMap = <int, Map<String, dynamic>>{
+      for (var item in oldList)
+        if (item['NoSak'] != null) item['NoSak'] as int: item
+    };
+
+    final newMap = <int, Map<String, dynamic>>{
+      for (var item in newList)
+        if (item['NoSak'] != null) item['NoSak'] as int: item
+    };
+
+    // Get all unique NoSak values
+    final allNoSak = <int>{
+      ...oldMap.keys,
+      ...newMap.keys,
+    }.toList()..sort(); // Convert to List first, then sort
+
+    // Build comparison for each NoSak
+    for (final noSak in allNoSak) {
+      final oldItem = oldMap[noSak];
+      final newItem = newMap[noSak];
+
+      String status;
+      if (oldItem != null && newItem == null) {
+        status = 'DELETED';
+      } else if (oldItem == null && newItem != null) {
+        status = 'ADDED';
+      } else if (_itemsAreDifferent(oldItem, newItem)) {
+        status = 'MODIFIED';
+      } else {
+        status = 'UNCHANGED';
+      }
+
+      comparisons.add(_DetailComparison(
+        noSak: noSak,
+        oldItem: oldItem,
+        newItem: newItem,
+        status: status,
+      ));
+    }
+
+    return comparisons;
+  }
+
+  // ✅ Check if items are different
+  bool _itemsAreDifferent(
+      Map<String, dynamic>? oldItem,
+      Map<String, dynamic>? newItem,
+      ) {
+    if (oldItem == null || newItem == null) return true;
+
+    // Compare key fields
+    return oldItem['Berat'] != newItem['Berat'] ||
+        oldItem['IsPartial'] != newItem['IsPartial'] ||
+        oldItem['DateUsage'] != newItem['DateUsage'];
+  }
+
+  // ✅ Build change summary
+  Widget _buildChangeSummary(List<_DetailComparison> comparisons) {
+    final added = comparisons.where((c) => c.status == 'ADDED').length;
+    final deleted = comparisons.where((c) => c.status == 'DELETED').length;
+    final modified = comparisons.where((c) => c.status == 'MODIFIED').length;
+    final unchanged = comparisons.where((c) => c.status == 'UNCHANGED').length;
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        if (deleted > 0)
+          _buildStatusBadge('Deleted', deleted, Colors.red),
+        if (added > 0)
+          _buildStatusBadge('Added', added, Colors.green),
+        if (modified > 0)
+          _buildStatusBadge('Modified', modified, Colors.orange),
+        if (unchanged > 0)
+          _buildStatusBadge('Unchanged', unchanged, Colors.grey),
+      ],
+    );
+  }
+
+  Widget _buildStatusBadge(String label, int count, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color),
+      ),
+      child: Text(
+        '$label: $count',
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
         ),
       ),
     );
@@ -484,20 +597,15 @@ class _DetailsChangesSection extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailsTable(
-      List<Map<String, dynamic>> oldList,
-      List<Map<String, dynamic>> newList,
-      ) {
-    final maxLength = oldList.length > newList.length
-        ? oldList.length
-        : newList.length;
-
+  // ✅ Build table with proper comparison
+  Widget _buildDetailsTable(List<_DetailComparison> comparisons) {
     return Table(
       border: TableBorder.all(color: Colors.grey[300]!),
       columnWidths: const {
         0: FlexColumnWidth(1),
-        1: FlexColumnWidth(3),
+        1: FlexColumnWidth(1.5),
         2: FlexColumnWidth(3),
+        3: FlexColumnWidth(3),
       },
       children: [
         // Header
@@ -506,60 +614,101 @@ class _DetailsChangesSection extends StatelessWidget {
           children: const [
             Padding(
               padding: EdgeInsets.all(8),
-              child: Text('#', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: Text('Sak#', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
             Padding(
               padding: EdgeInsets.all(8),
-              child: Text('Before',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
+              child: Text('Status', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
             Padding(
               padding: EdgeInsets.all(8),
-              child:
-              Text('After', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: Text('Before', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            Padding(
+              padding: EdgeInsets.all(8),
+              child: Text('After', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         ),
 
         // Data rows
-        ...List.generate(maxLength, (index) {
-          final oldItem = index < oldList.length ? oldList[index] : null;
-          final newItem = index < newList.length ? newList[index] : null;
-
-          final oldStr = oldItem != null ? _formatDetailItem(oldItem) : '-';
-          final newStr = newItem != null ? _formatDetailItem(newItem) : '-';
-
-          final hasChanged = oldStr != newStr;
+        ...comparisons.map((comparison) {
+          final statusColor = _getStatusColor(comparison.status);
+          final oldStr = comparison.oldItem != null
+              ? _formatDetailItem(comparison.oldItem!)
+              : '-';
+          final newStr = comparison.newItem != null
+              ? _formatDetailItem(comparison.newItem!)
+              : '-';
 
           return TableRow(
-            decoration: hasChanged
-                ? BoxDecoration(color: Colors.yellow[50])
+            decoration: comparison.status != 'UNCHANGED'
+                ? BoxDecoration(color: statusColor.withOpacity(0.1))
                 : null,
             children: [
+              // Sak number
               Padding(
                 padding: const EdgeInsets.all(8),
-                child: Text('${index + 1}'),
+                child: Text(
+                  '${comparison.noSak}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
+
+              // Status badge
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: statusColor),
+                  ),
+                  child: Text(
+                    comparison.status,
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+
+              // Before
               Padding(
                 padding: const EdgeInsets.all(8),
                 child: Text(
                   oldStr,
                   style: TextStyle(
-                    decoration: hasChanged && oldItem != null
+                    decoration: comparison.status == 'DELETED' ||
+                        comparison.status == 'MODIFIED'
                         ? TextDecoration.lineThrough
                         : null,
-                    color: hasChanged && oldItem != null ? Colors.grey : null,
+                    color: comparison.status == 'DELETED'
+                        ? Colors.grey
+                        : null,
                     fontSize: 12,
                   ),
                 ),
               ),
+
+              // After
               Padding(
                 padding: const EdgeInsets.all(8),
                 child: Text(
                   newStr,
                   style: TextStyle(
-                    fontWeight: hasChanged ? FontWeight.bold : null,
-                    color: hasChanged ? Colors.blue : null,
+                    fontWeight: comparison.status == 'ADDED' ||
+                        comparison.status == 'MODIFIED'
+                        ? FontWeight.bold
+                        : null,
+                    color: comparison.status == 'ADDED'
+                        ? Colors.green
+                        : comparison.status == 'MODIFIED'
+                        ? Colors.blue
+                        : null,
                     fontSize: 12,
                   ),
                 ),
@@ -571,23 +720,53 @@ class _DetailsChangesSection extends StatelessWidget {
     );
   }
 
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'DELETED':
+        return Colors.red;
+      case 'ADDED':
+        return Colors.green;
+      case 'MODIFIED':
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
+  }
+
   String _formatDetailItem(Map<String, dynamic> item) {
     final parts = <String>[];
 
-    if (item.containsKey('NoSak')) {
-      parts.add('Sak#${item['NoSak']}');
-    }
     if (item.containsKey('Berat')) {
       parts.add('${item['Berat']}kg');
     }
-    if (item.containsKey('DateUsage')) {
+    if (item.containsKey('IsPartial')) {
+      final isPartial = item['IsPartial'];
+      if (isPartial == true) {
+        parts.add('(Partial)');
+      }
+    }
+    if (item.containsKey('DateUsage') && item['DateUsage'] != null) {
       parts.add('Used: ${item['DateUsage']}');
     }
 
-    return parts.isNotEmpty ? parts.join(' • ') : item.toString();
+    return parts.isNotEmpty ? parts.join(' • ') : '-';
   }
 }
 
+// ✅ Helper class for comparison
+class _DetailComparison {
+  final int noSak;
+  final Map<String, dynamic>? oldItem;
+  final Map<String, dynamic>? newItem;
+  final String status; // DELETED | ADDED | MODIFIED | UNCHANGED
+
+  _DetailComparison({
+    required this.noSak,
+    this.oldItem,
+    this.newItem,
+    required this.status,
+  });
+}
 // =============================
 // ✅ REVISED: Output Changes Section (Simple Display)
 // =============================

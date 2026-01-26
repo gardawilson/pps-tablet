@@ -295,6 +295,45 @@ class AuditModuleConfig {
     ],
   );
 
+  static const barangjadi = AuditModuleConfig(
+    module: 'barangjadi',
+    pkField: 'NoBJ',
+    displayName: 'Barang Jadi',
+    fields: [
+      AuditFieldConfig(
+        idField: 'IdBJ',
+        nameField: 'NamaBJ',
+        displayLabel: 'Barang Jadi',
+        type: AuditFieldType.relational,
+      ),
+      AuditFieldConfig(
+        idField: 'Pcs',
+        displayLabel: 'Pcs',
+        type: AuditFieldType.scalar,
+      ),
+      AuditFieldConfig(
+        idField: 'Berat',
+        displayLabel: 'Berat (kg)',
+        type: AuditFieldType.scalar,
+      ),
+      AuditFieldConfig(
+        idField: 'DateCreate',
+        displayLabel: 'Tanggal Buat',
+        type: AuditFieldType.scalar,
+      ),
+      AuditFieldConfig(
+        idField: 'Blok',
+        displayLabel: 'Blok',
+        type: AuditFieldType.scalar,
+      ),
+      AuditFieldConfig(
+        idField: 'IdLokasi',
+        displayLabel: 'Lokasi',
+        type: AuditFieldType.scalar,
+      ),
+    ],
+  );
+
   // =============================
   // Lookup helper
   // =============================
@@ -314,6 +353,8 @@ class AuditModuleConfig {
         return mixer;
       case 'furniturewip':
         return furniturewip;
+      case 'barangjadi':
+        return barangjadi;
       default:
         return null;
     }

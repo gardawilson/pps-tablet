@@ -49,8 +49,8 @@ class RejectRowPopover extends StatelessWidget {
     // ambil izin sekali
     final perm = context.watch<PermissionViewModel>();
     // sementara ikut permission yang sama dengan routes: 'label_crusher:*'
-    final canEdit = perm.can('label_crusher:update');
-    final canDelete = perm.can('label_crusher:delete');
+    final canEdit = perm.can('label_reject:update');
+    final canDelete = perm.can('label_reject:delete');
 
     // untuk subtitle: info jenis + proses
     final prosesText = header.outputDisplay; // dari convenience getter

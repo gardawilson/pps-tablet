@@ -49,8 +49,8 @@ class FurnitureWipRowPopover extends StatelessWidget {
     // ambil izin sekali
     final perm = context.watch<PermissionViewModel>();
     // sementara ikut permission yang sama dengan routes: 'label_crusher:*'
-    final canEdit = perm.can('label_crusher:update');
-    final canDelete = perm.can('label_crusher:delete');
+    final canEdit = perm.can('label_furniturewip:update');
+    final canDelete = perm.can('label_furniturewip:delete');
 
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 220, maxWidth: 280),

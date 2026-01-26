@@ -79,7 +79,7 @@ class _KeyFittingProductionActionBarState
 
     // ✅ Permission key untuk key fitting production (ganti sesuai sistem kamu)
     final perm = context.watch<PermissionViewModel>();
-    final canCreate = perm.can('label_crusher:create');
+    final canCreate = perm.can('pasangkunci:create');
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),

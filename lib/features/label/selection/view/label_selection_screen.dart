@@ -9,8 +9,20 @@ class LabelSelectionScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final perm = context.watch<PermissionViewModel>();
 
+    // ===== permissions per menu =====
+    final canReadBahanBaku = perm.can('penerimaanbahanbaku:read'); // Label Bahan Baku
     final canReadWashing = perm.can('label_washing:read');
-    final canReadBroker = perm.can('label_washing:read');
+    final canReadBroker = perm.can('label_broker:read');
+    final canReadBonggolan = perm.can('label_bonggolan:read');
+    final canReadCrusher = perm.can('label_barangdagang:read'); // <-- kalau crusher belum ada permission khusus
+    final canReadGilingan = perm.can('label_gilingan:read');
+    final canReadMixer = perm.can('label_mixer:read');
+    final canReadFurnitureWip = perm.can('label_furniturewip:read');
+    final canReadPacking = perm.can('label_barangjadi:read'); // <-- kamu punya packing:read (bukan label_packing)
+    final canReadReject = perm.can('label_reject:read');
+
+    // kalau kamu punya "Label Barang Jadi" juga:
+    final canReadBarangJadi = perm.can('label_barangjadi:read');
 
     return Scaffold(
       appBar: AppBar(
@@ -22,18 +34,17 @@ class LabelSelectionScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
-          // 🔹 Card Label Bahan Baku
           _buildLabelCard(
             context,
             title: 'Label Bahan Baku',
             subtitle: 'Buat label untuk Bahan Baku',
             icon: Icons.label,
-            enabled: canReadWashing,
-            onTap: canReadWashing
+            enabled: canReadBahanBaku,
+            onTap: canReadBahanBaku
                 ? () => Navigator.pushNamed(context, '/label/bahan-baku')
                 : null,
           ),
-          // 🔹 Card Label Washing
+
           _buildLabelCard(
             context,
             title: 'Label Washing',
@@ -47,7 +58,6 @@ class LabelSelectionScreen extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          // 🔹 Card Label Broker
           _buildLabelCard(
             context,
             title: 'Label Broker',
@@ -61,87 +71,79 @@ class LabelSelectionScreen extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          // 🔹 Card Label Bonggolan
           _buildLabelCard(
             context,
             title: 'Label Bonggolan',
             subtitle: 'Buat label untuk proses bonggolan',
             icon: Icons.label,
-            enabled: canReadBroker,
-            onTap: canReadBroker
+            enabled: canReadBonggolan,
+            onTap: canReadBonggolan
                 ? () => Navigator.pushNamed(context, '/label/bonggolan')
                 : null,
           ),
 
-          // 🔹 Card Label Crusher
           _buildLabelCard(
             context,
             title: 'Label Crusher',
             subtitle: 'Buat label untuk proses crusher',
             icon: Icons.label,
-            enabled: canReadBroker,
-            onTap: canReadBroker
+            enabled: canReadCrusher,
+            onTap: canReadCrusher
                 ? () => Navigator.pushNamed(context, '/label/crusher')
                 : null,
           ),
 
-          // 🔹 Card Label Gilingan
           _buildLabelCard(
             context,
             title: 'Label Gilingan',
             subtitle: 'Buat label untuk proses gilingan',
             icon: Icons.label,
-            enabled: canReadBroker,
-            onTap: canReadBroker
+            enabled: canReadGilingan,
+            onTap: canReadGilingan
                 ? () => Navigator.pushNamed(context, '/label/gilingan')
                 : null,
           ),
 
-          // 🔹 Card Label Mixer
           _buildLabelCard(
             context,
             title: 'Label Mixer',
             subtitle: 'Buat label untuk proses mixer',
             icon: Icons.label,
-            enabled: canReadBroker,
-            onTap: canReadBroker
+            enabled: canReadMixer,
+            onTap: canReadMixer
                 ? () => Navigator.pushNamed(context, '/label/mixer')
                 : null,
           ),
 
-          // 🔹 Card Label FurnitureWIP
           _buildLabelCard(
             context,
             title: 'Label Furniture WIP',
             subtitle: 'Buat label untuk proses FWIP',
             icon: Icons.label,
-            enabled: canReadBroker,
-            onTap: canReadBroker
+            enabled: canReadFurnitureWip,
+            onTap: canReadFurnitureWip
                 ? () => Navigator.pushNamed(context, '/label/furniture_wip')
                 : null,
           ),
 
-
-          // 🔹 Card Label Packing
           _buildLabelCard(
             context,
             title: 'Label Packing',
             subtitle: 'Buat label untuk proses Packing',
             icon: Icons.label,
-            enabled: canReadBroker,
-            onTap: canReadBroker
+            enabled: canReadPacking,
+            onTap: canReadPacking
                 ? () => Navigator.pushNamed(context, '/label/packing')
                 : null,
           ),
 
-          // 🔹 Card Label Reject
           _buildLabelCard(
             context,
             title: 'Label Reject',
             subtitle: 'Buat label untuk proses Reject',
             icon: Icons.label,
-            enabled: canReadBroker,
-            onTap: canReadBroker
+            enabled: canReadReject,
+            onTap: canReadReject
                 ? () => Navigator.pushNamed(context, '/label/reject')
                 : null,
           ),
@@ -160,6 +162,7 @@ class LabelSelectionScreen extends StatelessWidget {
         bool enabled = true,
       }) {
     final Color baseColor = enabled ? Colors.blue : Colors.grey;
+
     return Opacity(
       opacity: enabled ? 1.0 : 0.5,
       child: Card(

@@ -50,8 +50,8 @@ class PackingRowPopover extends StatelessWidget {
     final perm = context.watch<PermissionViewModel>();
     // sementara ikut permission yang sama dengan routes: 'label_crusher:*'
     // kalau nanti punya permission khusus, ganti jadi 'label_packing:update/delete'
-    final canEdit = perm.can('label_crusher:update');
-    final canDelete = perm.can('label_crusher:delete');
+    final canEdit = perm.can('label_barangjadi:update');
+    final canDelete = perm.can('label_barangjadi:delete');
 
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 220, maxWidth: 280),

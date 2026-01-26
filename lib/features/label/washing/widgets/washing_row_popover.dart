@@ -49,8 +49,6 @@ class WashingRowPopover extends StatelessWidget {
     final perm = context.watch<PermissionViewModel>();
     final canEdit = perm.can('label_washing:update');
     final canDelete = perm.can('label_washing:delete');
-    // NEW: permission history (kalau belum ada, boleh pakai read)
-    final canHistory = perm.can('audit:read') || perm.can('label_washing:read');
 
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 220, maxWidth: 280),

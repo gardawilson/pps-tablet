@@ -1,6 +1,6 @@
 // lib/features/production/shared/models/reject_item.dart
 
-import 'model_helpers.dart';
+import '../../../../core/utils/model_helpers.dart';
 
 class RejectItem {
   final String? noReject;

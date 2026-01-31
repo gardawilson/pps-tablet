@@ -272,22 +272,21 @@ class HomeScreen extends StatelessWidget {
             );
           },
         ),
-        // const SizedBox(height: 12),
-        // _buildMenuCard(
-        //   context,
-        //   title: 'Audit',
-        //   subtitle: 'Lihat history',
-        //   icon: Icons.newspaper_outlined,
-        //   color: const Color(0xFF0D47A1), // BLUE PRIMARY
-        //   onTap: () {
-        //     Navigator.of(context).push(
-        //       MaterialPageRoute(
-        //         builder: (_) => const AuditScreen(),
-        //       ),
-        //     );
-        //   },
-        // ),
-
+        const SizedBox(height: 12),
+        _buildMenuCard(
+          context,
+          title: 'Audit',
+          subtitle: 'Lihat history',
+          icon: Icons.newspaper_outlined,
+          color: const Color(0xFF0D47A1), // BLUE PRIMARY
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const AuditScreen(),
+              ),
+            );
+          },
+        ),
         const SizedBox(height: 12),
         _buildMenuCard(
           context,

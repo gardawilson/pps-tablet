@@ -1,6 +1,6 @@
 // lib/features/production/shared/models/barang_jadi_item.dart
 
-import 'model_helpers.dart';
+import '../../../../core/utils/model_helpers.dart';
 
 class BarangJadiItem {
   final String? noBJ;

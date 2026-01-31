@@ -1142,7 +1142,9 @@ class InjectProductionInputViewModel extends ChangeNotifier {
   Map<String, dynamic> _buildPayload() {
     final payload = <String, dynamic>{};
 
+    // =========================
     // Full inputs
+    // =========================
     if (tempBroker.isNotEmpty) {
       payload['broker'] = tempBroker
           .map((e) => {
@@ -1172,7 +1174,7 @@ class InjectProductionInputViewModel extends ChangeNotifier {
     if (tempFurnitureWip.isNotEmpty) {
       payload['furnitureWip'] = tempFurnitureWip
           .map((e) => {
-        'noFurnitureWip': e.noFurnitureWIP,
+        'noFurnitureWIP': e.noFurnitureWIP,
       })
           .toList();
     }
@@ -1181,14 +1183,17 @@ class InjectProductionInputViewModel extends ChangeNotifier {
       payload['cabinetMaterial'] = tempCabinetMaterial
           .map((e) => {
         'idCabinetMaterial': e.IdCabinetMaterial,
-        'pcs': e.Jumlah, // backend expects 'pcs' field
+        'pcs': e.Jumlah, // backend expects 'pcs'
       })
           .toList();
     }
 
-    // Partial NEW (create)
+    // =========================
+    // Partial inputs (create partial)
+    // Backend expects: brokerPartial, mixerPartial, gilinganPartial, furnitureWipPartial
+    // =========================
     if (tempBrokerPartial.isNotEmpty) {
-      payload['brokerPartialNew'] = tempBrokerPartial
+      payload['brokerPartial'] = tempBrokerPartial
           .map((e) => {
         'noBroker': e.noBroker,
         'noSak': e.noSak,
@@ -1198,7 +1203,7 @@ class InjectProductionInputViewModel extends ChangeNotifier {
     }
 
     if (tempMixerPartial.isNotEmpty) {
-      payload['mixerPartialNew'] = tempMixerPartial
+      payload['mixerPartial'] = tempMixerPartial
           .map((e) => {
         'noMixer': e.noMixer,
         'noSak': e.noSak,
@@ -1208,7 +1213,7 @@ class InjectProductionInputViewModel extends ChangeNotifier {
     }
 
     if (tempGilinganPartial.isNotEmpty) {
-      payload['gilinganPartialNew'] = tempGilinganPartial
+      payload['gilinganPartial'] = tempGilinganPartial
           .map((e) => {
         'noGilingan': e.noGilingan,
         'berat': e.berat,
@@ -1217,9 +1222,9 @@ class InjectProductionInputViewModel extends ChangeNotifier {
     }
 
     if (tempFurnitureWipPartial.isNotEmpty) {
-      payload['furnitureWipPartialNew'] = tempFurnitureWipPartial
+      payload['furnitureWipPartial'] = tempFurnitureWipPartial
           .map((e) => {
-        'noFurnitureWip': e.noFurnitureWIP,
+        'noFurnitureWIP': e.noFurnitureWIP,
         'pcs': e.pcs,
       })
           .toList();
@@ -1227,6 +1232,7 @@ class InjectProductionInputViewModel extends ChangeNotifier {
 
     return payload;
   }
+
 
   /// ✅ Submit all temp items to backend
   Future<bool> submitTempItems(String noProduksi) async {
@@ -1377,10 +1383,10 @@ class InjectProductionInputViewModel extends ChangeNotifier {
         if (isPart) {
           final code = (it.noFurnitureWIPPartial ?? '').trim();
           if (code.isNotEmpty) {
-            add('furnitureWipPartial', {'noFurnitureWipPartial': code});
+            add('furnitureWipPartial', {'noFurnitureWIPPartial': code});
           }
         } else {
-          add('furnitureWip', {'noFurnitureWip': it.noFurnitureWIP});
+          add('furnitureWip', {'noFurnitureWIP': it.noFurnitureWIP});
         }
       } else if (it is CabinetMaterialItem) {
         add('cabinetMaterial', {'idCabinetMaterial': it.IdCabinetMaterial});

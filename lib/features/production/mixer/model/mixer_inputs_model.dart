@@ -4,7 +4,7 @@ import '../../shared/models/broker_item.dart';
 import '../../shared/models/bb_item.dart';
 import '../../shared/models/gilingan_item.dart';
 import '../../shared/models/mixer_item.dart';
-import '../../shared/models/model_helpers.dart';
+import '../../../../core/utils/model_helpers.dart';
 
 // ✅ Export item models agar bisa diakses lewat satu import
 export '../../shared/models/broker_item.dart';

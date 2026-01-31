@@ -872,38 +872,40 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
   Map<String, dynamic> _buildPayload() {
     final payload = <String, dynamic>{};
 
-    // Full furniture WIP
+    // attach full FWIP
     if (tempFurnitureWip.isNotEmpty) {
       payload['furnitureWip'] = tempFurnitureWip
           .map((e) => {
-        'noFurnitureWip': e.noFurnitureWIP,
+        'noFurnitureWIP': e.noFurnitureWIP, // ✅
       })
           .toList();
     }
 
-    // Cabinet material (upsert)
-    // ✅ NOTE: gunakan payload key sesuai API backend (camelCase).
+    // upsert cabinet material (ikuti config keyColumn = IdCabinetMaterial)
     if (tempCabinetMaterial.isNotEmpty) {
       payload['cabinetMaterial'] = tempCabinetMaterial
           .map((e) => {
-        'idCabinetMaterial': e.IdCabinetMaterial,
-        'jumlah': e.Jumlah,
+        'IdCabinetMaterial': e.IdCabinetMaterial,
+        'Jumlah': e.Jumlah,
       })
           .toList();
     }
 
-    // Partial furniture WIP (create new)
+    // create partial FWIP (controller sekarang expect furnitureWipPartial)
     if (tempFurnitureWipPartial.isNotEmpty) {
-      payload['furnitureWipPartialNew'] = tempFurnitureWipPartial
+      payload['furnitureWipPartial'] = tempFurnitureWipPartial
           .map((e) => {
-        'noFurnitureWip': e.noFurnitureWIP,
-        'pcs': e.pcs,
+        'noFurnitureWIP': e.noFurnitureWIP, // ✅ match $.noFurnitureWIP
+        'pcs': e.pcs,                       // ✅ match $.pcs
       })
           .toList();
     }
+
 
     return payload;
   }
+
+
 
   /// ✅ Submit all temp items to backend
   Future<bool> submitTempItems(String noProduksi) async {
@@ -1002,38 +1004,39 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
     final payload = <String, dynamic>{};
 
     void add(String key, Map<String, dynamic> row) {
-      final list = (payload[key] ?? <Map<String, dynamic>>[])
-      as List<Map<String, dynamic>>;
+      final list =
+      (payload[key] ?? <Map<String, dynamic>>[]) as List<Map<String, dynamic>>;
       list.add(row);
       payload[key] = list;
     }
 
     for (final it in items) {
       if (it is FurnitureWipItem) {
-        final isPart = it.isPartialRow ||
-            ((it.noFurnitureWIPPartial ?? '').trim().isNotEmpty);
+        final isPart =
+            it.isPartialRow || ((it.noFurnitureWIPPartial ?? '').trim().isNotEmpty);
+
         if (isPart) {
           final code = (it.noFurnitureWIPPartial ?? '').trim();
           if (code.isNotEmpty) {
             add('furnitureWipPartial', {
-              'noFurnitureWipPartial': code,
+              'NoFurnitureWIPPartial': code,
             });
           }
         } else {
           add('furnitureWip', {
-            'noFurnitureWip': it.noFurnitureWIP,
+            'NoFurnitureWIP': it.noFurnitureWIP,
           });
         }
       } else if (it is CabinetMaterialItem) {
-        // ✅ key sesuai API backend (camelCase)
         add('cabinetMaterial', {
-          'idCabinetMaterial': it.IdCabinetMaterial,
+          'IdCabinetMaterial': it.IdCabinetMaterial,
         });
       }
     }
 
     return payload;
   }
+
 
   /// ✅ Delete items (TEMP + DB)
   /// - Items di temp akan dihapus lokal tanpa API call

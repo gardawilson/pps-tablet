@@ -35,6 +35,7 @@ class AuditViewModel extends ChangeNotifier {
     AuditModuleConfig.mixer,
     AuditModuleConfig.furniturewip,
     AuditModuleConfig.barangjadi,
+    AuditModuleConfig.reject,
     // Add more as needed
   ];
 

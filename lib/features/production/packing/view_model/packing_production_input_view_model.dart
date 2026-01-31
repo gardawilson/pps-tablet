@@ -845,25 +845,31 @@ class PackingProductionInputViewModel extends ChangeNotifier {
   Map<String, dynamic> _buildPayload() {
     final payload = <String, dynamic>{};
 
+    // attach full FWIP
     if (tempFurnitureWip.isNotEmpty) {
-      payload['furnitureWip'] =
-          tempFurnitureWip.map((e) => {'noFurnitureWip': e.noFurnitureWIP}).toList();
-    }
-
-    if (tempCabinetMaterial.isNotEmpty) {
-      payload['cabinetMaterial'] = tempCabinetMaterial
+      payload['furnitureWip'] = tempFurnitureWip
           .map((e) => {
-        'idCabinetMaterial': e.IdCabinetMaterial,
-        'jumlah': e.Jumlah,
+        'noFurnitureWIP': e.noFurnitureWIP, // ✅
       })
           .toList();
     }
 
-    if (tempFurnitureWipPartial.isNotEmpty) {
-      payload['furnitureWipPartialNew'] = tempFurnitureWipPartial
+    // upsert cabinet material (ikuti config keyColumn = IdCabinetMaterial)
+    if (tempCabinetMaterial.isNotEmpty) {
+      payload['cabinetMaterial'] = tempCabinetMaterial
           .map((e) => {
-        'noFurnitureWip': e.noFurnitureWIP,
-        'pcs': e.pcs,
+        'IdCabinetMaterial': e.IdCabinetMaterial,
+        'Jumlah': e.Jumlah,
+      })
+          .toList();
+    }
+
+    // create partial FWIP (controller sekarang expect furnitureWipPartial)
+    if (tempFurnitureWipPartial.isNotEmpty) {
+      payload['furnitureWipPartial'] = tempFurnitureWipPartial
+          .map((e) => {
+        'noFurnitureWIP': e.noFurnitureWIP, // ✅ match $.noFurnitureWIP
+        'pcs': e.pcs,                       // ✅ match $.pcs
       })
           .toList();
     }
@@ -968,18 +974,28 @@ class PackingProductionInputViewModel extends ChangeNotifier {
 
     for (final it in items) {
       if (it is FurnitureWipItem) {
-        final isPart = it.isPartialRow ||
-            ((it.noFurnitureWIPPartial ?? '').trim().isNotEmpty);
+        final isPart =
+            it.isPartialRow || ((it.noFurnitureWIPPartial ?? '').trim().isNotEmpty);
+
         if (isPart) {
           final code = (it.noFurnitureWIPPartial ?? '').trim();
           if (code.isNotEmpty) {
-            add('furnitureWipPartial', {'noFurnitureWipPartial': code});
+            // ✅ NoFurnitureWIPPartial -> noFurnitureWIPPartial
+            add('furnitureWipPartial', {
+              'noFurnitureWIPPartial': code,
+            });
           }
         } else {
-          add('furnitureWip', {'noFurnitureWip': it.noFurnitureWIP});
+          // ✅ NoFurnitureWIP -> noFurnitureWIP
+          add('furnitureWip', {
+            'noFurnitureWIP': it.noFurnitureWIP,
+          });
         }
       } else if (it is CabinetMaterialItem) {
-        add('cabinetMaterial', {'idCabinetMaterial': it.IdCabinetMaterial});
+        // ✅ IdCabinetMaterial -> idCabinetMaterial
+        add('cabinetMaterial', {
+          'idCabinetMaterial': it.IdCabinetMaterial,
+        });
       }
     }
 

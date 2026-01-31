@@ -1,6 +1,6 @@
 // lib/features/production/shared/models/crusher_item.dart
 
-import 'model_helpers.dart';
+import '../../../../core/utils/model_helpers.dart';
 
 class CrusherItem {
   final String? noCrusher;

@@ -14,15 +14,13 @@ class LabelSelectionScreen extends StatelessWidget {
     final canReadWashing = perm.can('label_washing:read');
     final canReadBroker = perm.can('label_broker:read');
     final canReadBonggolan = perm.can('label_bonggolan:read');
-    final canReadCrusher = perm.can('label_barangdagang:read'); // <-- kalau crusher belum ada permission khusus
+    final canReadCrusher = perm.can('label_crusher:read'); // <-- kalau crusher belum ada permission khusus
     final canReadGilingan = perm.can('label_gilingan:read');
     final canReadMixer = perm.can('label_mixer:read');
     final canReadFurnitureWip = perm.can('label_furniturewip:read');
     final canReadPacking = perm.can('label_barangjadi:read'); // <-- kamu punya packing:read (bukan label_packing)
     final canReadReject = perm.can('label_reject:read');
 
-    // kalau kamu punya "Label Barang Jadi" juga:
-    final canReadBarangJadi = perm.can('label_barangjadi:read');
 
     return Scaffold(
       appBar: AppBar(

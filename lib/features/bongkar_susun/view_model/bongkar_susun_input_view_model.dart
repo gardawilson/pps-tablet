@@ -1536,7 +1536,7 @@ class BongkarSusunInputViewModel extends ChangeNotifier {
     if (tempFurnitureWip.isNotEmpty) {
       payload['furnitureWip'] = tempFurnitureWip
           .map((e) => {
-        'noFurnitureWip': e.noFurnitureWIP,
+        'noFurnitureWIP': e.noFurnitureWIP,
       })
           .toList();
     }
@@ -1738,7 +1738,7 @@ class BongkarSusunInputViewModel extends ChangeNotifier {
         });
       } else if (it is FurnitureWipItem) {
         add('furnitureWip', {
-          'noFurnitureWip': it.noFurnitureWIP,
+          'noFurnitureWIP': it.noFurnitureWIP,
         });
       } else if (it is BarangJadiItem) {
         add('barangJadi', {

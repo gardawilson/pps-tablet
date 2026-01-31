@@ -2,7 +2,7 @@
 
 import '../../shared/models/furniture_wip_item.dart';
 import '../../shared/models/cabinet_material_item.dart';
-import '../../shared/models/model_helpers.dart';
+import '../../../../core/utils/model_helpers.dart';
 
 // ✅ Export item models agar bisa diakses lewat satu import
 export '../../shared/models/furniture_wip_item.dart';

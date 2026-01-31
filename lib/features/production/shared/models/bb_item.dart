@@ -1,5 +1,5 @@
 // lib/features/production/shared/models/bb_item.dart
-import 'model_helpers.dart';
+import '../../../../core/utils/model_helpers.dart';
 
 class BbItem {
   final String? noBahanBaku;

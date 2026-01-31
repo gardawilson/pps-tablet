@@ -1,4 +1,4 @@
-import '../../shared/models/model_helpers.dart';
+import '../../../../core/utils/model_helpers.dart';
 
 class CabinetMaterialItem {
   // ===== MASTER/STOCK FIELDS (sesuai result SQL stock) =====

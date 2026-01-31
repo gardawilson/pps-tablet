@@ -3,7 +3,7 @@
 import '../../shared/models/bb_item.dart';
 import '../../shared/models/washing_item.dart';
 import '../../shared/models/gilingan_item.dart';
-import '../../shared/models/model_helpers.dart';
+import '../../../../core/utils/model_helpers.dart';
 
 // ✅ Export semua item models agar bisa diakses lewat satu import
 export '../../shared/models/bb_item.dart';

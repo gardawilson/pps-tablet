@@ -1,6 +1,6 @@
 // lib/features/production/shared/models/furniture_wip_item.dart
 
-import 'model_helpers.dart';
+import '../../../../core/utils/model_helpers.dart';
 
 class FurnitureWipItem {
   final String? noFurnitureWIP;

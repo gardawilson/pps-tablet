@@ -937,7 +937,7 @@ class SortirRejectInputViewModel extends ChangeNotifier {
     }
 
     if (tempBarangJadiPartial.isNotEmpty) {
-      payload['barangJadiPartialNew'] = tempBarangJadiPartial
+      payload['barangJadiPartial'] = tempBarangJadiPartial
           .map((e) => {
         'noBJ': e.noBJ,
         'pcs': e.pcs,
@@ -947,14 +947,14 @@ class SortirRejectInputViewModel extends ChangeNotifier {
 
     if (tempFurnitureWip.isNotEmpty) {
       payload['furnitureWip'] = tempFurnitureWip
-          .map((e) => {'noFurnitureWip': e.noFurnitureWIP})
+          .map((e) => {'noFurnitureWIP': e.noFurnitureWIP})
           .toList();
     }
 
     if (tempFurnitureWipPartial.isNotEmpty) {
-      payload['furnitureWipPartialNew'] = tempFurnitureWipPartial
+      payload['furnitureWipPartial'] = tempFurnitureWipPartial
           .map((e) => {
-        'noFurnitureWip': e.noFurnitureWIP,
+        'noFurnitureWIP': e.noFurnitureWIP,
         'pcs': e.pcs,
       })
           .toList();
@@ -1070,7 +1070,7 @@ class SortirRejectInputViewModel extends ChangeNotifier {
             add('furnitureWipPartial', {'noFurnitureWipPartial': code});
           }
         } else {
-          add('furnitureWip', {'noFurnitureWip': it.noFurnitureWIP});
+          add('furnitureWip', {'noFurnitureWIP': it.noFurnitureWIP});
         }
       } else if (it is CabinetMaterialItem) {
         add('cabinetMaterial', {'idCabinetMaterial': it.IdCabinetMaterial});

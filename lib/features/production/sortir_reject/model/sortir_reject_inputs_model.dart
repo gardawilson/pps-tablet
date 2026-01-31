@@ -5,7 +5,7 @@
 import '../../shared/models/barang_jadi_item.dart';
 import '../../shared/models/cabinet_material_item.dart';
 import '../../shared/models/furniture_wip_item.dart';
-import '../../shared/models/model_helpers.dart';
+import '../../../../core/utils/model_helpers.dart';
 
 class SortirRejectInputs {
   final List<BarangJadiItem> barangJadi;

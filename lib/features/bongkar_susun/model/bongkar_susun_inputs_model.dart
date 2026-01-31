@@ -11,7 +11,7 @@ import '../../production/shared/models/crusher_item.dart';
 import '../../production/shared/models/furniture_wip_item.dart';
 import '../../production/shared/models/gilingan_item.dart';
 import '../../production/shared/models/mixer_item.dart';
-import '../../production/shared/models/model_helpers.dart';
+import '../../../core/utils/model_helpers.dart';
 import '../../production/shared/models/washing_item.dart';
 
 class BongkarSusunInputs {

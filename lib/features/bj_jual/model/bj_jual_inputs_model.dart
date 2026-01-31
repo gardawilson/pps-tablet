@@ -1,7 +1,7 @@
 import '../../production/shared/models/barang_jadi_item.dart';
 import '../../production/shared/models/furniture_wip_item.dart';
 import '../../production/shared/models/cabinet_material_item.dart';
-import '../../production/shared/models/model_helpers.dart';
+import '../../../core/utils/model_helpers.dart';
 
 // ✅ Export item models agar bisa diakses lewat satu import
 export '../../production/shared/models/barang_jadi_item.dart';

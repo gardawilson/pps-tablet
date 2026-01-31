@@ -826,7 +826,9 @@ class KeyFittingProductionInputViewModel extends ChangeNotifier {
 
     if (tempFurnitureWip.isNotEmpty) {
       payload['furnitureWip'] = tempFurnitureWip
-          .map((e) => {'noFurnitureWip': e.noFurnitureWIP})
+          .map((e) => {
+        'noFurnitureWIP': e.noFurnitureWIP, // ✅
+      })
           .toList();
     }
 
@@ -840,10 +842,10 @@ class KeyFittingProductionInputViewModel extends ChangeNotifier {
     }
 
     if (tempFurnitureWipPartial.isNotEmpty) {
-      payload['furnitureWipPartialNew'] = tempFurnitureWipPartial
+      payload['furnitureWipPartial'] = tempFurnitureWipPartial
           .map((e) => {
-        'noFurnitureWip': e.noFurnitureWIP,
-        'pcs': e.pcs,
+        'noFurnitureWIP': e.noFurnitureWIP, // ✅
+        'pcs': e.pcs,                       // ✅
       })
           .toList();
     }
@@ -931,7 +933,8 @@ class KeyFittingProductionInputViewModel extends ChangeNotifier {
     final payload = <String, dynamic>{};
 
     void add(String key, Map<String, dynamic> row) {
-      final list = (payload[key] ?? <Map<String, dynamic>>[]) as List<Map<String, dynamic>>;
+      final list =
+      (payload[key] ?? <Map<String, dynamic>>[]) as List<Map<String, dynamic>>;
       list.add(row);
       payload[key] = list;
     }
@@ -940,16 +943,26 @@ class KeyFittingProductionInputViewModel extends ChangeNotifier {
       if (it is FurnitureWipItem) {
         final isPart =
             it.isPartialRow || ((it.noFurnitureWIPPartial ?? '').trim().isNotEmpty);
+
         if (isPart) {
           final code = (it.noFurnitureWIPPartial ?? '').trim();
           if (code.isNotEmpty) {
-            add('furnitureWipPartial', {'noFurnitureWipPartial': code});
+            // ✅ NoFurnitureWIPPartial -> noFurnitureWIPPartial
+            add('furnitureWipPartial', {
+              'noFurnitureWIPPartial': code,
+            });
           }
         } else {
-          add('furnitureWip', {'noFurnitureWip': it.noFurnitureWIP});
+          // ✅ NoFurnitureWIP -> noFurnitureWIP
+          add('furnitureWip', {
+            'noFurnitureWIP': it.noFurnitureWIP,
+          });
         }
       } else if (it is CabinetMaterialItem) {
-        add('cabinetMaterial', {'idCabinetMaterial': it.IdCabinetMaterial});
+        // ✅ IdCabinetMaterial -> idCabinetMaterial
+        add('cabinetMaterial', {
+          'idCabinetMaterial': it.IdCabinetMaterial,
+        });
       }
     }
 

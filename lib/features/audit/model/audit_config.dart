@@ -334,6 +334,40 @@ class AuditModuleConfig {
     ],
   );
 
+  static const reject = AuditModuleConfig(
+    module: 'reject',
+    pkField: 'NoReject',
+    displayName: 'Reject',
+    fields: [
+      AuditFieldConfig(
+        idField: 'IdReject',
+        nameField: 'NamaReject',
+        displayLabel: 'Reject',
+        type: AuditFieldType.relational,
+      ),
+      AuditFieldConfig(
+        idField: 'Berat',
+        displayLabel: 'Berat (kg)',
+        type: AuditFieldType.scalar,
+      ),
+      AuditFieldConfig(
+        idField: 'DateCreate',
+        displayLabel: 'Tanggal Buat',
+        type: AuditFieldType.scalar,
+      ),
+      AuditFieldConfig(
+        idField: 'Blok',
+        displayLabel: 'Blok',
+        type: AuditFieldType.scalar,
+      ),
+      AuditFieldConfig(
+        idField: 'IdLokasi',
+        displayLabel: 'Lokasi',
+        type: AuditFieldType.scalar,
+      ),
+    ],
+  );
+
   // =============================
   // Lookup helper
   // =============================
@@ -355,6 +389,8 @@ class AuditModuleConfig {
         return furniturewip;
       case 'barangjadi':
         return barangjadi;
+      case 'reject':
+        return reject;
       default:
         return null;
     }

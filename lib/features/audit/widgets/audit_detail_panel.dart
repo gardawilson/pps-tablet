@@ -5,6 +5,13 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
 
+import '../../../common/widgets/card_container.dart';
+import '../../../common/widgets/empty_state.dart';
+import '../../../common/widgets/info_row.dart';
+import '../../../common/widgets/json_viewer.dart';
+import '../../../common/widgets/section_header.dart';
+import '../../../common/widgets/simple_divider.dart';
+import '../../../core/utils/model_helpers.dart';
 import '../view_model/audit_view_model.dart';
 import '../model/audit_session_model.dart';
 
@@ -15,58 +22,59 @@ class AuditDetailPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<AuditViewModel>(
       builder: (context, vm, _) {
-        return Column(
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.all(16),
-              color: Colors.grey[100],
-              child: Row(
-                children: const [
-                  Icon(Icons.info_outline, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'Session Details',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Content
-            Expanded(
-              child: vm.selectedSession != null
-                  ? _SessionDetail(session: vm.selectedSession!)
-                  : _EmptyState(),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.touch_app, size: 64, color: Colors.grey[400]),
-          const SizedBox(height: 16),
-          Text(
-            'Select a session to view details',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
+        return Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFFFAFBFC),
+            border: Border(
+              left: BorderSide(color: Color(0xFFDFE1E6), width: 1),
             ),
           ),
-        ],
-      ),
+          child: Column(
+            children: [
+              // Atlassian-style Header
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(
+                    bottom: BorderSide(color: Color(0xFFDFE1E6), width: 1),
+                  ),
+                ),
+                child: Row(
+                  children: const [
+                    Icon(
+                      Icons.receipt_long_outlined,
+                      size: 20,
+                      color: Color(0xFF42526E),
+                    ),
+                    SizedBox(width: 10),
+                    Text(
+                      'Activity Details',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF172B4D),
+                        letterSpacing: -0.1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Content
+              Expanded(
+                child: vm.selectedSession != null
+                    ? _SessionDetail(session: vm.selectedSession!)
+                    : EmptyState(
+                      icon: Icons.list_alt_outlined,
+                      title: 'No activity selected',
+                      subtitle: 'Select an activity from the list to view details',
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -78,67 +86,177 @@ class _SessionDetail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateFormat = DateFormat('dd MMM yyyy HH:mm:ss');
+    final dateFormat = DateFormat('MMM dd, yyyy');
+    final timeFormat = DateFormat('HH:mm:ss');
     final startTime = DateTime.tryParse(session.startTime);
     final endTime = DateTime.tryParse(session.endTime);
 
+    final hasHeaderChanges =
+        (session.oldValues.isNotEmpty || session.newValues.isNotEmpty) &&
+            !session.isConsumeSession;
+
+    final hasDetailsChanges =
+        session.detailsOldList != null || session.detailsNewList != null;
+
+    final hasConsumeBlock =
+        (session.consumeUnifiedEvents != null &&
+            session.consumeUnifiedEvents!.isNotEmpty) ||
+            (session.consumeUnifiedItems != null &&
+                session.consumeUnifiedItems!.isNotEmpty);
+
+    final hasRaw = session.headerOld != null ||
+        session.headerNew != null ||
+        session.detailsOldJson != null ||
+        session.detailsNewJson != null ||
+        session.outputChanges != null ||
+        session.consumeJson != null ||
+        session.unconsumeJson != null;
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Session info card
-          _SessionInfoCard(
-            session: session,
-            dateFormat: dateFormat,
-            startTime: startTime,
-            endTime: endTime,
+          // Session Overview
+          CardContainer(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header with action lozenge
+                Row(
+                  children: [
+                    _AtlassianLozenge(action: session.sessionAction),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            session.documentNo,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF172B4D),
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'Document Number',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF6B778C),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+                const SimpleDivider(),
+                const SizedBox(height: 20),
+
+                // Info grid
+                InfoRow(
+                  icon: Icons.person_outline,
+                  label: 'User',
+                  value: session.actor,
+                ),
+                const SizedBox(height: 16),
+                InfoRow(
+                  icon: Icons.calendar_today_outlined,
+                  label: 'Date',
+                  value: startTime != null
+                      ? dateFormat.format(startTime)
+                      : '-',
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: InfoRow(
+                        icon: Icons.schedule_outlined,
+                        label: 'Start Time',
+                        value: startTime != null
+                            ? timeFormat.format(startTime)
+                            : '-',
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: InfoRow(
+                        icon: Icons.schedule_outlined,
+                        label: 'End Time',
+                        value: endTime != null
+                            ? timeFormat.format(endTime)
+                            : '-',
+                      ),
+                    ),
+                  ],
+                ),
+                if (session.requestId != null) ...[
+                  const SizedBox(height: 16),
+                  InfoRow(
+                    icon: Icons.fingerprint,
+                    label: 'Request ID',
+                    value: session.requestId!,
+                  ),
+                ],
+              ],
+            ),
           ),
 
           const SizedBox(height: 16),
 
-          // ✅ Header changes
-          if (session.oldValues.isNotEmpty || session.newValues.isNotEmpty) ...[
-            _SectionHeader(
-              icon: Icons.description,
-              title: 'Header Changes',
+          // Consume/Unconsume section
+          if (hasConsumeBlock) ...[
+            SectionHeader(
+              icon: Icons.swap_horiz_outlined,
+              title: session.isConsume ? 'Material Consumption' : 'Material Unconsumption',
             ),
-            const SizedBox(height: 8),
-            _HeaderChangesTable(session: session),
+            const SizedBox(height: 12),
+            _ConsumeUnconsumeSection(session: session),
             const SizedBox(height: 16),
           ],
 
-          // ✅ Details changes
-          if (session.detailsOldList != null ||
-              session.detailsNewList != null) ...[
-            _SectionHeader(
-              icon: Icons.list,
-              title: 'Details Changes',
+          // Header changes
+          if (hasHeaderChanges) ...[
+            const SectionHeader(
+              icon: Icons.edit_note_outlined,
+              title: 'Header Modifications',
+            ),
+            const SizedBox(height: 12),
+            _HeaderChangesSection(session: session),
+            const SizedBox(height: 16),
+          ],
+
+          // Details changes
+          if (hasDetailsChanges && !session.isConsumeSession) ...[
+            SectionHeader(
+              icon: Icons.list_alt_outlined,
+              title: 'Detail Line Changes',
               subtitle: session.detailsChangeSummary,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             _DetailsChangesSection(session: session),
             const SizedBox(height: 16),
           ],
 
-          // ✅ Output changes (REVISED - using outputDisplayValue)
+          // Output relation
           if (session.outputDisplayValue != null) ...[
-            _SectionHeader(
+            const SectionHeader(
               icon: Icons.link,
               title: 'Output Relation',
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             _OutputChangesSection(session: session),
             const SizedBox(height: 16),
           ],
 
-          // Raw JSON section (collapsible)
-          if (session.headerOld != null ||
-              session.headerNew != null ||
-              session.detailsOldJson != null ||
-              session.detailsNewJson != null ||
-              session.outputChanges != null)
-            _RawDataSection(session: session),
+          // Raw JSON section
+          if (hasRaw) _RawDataSection(session: session),
         ],
       ),
     );
@@ -146,178 +264,400 @@ class _SessionDetail extends StatelessWidget {
 }
 
 // =============================
-// Section Header Widget
+// Atlassian Lozenge
 // =============================
-class _SectionHeader extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String? subtitle;
+class _AtlassianLozenge extends StatelessWidget {
+  final String action;
 
-  const _SectionHeader({
-    required this.icon,
-    required this.title,
-    this.subtitle,
-  });
+  const _AtlassianLozenge({required this.action});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: Colors.blue[700]),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.blue[700],
-          ),
-        ),
-        if (subtitle != null) ...[
-          const SizedBox(width: 12),
+    final config = _getConfig(action);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: config.backgroundColor,
+        borderRadius: BorderRadius.circular(3),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            width: 6,
+            height: 6,
             decoration: BoxDecoration(
-              color: Colors.orange[50],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.orange[300]!),
+              color: config.dotColor,
+              shape: BoxShape.circle,
             ),
-            child: Text(
-              subtitle!,
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.orange[700],
-                fontWeight: FontWeight.w600,
-              ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            action.toUpperCase(),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: config.textColor,
+              letterSpacing: 0.3,
             ),
           ),
         ],
-      ],
-    );
-  }
-}
-
-// =============================
-// Session Info Card
-// =============================
-class _SessionInfoCard extends StatelessWidget {
-  final AuditSession session;
-  final DateFormat dateFormat;
-  final DateTime? startTime;
-  final DateTime? endTime;
-
-  const _SessionInfoCard({
-    required this.session,
-    required this.dateFormat,
-    this.startTime,
-    this.endTime,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildInfoRow(
-              'Document Number',
-              session.documentNo,
-              Icons.description,
-            ),
-            const Divider(height: 24),
-            _buildInfoRow(
-              'Action',
-              session.sessionAction,
-              Icons.settings,
-              valueColor: _getActionColor(session.sessionAction),
-            ),
-            const Divider(height: 24),
-            _buildInfoRow(
-              'Actor',
-              session.actor,
-              Icons.person,
-            ),
-            const Divider(height: 24),
-            _buildInfoRow(
-              'Start Time',
-              startTime != null
-                  ? dateFormat.format(startTime!)
-                  : session.startTime,
-              Icons.access_time,
-            ),
-            const Divider(height: 24),
-            _buildInfoRow(
-              'End Time',
-              endTime != null ? dateFormat.format(endTime!) : session.endTime,
-              Icons.access_time_filled,
-            ),
-            if (session.requestId != null) ...[
-              const Divider(height: 24),
-              _buildInfoRow(
-                'Request ID',
-                session.requestId!,
-                Icons.fingerprint,
-              ),
-            ],
-          ],
-        ),
       ),
     );
   }
 
-  Widget _buildInfoRow(String label, String value, IconData icon,
-      {Color? valueColor}) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 20, color: Colors.grey[600]),
-        const SizedBox(width: 12),
-        Expanded(
-          flex: 2,
-          child: Text(
-            label,
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 14,
-            ),
-          ),
-        ),
-        Expanded(
-          flex: 3,
-          child: Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              fontSize: 14,
-              color: valueColor,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Color _getActionColor(String action) {
+  _LozengeConfig _getConfig(String action) {
     switch (action.toUpperCase()) {
       case 'CREATE':
-        return Colors.green;
+        return _LozengeConfig(
+          backgroundColor: const Color(0xFFE3FCEF),
+          textColor: const Color(0xFF006644),
+          dotColor: const Color(0xFF36B37E),
+        );
+      case 'UPDATE':
+        return _LozengeConfig(
+          backgroundColor: const Color(0xFFDEEBFF),
+          textColor: const Color(0xFF0747A6),
+          dotColor: const Color(0xFF0052CC),
+        );
       case 'DELETE':
-        return Colors.red;
+        return _LozengeConfig(
+          backgroundColor: const Color(0xFFFFEBEB),
+          textColor: const Color(0xFFBF2600),
+          dotColor: const Color(0xFFDE350B),
+        );
+      case 'CONSUME':
+        return _LozengeConfig(
+          backgroundColor: const Color(0xFFFFF0E5),
+          textColor: const Color(0xFF974F0C),
+          dotColor: const Color(0xFFFF991F),
+        );
+      case 'UNCONSUME':
+        return _LozengeConfig(
+          backgroundColor: const Color(0xFFEAE6FF),
+          textColor: const Color(0xFF403294),
+          dotColor: const Color(0xFF6554C0),
+        );
       default:
-        return Colors.blue;
+        return _LozengeConfig(
+          backgroundColor: const Color(0xFFF4F5F7),
+          textColor: const Color(0xFF42526E),
+          dotColor: const Color(0xFF6B778C),
+        );
     }
   }
 }
 
+class _LozengeConfig {
+  final Color backgroundColor;
+  final Color textColor;
+  final Color dotColor;
+
+  _LozengeConfig({
+    required this.backgroundColor,
+    required this.textColor,
+    required this.dotColor,
+  });
+}
+
 // =============================
-// Header Changes Table
+// Consume/Unconsume Section
 // =============================
-class _HeaderChangesTable extends StatelessWidget {
+class _ConsumeUnconsumeSection extends StatelessWidget {
   final AuditSession session;
 
-  const _HeaderChangesTable({required this.session});
+  const _ConsumeUnconsumeSection({required this.session});
+
+  @override
+  Widget build(BuildContext context) {
+    final isConsume = session.isConsume;
+    final groups = isConsume ? session.consumeGroups : session.unconsumeGroups;
+
+    if (groups.isEmpty) {
+      return CardContainer(
+        child: Text(
+          'No ${isConsume ? 'consumption' : 'unconsumption'} data.',
+          style: const TextStyle(
+            color: Color(0xFF6B778C),
+            fontSize: 14,
+          ),
+        ),
+      );
+    }
+
+    final totalCount = groups.values.fold<int>(0, (sum, list) => sum + list.length);
+
+    return CardContainer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              _AtlassianLozenge(
+                action: isConsume ? 'CONSUME' : 'UNCONSUME',
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4F5F7),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                child: Text(
+                  '$totalCount ${totalCount == 1 ? 'item' : 'items'}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF42526E),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Groups
+          ...groups.entries.map((entry) {
+            final key = entry.key;
+            final parts = key.split('|');
+            final tableName = parts.isNotEmpty ? parts[0] : '-';
+            final action = parts.length > 1 ? parts[1] : '-';
+            final items = entry.value;
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: _ConsumeGroup(
+                tableName: tableName,
+                action: action,
+                items: items,
+              ),
+            );
+          }).toList(),
+        ],
+      ),
+    );
+  }
+}
+
+class _ConsumeGroup extends StatelessWidget {
+  final String tableName;
+  final String action;
+  final List<Map<String, dynamic>> items;
+
+  const _ConsumeGroup({
+    required this.tableName,
+    required this.action,
+    required this.items,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Group header
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF4F5F7),
+            borderRadius: BorderRadius.circular(3),
+            border: Border.all(color: const Color(0xFFDFE1E6)),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.table_chart_outlined,
+                size: 14,
+                color: Color(0xFF6B778C),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  tableName,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF172B4D),
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(3),
+                  border: Border.all(color: const Color(0xFFDFE1E6)),
+                ),
+                child: Text(
+                  action,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF6B778C),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${items.length}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF6B778C),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 8),
+
+        // Items
+        ...items.map((row) => _ConsumeRowTile(row: row)).toList(),
+      ],
+    );
+  }
+}
+
+class _ConsumeRowTile extends StatelessWidget {
+  final Map<String, dynamic> row;
+
+  const _ConsumeRowTile({required this.row});
+
+  @override
+  Widget build(BuildContext context) {
+    final noProduksi = pickS(row, [
+      'NoProduksi',
+      'NoCrusherProduksi',
+      'NoPacking',
+      'NoBJSortir',
+      'NoBongkarSusun'
+    ]);
+    final noSak = row['NoSak']?.toString();
+    final noPartial = row['NoBrokerPartial']?.toString();
+    final noFurnitureWip = row['NoFurnitureWIP']?.toString();
+    final noFurnitureWipPartial = row['NoFurnitureWIPPartial']?.toString();
+
+    final leftTitle = noProduksi ?? noFurnitureWip ?? '-';
+    final rightTitle = (noFurnitureWipPartial != null &&
+        noFurnitureWipPartial.isNotEmpty)
+        ? noFurnitureWipPartial
+        : (noPartial != null && noPartial.isNotEmpty)
+        ? noPartial
+        : (noSak != null ? 'Sak $noSak' : '');
+
+    final oldPcs = asInt(row['OldPcs']);
+    final newPcs = asInt(row['NewPcs']);
+    final oldBerat = pickN(row, ['OldBerat'])?.toString();
+    final newBerat = pickN(row, ['NewBerat'])?.toString();
+    final pcs = asInt(row['Pcs']);
+    final berat = row['Berat']?.toString();
+
+    final subtitleParts = <String>[];
+
+    final hasOldNewPcs = (oldPcs != null || newPcs != null);
+    if (hasOldNewPcs && oldPcs != newPcs) {
+      subtitleParts.add('Pcs: ${oldPcs ?? '-'} → ${newPcs ?? '-'}');
+    } else if (pcs != null) {
+      subtitleParts.add('Pcs: $pcs');
+    }
+
+    final hasOldNewBerat = (oldBerat != null || newBerat != null);
+    if (hasOldNewBerat && oldBerat != newBerat) {
+      subtitleParts.add('Berat: ${oldBerat ?? '-'} → ${newBerat ?? '-'}');
+    } else if (berat != null && berat.isNotEmpty) {
+      subtitleParts.add('Berat: $berat kg');
+    }
+
+    // for (final k in ['NoBroker', 'NoBahanBaku', 'NoPallet', 'NoBBPartial']) {
+    //   if (row[k] != null) subtitleParts.add('$k: ${row[k]}');
+    // }
+
+    final subtitle = subtitleParts.isEmpty ? null : subtitleParts.join(' • ');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAFBFC),
+        borderRadius: BorderRadius.circular(3),
+        border: Border.all(color: const Color(0xFFEBECF0)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.inventory_2_outlined,
+            size: 16,
+            color: Color(0xFF6B778C),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        leftTitle,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: Color(0xFF172B4D),
+                        ),
+                      ),
+                    ),
+                    if (rightTitle.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDEEBFF),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: Text(
+                          rightTitle,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF0747A6),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF6B778C),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =============================
+// Header Changes Section
+// =============================
+class _HeaderChangesSection extends StatelessWidget {
+  final AuditSession session;
+
+  const _HeaderChangesSection({required this.session});
 
   @override
   Widget build(BuildContext context) {
@@ -326,101 +666,185 @@ class _HeaderChangesTable extends StatelessWidget {
       ...session.newValues.keys,
     };
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Table(
-          border: TableBorder.all(color: Colors.grey[300]!),
-          columnWidths: const {
-            0: FlexColumnWidth(2),
-            1: FlexColumnWidth(3),
-            2: FlexColumnWidth(3),
-          },
-          children: [
-            // Header
-            TableRow(
-              decoration: BoxDecoration(color: Colors.grey[100]),
-              children: const [
-                Padding(
-                  padding: EdgeInsets.all(12),
-                  child: Text(
-                    'Field',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Padding(
-                  padding: EdgeInsets.all(12),
-                  child: Text(
-                    'Before',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Padding(
-                  padding: EdgeInsets.all(12),
-                  child: Text(
-                    'After',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
+    if (allKeys.isEmpty) {
+      return CardContainer(
+        child: const Text(
+          'No header changes.',
+          style: TextStyle(
+            color: Color(0xFF6B778C),
+            fontSize: 14,
+          ),
+        ),
+      );
+    }
+
+    return CardContainer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: allKeys.map((key) {
+          final oldValue = session.oldValues[key]?.toString() ?? '-';
+          final newValue = session.newValues[key]?.toString() ?? '-';
+          final hasChanged = oldValue != newValue;
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: _HeaderChangeRow(
+              fieldName: key,
+              oldValue: oldValue,
+              newValue: newValue,
+              hasChanged: hasChanged,
             ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
 
-            // Data rows
-            ...allKeys.map((key) {
-              final oldValue = session.oldValues[key]?.toString() ?? '-';
-              final newValue = session.newValues[key]?.toString() ?? '-';
-              final hasChanged = oldValue != newValue;
+class _HeaderChangeRow extends StatelessWidget {
+  final String fieldName;
+  final String oldValue;
+  final String newValue;
+  final bool hasChanged;
 
-              return TableRow(
-                decoration: hasChanged
-                    ? BoxDecoration(color: Colors.yellow[50])
-                    : null,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: [
-                        if (hasChanged)
-                          const Icon(
-                            Icons.circle,
-                            size: 8,
-                            color: Colors.orange,
-                          ),
-                        if (hasChanged) const SizedBox(width: 8),
-                        Expanded(child: Text(key)),
-                      ],
-                    ),
+  const _HeaderChangeRow({
+    required this.fieldName,
+    required this.oldValue,
+    required this.newValue,
+    required this.hasChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Field name
+        Row(
+          children: [
+            if (hasChanged)
+              Container(
+                width: 6,
+                height: 6,
+                margin: const EdgeInsets.only(right: 8),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFF991F),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            Text(
+              fieldName,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF42526E),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 10),
+
+        // Before/After
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: hasChanged
+                      ? const Color(0xFFFFEBEB)
+                      : const Color(0xFFF4F5F7),
+                  borderRadius: BorderRadius.circular(3),
+                  border: Border.all(
+                    color: hasChanged
+                        ? const Color(0xFFFFBDAD)
+                        : const Color(0xFFDFE1E6),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Text(
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Before',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Color(0xFF6B778C),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
                       oldValue,
                       style: TextStyle(
+                        fontSize: 13,
+                        color: hasChanged
+                            ? const Color(0xFFBF2600)
+                            : const Color(0xFF172B4D),
                         decoration: hasChanged
                             ? TextDecoration.lineThrough
                             : null,
-                        color: hasChanged ? Colors.grey : null,
                       ),
                     ),
+                  ],
+                ),
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Icon(
+                Icons.arrow_forward,
+                size: 16,
+                color: hasChanged
+                    ? const Color(0xFF0052CC)
+                    : const Color(0xFFA5ADBA),
+              ),
+            ),
+
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: hasChanged
+                      ? const Color(0xFFE3FCEF)
+                      : const Color(0xFFF4F5F7),
+                  borderRadius: BorderRadius.circular(3),
+                  border: Border.all(
+                    color: hasChanged
+                        ? const Color(0xFF79F2C0)
+                        : const Color(0xFFDFE1E6),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Text(
-                      newValue,
-                      style: hasChanged
-                          ? const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue,
-                      )
-                          : null,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'After',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Color(0xFF6B778C),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                ],
-              );
-            }),
+                    const SizedBox(height: 4),
+                    Text(
+                      newValue,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: hasChanged ? FontWeight.w600 : FontWeight.w400,
+                        color: hasChanged
+                            ? const Color(0xFF006644)
+                            : const Color(0xFF172B4D),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
-      ),
+      ],
     );
   }
 }
@@ -437,49 +861,69 @@ class _DetailsChangesSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final oldList = session.detailsOldList ?? [];
     final newList = session.detailsNewList ?? [];
-
-    // ✅ Build comparison data by NoSak
     final comparisonData = _buildComparisonData(oldList, newList);
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Summary
-            Row(
-              children: [
-                _buildCountBadge('Before', oldList.length, Colors.red),
-                const SizedBox(width: 12),
-                const Icon(Icons.arrow_forward, size: 16),
-                const SizedBox(width: 12),
-                _buildCountBadge('After', newList.length, Colors.green),
-              ],
-            ),
+    final added = comparisonData.where((c) => c.status == 'ADDED').length;
+    final deleted = comparisonData.where((c) => c.status == 'DELETED').length;
+    final modified = comparisonData.where((c) => c.status == 'MODIFIED').length;
+
+    return CardContainer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Stats
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (deleted > 0)
+                _StatusLozenge(
+                  label: 'Deleted',
+                  count: deleted,
+                  color: const Color(0xFFDE350B),
+                  bgColor: const Color(0xFFFFEBEB),
+                ),
+              if (added > 0)
+                _StatusLozenge(
+                  label: 'Added',
+                  count: added,
+                  color: const Color(0xFF36B37E),
+                  bgColor: const Color(0xFFE3FCEF),
+                ),
+              if (modified > 0)
+                _StatusLozenge(
+                  label: 'Modified',
+                  count: modified,
+                  color: const Color(0xFFFF991F),
+                  bgColor: const Color(0xFFFFF0E5),
+                ),
+            ],
+          ),
+
+          if (comparisonData.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const SimpleDivider(),
             const SizedBox(height: 16),
 
-            // Change summary
-            _buildChangeSummary(comparisonData),
-            const SizedBox(height: 16),
-
-            // Table
-            if (comparisonData.isNotEmpty)
-              _buildDetailsTable(comparisonData),
+            // Details list
+            ...comparisonData.map((comparison) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _DetailChangeRow(comparison: comparison),
+              );
+            }).toList(),
           ],
-        ),
+        ],
       ),
     );
   }
 
-  // ✅ Build comparison data structure
   List<_DetailComparison> _buildComparisonData(
       List<Map<String, dynamic>> oldList,
       List<Map<String, dynamic>> newList,
       ) {
     final comparisons = <_DetailComparison>[];
 
-    // Create maps by NoSak for easy lookup
     final oldMap = <int, Map<String, dynamic>>{
       for (var item in oldList)
         if (item['NoSak'] != null) item['NoSak'] as int: item
@@ -490,13 +934,8 @@ class _DetailsChangesSection extends StatelessWidget {
         if (item['NoSak'] != null) item['NoSak'] as int: item
     };
 
-    // Get all unique NoSak values
-    final allNoSak = <int>{
-      ...oldMap.keys,
-      ...newMap.keys,
-    }.toList()..sort(); // Convert to List first, then sort
+    final allNoSak = <int>{...oldMap.keys, ...newMap.keys}.toList()..sort();
 
-    // Build comparison for each NoSak
     for (final noSak in allNoSak) {
       final oldItem = oldMap[noSak];
       final newItem = newMap[noSak];
@@ -523,242 +962,240 @@ class _DetailsChangesSection extends StatelessWidget {
     return comparisons;
   }
 
-  // ✅ Check if items are different
   bool _itemsAreDifferent(
-      Map<String, dynamic>? oldItem,
-      Map<String, dynamic>? newItem,
-      ) {
+      Map<String, dynamic>? oldItem, Map<String, dynamic>? newItem) {
     if (oldItem == null || newItem == null) return true;
-
-    // Compare key fields
     return oldItem['Berat'] != newItem['Berat'] ||
         oldItem['IsPartial'] != newItem['IsPartial'] ||
         oldItem['DateUsage'] != newItem['DateUsage'];
   }
+}
 
-  // ✅ Build change summary
-  Widget _buildChangeSummary(List<_DetailComparison> comparisons) {
-    final added = comparisons.where((c) => c.status == 'ADDED').length;
-    final deleted = comparisons.where((c) => c.status == 'DELETED').length;
-    final modified = comparisons.where((c) => c.status == 'MODIFIED').length;
-    final unchanged = comparisons.where((c) => c.status == 'UNCHANGED').length;
+class _StatusLozenge extends StatelessWidget {
+  final String label;
+  final int count;
+  final Color color;
+  final Color bgColor;
 
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        if (deleted > 0)
-          _buildStatusBadge('Deleted', deleted, Colors.red),
-        if (added > 0)
-          _buildStatusBadge('Added', added, Colors.green),
-        if (modified > 0)
-          _buildStatusBadge('Modified', modified, Colors.orange),
-        if (unchanged > 0)
-          _buildStatusBadge('Unchanged', unchanged, Colors.grey),
-      ],
-    );
-  }
+  const _StatusLozenge({
+    required this.label,
+    required this.count,
+    required this.color,
+    required this.bgColor,
+  });
 
-  Widget _buildStatusBadge(String label, int count, Color color) {
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color),
+        color: bgColor,
+        borderRadius: BorderRadius.circular(3),
       ),
       child: Text(
         '$label: $count',
         style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
           color: color,
-          fontWeight: FontWeight.w600,
-          fontSize: 12,
         ),
       ),
     );
   }
+}
 
-  Widget _buildCountBadge(String label, int count, Color color) {
+class _DetailChangeRow extends StatelessWidget {
+  final _DetailComparison comparison;
+
+  const _DetailChangeRow({required this.comparison});
+
+  @override
+  Widget build(BuildContext context) {
+    final config = _getStatusConfig(comparison.status);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color),
+        color: config.bgColor,
+        borderRadius: BorderRadius.circular(3),
+        border: Border.all(color: config.borderColor),
       ),
-      child: Text(
-        '$label: $count',
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.bold,
-          fontSize: 13,
-        ),
-      ),
-    );
-  }
-
-  // ✅ Build table with proper comparison
-  Widget _buildDetailsTable(List<_DetailComparison> comparisons) {
-    return Table(
-      border: TableBorder.all(color: Colors.grey[300]!),
-      columnWidths: const {
-        0: FlexColumnWidth(1),
-        1: FlexColumnWidth(1.5),
-        2: FlexColumnWidth(3),
-        3: FlexColumnWidth(3),
-      },
-      children: [
-        // Header
-        TableRow(
-          decoration: BoxDecoration(color: Colors.grey[100]),
-          children: const [
-            Padding(
-              padding: EdgeInsets.all(8),
-              child: Text('Sak#', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-            Padding(
-              padding: EdgeInsets.all(8),
-              child: Text('Status', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-            Padding(
-              padding: EdgeInsets.all(8),
-              child: Text('Before', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-            Padding(
-              padding: EdgeInsets.all(8),
-              child: Text('After', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
-
-        // Data rows
-        ...comparisons.map((comparison) {
-          final statusColor = _getStatusColor(comparison.status);
-          final oldStr = comparison.oldItem != null
-              ? _formatDetailItem(comparison.oldItem!)
-              : '-';
-          final newStr = comparison.newItem != null
-              ? _formatDetailItem(comparison.newItem!)
-              : '-';
-
-          return TableRow(
-            decoration: comparison.status != 'UNCHANGED'
-                ? BoxDecoration(color: statusColor.withOpacity(0.1))
-                : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              // Sak number
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: Text(
-                  '${comparison.noSak}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: config.dotColor,
+                  shape: BoxShape.circle,
                 ),
               ),
-
-              // Status badge
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: statusColor),
-                  ),
-                  child: Text(
-                    comparison.status,
-                    style: TextStyle(
-                      color: statusColor,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+              const SizedBox(width: 8),
+              Text(
+                'Sak #${comparison.noSak}',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: config.textColor,
                 ),
               ),
-
-              // Before
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: Text(
-                  oldStr,
-                  style: TextStyle(
-                    decoration: comparison.status == 'DELETED' ||
-                        comparison.status == 'MODIFIED'
-                        ? TextDecoration.lineThrough
-                        : null,
-                    color: comparison.status == 'DELETED'
-                        ? Colors.grey
-                        : null,
-                    fontSize: 12,
-                  ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: config.dotColor,
+                  borderRadius: BorderRadius.circular(3),
                 ),
-              ),
-
-              // After
-              Padding(
-                padding: const EdgeInsets.all(8),
                 child: Text(
-                  newStr,
-                  style: TextStyle(
-                    fontWeight: comparison.status == 'ADDED' ||
-                        comparison.status == 'MODIFIED'
-                        ? FontWeight.bold
-                        : null,
-                    color: comparison.status == 'ADDED'
-                        ? Colors.green
-                        : comparison.status == 'MODIFIED'
-                        ? Colors.blue
-                        : null,
-                    fontSize: 12,
+                  comparison.status,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
                   ),
                 ),
               ),
             ],
-          );
-        }),
-      ],
+          ),
+
+          if (comparison.oldItem != null || comparison.newItem != null) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                if (comparison.oldItem != null)
+                  Expanded(
+                    child: _DetailItemDisplay(
+                      label: 'Before',
+                      item: comparison.oldItem!,
+                    ),
+                  ),
+                if (comparison.oldItem != null && comparison.newItem != null)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Icon(
+                      Icons.arrow_forward,
+                      size: 14,
+                      color: Color(0xFF6B778C),
+                    ),
+                  ),
+                if (comparison.newItem != null)
+                  Expanded(
+                    child: _DetailItemDisplay(
+                      label: 'After',
+                      item: comparison.newItem!,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 
-  Color _getStatusColor(String status) {
+  _StatusConfig _getStatusConfig(String status) {
     switch (status) {
       case 'DELETED':
-        return Colors.red;
+        return _StatusConfig(
+          bgColor: const Color(0xFFFFEBEB),
+          borderColor: const Color(0xFFFFBDAD),
+          dotColor: const Color(0xFFDE350B),
+          textColor: const Color(0xFFBF2600),
+        );
       case 'ADDED':
-        return Colors.green;
+        return _StatusConfig(
+          bgColor: const Color(0xFFE3FCEF),
+          borderColor: const Color(0xFF79F2C0),
+          dotColor: const Color(0xFF36B37E),
+          textColor: const Color(0xFF006644),
+        );
       case 'MODIFIED':
-        return Colors.orange;
+        return _StatusConfig(
+          bgColor: const Color(0xFFFFF0E5),
+          borderColor: const Color(0xFFFFD79E),
+          dotColor: const Color(0xFFFF991F),
+          textColor: const Color(0xFF974F0C),
+        );
       default:
-        return Colors.grey;
+        return _StatusConfig(
+          bgColor: const Color(0xFFF4F5F7),
+          borderColor: const Color(0xFFDFE1E6),
+          dotColor: const Color(0xFF6B778C),
+          textColor: const Color(0xFF42526E),
+        );
     }
   }
+}
 
-  String _formatDetailItem(Map<String, dynamic> item) {
+class _StatusConfig {
+  final Color bgColor;
+  final Color borderColor;
+  final Color dotColor;
+  final Color textColor;
+
+  _StatusConfig({
+    required this.bgColor,
+    required this.borderColor,
+    required this.dotColor,
+    required this.textColor,
+  });
+}
+
+class _DetailItemDisplay extends StatelessWidget {
+  final String label;
+  final Map<String, dynamic> item;
+
+  const _DetailItemDisplay({
+    required this.label,
+    required this.item,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     final parts = <String>[];
 
     if (item.containsKey('Berat')) {
-      parts.add('${item['Berat']}kg');
+      parts.add('${item['Berat']} kg');
     }
-    if (item.containsKey('IsPartial')) {
-      final isPartial = item['IsPartial'];
-      if (isPartial == true) {
-        parts.add('(Partial)');
-      }
+    if (item.containsKey('IsPartial') && item['IsPartial'] == true) {
+      parts.add('Partial');
     }
     if (item.containsKey('DateUsage') && item['DateUsage'] != null) {
       parts.add('Used: ${item['DateUsage']}');
     }
 
-    return parts.isNotEmpty ? parts.join(' • ') : '-';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            color: Color(0xFF6B778C),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          parts.isNotEmpty ? parts.join(' • ') : '-',
+          style: const TextStyle(
+            fontSize: 12,
+            color: Color(0xFF172B4D),
+          ),
+        ),
+      ],
+    );
   }
 }
 
-// ✅ Helper class for comparison
 class _DetailComparison {
   final int noSak;
   final Map<String, dynamic>? oldItem;
   final Map<String, dynamic>? newItem;
-  final String status; // DELETED | ADDED | MODIFIED | UNCHANGED
+  final String status;
 
   _DetailComparison({
     required this.noSak,
@@ -767,8 +1204,9 @@ class _DetailComparison {
     required this.status,
   });
 }
+
 // =============================
-// ✅ REVISED: Output Changes Section (Simple Display)
+// Output Changes Section
 // =============================
 class _OutputChangesSection extends StatelessWidget {
   final AuditSession session;
@@ -777,57 +1215,49 @@ class _OutputChangesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header with label
-            Row(
+    return CardContainer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            session.outputDisplayLabel ?? 'Output',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF42526E),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFDEEBFF),
+              borderRadius: BorderRadius.circular(3),
+              border: Border.all(color: const Color(0xFF4C9AFF)),
+            ),
+            child: Row(
               children: [
-                Icon(Icons.link, size: 18, color: Colors.blue[700]),
+                const Icon(
+                  Icons.arrow_forward,
+                  size: 16,
+                  color: Color(0xFF0052CC),
+                ),
                 const SizedBox(width: 8),
-                Text(
-                  session.outputDisplayLabel ?? 'Output',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.blue[700],
+                Expanded(
+                  child: Text(
+                    session.outputDisplayValue ?? '-',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF0747A6),
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-
-            // Display Value
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue[200]!),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.arrow_forward, size: 16, color: Colors.blue[700]),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      session.outputDisplayValue ?? '-',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue[900],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -850,97 +1280,57 @@ class _RawDataSectionState extends State<_RawDataSection> {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return CardContainer(
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           InkWell(
             onTap: () => setState(() => _isExpanded = !_isExpanded),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  const Icon(Icons.code, size: 20),
-                  const SizedBox(width: 12),
-                  const Text(
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.code,
+                  size: 16,
+                  color: Color(0xFF42526E),
+                ),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
                     'Raw JSON Data',
                     style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF172B4D),
                     ),
                   ),
-                  const Spacer(),
-                  Icon(
-                    _isExpanded ? Icons.expand_less : Icons.expand_more,
-                  ),
-                ],
-              ),
+                ),
+                Icon(
+                  _isExpanded ? Icons.expand_less : Icons.expand_more,
+                  size: 20,
+                  color: const Color(0xFF6B778C),
+                ),
+              ],
             ),
           ),
-          if (_isExpanded)
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (widget.session.headerOld != null)
-                    _buildJsonBlock('Header (Old)', widget.session.headerOld!),
-                  if (widget.session.headerNew != null)
-                    _buildJsonBlock('Header (New)', widget.session.headerNew!),
-                  if (widget.session.detailsOldJson != null)
-                    _buildJsonBlock(
-                        'Details (Old)', widget.session.detailsOldJson!),
-                  if (widget.session.detailsNewJson != null)
-                    _buildJsonBlock(
-                        'Details (New)', widget.session.detailsNewJson!),
-                  if (widget.session.outputChanges != null)
-                    _buildJsonBlock(
-                        'Output Changes', widget.session.outputChanges!),
-                ],
-              ),
-            ),
+          if (_isExpanded) ...[
+            const SizedBox(height: 16),
+            if (widget.session.headerOld != null)
+              JsonViewer(title: 'Header (Old)', jsonString: widget.session.headerOld!),
+            if (widget.session.headerNew != null)
+              JsonViewer(title: 'Header (New)', jsonString: widget.session.headerNew!),
+            if (widget.session.detailsOldJson != null)
+              JsonViewer(title: 'Details (Old)', jsonString: widget.session.detailsOldJson!),
+            if (widget.session.detailsNewJson != null)
+              JsonViewer(title: 'Details (New)', jsonString: widget.session.detailsNewJson!),
+            if (widget.session.consumeJson != null)
+              JsonViewer(title: 'Consume Data', jsonString: widget.session.consumeJson!),
+            if (widget.session.unconsumeJson != null)
+              JsonViewer(title: 'Unconsume Data', jsonString: widget.session.unconsumeJson!),
+            if (widget.session.outputChanges != null)
+              JsonViewer(title: 'Output Changes', jsonString: widget.session.outputChanges!),
+          ],
         ],
       ),
-    );
-  }
-
-  Widget _buildJsonBlock(String title, String jsonString) {
-    String formatted;
-    try {
-      final decoded = json.decode(jsonString);
-      formatted = const JsonEncoder.withIndent('  ').convert(decoded);
-    } catch (e) {
-      formatted = jsonString;
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.grey[100],
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: Colors.grey[300]!),
-          ),
-          child: SelectableText(
-            formatted,
-            style: const TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 12,
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-      ],
     );
   }
 }

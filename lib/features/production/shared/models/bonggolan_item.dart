@@ -1,6 +1,6 @@
 // lib/features/production/shared/models/bonggolan_item.dart
 
-import 'model_helpers.dart';
+import '../../../../core/utils/model_helpers.dart';
 
 class BonggolanItem {
   final String? noBonggolan;     // M.0000000003

@@ -36,6 +36,19 @@ class AuditViewModel extends ChangeNotifier {
     AuditModuleConfig.furniturewip,
     AuditModuleConfig.barangjadi,
     AuditModuleConfig.reject,
+    AuditModuleConfig.washingProduksi,
+    AuditModuleConfig.brokerProduksi,
+    AuditModuleConfig.crusherProduksi,
+    AuditModuleConfig.gilinganProduksi,
+    AuditModuleConfig.mixerProduksi,
+    AuditModuleConfig.injectProduksi,
+    AuditModuleConfig.hotStamping,
+    AuditModuleConfig.pasangKunci,
+    AuditModuleConfig.spanner,
+    AuditModuleConfig.packing,
+    AuditModuleConfig.sortirReject,
+    AuditModuleConfig.bjJual,
+    AuditModuleConfig.bongkarSusun,
     // Add more as needed
   ];
 

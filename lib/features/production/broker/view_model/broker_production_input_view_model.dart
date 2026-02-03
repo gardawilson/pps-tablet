@@ -1302,7 +1302,7 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     }
 
     if (tempBrokerPartial.isNotEmpty) {
-      payload['brokerPartialNew'] = tempBrokerPartial.map((e) => {
+      payload['brokerPartial'] = tempBrokerPartial.map((e) => {
         'noBroker': e.noBroker,
         'noSak': e.noSak,
         'berat': e.berat,
@@ -1311,7 +1311,7 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
 
     // NEW partials to create
     if (tempBbPartial.isNotEmpty) {
-      payload['bbPartialNew'] = tempBbPartial.map((e) => {
+      payload['bbPartial'] = tempBbPartial.map((e) => {
         'noBahanBaku': e.noBahanBaku,
         'noPallet': e.noPallet,
         'noSak': e.noSak,
@@ -1320,14 +1320,14 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     }
 
     if (tempGilinganPartial.isNotEmpty) {
-      payload['gilinganPartialNew'] = tempGilinganPartial.map((e) => {
+      payload['gilinganPartial'] = tempGilinganPartial.map((e) => {
         'noGilingan': e.noGilingan,
         'berat': e.berat,
       }).toList();
     }
 
     if (tempMixerPartial.isNotEmpty) {
-      payload['mixerPartialNew'] = tempMixerPartial.map((e) => {
+      payload['mixerPartial'] = tempMixerPartial.map((e) => {
         'noMixer': e.noMixer,
         'noSak': e.noSak,
         'berat': e.berat,
@@ -1335,7 +1335,7 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     }
 
     if (tempRejectPartial.isNotEmpty) {
-      payload['rejectPartialNew'] = tempRejectPartial.map((e) => {
+      payload['rejectPartial'] = tempRejectPartial.map((e) => {
         'noReject': e.noReject,
         'berat': e.berat,
       }).toList();

@@ -534,6 +534,7 @@ class _ConsumeRowTile extends StatelessWidget {
       'NoCrusherProduksi',
       'NoPacking',
       'NoBJSortir',
+      'NoBJJual',
       'NoBongkarSusun'
     ]);
     final noSak = row['NoSak']?.toString();

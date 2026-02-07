@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/services/dialog_service.dart';
@@ -64,8 +65,6 @@ class _GilinganScreenState extends State<GilinganScreen> {
     _confirmDelete(header);
   }
 
-
-
   @override
   void initState() {
     super.initState();
@@ -124,9 +123,7 @@ class _GilinganScreenState extends State<GilinganScreen> {
       context: context,
       barrierDismissible: false,
       useSafeArea: false,
-      builder: (_) => GilinganFormDialog(
-        header: header,
-      ),
+      builder: (_) => GilinganFormDialog(header: header),
     );
   }
 
@@ -152,9 +149,9 @@ class _GilinganScreenState extends State<GilinganScreen> {
 
   /// Long-press handler: set highlight & show row popover (Edit / Print / Delete)
   Future<void> _onItemLongPress(
-      GilinganHeader header,
-      Offset globalPosition,
-      ) async {
+    GilinganHeader header,
+    Offset globalPosition,
+  ) async {
     final vm = context.read<GilinganViewModel>();
 
     // Pindah highlight ke row ini
@@ -179,6 +176,10 @@ class _GilinganScreenState extends State<GilinganScreen> {
           _closeContextMenu();
           // printing sudah dihandle di dalam GilinganRowPopover (PdfPrintService)
         },
+        onAuditHistory: () {
+          _closeContextMenu();
+          _navigateToAuditHistory(header);
+        },
       ),
       preferAbove: true,
       verticalGap: 8,
@@ -189,11 +190,20 @@ class _GilinganScreenState extends State<GilinganScreen> {
     );
   }
 
+  void _navigateToAuditHistory(GilinganHeader header) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            AuditScreenWithPrefilledDoc(documentNo: header.noGilingan),
+      ),
+    );
+  }
+
   /// Tap handler khusus untuk row yang punya partial: tampilkan popover partial.
   Future<void> _onPartialTap(
-      GilinganHeader header,
-      Offset globalPosition,
-      ) async {
+    GilinganHeader header,
+    Offset globalPosition,
+  ) async {
     final vm = context.read<GilinganViewModel>();
 
     // Set selected row
@@ -246,9 +256,9 @@ class _GilinganScreenState extends State<GilinganScreen> {
                     onSearchChanged: _onSearchChanged,
                     onClear: () {
                       searchCtrl.clear();
-                      context
-                          .read<GilinganViewModel>()
-                          .fetchHeaders(search: "");
+                      context.read<GilinganViewModel>().fetchHeaders(
+                        search: "",
+                      );
                     },
                     onAddPressed: _showFormDialog,
                   ),

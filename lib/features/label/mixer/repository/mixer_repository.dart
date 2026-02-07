@@ -68,9 +68,7 @@ class MixerRepository {
   Future<List<MixerDetail>> fetchDetails(String noMixer) async {
     final token = await TokenStorage.getToken();
 
-    final url = Uri.parse(
-      "${ApiConstants.baseUrl}/api/labels/mixer/$noMixer",
-    );
+    final url = Uri.parse("${ApiConstants.baseUrl}/api/labels/mixer/$noMixer");
 
     print("➡️ Fetching Mixer Details: $url");
 
@@ -133,11 +131,13 @@ class MixerRepository {
     final body = <String, dynamic>{
       "header": headerMap,
       "details": details
-          .map((d) => {
-        "NoSak": d.noSak,
-        "Berat": d.berat,
-        // no IdLokasi, no IsPartial here (IsPartial always 0 in BE)
-      })
+          .map(
+            (d) => {
+              "NoSak": d.noSak,
+              "Berat": d.berat,
+              // no IdLokasi, no IsPartial here (IsPartial always 0 in BE)
+            },
+          )
           .toList(),
       "outputCode": outputCode, // <-- selalu dikirim
     };
@@ -148,10 +148,12 @@ class MixerRepository {
     const encoder = JsonEncoder.withIndent('  ');
 
     debugPrint(
-        '==================== [MixerRepository] createMixer ====================');
+      '==================== [MixerRepository] createMixer ====================',
+    );
     debugPrint('➡️  URL           : $url');
     debugPrint(
-        '➡️  Token (short) : ${token != null && token.length > 20 ? token.substring(0, 20) + '...' : token}');
+      '➡️  Token (short) : ${token != null && token.length > 20 ? token.substring(0, 20) + '...' : token}',
+    );
     debugPrint('➡️  OutputCode    : $outputCode');
     debugPrint('➡️  HeaderMap     :\n${encoder.convert(headerMap)}');
     debugPrint('➡️  Details count : ${details.length}');
@@ -172,7 +174,9 @@ class MixerRepository {
 
     debugPrint('⬅️  Response status : ${resp.statusCode}');
     debugPrint('⬅️  Response body   : ${resp.body}');
-    debugPrint('=====================================================================');
+    debugPrint(
+      '=====================================================================',
+    );
 
     if (resp.statusCode == 200 || resp.statusCode == 201) {
       return json.decode(resp.body) as Map<String, dynamic>;
@@ -216,10 +220,7 @@ class MixerRepository {
       "header": headerMap,
       // As in Broker: sending "details" will REPLACE all details with DateUsage IS NULL
       "details": details
-          .map((d) => {
-        "NoSak": d.noSak,
-        "Berat": d.berat,
-      })
+          .map((d) => {"NoSak": d.noSak, "Berat": d.berat})
           .toList(),
     };
 

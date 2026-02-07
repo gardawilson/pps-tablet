@@ -53,7 +53,8 @@ class BrokerViewModel extends ChangeNotifier {
   // =============================
 
   /// Set / pindahkan highlight ke [no] (atau null untuk clear) tanpa memuat detail.
-  void setSelectedNoBroker(String? no) { // ⬅️ baru
+  void setSelectedNoBroker(String? no) {
+    // ⬅️ baru
     if (selectedNoBroker == no) return;
     selectedNoBroker = no;
     notifyListeners();
@@ -77,7 +78,7 @@ class BrokerViewModel extends ChangeNotifier {
 
       if (preselectId != null && jenisList.isNotEmpty) {
         selectedJenisPlastik = jenisList.firstWhere(
-              (e) => e.idJenisPlastik == preselectId,
+          (e) => e.idJenisPlastik == preselectId,
           orElse: () => jenisList.first,
         );
       } else if (jenisList.isNotEmpty) {
@@ -115,7 +116,6 @@ class BrokerViewModel extends ChangeNotifier {
       items = result['items'] as List<BrokerHeader>;
       _totalPages = result['totalPages'] ?? 1;
       _total = result['total'] ?? 0;
-
 
       debugPrint("✅ Page $_page loaded, total items: ${items.length}");
     } catch (e) {
@@ -157,7 +157,6 @@ class BrokerViewModel extends ChangeNotifier {
 
   bool get hasMore => _page < _totalPages;
 
-
   // === FETCH DETAIL ===
   Future<void> fetchDetails(String noBroker) async {
     // ⬅️ pastikan highlight pindah ke item yang dimuat detailnya
@@ -181,14 +180,17 @@ class BrokerViewModel extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>?> createBroker(
-      BrokerHeader header,
-      List<BrokerDetail> details,
-      ) async {
+    BrokerHeader header,
+    List<BrokerDetail> details,
+  ) async {
     try {
       isLoading = true;
       notifyListeners();
 
-      final res = await repository.createBroker(header: header, details: details);
+      final res = await repository.createBroker(
+        header: header,
+        details: details,
+      );
 
       lastCreatedNoBroker = res['data']?['header']?['NoBroker'] as String?;
 
@@ -210,12 +212,11 @@ class BrokerViewModel extends ChangeNotifier {
     }
   }
 
-
   Future<Map<String, dynamic>?> updateBroker(
-      String noBroker,
-      BrokerHeader header,
-      List<BrokerDetail> details,
-      ) async {
+    String noBroker,
+    BrokerHeader header,
+    List<BrokerDetail> details,
+  ) async {
     try {
       isLoading = true;
       notifyListeners();
@@ -242,7 +243,6 @@ class BrokerViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
-
 
   Future<bool> deleteWashing(String noBroker) async {
     try {
@@ -284,7 +284,10 @@ class BrokerViewModel extends ChangeNotifier {
       partialError = null;
       notifyListeners();
 
-      partialInfo = await repository.fetchPartialInfo(noBroker: nb, noSak: noSak);
+      partialInfo = await repository.fetchPartialInfo(
+        noBroker: nb,
+        noSak: noSak,
+      );
     } catch (e) {
       partialError = e.toString();
       partialInfo = null;
@@ -294,7 +297,6 @@ class BrokerViewModel extends ChangeNotifier {
     }
   }
 
-
   void resetForScreen() {
     // panggil ini saat masuk/keluar screen
     selectedNoBroker = null;
@@ -302,5 +304,4 @@ class BrokerViewModel extends ChangeNotifier {
     detailError = '';
     // items tetap dibiarkan; akan diisi fetchBrokerHeaders
   }
-
 }

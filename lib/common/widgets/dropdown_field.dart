@@ -54,7 +54,10 @@ class DropdownPlainField<T> extends StatefulWidget {
     this.onRetry,
     this.errorText,
     this.popupMaxHeight = 500,
-    this.contentPadding = const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+    this.contentPadding = const EdgeInsets.symmetric(
+      horizontal: 16,
+      vertical: 0,
+    ),
     this.compareFn,
   });
 
@@ -70,9 +73,14 @@ class _DropdownPlainFieldState<T> extends State<DropdownPlainField<T>>
   @override
   void initState() {
     super.initState();
-    _anim = AnimationController(vsync: this, duration: const Duration(milliseconds: 200));
-    _rot = CurvedAnimation(parent: _anim, curve: Curves.easeInOut)
-        .drive(Tween(begin: 0.0, end: 0.5));
+    _anim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    _rot = CurvedAnimation(
+      parent: _anim,
+      curve: Curves.easeInOut,
+    ).drive(Tween(begin: 0.0, end: 0.5));
   }
 
   @override
@@ -96,7 +104,10 @@ class _DropdownPlainFieldState<T> extends State<DropdownPlainField<T>>
       return _decorated(
         context,
         errorText: widget.fetchErrorText ?? 'Gagal mengambil data',
-        child: SizedBox(height: widget.fieldHeight, child: _fetchErrorRow(context)),
+        child: SizedBox(
+          height: widget.fieldHeight,
+          child: _fetchErrorRow(context),
+        ),
       );
     }
 
@@ -105,7 +116,8 @@ class _DropdownPlainFieldState<T> extends State<DropdownPlainField<T>>
       key: ValueKey(widget.value), // ✅ sinkron bila value berubah dari parent
       validator: widget.validator,
       autovalidateMode: widget.autovalidateMode,
-      initialValue: widget.value,  // hanya utk validator, tampilan pakai widgets.value
+      initialValue:
+          widget.value, // hanya utk validator, tampilan pakai widgets.value
       builder: (field) {
         final mergedError = widget.errorText ?? field.errorText;
 
@@ -118,7 +130,8 @@ class _DropdownPlainFieldState<T> extends State<DropdownPlainField<T>>
               height: widget.fieldHeight, // kunci tinggi agar seragam
               child: DropdownSearch<T>(
                 items: widget.items,
-                selectedItem: widget.value, // ✅ kunci tampilan ke nilai dari parent
+                selectedItem:
+                    widget.value, // ✅ kunci tampilan ke nilai dari parent
                 enabled: widget.enabled,
                 itemAsString: widget.itemAsString,
                 compareFn: widget.compareFn,
@@ -136,9 +149,11 @@ class _DropdownPlainFieldState<T> extends State<DropdownPlainField<T>>
                 dropdownBuilder: (context, selectedItem) {
                   final String text = (selectedItem == null)
                       ? widget.hint
-                      : (widget.itemAsString?.call(selectedItem) ?? '$selectedItem');
-                  final Color color =
-                  (selectedItem == null) ? Colors.grey.shade600 : Colors.black87;
+                      : (widget.itemAsString?.call(selectedItem) ??
+                            '$selectedItem');
+                  final Color color = (selectedItem == null)
+                      ? Colors.grey.shade600
+                      : Colors.black87;
 
                   return Align(
                     alignment: Alignment.centerLeft,
@@ -161,8 +176,11 @@ class _DropdownPlainFieldState<T> extends State<DropdownPlainField<T>>
                     animation: _rot,
                     builder: (_, __) => Transform.rotate(
                       angle: _rot.value * 3.14159,
-                      child: Icon(Icons.keyboard_arrow_down,
-                          color: Colors.grey.shade600, size: 24),
+                      child: Icon(
+                        Icons.keyboard_arrow_down,
+                        color: Colors.grey.shade600,
+                        size: 24,
+                      ),
                     ),
                   ),
                   alignment: Alignment.center,
@@ -191,7 +209,7 @@ class _DropdownPlainFieldState<T> extends State<DropdownPlainField<T>>
                 },
 
                 onChanged: (val) {
-                  field.didChange(val);        // agar validator aware
+                  field.didChange(val); // agar validator aware
                   widget.onChanged?.call(val); // lempar ke parent
                 },
               ),
@@ -203,7 +221,11 @@ class _DropdownPlainFieldState<T> extends State<DropdownPlainField<T>>
   }
 
   /// ===== InputDecorator wrapper =====
-  Widget _decorated(BuildContext context, {required Widget child, String? errorText}) {
+  Widget _decorated(
+    BuildContext context, {
+    required Widget child,
+    String? errorText,
+  }) {
     return InputDecorator(
       isFocused: false,
       decoration: InputDecoration(
@@ -211,7 +233,9 @@ class _DropdownPlainFieldState<T> extends State<DropdownPlainField<T>>
         floatingLabelBehavior: FloatingLabelBehavior.auto,
         helperText: widget.helperText,
         errorText: errorText,
-        prefixIcon: widget.prefixIcon != null ? Icon(widget.prefixIcon, size: 22) : null,
+        prefixIcon: widget.prefixIcon != null
+            ? Icon(widget.prefixIcon, size: 22)
+            : null,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         enabled: widget.enabled,
         isDense: true,
@@ -229,7 +253,10 @@ class _DropdownPlainFieldState<T> extends State<DropdownPlainField<T>>
         child: CircularProgressIndicator(strokeWidth: 2),
       ),
       const SizedBox(width: 12),
-      Text('Memuat...', style: TextStyle(fontSize: 16, color: Colors.grey.shade600)),
+      Text(
+        'Memuat...',
+        style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+      ),
     ],
   );
 
@@ -261,7 +288,9 @@ class _DropdownPlainFieldState<T> extends State<DropdownPlainField<T>>
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
       decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB), width: 0.5)),
+        border: Border(
+          bottom: BorderSide(color: Color(0xFFE5E7EB), width: 0.5),
+        ),
       ),
       child: Text(
         text,

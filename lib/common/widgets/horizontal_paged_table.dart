@@ -48,7 +48,8 @@ class HorizontalPagedTable<T> extends StatefulWidget {
   final WidgetBuilder? noItems;
 
   @override
-  State<HorizontalPagedTable<T>> createState() => _HorizontalPagedTableState<T>();
+  State<HorizontalPagedTable<T>> createState() =>
+      _HorizontalPagedTableState<T>();
 }
 
 class _HorizontalPagedTableState<T> extends State<HorizontalPagedTable<T>> {
@@ -67,9 +68,11 @@ class _HorizontalPagedTableState<T> extends State<HorizontalPagedTable<T>> {
       case TableWidthMode.content:
         return desired; // natural = konten
       case TableWidthMode.fill:
-        return desired >= cons.maxWidth ? desired : cons.maxWidth; // penuhi layar minimal
+        return desired >= cons.maxWidth
+            ? desired
+            : cons.maxWidth; // penuhi layar minimal
       case TableWidthMode.clamp:
-      // Hanya aman jika kolom bisa di-resize. Tetap pakai min(desired, viewport).
+        // Hanya aman jika kolom bisa di-resize. Tetap pakai min(desired, viewport).
         return desired <= cons.maxWidth ? desired : cons.maxWidth;
     }
   }
@@ -191,7 +194,8 @@ class _HorizontalPagedTableState<T> extends State<HorizontalPagedTable<T>> {
                       controller: widget.pagingController,
                       builder: (context, state, fetchNextPage) {
                         return RefreshIndicator(
-                          onRefresh: () async => widget.pagingController.refresh(),
+                          onRefresh: () async =>
+                              widget.pagingController.refresh(),
                           child: PagedListView<int, T>(
                             state: state,
                             fetchNextPage: fetchNextPage,
@@ -199,23 +203,29 @@ class _HorizontalPagedTableState<T> extends State<HorizontalPagedTable<T>> {
                             builderDelegate: PagedChildBuilderDelegate<T>(
                               itemBuilder: (context, item, index) {
                                 final selected =
-                                    widget.selectedPredicate?.call(item) ?? false;
+                                    widget.selectedPredicate?.call(item) ??
+                                    false;
                                 final isEven = index % 2 == 0;
                                 final bgColor = selected
                                     ? Colors.blue.shade50
-                                    : (isEven ? Colors.white : Colors.grey.shade50);
+                                    : (isEven
+                                          ? Colors.white
+                                          : Colors.grey.shade50);
 
                                 return GestureDetector(
                                   behavior: HitTestBehavior.opaque,
-                                  onLongPressStart: (d) =>
-                                      widget.onRowLongPress?.call(item, d.globalPosition),
-                                  onSecondaryTapDown: (d) =>
-                                      widget.onRowLongPress?.call(item, d.globalPosition),
+                                  onLongPressStart: (d) => widget.onRowLongPress
+                                      ?.call(item, d.globalPosition),
+                                  onSecondaryTapDown: (d) => widget
+                                      .onRowLongPress
+                                      ?.call(item, d.globalPosition),
                                   child: InkWell(
                                     onTap: () => widget.onRowTap?.call(item),
                                     child: AnimatedContainer(
                                       height: widget.rowHeight,
-                                      duration: const Duration(milliseconds: 150),
+                                      duration: const Duration(
+                                        milliseconds: 150,
+                                      ),
                                       curve: Curves.easeInOut,
                                       decoration: BoxDecoration(
                                         color: bgColor,
@@ -226,14 +236,17 @@ class _HorizontalPagedTableState<T> extends State<HorizontalPagedTable<T>> {
                                                 : Colors.transparent,
                                             width: kLeftBorderW,
                                           ),
-                                          bottom: BorderSide(color: Colors.grey.shade200),
+                                          bottom: BorderSide(
+                                            color: Colors.grey.shade200,
+                                          ),
                                         ),
                                       ),
                                       // 🔒 + ✂️ kunci & clip isi row
                                       child: ClipRect(
                                         child: Padding(
                                           padding: EdgeInsets.symmetric(
-                                            horizontal: widget.horizontalPadding,
+                                            horizontal:
+                                                widget.horizontalPadding,
                                           ),
                                           child: SizedBox(
                                             width: _contentWidth,
@@ -243,7 +256,9 @@ class _HorizontalPagedTableState<T> extends State<HorizontalPagedTable<T>> {
                                                 return SizedBox(
                                                   width: c.width,
                                                   child: Align(
-                                                    alignment: _toAlignment(c.cellAlign),
+                                                    alignment: _toAlignment(
+                                                      c.cellAlign,
+                                                    ),
                                                     child: DefaultTextStyle(
                                                       style: TextStyle(
                                                         fontSize: 15,
@@ -251,10 +266,17 @@ class _HorizontalPagedTableState<T> extends State<HorizontalPagedTable<T>> {
                                                             ? FontWeight.bold
                                                             : FontWeight.w500,
                                                         color: selected
-                                                            ? Colors.blue.shade900
-                                                            : Colors.grey.shade800,
+                                                            ? Colors
+                                                                  .blue
+                                                                  .shade900
+                                                            : Colors
+                                                                  .grey
+                                                                  .shade800,
                                                       ),
-                                                      child: c.cellBuilder(context, item),
+                                                      child: c.cellBuilder(
+                                                        context,
+                                                        item,
+                                                      ),
                                                     ),
                                                   ),
                                                 );
@@ -268,37 +290,44 @@ class _HorizontalPagedTableState<T> extends State<HorizontalPagedTable<T>> {
                                 );
                               },
                               firstPageProgressIndicatorBuilder:
-                              widget.firstPageProgress ??
-                                      (_) => const Center(
+                                  widget.firstPageProgress ??
+                                  (_) => const Center(
                                     child: Padding(
                                       padding: EdgeInsets.all(24),
                                       child: CircularProgressIndicator(),
                                     ),
                                   ),
                               newPageProgressIndicatorBuilder:
-                              widget.newPageProgress ??
-                                      (_) => const Padding(
+                                  widget.newPageProgress ??
+                                  (_) => const Padding(
                                     padding: EdgeInsets.symmetric(vertical: 16),
-                                    child: Center(child: CircularProgressIndicator()),
+                                    child: Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
                                   ),
                               firstPageErrorIndicatorBuilder:
-                              widget.firstPageError ??
-                                      (_) => Center(
+                                  widget.firstPageError ??
+                                  (_) => Center(
                                     child: Padding(
                                       padding: EdgeInsets.all(24),
-                                      child: Text('Terjadi kesalahan memuat data.'),
+                                      child: Text(
+                                        'Terjadi kesalahan memuat data.',
+                                      ),
                                     ),
                                   ),
                               newPageErrorIndicatorBuilder:
-                              widget.newPageError ??
-                                      (_) => const Padding(
+                                  widget.newPageError ??
+                                  (_) => const Padding(
                                     padding: EdgeInsets.symmetric(vertical: 16),
-                                    child:
-                                    Center(child: Text('Gagal memuat halaman berikutnya')),
+                                    child: Center(
+                                      child: Text(
+                                        'Gagal memuat halaman berikutnya',
+                                      ),
+                                    ),
                                   ),
                               noItemsFoundIndicatorBuilder:
-                              widget.noItems ??
-                                      (_) => const Center(
+                                  widget.noItems ??
+                                  (_) => const Center(
                                     child: Padding(
                                       padding: EdgeInsets.all(24),
                                       child: Text('Tidak ada data.'),

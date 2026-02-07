@@ -1,6 +1,7 @@
 // lib/features/production/hot_stamp/view/hot_stamp_production_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
@@ -63,7 +64,7 @@ class _HotStampProductionScreenState extends State<HotStampProductionScreen> {
     required Offset globalPos,
   }) async {
     final overlay =
-    Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
+        Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
     if (overlay == null) return;
 
     final local = overlay.globalToLocal(globalPos);
@@ -108,8 +109,9 @@ class _HotStampProductionScreenState extends State<HotStampProductionScreen> {
                       return HotStampProductionDeleteDialog(
                         header: row,
                         onConfirm: () async {
-                          final success =
-                          await _viewModel.deleteProduksi(row.noProduksi);
+                          final success = await _viewModel.deleteProduksi(
+                            row.noProduksi,
+                          );
 
                           if (ctx.mounted) Navigator.of(ctx).pop();
                           if (!context.mounted) return;
@@ -120,7 +122,7 @@ class _HotStampProductionScreenState extends State<HotStampProductionScreen> {
                               builder: (_) => SuccessStatusDialog(
                                 title: 'Berhasil Menghapus',
                                 message:
-                                'No. Produksi ${row.noProduksi} berhasil dihapus.',
+                                    'No. Produksi ${row.noProduksi} berhasil dihapus.',
                               ),
                             );
                           } else {
@@ -142,11 +144,23 @@ class _HotStampProductionScreenState extends State<HotStampProductionScreen> {
                 onPrint: () {
                   // TODO: kalau nanti ada cetak label hot stamp
                 },
+                onAuditHistory: () {
+                  _navigateToAuditHistory(row);
+                },
               ),
             ),
           ],
         );
       },
+    );
+  }
+
+  void _navigateToAuditHistory(HotStampProduction header) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            AuditScreenWithPrefilledDoc(documentNo: header.noProduksi),
+      ),
     );
   }
 
@@ -271,7 +285,7 @@ class _HotStampProductionScreenState extends State<HotStampProductionScreen> {
                     columns: columns,
                     horizontalPadding: 16,
                     selectedPredicate: (r) =>
-                    r.noProduksi == _selectedNoProduksi,
+                        r.noProduksi == _selectedNoProduksi,
                     onRowTap: (r) =>
                         setState(() => _selectedNoProduksi = r.noProduksi),
                     onRowLongPress: (r, globalPos) async {
@@ -322,9 +336,7 @@ class _HotStampProductionScreenState extends State<HotStampProductionScreen> {
       debugPrint('🟦 [HOTSTAMP_SCREEN] Success detected (create).');
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Produksi hot stamp berhasil dibuat'),
-        ),
+        const SnackBar(content: Text('Produksi hot stamp berhasil dibuat')),
       );
     } else {
       debugPrint('🟦 [HOTSTAMP_SCREEN] Result was null or false: $created');
@@ -332,11 +344,12 @@ class _HotStampProductionScreenState extends State<HotStampProductionScreen> {
   }
 
   Future<void> _openEditDialog(
-      BuildContext context,
-      HotStampProduction row,
-      ) async {
+    BuildContext context,
+    HotStampProduction row,
+  ) async {
     debugPrint(
-        '🟦 [HOTSTAMP_SCREEN] Opening edit dialog for: ${row.noProduksi}');
+      '🟦 [HOTSTAMP_SCREEN] Opening edit dialog for: ${row.noProduksi}',
+    );
     debugPrint('🟦 [HOTSTAMP_SCREEN] Using VM hash=${_viewModel.hashCode}');
     debugPrint(
       '🟦 [HOTSTAMP_SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
@@ -353,9 +366,7 @@ class _HotStampProductionScreenState extends State<HotStampProductionScreen> {
         // ✅ Share the SAME VM instance
         return ChangeNotifierProvider<HotStampProductionViewModel>.value(
           value: _viewModel,
-          child: HotStampProductionFormDialog(
-            header: row,
-          ),
+          child: HotStampProductionFormDialog(header: row),
         );
       },
     );

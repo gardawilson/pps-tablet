@@ -9,8 +9,8 @@ class AppNumberField extends StatelessWidget {
   // Behavior
   final bool enabled;
   final bool readOnly;
-  final bool allowDecimal;     // izinkan angka desimal
-  final bool allowNegative;    // izinkan angka negatif
+  final bool allowDecimal; // izinkan angka desimal
+  final bool allowNegative; // izinkan angka negatif
   final String decimalSeparator; // '.', ','
 
   final int? maxLength;
@@ -46,7 +46,10 @@ class AppNumberField extends StatelessWidget {
     this.validator,
     this.onChanged,
     this.onSubmitted,
-  }) : assert(decimalSeparator == '.' || decimalSeparator == ',', 'decimalSeparator must be "." or ","');
+  }) : assert(
+         decimalSeparator == '.' || decimalSeparator == ',',
+         'decimalSeparator must be "." or ","',
+       );
 
   // Build regex formatter sesuai opsi
   List<TextInputFormatter> _formatters() {
@@ -63,9 +66,7 @@ class AppNumberField extends StatelessWidget {
     } else {
       pattern = r'^\d*$';
     }
-    return [
-      FilteringTextInputFormatter.allow(RegExp(pattern)),
-    ];
+    return [FilteringTextInputFormatter.allow(RegExp(pattern))];
   }
 
   TextInputType _keyboard() {
@@ -91,12 +92,19 @@ class AppNumberField extends StatelessWidget {
         labelText: label,
         labelStyle: const TextStyle(fontSize: 15),
         hintText: hintText,
-        prefixIcon: Icon(icon, size: 22, color: enabled ? null : Theme.of(context).disabledColor),
+        prefixIcon: Icon(
+          icon,
+          size: 22,
+          color: enabled ? null : Theme.of(context).disabledColor,
+        ),
         prefixText: prefixText,
         suffixIcon: suffixIcon,
         suffixText: suffixText,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
       ),
       validator: validator,
       onChanged: onChanged,

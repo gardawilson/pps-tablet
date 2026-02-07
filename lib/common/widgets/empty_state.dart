@@ -100,10 +100,7 @@ class EmptyState extends StatelessWidget {
             ],
 
             // Action widget (optional)
-            if (action != null) ...[
-              const SizedBox(height: 24),
-              action!,
-            ],
+            if (action != null) ...[const SizedBox(height: 24), action!],
           ],
         ),
       ),

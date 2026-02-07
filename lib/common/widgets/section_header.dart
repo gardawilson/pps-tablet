@@ -77,11 +77,7 @@ class SectionHeader extends StatelessWidget {
     return Row(
       children: [
         // Icon
-        Icon(
-          icon,
-          size: iconSize,
-          color: iconColor ?? const Color(0xFF42526E),
-        ),
+        Icon(icon, size: iconSize, color: iconColor ?? const Color(0xFF42526E)),
 
         SizedBox(width: spacing),
 
@@ -117,10 +113,7 @@ class SectionHeader extends StatelessWidget {
         ],
 
         // Action widget (optional)
-        if (action != null) ...[
-          const Spacer(),
-          action!,
-        ],
+        if (action != null) ...[const Spacer(), action!],
       ],
     );
   }

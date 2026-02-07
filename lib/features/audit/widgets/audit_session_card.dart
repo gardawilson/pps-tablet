@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:pps_tablet/features/audit/widgets/components/action_lozenge.dart';
 
 import '../model/audit_session_model.dart';
 
@@ -11,11 +12,11 @@ class AuditSessionCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const AuditSessionCard({
-    Key? key,
+    super.key,
     required this.session,
     required this.isSelected,
     required this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -33,10 +34,7 @@ class AuditSessionCard extends StatelessWidget {
             color: isSelected ? const Color(0xFF0052CC) : Colors.transparent,
             width: 3,
           ),
-          bottom: BorderSide(
-            color: const Color(0xFFDFE1E6),
-            width: 1,
-          ),
+          bottom: BorderSide(color: const Color(0xFFDFE1E6), width: 1),
         ),
       ),
       child: Material(
@@ -51,9 +49,7 @@ class AuditSessionCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 // Action type badge (Atlassian style lozenge)
-                _AtlassianLozenge(
-                  action: session.sessionAction,
-                ),
+                ActionLozenge(action: session.sessionAction),
 
                 const SizedBox(width: 12),
 
@@ -95,7 +91,8 @@ class AuditSessionCard extends StatelessWidget {
                               ),
                               child: const Center(
                                 child: Icon(
-                                  Icons.person_rounded, // atau Icons.person_outline_rounded
+                                  Icons
+                                      .person_rounded, // atau Icons.person_outline_rounded
                                   size: 14,
                                   color: Colors.white,
                                 ),
@@ -172,125 +169,20 @@ class AuditSessionCard extends StatelessWidget {
 }
 
 // =============================
-// Atlassian-style Lozenge Badge
-// =============================
-class _AtlassianLozenge extends StatelessWidget {
-  final String action;
-
-  const _AtlassianLozenge({required this.action});
-
-  @override
-  Widget build(BuildContext context) {
-    final config = _getConfig(action);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: config.backgroundColor,
-        borderRadius: BorderRadius.circular(3),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(
-              color: config.dotColor,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            action.toUpperCase(),
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: config.textColor,
-              letterSpacing: 0.3,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  _LozengeConfig _getConfig(String action) {
-    switch (action.toUpperCase()) {
-      case 'CREATE':
-        return _LozengeConfig(
-          backgroundColor: const Color(0xFFE3FCEF),
-          textColor: const Color(0xFF006644),
-          dotColor: const Color(0xFF36B37E),
-        );
-      case 'UPDATE':
-        return _LozengeConfig(
-          backgroundColor: const Color(0xFFDEEBFF),
-          textColor: const Color(0xFF0747A6),
-          dotColor: const Color(0xFF0052CC),
-        );
-      case 'DELETE':
-        return _LozengeConfig(
-          backgroundColor: const Color(0xFFFFEBEB),
-          textColor: const Color(0xFFBF2600),
-          dotColor: const Color(0xFFDE350B),
-        );
-      case 'CONSUME':
-        return _LozengeConfig(
-          backgroundColor: const Color(0xFFFFF0E5),
-          textColor: const Color(0xFF974F0C),
-          dotColor: const Color(0xFFFF991F),
-        );
-      case 'UNCONSUME':
-        return _LozengeConfig(
-          backgroundColor: const Color(0xFFEAE6FF),
-          textColor: const Color(0xFF403294),
-          dotColor: const Color(0xFF6554C0),
-        );
-      default:
-        return _LozengeConfig(
-          backgroundColor: const Color(0xFFF4F5F7),
-          textColor: const Color(0xFF42526E),
-          dotColor: const Color(0xFF6B778C),
-        );
-    }
-  }
-}
-
-class _LozengeConfig {
-  final Color backgroundColor;
-  final Color textColor;
-  final Color dotColor;
-
-  _LozengeConfig({
-    required this.backgroundColor,
-    required this.textColor,
-    required this.dotColor,
-  });
-}
-
-// =============================
 // Metadata Item Component
 // =============================
 class _MetadataItem extends StatelessWidget {
   final IconData icon;
   final String text;
 
-  const _MetadataItem({
-    required this.icon,
-    required this.text,
-  });
+  const _MetadataItem({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
-          icon,
-          size: 14,
-          color: const Color(0xFF6B778C),
-        ),
+        Icon(icon, size: 14, color: const Color(0xFF6B778C)),
         const SizedBox(width: 4),
         Text(
           text,

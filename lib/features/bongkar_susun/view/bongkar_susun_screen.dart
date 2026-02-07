@@ -1,5 +1,6 @@
 // lib/features/shared/bongkar_susun/view/bongkar_susun_screen.dart
 import 'package:flutter/material.dart';
+import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:pps_tablet/features/bongkar_susun/view/bongkar_susun_input_screen.dart';
 import 'package:provider/provider.dart';
 
@@ -39,7 +40,7 @@ class _BongkarSusunScreenState extends State<BongkarSusunScreen> {
     super.initState();
 
     // ✅ Screen hanya tahu tentang ViewModel, tidak peduli repository
-    _viewModel = BongkarSusunViewModel();  // ← Clean!
+    _viewModel = BongkarSusunViewModel(); // ← Clean!
 
     debugPrint(
       '🟦🟦🟦 [SCREEN] initState: Created VM hash=${_viewModel.hashCode}',
@@ -65,7 +66,7 @@ class _BongkarSusunScreenState extends State<BongkarSusunScreen> {
     required Offset globalPos,
   }) async {
     final overlay =
-    Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
+        Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
     if (overlay == null) return;
 
     final local = overlay.globalToLocal(globalPos);
@@ -112,8 +113,9 @@ class _BongkarSusunScreenState extends State<BongkarSusunScreen> {
                       return BongkarSusunDeleteDialog(
                         header: row,
                         onConfirm: () async {
-                          final success =
-                          await _viewModel.deleteBongkarSusun(row.noBongkarSusun);
+                          final success = await _viewModel.deleteBongkarSusun(
+                            row.noBongkarSusun,
+                          );
 
                           if (ctx.mounted) Navigator.of(ctx).pop();
                           if (!context.mounted) return;
@@ -124,7 +126,7 @@ class _BongkarSusunScreenState extends State<BongkarSusunScreen> {
                               builder: (_) => SuccessStatusDialog(
                                 title: 'Berhasil Menghapus',
                                 message:
-                                'No. Bongkar/Susun ${row.noBongkarSusun} berhasil dihapus.',
+                                    'No. Bongkar/Susun ${row.noBongkarSusun} berhasil dihapus.',
                               ),
                             );
                           } else {
@@ -143,11 +145,23 @@ class _BongkarSusunScreenState extends State<BongkarSusunScreen> {
                     },
                   );
                 },
+                onAuditHistory: () {
+                  _navigateToAuditHistory(row);
+                },
               ),
             ),
           ],
         );
       },
+    );
+  }
+
+  void _navigateToAuditHistory(BongkarSusun header) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            AuditScreenWithPrefilledDoc(documentNo: header.noBongkarSusun),
+      ),
     );
   }
 
@@ -237,9 +251,9 @@ class _BongkarSusunScreenState extends State<BongkarSusunScreen> {
                     columns: columns,
                     horizontalPadding: 16,
                     selectedPredicate: (r) =>
-                    r.noBongkarSusun == _selectedNoBongkarSusun,
+                        r.noBongkarSusun == _selectedNoBongkarSusun,
                     onRowTap: (r) => setState(
-                          () => _selectedNoBongkarSusun = r.noBongkarSusun,
+                      () => _selectedNoBongkarSusun = r.noBongkarSusun,
                     ),
                     onRowLongPress: (r, globalPos) async {
                       await _showRowPopover(
@@ -289,19 +303,14 @@ class _BongkarSusunScreenState extends State<BongkarSusunScreen> {
       debugPrint('🟦 [SCREEN] Success detected (create).');
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Bongkar/Susun berhasil dibuat'),
-        ),
+        const SnackBar(content: Text('Bongkar/Susun berhasil dibuat')),
       );
     } else {
       debugPrint('🟦 [SCREEN] Result was null or false: $created');
     }
   }
 
-  Future<void> _openEditDialog(
-      BuildContext context,
-      BongkarSusun row,
-      ) async {
+  Future<void> _openEditDialog(BuildContext context, BongkarSusun row) async {
     debugPrint('🟦 [SCREEN] Opening edit dialog for: ${row.noBongkarSusun}');
     debugPrint('🟦 [SCREEN] Using VM hash=${_viewModel.hashCode}');
     debugPrint(
@@ -319,9 +328,7 @@ class _BongkarSusunScreenState extends State<BongkarSusunScreen> {
         // ✅ Share the SAME VM instance
         return ChangeNotifierProvider<BongkarSusunViewModel>.value(
           value: _viewModel,
-          child: BongkarSusunFormDialog(
-            header: row,
-          ),
+          child: BongkarSusunFormDialog(header: row),
         );
       },
     );

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/services/dialog_service.dart';
@@ -99,9 +100,7 @@ class _RejectScreenState extends State<RejectScreen> {
       context: context,
       barrierDismissible: false,
       useSafeArea: false,
-      builder: (_) => RejectFormDialog(
-        header: header,
-      ),
+      builder: (_) => RejectFormDialog(header: header),
     );
   }
 
@@ -162,9 +161,9 @@ class _RejectScreenState extends State<RejectScreen> {
 
   /// Long-press handler: set highlight & show row popover (Edit / Print / Delete)
   Future<void> _onItemLongPress(
-      RejectHeader header,
-      Offset globalPosition,
-      ) async {
+    RejectHeader header,
+    Offset globalPosition,
+  ) async {
     final vm = context.read<RejectViewModel>();
 
     // Pindah highlight ke row ini
@@ -189,6 +188,10 @@ class _RejectScreenState extends State<RejectScreen> {
           _closeContextMenu();
           // printing sudah di-handle di dalam RejectRowPopover
         },
+        onAuditHistory: () {
+          _closeContextMenu();
+          _navigateToAuditHistory(header);
+        },
       ),
       preferAbove: true,
       verticalGap: 8,
@@ -196,6 +199,15 @@ class _RejectScreenState extends State<RejectScreen> {
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutBack,
       startScale: 0.94,
+    );
+  }
+
+  void _navigateToAuditHistory(RejectHeader header) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            AuditScreenWithPrefilledDoc(documentNo: header.noReject),
+      ),
     );
   }
 
@@ -261,9 +273,7 @@ class _RejectScreenState extends State<RejectScreen> {
                     onSearchChanged: _onSearchChanged,
                     onClear: () {
                       searchCtrl.clear();
-                      context
-                          .read<RejectViewModel>()
-                          .fetchHeaders(search: "");
+                      context.read<RejectViewModel>().fetchHeaders(search: "");
                     },
                     onAddPressed: _showFormDialog,
                   ),

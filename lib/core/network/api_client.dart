@@ -26,8 +26,7 @@ class ApiClient {
 
   static const Duration _timeout = Duration(seconds: 25);
 
-  String get _base =>
-      ApiConstants.baseUrl.replaceFirst(RegExp(r'/*$'), '');
+  String get _base => ApiConstants.baseUrl.replaceFirst(RegExp(r'/*$'), '');
 
   /// Build URL from path + query
   Uri _buildUri(String path, [Map<String, dynamic>? query]) {
@@ -35,9 +34,7 @@ class ApiClient {
     final cleanPath = path.startsWith('/') ? path : '/$path';
 
     return Uri.parse('$base$cleanPath').replace(
-      queryParameters: query?.map(
-            (k, v) => MapEntry(k, v?.toString() ?? ''),
-      ),
+      queryParameters: query?.map((k, v) => MapEntry(k, v?.toString() ?? '')),
     );
   }
 
@@ -51,11 +48,11 @@ class ApiClient {
   }
 
   Future<http.Response> _send(
-      String method,
-      String path, {
-        Map<String, dynamic>? query,
-        Object? body,
-      }) async {
+    String method,
+    String path, {
+    Map<String, dynamic>? query,
+    Object? body,
+  }) async {
     final url = _buildUri(path, query);
     final headers = await _headers();
 
@@ -70,9 +67,7 @@ class ApiClient {
     try {
       switch (method) {
         case 'GET':
-          resp = await _client
-              .get(url, headers: headers)
-              .timeout(_timeout);
+          resp = await _client.get(url, headers: headers).timeout(_timeout);
           break;
         case 'POST':
           resp = await _client
@@ -86,7 +81,11 @@ class ApiClient {
           break;
         case 'DELETE':
           resp = await _client
-              .delete(url, headers: headers, body: body != null ? json.encode(body) : null)
+              .delete(
+                url,
+                headers: headers,
+                body: body != null ? json.encode(body) : null,
+              )
               .timeout(_timeout);
           break;
         default:
@@ -99,8 +98,10 @@ class ApiClient {
       rethrow;
     }
 
-    print('⬅️ [${resp.statusCode}] in '
-        '${DateTime.now().difference(started).inMilliseconds}ms');
+    print(
+      '⬅️ [${resp.statusCode}] in '
+      '${DateTime.now().difference(started).inMilliseconds}ms',
+    );
     if (resp.body.isNotEmpty) {
       print('📨 Body: ${resp.body}');
     }
@@ -125,9 +126,9 @@ class ApiClient {
   // ---------------------------
 
   Future<Map<String, dynamic>> getJson(
-      String path, {
-        Map<String, dynamic>? query,
-      }) async {
+    String path, {
+    Map<String, dynamic>? query,
+  }) async {
     final resp = await _send('GET', path, query: query);
 
     if (resp.statusCode < 200 || resp.statusCode >= 300) {
@@ -142,10 +143,10 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> postJson(
-      String path, {
-        Map<String, dynamic>? query,
-        Object? body,
-      }) async {
+    String path, {
+    Map<String, dynamic>? query,
+    Object? body,
+  }) async {
     final resp = await _send('POST', path, query: query, body: body);
 
     if (resp.statusCode < 200 || resp.statusCode >= 300) {
@@ -160,10 +161,10 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> putJson(
-      String path, {
-        Map<String, dynamic>? query,
-        Object? body,
-      }) async {
+    String path, {
+    Map<String, dynamic>? query,
+    Object? body,
+  }) async {
     final resp = await _send('PUT', path, query: query, body: body);
 
     if (resp.statusCode < 200 || resp.statusCode >= 300) {
@@ -179,10 +180,10 @@ class ApiClient {
 
   /// Delete yang mungkin mengembalikan body (200) atau tidak (204).
   Future<Map<String, dynamic>> deleteJson(
-      String path, {
-        Map<String, dynamic>? query,
-        Object? body,
-      }) async {
+    String path, {
+    Map<String, dynamic>? query,
+    Object? body,
+  }) async {
     final resp = await _send('DELETE', path, query: query, body: body);
 
     if (resp.statusCode < 200 || resp.statusCode >= 300) {

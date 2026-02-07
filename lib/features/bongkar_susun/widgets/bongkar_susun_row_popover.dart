@@ -14,6 +14,7 @@ class BongkarSusunRowPopover extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback? onPrint; // opsional
+  final VoidCallback onAuditHistory;
 
   const BongkarSusunRowPopover({
     super.key,
@@ -23,6 +24,7 @@ class BongkarSusunRowPopover extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     this.onPrint,
+    required this.onAuditHistory,
   });
 
   void _runAndClose(VoidCallback action) {
@@ -45,8 +47,11 @@ class BongkarSusunRowPopover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final divider =
-    Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
+    final divider = Divider(
+      height: 0,
+      thickness: 0.6,
+      color: Colors.grey.shade300,
+    );
 
     // Permissions (sesuaikan dengan ACL backend)
     final perm = context.watch<PermissionViewModel>();
@@ -57,7 +62,7 @@ class BongkarSusunRowPopover extends StatelessWidget {
     final subtitle = [
       row.tanggalText.isNotEmpty ? row.tanggalText : '-',
       if ((row.note ?? '').trim().isNotEmpty)
-        (row.note!.length > 30 ? '${row.note!.substring(0, 30)}…' : row.note!)
+        (row.note!.length > 30 ? '${row.note!.substring(0, 30)}…' : row.note!),
     ].where((e) => e.isNotEmpty).join(' • ');
 
     return ConstrainedBox(
@@ -73,8 +78,10 @@ class BongkarSusunRowPopover extends StatelessWidget {
             children: [
               // Header band (samakan gaya dengan gilingan)
               Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [Colors.teal.shade400, Colors.teal.shade600],
@@ -144,6 +151,14 @@ class BongkarSusunRowPopover extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+              divider,
+
+              _MenuTile(
+                icon: Icons.history,
+                label: 'History',
+                enabled: true,
+                onTap: () => _runAndClose(onAuditHistory),
               ),
               divider,
 
@@ -222,8 +237,9 @@ class _MenuTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final effectiveIconColor =
-    enabled ? (iconColor ?? theme.iconTheme.color) : Colors.grey;
+    final effectiveIconColor = enabled
+        ? (iconColor ?? theme.iconTheme.color)
+        : Colors.grey;
 
     final baseStyle =
         theme.textTheme.bodyMedium ?? const TextStyle(fontSize: 14);

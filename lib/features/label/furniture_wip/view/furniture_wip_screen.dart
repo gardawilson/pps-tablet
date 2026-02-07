@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/services/dialog_service.dart';
@@ -42,7 +43,8 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
     if (_isPartialHeader(header)) {
       await DialogService.instance.showError(
         title: 'Tidak bisa edit',
-        message: 'Label ${header.noFurnitureWip} tidak bisa diedit karena statusnya PARTIAL.',
+        message:
+            'Label ${header.noFurnitureWip} tidak bisa diedit karena statusnya PARTIAL.',
       );
       return;
     }
@@ -54,15 +56,14 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
     if (_isPartialHeader(header)) {
       await DialogService.instance.showError(
         title: 'Tidak bisa hapus',
-        message: 'Label ${header.noFurnitureWip} tidak bisa dihapus karena statusnya PARTIAL.',
+        message:
+            'Label ${header.noFurnitureWip} tidak bisa dihapus karena statusnya PARTIAL.',
       );
       return;
     }
 
     _confirmDelete(header);
   }
-
-
 
   @override
   void initState() {
@@ -97,9 +98,7 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
       context: context,
       barrierDismissible: false,
       useSafeArea: false,
-      builder: (_) => FurnitureWipFormDialog(
-        header: header,
-      ),
+      builder: (_) => FurnitureWipFormDialog(header: header),
     );
   }
 
@@ -125,9 +124,9 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
 
   /// Long-press handler: set highlight & show row popover (Edit / Print / Delete)
   Future<void> _onItemLongPress(
-      FurnitureWipHeader header,
-      Offset globalPosition,
-      ) async {
+    FurnitureWipHeader header,
+    Offset globalPosition,
+  ) async {
     final vm = context.read<FurnitureWipViewModel>();
 
     // Pindah highlight ke row ini
@@ -152,6 +151,10 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
           _closeContextMenu();
           // printing sudah dihandle di dalam FurnitureWipRowPopover
         },
+        onAuditHistory: () {
+          _closeContextMenu();
+          _navigateToAuditHistory(header);
+        },
       ),
       preferAbove: true,
       verticalGap: 8,
@@ -159,6 +162,15 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutBack,
       startScale: 0.94,
+    );
+  }
+
+  void _navigateToAuditHistory(FurnitureWipHeader header) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            AuditScreenWithPrefilledDoc(documentNo: header.noFurnitureWip),
+      ),
     );
   }
 
@@ -221,9 +233,9 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
                     onSearchChanged: _onSearchChanged,
                     onClear: () {
                       searchCtrl.clear();
-                      context
-                          .read<FurnitureWipViewModel>()
-                          .fetchHeaders(search: "");
+                      context.read<FurnitureWipViewModel>().fetchHeaders(
+                        search: "",
+                      );
                     },
                     onAddPressed: _showFormDialog,
                   ),

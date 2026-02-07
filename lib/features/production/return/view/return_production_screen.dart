@@ -1,6 +1,7 @@
 // lib/features/shared/return_production/view/return_production_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
@@ -17,8 +18,6 @@ import '../widgets/return_production_action_bar.dart';
 import '../widgets/return_production_delete_dialog.dart';
 import '../widgets/return_production_form_dialog.dart';
 import '../widgets/return_production_row_popover.dart';
-
-
 
 class ReturnProductionScreen extends StatefulWidget {
   const ReturnProductionScreen({super.key});
@@ -62,7 +61,7 @@ class _ReturnProductionScreenState extends State<ReturnProductionScreen> {
     required Offset globalPos,
   }) async {
     final overlay =
-    Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
+        Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
     if (overlay == null) return;
 
     final local = overlay.globalToLocal(globalPos);
@@ -96,8 +95,9 @@ class _ReturnProductionScreenState extends State<ReturnProductionScreen> {
                       return ReturnProductionDeleteDialog(
                         header: row,
                         onConfirm: () async {
-                          final success =
-                          await _viewModel.deleteReturn(row.noRetur);
+                          final success = await _viewModel.deleteReturn(
+                            row.noRetur,
+                          );
 
                           if (ctx.mounted) Navigator.of(ctx).pop();
                           if (!context.mounted) return;
@@ -108,7 +108,7 @@ class _ReturnProductionScreenState extends State<ReturnProductionScreen> {
                               builder: (_) => SuccessStatusDialog(
                                 title: 'Berhasil Menghapus',
                                 message:
-                                'No. Retur ${row.noRetur} berhasil dihapus.',
+                                    'No. Retur ${row.noRetur} berhasil dihapus.',
                               ),
                             );
                           } else {
@@ -127,11 +127,23 @@ class _ReturnProductionScreenState extends State<ReturnProductionScreen> {
                     },
                   );
                 },
+                onAuditHistory: () {
+                  _navigateToAuditHistory(row);
+                },
               ),
             ),
           ],
         );
       },
+    );
+  }
+
+  void _navigateToAuditHistory(ReturnProduction header) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            AuditScreenWithPrefilledDoc(documentNo: header.noRetur),
+      ),
     );
   }
 
@@ -154,11 +166,8 @@ class _ReturnProductionScreenState extends State<ReturnProductionScreen> {
               width: 160,
               headerAlign: TextAlign.left,
               cellAlign: TextAlign.left,
-              cellBuilder: (_, r) => Text(
-                r.noRetur,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+              cellBuilder: (_, r) =>
+                  Text(r.noRetur, maxLines: 1, overflow: TextOverflow.ellipsis),
             ),
             TableColumnSpec(
               title: 'TANGGAL',
@@ -234,7 +243,8 @@ class _ReturnProductionScreenState extends State<ReturnProductionScreen> {
                     columns: columns,
                     horizontalPadding: 16,
                     selectedPredicate: (r) => r.noRetur == _selectedNoRetur,
-                    onRowTap: (r) => setState(() => _selectedNoRetur = r.noRetur),
+                    onRowTap: (r) =>
+                        setState(() => _selectedNoRetur = r.noRetur),
                     onRowLongPress: (r, globalPos) async {
                       await _showRowPopover(
                         context: context,
@@ -279,17 +289,15 @@ class _ReturnProductionScreenState extends State<ReturnProductionScreen> {
 
     if (created != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Return ${created.noRetur} berhasil dibuat'),
-        ),
+        SnackBar(content: Text('Return ${created.noRetur} berhasil dibuat')),
       );
     }
   }
 
   Future<void> _openEditDialog(
-      BuildContext context,
-      ReturnProduction row,
-      ) async {
+    BuildContext context,
+    ReturnProduction row,
+  ) async {
     debugPrint('🟩 [RETURN_SCREEN] Opening edit dialog: ${row.noRetur}');
     debugPrint('🟩 [RETURN_SCREEN] Using VM hash=${_viewModel.hashCode}');
     debugPrint(
@@ -310,9 +318,7 @@ class _ReturnProductionScreenState extends State<ReturnProductionScreen> {
       },
     );
 
-    debugPrint(
-      '🟩 [RETURN_SCREEN] Edit dialog closed: ${updated?.noRetur}',
-    );
+    debugPrint('🟩 [RETURN_SCREEN] Edit dialog closed: ${updated?.noRetur}');
 
     if (!mounted) return;
 

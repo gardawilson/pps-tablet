@@ -1,6 +1,7 @@
 // lib/features/production/spanner/view/spanner_production_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:pps_tablet/features/production/spanner/view/spanner_production_input_screen.dart';
 import 'package:provider/provider.dart';
 
@@ -22,7 +23,8 @@ class SpannerProductionScreen extends StatefulWidget {
   const SpannerProductionScreen({super.key});
 
   @override
-  State<SpannerProductionScreen> createState() => _SpannerProductionScreenState();
+  State<SpannerProductionScreen> createState() =>
+      _SpannerProductionScreenState();
 }
 
 class _SpannerProductionScreenState extends State<SpannerProductionScreen> {
@@ -63,7 +65,7 @@ class _SpannerProductionScreenState extends State<SpannerProductionScreen> {
     required Offset globalPos,
   }) async {
     final overlay =
-    Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
+        Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
     if (overlay == null) return;
 
     final local = overlay.globalToLocal(globalPos);
@@ -108,8 +110,9 @@ class _SpannerProductionScreenState extends State<SpannerProductionScreen> {
                       return SpannerProductionDeleteDialog(
                         header: row,
                         onConfirm: () async {
-                          final success =
-                          await _viewModel.deleteProduksi(row.noProduksi);
+                          final success = await _viewModel.deleteProduksi(
+                            row.noProduksi,
+                          );
 
                           if (ctx.mounted) Navigator.of(ctx).pop();
                           if (!context.mounted) return;
@@ -120,7 +123,7 @@ class _SpannerProductionScreenState extends State<SpannerProductionScreen> {
                               builder: (_) => SuccessStatusDialog(
                                 title: 'Berhasil Menghapus',
                                 message:
-                                'No. Produksi ${row.noProduksi} berhasil dihapus.',
+                                    'No. Produksi ${row.noProduksi} berhasil dihapus.',
                               ),
                             );
                           } else {
@@ -142,11 +145,23 @@ class _SpannerProductionScreenState extends State<SpannerProductionScreen> {
                 onPrint: () {
                   // TODO: kalau nanti ada cetak / print spanner
                 },
+                onAuditHistory: () {
+                  _navigateToAuditHistory(row);
+                },
               ),
             ),
           ],
         );
       },
+    );
+  }
+
+  void _navigateToAuditHistory(SpannerProduction header) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            AuditScreenWithPrefilledDoc(documentNo: header.noProduksi),
+      ),
     );
   }
 
@@ -270,7 +285,7 @@ class _SpannerProductionScreenState extends State<SpannerProductionScreen> {
                     columns: columns,
                     horizontalPadding: 16,
                     selectedPredicate: (r) =>
-                    r.noProduksi == _selectedNoProduksi,
+                        r.noProduksi == _selectedNoProduksi,
                     onRowTap: (r) =>
                         setState(() => _selectedNoProduksi = r.noProduksi),
                     onRowLongPress: (r, globalPos) async {
@@ -318,17 +333,15 @@ class _SpannerProductionScreenState extends State<SpannerProductionScreen> {
 
     if (created == true) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Produksi spanner berhasil dibuat'),
-        ),
+        const SnackBar(content: Text('Produksi spanner berhasil dibuat')),
       );
     }
   }
 
   Future<void> _openEditDialog(
-      BuildContext context,
-      SpannerProduction row,
-      ) async {
+    BuildContext context,
+    SpannerProduction row,
+  ) async {
     debugPrint('🟦 [SPANNER_SCREEN] Opening edit dialog: ${row.noProduksi}');
     debugPrint('🟦 [SPANNER_SCREEN] Using VM hash=${_viewModel.hashCode}');
     debugPrint(
@@ -359,7 +372,9 @@ class _SpannerProductionScreenState extends State<SpannerProductionScreen> {
     if (updated != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('No. Produksi ${updated.noProduksi} berhasil diperbarui'),
+          content: Text(
+            'No. Produksi ${updated.noProduksi} berhasil diperbarui',
+          ),
         ),
       );
     }

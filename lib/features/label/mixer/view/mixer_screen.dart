@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/services/dialog_service.dart';
 import '../view_model/mixer_view_model.dart';
@@ -44,7 +45,9 @@ class _MixerScreenState extends State<MixerScreen> {
     vm.setSelectedNoMixer(header.noMixer);
 
     // fetch detail terbaru untuk header ini
-    DialogService.instance.showLoading(message: 'Cek detail ${header.noMixer}...');
+    DialogService.instance.showLoading(
+      message: 'Cek detail ${header.noMixer}...',
+    );
     await vm.fetchDetails(header.noMixer);
     DialogService.instance.hideLoading();
 
@@ -78,7 +81,9 @@ class _MixerScreenState extends State<MixerScreen> {
     vm.setSelectedNoMixer(header.noMixer);
 
     // fetch detail terbaru untuk header ini (biar rule valid)
-    DialogService.instance.showLoading(message: 'Cek detail ${header.noMixer}...');
+    DialogService.instance.showLoading(
+      message: 'Cek detail ${header.noMixer}...',
+    );
     await vm.fetchDetails(header.noMixer);
     DialogService.instance.hideLoading();
 
@@ -103,7 +108,6 @@ class _MixerScreenState extends State<MixerScreen> {
     // aman -> lanjut confirm delete
     _confirmDelete(header);
   }
-
 
   @override
   void initState() {
@@ -193,7 +197,6 @@ class _MixerScreenState extends State<MixerScreen> {
     );
   }
 
-
   // Tutup popover (tidak mengubah selection — biarkan tetap menandai item aktif)
   void _closeContextMenu() {
     _popover.hide();
@@ -201,9 +204,9 @@ class _MixerScreenState extends State<MixerScreen> {
 
   /// Long-press handler: pindahkan highlight ke item & tampilkan popover.
   Future<void> _onItemLongPress(
-      MixerHeader header,
-      Offset globalPosition,
-      ) async {
+    MixerHeader header,
+    Offset globalPosition,
+  ) async {
     final vm = context.read<MixerViewModel>();
 
     // Pindahkan highlight saat long-press
@@ -230,6 +233,10 @@ class _MixerScreenState extends State<MixerScreen> {
           _closeContextMenu();
           // TODO: print/preview
         },
+        onAuditHistory: () {
+          _closeContextMenu();
+          _navigateToAuditHistory(header);
+        },
       ),
       // animasi & penempatan cerdas
       preferAbove: true,
@@ -238,6 +245,15 @@ class _MixerScreenState extends State<MixerScreen> {
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutBack, // overshoot untuk SCALE tetap aman
       startScale: 0.94,
+    );
+  }
+
+  void _navigateToAuditHistory(MixerHeader header) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            AuditScreenWithPrefilledDoc(documentNo: header.noMixer),
+      ),
     );
   }
 
@@ -279,9 +295,7 @@ class _MixerScreenState extends State<MixerScreen> {
                     onSearchChanged: _onSearchChanged,
                     onClear: () {
                       searchCtrl.clear();
-                      context
-                          .read<MixerViewModel>()
-                          .fetchHeaders(search: "");
+                      context.read<MixerViewModel>().fetchHeaders(search: "");
                     },
                     onAddPressed: _showFormDialog,
                   ),
@@ -310,9 +324,7 @@ class _MixerScreenState extends State<MixerScreen> {
           // Detail Panel
           Expanded(
             flex: 1,
-            child: MixerDetailTable(
-              scrollController: _detailScrollController,
-            ),
+            child: MixerDetailTable(scrollController: _detailScrollController),
           ),
         ],
       ),
@@ -338,7 +350,6 @@ class _MixerScreenState extends State<MixerScreen> {
 
       // (Opsional) scroll panel detail ke atas
       // _detailScrollController.jumpTo(0);
-
     } else {
       await DialogService.instance.showError(
         title: 'Gagal',
@@ -346,6 +357,4 @@ class _MixerScreenState extends State<MixerScreen> {
       );
     }
   }
-
-
 }

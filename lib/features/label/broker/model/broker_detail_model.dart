@@ -1,10 +1,10 @@
 class BrokerDetail {
-  final String noBroker;        // NoBroker
-  final int noSak;              // NoSak
-  final double? berat;          // Berat
-  final String? dateUsage;      // DateUsage (already formatted by API)
-  final String? idLokasi;       // IdLokasi (stringify to be safe)
-  final bool? isPartial;        // IsPartial
+  final String noBroker; // NoBroker
+  final int noSak; // NoSak
+  final double? berat; // Berat
+  final String? dateUsage; // DateUsage (already formatted by API)
+  final String? idLokasi; // IdLokasi (stringify to be safe)
+  final bool? isPartial; // IsPartial
 
   const BrokerDetail({
     required this.noBroker,

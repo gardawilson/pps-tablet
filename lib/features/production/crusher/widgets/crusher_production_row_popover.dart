@@ -14,6 +14,7 @@ class CrusherProductionRowPopover extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onPrint;
+  final VoidCallback onAuditHistory;
 
   const CrusherProductionRowPopover({
     super.key,
@@ -23,6 +24,7 @@ class CrusherProductionRowPopover extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onPrint,
+    required this.onAuditHistory,
   });
 
   void _runAndClose(VoidCallback action) {
@@ -45,11 +47,15 @@ class CrusherProductionRowPopover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final divider = Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
+    final divider = Divider(
+      height: 0,
+      thickness: 0.6,
+      color: Colors.grey.shade300,
+    );
 
     // Permissions (adjust keys to match your backend ACL if needed)
     final perm = context.watch<PermissionViewModel>();
-    final canEdit   = perm.can('label_crusher:update');
+    final canEdit = perm.can('label_crusher:update');
     final canDelete = perm.can('label_crusher:delete');
 
     return ConstrainedBox(
@@ -65,10 +71,16 @@ class CrusherProductionRowPopover extends StatelessWidget {
             children: [
               // Header band
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [Colors.blue.shade400, Colors.blue.shade600], // ⬅️ CHANGED: color theme
+                    colors: [
+                      Colors.blue.shade400,
+                      Colors.blue.shade600,
+                    ], // ⬅️ CHANGED: color theme
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -76,13 +88,21 @@ class CrusherProductionRowPopover extends StatelessWidget {
                 child: Row(
                   children: [
                     Container(
-                      width: 40, height: 40,
+                      width: 40,
+                      height: 40,
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.25),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.3),
+                          width: 1,
+                        ),
                       ),
-                      child: const Icon(Icons.construction_outlined, color: Colors.white, size: 20), // ⬅️ CHANGED: icon
+                      child: const Icon(
+                        Icons.construction_outlined,
+                        color: Colors.white,
+                        size: 20,
+                      ), // ⬅️ CHANGED: icon
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -130,13 +150,27 @@ class CrusherProductionRowPopover extends StatelessWidget {
                     const SizedBox(width: 8),
                     // Copy NoCrusherProduksi (no tooltip)
                     IconButton(
-                      icon: Icon(Icons.copy_outlined, color: Colors.white.withOpacity(0.9)),
+                      icon: Icon(
+                        Icons.copy_outlined,
+                        color: Colors.white.withOpacity(0.9),
+                      ),
                       onPressed: () => _copyOnly(context),
-                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                      constraints: const BoxConstraints(
+                        minWidth: 40,
+                        minHeight: 40,
+                      ),
                       padding: EdgeInsets.zero,
                     ),
                   ],
                 ),
+              ),
+              divider,
+
+              _MenuTile(
+                icon: Icons.history,
+                label: 'History',
+                enabled: true,
+                onTap: () => _runAndClose(onAuditHistory),
               ),
               divider,
 
@@ -202,8 +236,11 @@ class _MenuTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final effectiveIconColor = enabled ? (iconColor ?? theme.iconTheme.color) : Colors.grey;
-    final baseStyle = theme.textTheme.bodyMedium ?? const TextStyle(fontSize: 14);
+    final effectiveIconColor = enabled
+        ? (iconColor ?? theme.iconTheme.color)
+        : Colors.grey;
+    final baseStyle =
+        theme.textTheme.bodyMedium ?? const TextStyle(fontSize: 14);
     final effectiveTextStyle = (textStyle ?? baseStyle).copyWith(
       color: enabled ? (textStyle?.color ?? baseStyle.color) : Colors.grey,
     );

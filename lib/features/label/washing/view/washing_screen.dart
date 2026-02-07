@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/services/dialog_service.dart';
@@ -114,8 +115,9 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
 
     vm.setSelectedNoWashing(header.noWashing);
 
-    DialogService.instance
-        .showLoading(message: 'Cek detail ${header.noWashing}...');
+    DialogService.instance.showLoading(
+      message: 'Cek detail ${header.noWashing}...',
+    );
     await vm.fetchDetails(header.noWashing);
     DialogService.instance.hideLoading();
 
@@ -138,8 +140,9 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
 
     vm.setSelectedNoWashing(header.noWashing);
 
-    DialogService.instance
-        .showLoading(message: 'Cek detail ${header.noWashing}...');
+    DialogService.instance.showLoading(
+      message: 'Cek detail ${header.noWashing}...',
+    );
     await vm.fetchDetails(header.noWashing);
     DialogService.instance.hideLoading();
 
@@ -196,9 +199,9 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
 
   /// Long-press handler: pindahkan highlight ke item & tampilkan popover.
   Future<void> _onItemLongPress(
-      WashingHeader header,
-      Offset globalPosition,
-      ) async {
+    WashingHeader header,
+    Offset globalPosition,
+  ) async {
     final vm = context.read<WashingViewModel>();
     vm.setSelectedNoWashing(header.noWashing);
 
@@ -221,6 +224,10 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
           _closeContextMenu();
           // TODO: print/preview
         },
+        onAuditHistory: () {
+          _closeContextMenu();
+          _navigateToAuditHistory(header);
+        },
       ),
       preferAbove: true,
       verticalGap: 8,
@@ -228,6 +235,15 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutBack,
       startScale: 0.94,
+    );
+  }
+
+  void _navigateToAuditHistory(WashingHeader header) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            AuditScreenWithPrefilledDoc(documentNo: header.noWashing),
+      ),
     );
   }
 
@@ -268,7 +284,9 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
                     onSearchChanged: _onSearchChanged,
                     onClear: () {
                       searchCtrl.clear();
-                      context.read<WashingViewModel>().fetchWashingHeaders(search: "");
+                      context.read<WashingViewModel>().fetchWashingHeaders(
+                        search: "",
+                      );
                     },
                     onAddPressed: _showFormDialog,
                   ),

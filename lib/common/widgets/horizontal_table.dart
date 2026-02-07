@@ -164,7 +164,8 @@ class _HorizontalTableState<T> extends State<HorizontalTable<T>> {
 
               if (widget.rows.isEmpty) {
                 return Center(
-                  child: widget.emptyBuilder?.call(context) ??
+                  child:
+                      widget.emptyBuilder?.call(context) ??
                       const Padding(
                         padding: EdgeInsets.all(24),
                         child: Text('Tidak ada data.'),
@@ -197,10 +198,12 @@ class _HorizontalTableState<T> extends State<HorizontalTable<T>> {
 
                         return GestureDetector(
                           behavior: HitTestBehavior.opaque,
-                          onLongPressStart: (d) =>
-                              widget.onRowLongPress?.call(item, d.globalPosition),
-                          onSecondaryTapDown: (d) =>
-                              widget.onRowLongPress?.call(item, d.globalPosition),
+                          onLongPressStart: (d) => widget.onRowLongPress?.call(
+                            item,
+                            d.globalPosition,
+                          ),
+                          onSecondaryTapDown: (d) => widget.onRowLongPress
+                              ?.call(item, d.globalPosition),
                           child: InkWell(
                             onTap: () => widget.onRowTap?.call(item),
                             child: AnimatedContainer(
@@ -233,7 +236,9 @@ class _HorizontalTableState<T> extends State<HorizontalTable<T>> {
                                         return SizedBox(
                                           width: c.width,
                                           child: Align(
-                                            alignment: _toAlignment(c.cellAlign),
+                                            alignment: _toAlignment(
+                                              c.cellAlign,
+                                            ),
                                             child: DefaultTextStyle(
                                               style: TextStyle(
                                                 fontSize: 15,
@@ -244,7 +249,10 @@ class _HorizontalTableState<T> extends State<HorizontalTable<T>> {
                                                     ? Colors.blue.shade900
                                                     : Colors.grey.shade800,
                                               ),
-                                              child: c.cellBuilder(context, item),
+                                              child: c.cellBuilder(
+                                                context,
+                                                item,
+                                              ),
                                             ),
                                           ),
                                         );

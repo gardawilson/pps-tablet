@@ -12,7 +12,8 @@ class GilinganProductionRowPopover extends StatelessWidget {
   final VoidCallback onInput;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
-  final VoidCallback onPrint; // kalau belum dipakai, boleh diabaikan dulu
+  final VoidCallback onPrint;
+  final VoidCallback onAuditHistory;
 
   const GilinganProductionRowPopover({
     super.key,
@@ -22,6 +23,7 @@ class GilinganProductionRowPopover extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onPrint,
+    required this.onAuditHistory,
   });
 
   void _runAndClose(VoidCallback action) {
@@ -44,8 +46,11 @@ class GilinganProductionRowPopover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final divider =
-    Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
+    final divider = Divider(
+      height: 0,
+      thickness: 0.6,
+      color: Colors.grey.shade300,
+    );
 
     // Permissions (sesuaikan dengan ACL backend)
     final perm = context.watch<PermissionViewModel>();
@@ -65,8 +70,10 @@ class GilinganProductionRowPopover extends StatelessWidget {
             children: [
               // Header band
               Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [Colors.teal.shade400, Colors.teal.shade600],
@@ -142,6 +149,14 @@ class GilinganProductionRowPopover extends StatelessWidget {
               ),
               divider,
 
+              _MenuTile(
+                icon: Icons.history,
+                label: 'History',
+                enabled: true,
+                onTap: () => _runAndClose(onAuditHistory),
+              ),
+              divider,
+
               // Input
               _MenuTile(
                 icon: Icons.input,
@@ -170,8 +185,7 @@ class GilinganProductionRowPopover extends StatelessWidget {
                 disabledHint: 'Tidak punya izin hapus',
                 iconColor: canDelete ? Colors.red.shade600 : null,
                 textStyle: TextStyle(
-                  color:
-                  canDelete ? Colors.red.shade600 : Colors.grey,
+                  color: canDelete ? Colors.red.shade600 : Colors.grey,
                 ),
                 onTap: () => _runAndClose(onDelete),
               ),
@@ -214,19 +228,17 @@ class _MenuTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final effectiveIconColor =
-    enabled ? (iconColor ?? theme.iconTheme.color) : Colors.grey;
+    final effectiveIconColor = enabled
+        ? (iconColor ?? theme.iconTheme.color)
+        : Colors.grey;
     final baseStyle =
         theme.textTheme.bodyMedium ?? const TextStyle(fontSize: 14);
     final effectiveTextStyle = (textStyle ?? baseStyle).copyWith(
-      color: enabled
-          ? (textStyle?.color ?? baseStyle.color)
-          : Colors.grey,
+      color: enabled ? (textStyle?.color ?? baseStyle.color) : Colors.grey,
     );
 
     final content = Padding(
-      padding:
-      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Row(
         children: [
           Icon(icon, color: effectiveIconColor),

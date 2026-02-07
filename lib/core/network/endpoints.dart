@@ -4,7 +4,6 @@ class ApiConstants {
   static String get baseUrl => dotenv.env['API_BASE_URL'] ?? '';
   static String get socketBaseUrl => dotenv.env['SOCKET_BASE_URL'] ?? '';
 
-
   static String get changePassword => '$baseUrl/api/change-password';
   static String get login => '$baseUrl/api/auth/login2';
   static String get checkLabel => '$baseUrl/api/label-list/check';
@@ -13,19 +12,19 @@ class ApiConstants {
   static String get listNyangkut => '$baseUrl/api/nyangkut-list';
   static String get mstLokasi => '$baseUrl/api/mst-lokasi';
 
-  static String scanLabel(String noSO) => '$baseUrl/api/no-stock-opname/$noSO/scan';
+  static String scanLabel(String noSO) =>
+      '$baseUrl/api/no-stock-opname/$noSO/scan';
 
   static String labelData(String noLabel) => '$baseUrl/api/label-data/$noLabel';
-
 
   static String labelSOList({
     required String selectedNoSO,
     required int page,
     required int pageSize,
-    String? filterBy,     // 'all' | 'bahanbaku' | dst
-    String? blok,         // ex: 'A' (nullable -> tidak dikirim jika null/'all'/'')
-    int? idLokasi,        // ex: 3  (nullable/0 -> tidak dikirim)
-    String? search,       // optional
+    String? filterBy, // 'all' | 'bahanbaku' | dst
+    String? blok, // ex: 'A' (nullable -> tidak dikirim jika null/'all'/'')
+    int? idLokasi, // ex: 3  (nullable/0 -> tidak dikirim)
+    String? search, // optional
   }) {
     final qp = <String, String>{
       'page': '$page',
@@ -52,15 +51,14 @@ class ApiConstants {
     return '$baseUrl/api/no-stock-opname/$selectedNoSO/hasil?$query';
   }
 
-
   static String stockOpnameAcuanList({
     required String noSO,
     required int page,
     required int pageSize,
-    String? filterBy,          // 'all' | 'bahanbaku' | dst
-    String? blok,              // ex: 'A' (nullable -> tidak dikirim jika null/'all'/'')
-    int? idLokasi,             // ex: 3  (nullable/0 -> tidak dikirim)
-    String? search,            // optional
+    String? filterBy, // 'all' | 'bahanbaku' | dst
+    String? blok, // ex: 'A' (nullable -> tidak dikirim jika null/'all'/'')
+    int? idLokasi, // ex: 3  (nullable/0 -> tidak dikirim)
+    String? search, // optional
   }) {
     final qp = <String, String>{
       'page': '$page',
@@ -111,9 +109,12 @@ class ApiConstants {
     return '$baseUrl/api/label-list?page=$page&pageSize=$loadMoreSize&filterBy=$currentFilter&idlokasi=$currentLocation';
   }
 
-
   // 🔹 No Stock Opname (Ascend)
-  static String noStockOpnameAscendItems(String noSO, int familyID, {String keyword = ''}) =>
+  static String noStockOpnameAscendItems(
+    String noSO,
+    int familyID, {
+    String keyword = '',
+  }) =>
       '$baseUrl/api/no-stock-opname/$noSO/families/$familyID/ascend?keyword=$keyword';
 
   static Uri noStockOpnameUsage(int itemID, String tglSO, String wids) {
@@ -125,7 +126,6 @@ class ApiConstants {
     return Uri.parse(url);
   }
 
-
   static String noStockOpnameSave(String noSO) =>
       '$baseUrl/api/no-stock-opname/$noSO/ascend/hasil';
 
@@ -135,5 +135,4 @@ class ApiConstants {
   // 🔹 No Stock Opname (Family)
   static String noStockOpnameFamilies(String noSO) =>
       '$baseUrl/api/no-stock-opname/$noSO/families';
-
 }

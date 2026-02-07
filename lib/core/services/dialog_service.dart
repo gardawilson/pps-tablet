@@ -43,7 +43,7 @@ class DialogService {
     );
   }
 
-// core/services/dialog_service.dart
+  // core/services/dialog_service.dart
   Future<void> showSuccess({
     required String title,
     required String message,
@@ -63,5 +63,4 @@ class DialogService {
       ),
     );
   }
-
 }

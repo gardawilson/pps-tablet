@@ -15,9 +15,9 @@ class SearchDropdownField<T> extends StatefulWidget {
   final String Function(T)? itemAsString;
 
   // UX
-  final String label;                 // label di InputDecorator
-  final String hint;                  // placeholder saat belum ada pilihan
-  final IconData? prefixIcon;         // ikon kecil di kiri (opsional)
+  final String label; // label di InputDecorator
+  final String hint; // placeholder saat belum ada pilihan
+  final IconData? prefixIcon; // ikon kecil di kiri (opsional)
   final bool enabled;
   final bool isExpanded;
 
@@ -35,7 +35,7 @@ class SearchDropdownField<T> extends StatefulWidget {
   final String? helperText;
 
   // error eksternal & fetch error
-  final String? errorText;            // error dari luar (mis. dari VM)
+  final String? errorText; // error dari luar (mis. dari VM)
   final bool fetchError;
   final String? fetchErrorText;
   final VoidCallback? onRetry;
@@ -76,7 +76,10 @@ class SearchDropdownField<T> extends StatefulWidget {
     this.isLoading = false,
     this.compareFn,
     this.filterFn,
-    this.contentPadding = const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+    this.contentPadding = const EdgeInsets.symmetric(
+      horizontal: 16,
+      vertical: 0,
+    ),
   });
 
   @override
@@ -121,16 +124,19 @@ class _SearchDropdownFieldState<T> extends State<SearchDropdownField<T>>
       return _decorated(
         context,
         errorText: widget.fetchErrorText ?? 'Gagal mengambil data',
-        child: SizedBox(height: widget.fieldHeight, child: _fetchErrorRow(context)),
+        child: SizedBox(
+          height: widget.fieldHeight,
+          child: _fetchErrorRow(context),
+        ),
       );
     }
 
     // Normal
     return FormField<T>(
-      key: ValueKey(widget.value),        // ✅ sinkron saat value berubah dari parent
+      key: ValueKey(widget.value), // ✅ sinkron saat value berubah dari parent
       validator: widget.validator,
       autovalidateMode: widget.autovalidateMode,
-      initialValue: widget.value,         // hanya utk validator; UI pakai widgets.value
+      initialValue: widget.value, // hanya utk validator; UI pakai widgets.value
       builder: (field) {
         final mergedError = widget.errorText ?? field.errorText;
 
@@ -143,7 +149,7 @@ class _SearchDropdownFieldState<T> extends State<SearchDropdownField<T>>
               height: widget.fieldHeight, // kunci tinggi
               child: DropdownSearch<T>(
                 items: widget.items,
-                selectedItem: widget.value,          // ✅ pakai nilai dari parent
+                selectedItem: widget.value, // ✅ pakai nilai dari parent
                 enabled: widget.enabled,
                 itemAsString: widget.itemAsString,
                 compareFn: widget.compareFn,
@@ -161,7 +167,8 @@ class _SearchDropdownFieldState<T> extends State<SearchDropdownField<T>>
                 dropdownBuilder: (context, selectedItem) {
                   final text = (selectedItem == null)
                       ? widget.hint
-                      : (widget.itemAsString?.call(selectedItem) ?? '$selectedItem');
+                      : (widget.itemAsString?.call(selectedItem) ??
+                            '$selectedItem');
                   final color = (selectedItem == null)
                       ? Colors.grey.shade600
                       : Colors.black87;
@@ -213,8 +220,15 @@ class _SearchDropdownFieldState<T> extends State<SearchDropdownField<T>>
                   searchFieldProps: TextFieldProps(
                     decoration: InputDecoration(
                       hintText: widget.searchHint,
-                      hintStyle: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                      prefixIcon: Icon(Icons.search, color: Colors.grey.shade600, size: 20),
+                      hintStyle: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.search,
+                        color: Colors.grey.shade600,
+                        size: 20,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(color: Colors.grey.shade300),
@@ -225,11 +239,17 @@ class _SearchDropdownFieldState<T> extends State<SearchDropdownField<T>>
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: Colors.blue.shade400, width: 1.5),
+                        borderSide: BorderSide(
+                          color: Colors.blue.shade400,
+                          width: 1.5,
+                        ),
                       ),
                       filled: true,
                       fillColor: Colors.grey.shade50,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
                     ),
                     style: const TextStyle(fontSize: 14),
                   ),
@@ -241,8 +261,8 @@ class _SearchDropdownFieldState<T> extends State<SearchDropdownField<T>>
                 },
 
                 onChanged: (val) {
-                  field.didChange(val);         // agar validator aware
-                  widget.onChanged?.call(val);  // lempar ke parent
+                  field.didChange(val); // agar validator aware
+                  widget.onChanged?.call(val); // lempar ke parent
                 },
               ),
             ),
@@ -255,10 +275,10 @@ class _SearchDropdownFieldState<T> extends State<SearchDropdownField<T>>
   /// ===== InputDecorator wrapper =====
   /// label/helper/error/border dipusatkan di sini.
   Widget _decorated(
-      BuildContext context, {
-        required Widget child,
-        String? errorText,
-      }) {
+    BuildContext context, {
+    required Widget child,
+    String? errorText,
+  }) {
     return InputDecorator(
       isFocused: false,
       decoration: InputDecoration(
@@ -266,7 +286,9 @@ class _SearchDropdownFieldState<T> extends State<SearchDropdownField<T>>
         floatingLabelBehavior: FloatingLabelBehavior.auto,
         helperText: widget.helperText,
         errorText: errorText,
-        prefixIcon: widget.prefixIcon != null ? Icon(widget.prefixIcon, size: 22) : null,
+        prefixIcon: widget.prefixIcon != null
+            ? Icon(widget.prefixIcon, size: 22)
+            : null,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         enabled: widget.enabled,
         isDense: true, // bikin lebih “padat”
@@ -285,7 +307,10 @@ class _SearchDropdownFieldState<T> extends State<SearchDropdownField<T>>
           child: CircularProgressIndicator(strokeWidth: 2),
         ),
         const SizedBox(width: 12),
-        Text('Memuat...', style: TextStyle(fontSize: 16, color: Colors.grey.shade600)),
+        Text(
+          'Memuat...',
+          style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+        ),
       ],
     );
   }

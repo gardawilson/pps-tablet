@@ -11,6 +11,7 @@ class SortirRejectProductionRowPopover extends StatelessWidget {
   final VoidCallback onInput;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onAuditHistory;
 
   const SortirRejectProductionRowPopover({
     super.key,
@@ -19,6 +20,7 @@ class SortirRejectProductionRowPopover extends StatelessWidget {
     required this.onInput,
     required this.onEdit,
     required this.onDelete,
+    required this.onAuditHistory,
   });
 
   void _runAndClose(VoidCallback action) {
@@ -41,8 +43,11 @@ class SortirRejectProductionRowPopover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final divider =
-    Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
+    final divider = Divider(
+      height: 0,
+      thickness: 0.6,
+      color: Colors.grey.shade300,
+    );
 
     final perm = context.watch<PermissionViewModel>();
 
@@ -54,7 +59,8 @@ class SortirRejectProductionRowPopover extends StatelessWidget {
     final String? lockHint = row.isLocked ? row.lockStatusMessage : null;
 
     final subtitleParts = <String>[];
-    if ((row.username).trim().isNotEmpty) subtitleParts.add(row.username.trim());
+    if ((row.username).trim().isNotEmpty)
+      subtitleParts.add(row.username.trim());
     if (row.idWarehouse != null) subtitleParts.add('WH ${row.idWarehouse}');
     final subtitle = subtitleParts.isEmpty ? '-' : subtitleParts.join(' • ');
 
@@ -71,8 +77,10 @@ class SortirRejectProductionRowPopover extends StatelessWidget {
             children: [
               // Header band
               Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: row.isLocked
@@ -128,7 +136,9 @@ class SortirRejectProductionRowPopover extends StatelessWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            row.isLocked ? row.lockInfoText : row.tanggalTextShort,
+                            row.isLocked
+                                ? row.lockInfoText
+                                : row.tanggalTextShort,
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w400,
@@ -159,8 +169,10 @@ class SortirRejectProductionRowPopover extends StatelessWidget {
               // Lock warning banner
               if (row.isLocked) ...[
                 Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   color: Colors.red.shade50,
                   child: Row(
                     children: [
@@ -185,6 +197,14 @@ class SortirRejectProductionRowPopover extends StatelessWidget {
                 ),
                 divider,
               ],
+
+              _MenuTile(
+                icon: Icons.history,
+                label: 'History',
+                enabled: true,
+                onTap: () => _runAndClose(onAuditHistory),
+              ),
+              divider,
 
               // Input
               _MenuTile(
@@ -248,8 +268,9 @@ class _MenuTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final effectiveIconColor =
-    enabled ? (iconColor ?? theme.iconTheme.color) : Colors.grey;
+    final effectiveIconColor = enabled
+        ? (iconColor ?? theme.iconTheme.color)
+        : Colors.grey;
     final baseStyle =
         theme.textTheme.bodyMedium ?? const TextStyle(fontSize: 14);
     final effectiveTextStyle = (textStyle ?? baseStyle).copyWith(

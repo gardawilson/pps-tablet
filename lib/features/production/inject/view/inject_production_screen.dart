@@ -1,6 +1,7 @@
 // lib/features/production/inject/view/inject_production_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:pps_tablet/features/production/inject/repository/inject_production_repository.dart';
 import 'package:provider/provider.dart';
 
@@ -29,8 +30,7 @@ class InjectProductionScreen extends StatefulWidget {
   const InjectProductionScreen({super.key});
 
   @override
-  State<InjectProductionScreen> createState() =>
-      _InjectProductionScreenState();
+  State<InjectProductionScreen> createState() => _InjectProductionScreenState();
 }
 
 class _InjectProductionScreenState extends State<InjectProductionScreen> {
@@ -46,7 +46,7 @@ class _InjectProductionScreenState extends State<InjectProductionScreen> {
 
     // ✅ Create VM once in initState
     _viewModel = InjectProductionViewModel(
-      repository: InjectProductionRepository()
+      repository: InjectProductionRepository(),
     );
 
     debugPrint(
@@ -73,7 +73,7 @@ class _InjectProductionScreenState extends State<InjectProductionScreen> {
     required Offset globalPos,
   }) async {
     final overlay =
-    Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
+        Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
     if (overlay == null) return;
 
     final local = overlay.globalToLocal(globalPos);
@@ -118,8 +118,9 @@ class _InjectProductionScreenState extends State<InjectProductionScreen> {
                       return InjectProductionDeleteDialog(
                         header: row,
                         onConfirm: () async {
-                          final success =
-                          await _viewModel.deleteProduksi(row.noProduksi);
+                          final success = await _viewModel.deleteProduksi(
+                            row.noProduksi,
+                          );
 
                           if (ctx.mounted) Navigator.of(ctx).pop();
                           if (!context.mounted) return;
@@ -130,7 +131,7 @@ class _InjectProductionScreenState extends State<InjectProductionScreen> {
                               builder: (_) => SuccessStatusDialog(
                                 title: 'Berhasil Menghapus',
                                 message:
-                                'No. Produksi ${row.noProduksi} berhasil dihapus.',
+                                    'No. Produksi ${row.noProduksi} berhasil dihapus.',
                               ),
                             );
                           } else {
@@ -152,11 +153,23 @@ class _InjectProductionScreenState extends State<InjectProductionScreen> {
                 onPrint: () {
                   // TODO: kalau nanti ada cetak label inject
                 },
+                onAuditHistory: () {
+                  _navigateToAuditHistory(row);
+                },
               ),
             ),
           ],
         );
       },
+    );
+  }
+
+  void _navigateToAuditHistory(InjectProduction header) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            AuditScreenWithPrefilledDoc(documentNo: header.noProduksi),
+      ),
     );
   }
 
@@ -289,7 +302,7 @@ class _InjectProductionScreenState extends State<InjectProductionScreen> {
                     columns: columns,
                     horizontalPadding: 16,
                     selectedPredicate: (r) =>
-                    r.noProduksi == _selectedNoProduksi,
+                        r.noProduksi == _selectedNoProduksi,
                     onRowTap: (r) =>
                         setState(() => _selectedNoProduksi = r.noProduksi),
                     onRowLongPress: (r, globalPos) async {
@@ -357,9 +370,7 @@ class _InjectProductionScreenState extends State<InjectProductionScreen> {
       debugPrint('🟦 [INJECT_SCREEN] Success detected (create).');
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Produksi inject berhasil dibuat'),
-        ),
+        const SnackBar(content: Text('Produksi inject berhasil dibuat')),
       );
     } else {
       debugPrint('🟦 [INJECT_SCREEN] Result was null or false: $created');
@@ -367,11 +378,10 @@ class _InjectProductionScreenState extends State<InjectProductionScreen> {
   }
 
   Future<void> _openEditDialog(
-      BuildContext context,
-      InjectProduction row,
-      ) async {
-    debugPrint(
-        '🟦 [INJECT_SCREEN] Opening edit dialog for: ${row.noProduksi}');
+    BuildContext context,
+    InjectProduction row,
+  ) async {
+    debugPrint('🟦 [INJECT_SCREEN] Opening edit dialog for: ${row.noProduksi}');
     debugPrint('🟦 [INJECT_SCREEN] Using VM hash=${_viewModel.hashCode}');
     debugPrint(
       '🟦 [INJECT_SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
@@ -405,9 +415,7 @@ class _InjectProductionScreenState extends State<InjectProductionScreen> {
               ),
             ),
           ],
-          child: InjectProductionFormDialog(
-            header: row,
-          ),
+          child: InjectProductionFormDialog(header: row),
         );
       },
     );

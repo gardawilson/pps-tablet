@@ -12,7 +12,7 @@ class AppDateField extends StatefulWidget {
   final DateTime firstDate;
   final DateTime lastDate;
   final DateTime? initialDate; // kalau controller kosong, pakai ini
-  final Locale? locale;        // contoh: const Locale('id','ID')
+  final Locale? locale; // contoh: const Locale('id','ID')
   final bool enabled;
   final FormFieldValidator<String>? validator;
   final ValueChanged<DateTime?>? onChanged; // callback setelah pilih
@@ -32,9 +32,9 @@ class AppDateField extends StatefulWidget {
     this.enabled = true,
     this.validator,
     this.onChanged,
-  })  : format = format ?? DateFormat('yyyy-MM-dd'),
-        firstDate = firstDate ?? DateTime(2000, 1, 1),
-        lastDate  = lastDate  ?? DateTime(2100, 12, 31);
+  }) : format = format ?? DateFormat('yyyy-MM-dd'),
+       firstDate = firstDate ?? DateTime(2000, 1, 1),
+       lastDate = lastDate ?? DateTime(2100, 12, 31);
 
   @override
   State<AppDateField> createState() => _AppDateFieldState();
@@ -42,8 +42,10 @@ class AppDateField extends StatefulWidget {
 
 class _AppDateFieldState extends State<AppDateField> {
   static const double _fieldHeight = 40;
-  static const EdgeInsets _contentPadding =
-  EdgeInsets.symmetric(horizontal: 16, vertical: 0);
+  static const EdgeInsets _contentPadding = EdgeInsets.symmetric(
+    horizontal: 16,
+    vertical: 0,
+  );
 
   bool get _hasText => widget.controller.text.trim().isNotEmpty;
 
@@ -107,7 +109,8 @@ class _AppDateFieldState extends State<AppDateField> {
     if (!widget.enabled) return;
 
     final init0 = widget.initialDate ?? _parseCurrentOr(DateTime.now());
-    final init = (init0.isBefore(widget.firstDate) || init0.isAfter(widget.lastDate))
+    final init =
+        (init0.isBefore(widget.firstDate) || init0.isAfter(widget.lastDate))
         ? widget.firstDate
         : init0;
 
@@ -151,7 +154,9 @@ class _AppDateFieldState extends State<AppDateField> {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    _hasText ? widget.controller.text : (widget.hintText ?? 'PILIH TANGGAL'),
+                    _hasText
+                        ? widget.controller.text
+                        : (widget.hintText ?? 'PILIH TANGGAL'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(

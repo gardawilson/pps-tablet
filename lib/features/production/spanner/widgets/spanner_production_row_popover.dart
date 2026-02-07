@@ -14,6 +14,7 @@ class SpannerProductionRowPopover extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onPrint;
+  final VoidCallback onAuditHistory;
 
   const SpannerProductionRowPopover({
     super.key,
@@ -23,6 +24,7 @@ class SpannerProductionRowPopover extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onPrint,
+    required this.onAuditHistory,
   });
 
   void _runAndClose(VoidCallback action) {
@@ -45,8 +47,11 @@ class SpannerProductionRowPopover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final divider =
-    Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
+    final divider = Divider(
+      height: 0,
+      thickness: 0.6,
+      color: Colors.grey.shade300,
+    );
 
     final perm = context.watch<PermissionViewModel>();
 
@@ -69,8 +74,10 @@ class SpannerProductionRowPopover extends StatelessWidget {
             children: [
               // Header band
               Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: row.isLocked
@@ -159,8 +166,10 @@ class SpannerProductionRowPopover extends StatelessWidget {
               // Lock warning banner
               if (row.isLocked) ...[
                 Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   color: Colors.red.shade50,
                   child: Row(
                     children: [
@@ -185,6 +194,14 @@ class SpannerProductionRowPopover extends StatelessWidget {
                 ),
                 divider,
               ],
+
+              _MenuTile(
+                icon: Icons.history,
+                label: 'History',
+                enabled: true,
+                onTap: () => _runAndClose(onAuditHistory),
+              ),
+              divider,
 
               // Input
               _MenuTile(
@@ -257,9 +274,11 @@ class _MenuTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final effectiveIconColor =
-    enabled ? (iconColor ?? theme.iconTheme.color) : Colors.grey;
-    final baseStyle = theme.textTheme.bodyMedium ?? const TextStyle(fontSize: 14);
+    final effectiveIconColor = enabled
+        ? (iconColor ?? theme.iconTheme.color)
+        : Colors.grey;
+    final baseStyle =
+        theme.textTheme.bodyMedium ?? const TextStyle(fontSize: 14);
     final effectiveTextStyle = (textStyle ?? baseStyle).copyWith(
       color: enabled ? (textStyle?.color ?? baseStyle.color) : Colors.grey,
     );

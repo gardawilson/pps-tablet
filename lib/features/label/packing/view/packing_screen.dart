@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/services/dialog_service.dart';
@@ -54,14 +55,14 @@ class _PackingScreenState extends State<PackingScreen> {
     if (_isPartialHeader(header)) {
       await DialogService.instance.showError(
         title: 'Delete Tidak Tersedia',
-        message: 'Label ${header.noBJ} tidak dapat dihapus karena telah di partial.',
+        message:
+            'Label ${header.noBJ} tidak dapat dihapus karena telah di partial.',
       );
       return;
     }
 
     _confirmDelete(header);
   }
-
 
   @override
   void initState() {
@@ -94,9 +95,7 @@ class _PackingScreenState extends State<PackingScreen> {
       context: context,
       barrierDismissible: false,
       useSafeArea: false,
-      builder: (_) => PackingFormDialog(
-        header: header,
-      ),
+      builder: (_) => PackingFormDialog(header: header),
     );
   }
 
@@ -122,9 +121,9 @@ class _PackingScreenState extends State<PackingScreen> {
 
   /// Long-press handler: set highlight & show row popover (Edit / Print / Delete)
   Future<void> _onItemLongPress(
-      PackingHeader header,
-      Offset globalPosition,
-      ) async {
+    PackingHeader header,
+    Offset globalPosition,
+  ) async {
     final vm = context.read<PackingViewModel>();
 
     // Pindah highlight ke row ini
@@ -150,6 +149,10 @@ class _PackingScreenState extends State<PackingScreen> {
           _closeContextMenu();
           // printing sudah dihandle di dalam PackingRowPopover
         },
+        onAuditHistory: () {
+          _closeContextMenu();
+          _navigateToAuditHistory(header);
+        },
       ),
       preferAbove: true,
       verticalGap: 8,
@@ -157,6 +160,15 @@ class _PackingScreenState extends State<PackingScreen> {
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutBack,
       startScale: 0.94,
+    );
+  }
+
+  void _navigateToAuditHistory(PackingHeader header) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            AuditScreenWithPrefilledDoc(documentNo: header.noBJ),
+      ),
     );
   }
 
@@ -218,9 +230,7 @@ class _PackingScreenState extends State<PackingScreen> {
                     onSearchChanged: _onSearchChanged,
                     onClear: () {
                       searchCtrl.clear();
-                      context
-                          .read<PackingViewModel>()
-                          .fetchHeaders(search: "");
+                      context.read<PackingViewModel>().fetchHeaders(search: "");
                     },
                     onAddPressed: _showFormDialog,
                   ),

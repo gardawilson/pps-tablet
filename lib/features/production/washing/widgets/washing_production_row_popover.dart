@@ -13,6 +13,7 @@ class WashingProductionRowPopover extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onPrint;
+  final VoidCallback onAuditHistory;
 
   const WashingProductionRowPopover({
     super.key,
@@ -22,6 +23,7 @@ class WashingProductionRowPopover extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onPrint,
+    required this.onAuditHistory,
   });
 
   void _runAndClose(VoidCallback action) {
@@ -44,8 +46,11 @@ class WashingProductionRowPopover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final divider =
-    Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
+    final divider = Divider(
+      height: 0,
+      thickness: 0.6,
+      color: Colors.grey.shade300,
+    );
 
     // Permissions (pakai key washing)
     final perm = context.watch<PermissionViewModel>();
@@ -66,8 +71,10 @@ class WashingProductionRowPopover extends StatelessWidget {
             children: [
               // Header band
               Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [Colors.teal.shade400, Colors.teal.shade600],
@@ -143,6 +150,14 @@ class WashingProductionRowPopover extends StatelessWidget {
               ),
               divider,
 
+              _MenuTile(
+                icon: Icons.history,
+                label: 'History',
+                enabled: true,
+                onTap: () => _runAndClose(onAuditHistory),
+              ),
+              divider,
+
               // Input (misalnya untuk buka input detail washing)
               _MenuTile(
                 icon: Icons.input,
@@ -215,8 +230,9 @@ class _MenuTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final effectiveIconColor =
-    enabled ? (iconColor ?? theme.iconTheme.color) : Colors.grey;
+    final effectiveIconColor = enabled
+        ? (iconColor ?? theme.iconTheme.color)
+        : Colors.grey;
     final baseStyle =
         theme.textTheme.bodyMedium ?? const TextStyle(fontSize: 14);
     final effectiveTextStyle = (textStyle ?? baseStyle).copyWith(

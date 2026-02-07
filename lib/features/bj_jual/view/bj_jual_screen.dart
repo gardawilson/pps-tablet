@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:pps_tablet/features/bj_jual/view/bj_jual_input_screen.dart';
 import 'package:provider/provider.dart';
 
@@ -37,7 +38,9 @@ class _BJJualScreenState extends State<BJJualScreen> {
     // ✅ Create VM once in initState
     _viewModel = BJJualViewModel();
 
-    debugPrint('🟦🟦🟦 [BJ_JUAL_SCREEN] initState: VM hash=${_viewModel.hashCode}');
+    debugPrint(
+      '🟦🟦🟦 [BJ_JUAL_SCREEN] initState: VM hash=${_viewModel.hashCode}',
+    );
     debugPrint(
       '🟦🟦🟦 [BJ_JUAL_SCREEN] initState: PagingController hash=${_viewModel.pagingController.hashCode}',
     );
@@ -59,7 +62,7 @@ class _BJJualScreenState extends State<BJJualScreen> {
     required Offset globalPos,
   }) async {
     final overlay =
-    Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
+        Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
     if (overlay == null) return;
 
     final local = overlay.globalToLocal(globalPos);
@@ -106,8 +109,9 @@ class _BJJualScreenState extends State<BJJualScreen> {
                       return BJJualDeleteDialog(
                         header: row,
                         onConfirm: () async {
-                          final success =
-                          await _viewModel.deleteBJJual(row.noBJJual);
+                          final success = await _viewModel.deleteBJJual(
+                            row.noBJJual,
+                          );
 
                           if (ctx.mounted) Navigator.of(ctx).pop();
                           if (!context.mounted) return;
@@ -118,7 +122,7 @@ class _BJJualScreenState extends State<BJJualScreen> {
                               builder: (_) => SuccessStatusDialog(
                                 title: 'Berhasil Menghapus',
                                 message:
-                                'No. BJ Jual ${row.noBJJual} berhasil dihapus.',
+                                    'No. BJ Jual ${row.noBJJual} berhasil dihapus.',
                               ),
                             );
                           } else {
@@ -137,11 +141,23 @@ class _BJJualScreenState extends State<BJJualScreen> {
                     },
                   );
                 },
+                onAuditHistory: () {
+                  _navigateToAuditHistory(row);
+                },
               ),
             ),
           ],
         );
       },
+    );
+  }
+
+  void _navigateToAuditHistory(BJJual header) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            AuditScreenWithPrefilledDoc(documentNo: header.noBJJual),
+      ),
     );
   }
 
@@ -278,11 +294,9 @@ class _BJJualScreenState extends State<BJJualScreen> {
     if (!mounted) return;
 
     if (created == true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('BJ Jual berhasil dibuat'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('BJ Jual berhasil dibuat')));
     }
   }
 

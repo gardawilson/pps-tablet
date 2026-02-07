@@ -13,7 +13,8 @@ class InjectProductionRowPopover extends StatelessWidget {
   final VoidCallback onInput;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
-  final VoidCallback onPrint; // kalau belum dipakai, boleh diabaikan dulu
+  final VoidCallback onPrint;
+  final VoidCallback onAuditHistory;
 
   const InjectProductionRowPopover({
     super.key,
@@ -23,6 +24,7 @@ class InjectProductionRowPopover extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onPrint,
+    required this.onAuditHistory,
   });
 
   void _runAndClose(VoidCallback action) {
@@ -45,13 +47,20 @@ class InjectProductionRowPopover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final divider =
-    Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
+    final divider = Divider(
+      height: 0,
+      thickness: 0.6,
+      color: Colors.grey.shade300,
+    );
 
     // ✅ Permissions untuk inject production
     final perm = context.watch<PermissionViewModel>();
-    final canEdit = perm.can('injectproduksi:update'); // TODO: sesuaikan dengan inject permission
-    final canDelete = perm.can('injectproduksi:delete'); // TODO: sesuaikan dengan inject permission
+    final canEdit = perm.can(
+      'injectproduksi:update',
+    ); // TODO: sesuaikan dengan inject permission
+    final canDelete = perm.can(
+      'injectproduksi:delete',
+    ); // TODO: sesuaikan dengan inject permission
 
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 240, maxWidth: 320),
@@ -66,8 +75,10 @@ class InjectProductionRowPopover extends StatelessWidget {
             children: [
               // Header band
               Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [Colors.indigo.shade400, Colors.indigo.shade600],
@@ -150,6 +161,14 @@ class InjectProductionRowPopover extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+              divider,
+
+              _MenuTile(
+                icon: Icons.history,
+                label: 'History',
+                enabled: true,
+                onTap: () => _runAndClose(onAuditHistory),
               ),
               divider,
 
@@ -242,14 +261,13 @@ class _MenuTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final effectiveIconColor =
-    enabled ? (iconColor ?? theme.iconTheme.color) : Colors.grey;
+    final effectiveIconColor = enabled
+        ? (iconColor ?? theme.iconTheme.color)
+        : Colors.grey;
     final baseStyle =
         theme.textTheme.bodyMedium ?? const TextStyle(fontSize: 14);
     final effectiveTextStyle = (textStyle ?? baseStyle).copyWith(
-      color: enabled
-          ? (textStyle?.color ?? baseStyle.color)
-          : Colors.grey,
+      color: enabled ? (textStyle?.color ?? baseStyle.color) : Colors.grey,
     );
 
     final content = Padding(

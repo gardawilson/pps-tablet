@@ -39,12 +39,12 @@ class SuccessStatusDialog extends StatelessWidget {
 
     final buttons = (actions == null || actions!.isEmpty)
         ? <StatusAction>[
-      StatusAction(
-        label: 'OK',
-        onPressed: () => Navigator.of(context).pop(),
-        isPrimary: true,
-      )
-    ]
+            StatusAction(
+              label: 'OK',
+              onPressed: () => Navigator.of(context).pop(),
+              isPrimary: true,
+            ),
+          ]
         : actions!;
 
     return Dialog(
@@ -55,7 +55,10 @@ class SuccessStatusDialog extends StatelessWidget {
         child: SizedBox(
           width: dialogW,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 28.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 24.0,
+              vertical: 28.0,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -64,7 +67,11 @@ class SuccessStatusDialog extends StatelessWidget {
                 Text(
                   title,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.green),
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.green,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Text(
@@ -111,20 +118,26 @@ class SuccessStatusDialog extends StatelessWidget {
 
     return a.isPrimary
         ? ElevatedButton(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.green,
-        foregroundColor: Colors.white,
-      ).merge(styleBase),
-      onPressed: a.onPressed,
-      child: Text(a.label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-    )
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ).merge(styleBase),
+            onPressed: a.onPressed,
+            child: Text(
+              a.label,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          )
         : OutlinedButton(
-      style: OutlinedButton.styleFrom(
-        side: const BorderSide(color: Colors.grey),
-        foregroundColor: Colors.black87,
-      ).merge(styleBase),
-      onPressed: a.onPressed,
-      child: Text(a.label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-    );
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Colors.grey),
+              foregroundColor: Colors.black87,
+            ).merge(styleBase),
+            onPressed: a.onPressed,
+            child: Text(
+              a.label,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          );
   }
 }

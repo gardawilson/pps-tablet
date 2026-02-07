@@ -14,6 +14,7 @@ class HotStampProductionRowPopover extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onPrint; // kalau belum dipakai, boleh diabaikan dulu
+  final VoidCallback onAuditHistory;
 
   const HotStampProductionRowPopover({
     super.key,
@@ -23,6 +24,7 @@ class HotStampProductionRowPopover extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onPrint,
+    required this.onAuditHistory,
   });
 
   void _runAndClose(VoidCallback action) {
@@ -45,8 +47,11 @@ class HotStampProductionRowPopover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final divider =
-    Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
+    final divider = Divider(
+      height: 0,
+      thickness: 0.6,
+      color: Colors.grey.shade300,
+    );
 
     // ✅ Permissions untuk hot stamp production
     final perm = context.watch<PermissionViewModel>();
@@ -69,8 +74,10 @@ class HotStampProductionRowPopover extends StatelessWidget {
             children: [
               // Header band
               Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: row.isLocked
@@ -96,7 +103,8 @@ class HotStampProductionRowPopover extends StatelessWidget {
                       child: Icon(
                         row.isLocked
                             ? Icons.lock
-                            : Icons.local_fire_department_outlined, // ✅ Hot stamp icon
+                            : Icons
+                                  .local_fire_department_outlined, // ✅ Hot stamp icon
                         color: Colors.white,
                         size: 20,
                       ),
@@ -194,6 +202,14 @@ class HotStampProductionRowPopover extends StatelessWidget {
                 divider,
               ],
 
+              _MenuTile(
+                icon: Icons.history,
+                label: 'History',
+                enabled: true,
+                onTap: () => _runAndClose(onAuditHistory),
+              ),
+              divider,
+
               // Input
               _MenuTile(
                 icon: Icons.input,
@@ -265,14 +281,13 @@ class _MenuTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final effectiveIconColor =
-    enabled ? (iconColor ?? theme.iconTheme.color) : Colors.grey;
+    final effectiveIconColor = enabled
+        ? (iconColor ?? theme.iconTheme.color)
+        : Colors.grey;
     final baseStyle =
         theme.textTheme.bodyMedium ?? const TextStyle(fontSize: 14);
     final effectiveTextStyle = (textStyle ?? baseStyle).copyWith(
-      color: enabled
-          ? (textStyle?.color ?? baseStyle.color)
-          : Colors.grey,
+      color: enabled ? (textStyle?.color ?? baseStyle.color) : Colors.grey,
     );
 
     final content = Padding(

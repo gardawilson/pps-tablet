@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/services/dialog_service.dart';
 import '../view_model/crusher_view_model.dart';
@@ -115,8 +116,6 @@ class _CrusherScreenState extends State<CrusherScreen> {
     );
   }
 
-
-
   // Tutup popover (tidak mengubah selection — biarkan tetap menandai item aktif)
   void _closeContextMenu() {
     _popover.hide();
@@ -124,9 +123,9 @@ class _CrusherScreenState extends State<CrusherScreen> {
 
   /// Long-press handler: pindahkan highlight ke item & tampilkan popover.
   Future<void> _onItemLongPress(
-      CrusherHeader header,
-      Offset globalPosition,
-      ) async {
+    CrusherHeader header,
+    Offset globalPosition,
+  ) async {
     final vm = context.read<CrusherViewModel>();
 
     // Pindahkan highlight saat long-press
@@ -151,6 +150,10 @@ class _CrusherScreenState extends State<CrusherScreen> {
           _closeContextMenu();
           // TODO: print/preview
         },
+        onAuditHistory: () {
+          _closeContextMenu();
+          _navigateToAuditHistory(header);
+        },
       ),
       // animasi & penempatan cerdas
       preferAbove: true,
@@ -159,6 +162,15 @@ class _CrusherScreenState extends State<CrusherScreen> {
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutBack, // overshoot untuk SCALE tetap aman
       startScale: 0.94,
+    );
+  }
+
+  void _navigateToAuditHistory(CrusherHeader header) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            AuditScreenWithPrefilledDoc(documentNo: header.noCrusher),
+      ),
     );
   }
 
@@ -199,9 +211,7 @@ class _CrusherScreenState extends State<CrusherScreen> {
                     onSearchChanged: _onSearchChanged,
                     onClear: () {
                       searchCtrl.clear();
-                      context
-                          .read<CrusherViewModel>()
-                          .fetchHeaders(search: "");
+                      context.read<CrusherViewModel>().fetchHeaders(search: "");
                     },
                     onAddPressed: _showFormDialog,
                   ),
@@ -255,7 +265,4 @@ class _CrusherScreenState extends State<CrusherScreen> {
       );
     }
   }
-
-
-
 }

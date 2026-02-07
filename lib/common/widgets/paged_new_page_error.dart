@@ -4,10 +4,7 @@ import 'package:flutter/material.dart';
 class PagedNewPageError extends StatelessWidget {
   final VoidCallback onRetry;
 
-  const PagedNewPageError({
-    super.key,
-    required this.onRetry,
-  });
+  const PagedNewPageError({super.key, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {

@@ -50,8 +50,8 @@ class SimpleDivider extends StatelessWidget {
     this.margin,
     this.indent = 0,
     this.endIndent = 0,
-  })  : isVertical = false,
-        super(key: key);
+  }) : isVertical = false,
+       super(key: key);
 
   /// Creates a vertical divider
   const SimpleDivider.vertical({
@@ -61,8 +61,8 @@ class SimpleDivider extends StatelessWidget {
     this.margin,
     this.indent = 0,
     this.endIndent = 0,
-  })  : isVertical = true,
-        super(key: key);
+  }) : isVertical = true,
+       super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -75,10 +75,7 @@ class SimpleDivider extends StatelessWidget {
           children: [
             if (indent > 0) SizedBox(height: indent),
             Expanded(
-              child: Container(
-                width: thickness,
-                color: dividerColor,
-              ),
+              child: Container(width: thickness, color: dividerColor),
             ),
             if (endIndent > 0) SizedBox(height: endIndent),
           ],
@@ -92,10 +89,7 @@ class SimpleDivider extends StatelessWidget {
         children: [
           if (indent > 0) SizedBox(width: indent),
           Expanded(
-            child: Container(
-              height: thickness,
-              color: dividerColor,
-            ),
+            child: Container(height: thickness, color: dividerColor),
           ),
           if (endIndent > 0) SizedBox(width: endIndent),
         ],

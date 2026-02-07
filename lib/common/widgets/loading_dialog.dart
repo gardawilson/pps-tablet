@@ -4,10 +4,8 @@ import 'package:lottie/lottie.dart';
 class LoadingDialog extends StatelessWidget {
   final String message;
 
-  const LoadingDialog({
-    Key? key,
-    this.message = 'Memproses...',
-  }) : super(key: key);
+  const LoadingDialog({Key? key, this.message = 'Memproses...'})
+    : super(key: key);
 
   @override
   Widget build(BuildContext context) {

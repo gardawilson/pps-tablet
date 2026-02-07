@@ -11,6 +11,7 @@ class BJJualRowPopover extends StatelessWidget {
   final VoidCallback onClose;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onAuditHistory;
 
   // optional (kalau nanti ada layar detail / input label)
   final VoidCallback? onInput;
@@ -24,6 +25,7 @@ class BJJualRowPopover extends StatelessWidget {
     required this.onDelete,
     this.onInput,
     this.onPrint,
+    required this.onAuditHistory,
   });
 
   void _runAndClose(VoidCallback action) {
@@ -46,8 +48,11 @@ class BJJualRowPopover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final divider =
-    Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
+    final divider = Divider(
+      height: 0,
+      thickness: 0.6,
+      color: Colors.grey.shade300,
+    );
 
     final perm = context.watch<PermissionViewModel>();
 
@@ -71,8 +76,10 @@ class BJJualRowPopover extends StatelessWidget {
             children: [
               // Header band
               Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: row.isLocked
@@ -131,8 +138,8 @@ class BJJualRowPopover extends StatelessWidget {
                             row.isLocked
                                 ? row.lockInfoText
                                 : (row.remark?.isNotEmpty == true
-                                ? row.remark!
-                                : '—'),
+                                      ? row.remark!
+                                      : '—'),
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w400,
@@ -165,8 +172,10 @@ class BJJualRowPopover extends StatelessWidget {
               // Lock warning banner
               if (row.isLocked) ...[
                 Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   color: Colors.red.shade50,
                   child: Row(
                     children: [
@@ -190,6 +199,14 @@ class BJJualRowPopover extends StatelessWidget {
                 ),
                 divider,
               ],
+
+              _MenuTile(
+                icon: Icons.history,
+                label: 'History',
+                enabled: true,
+                onTap: () => _runAndClose(onAuditHistory),
+              ),
+              divider,
 
               // Optional: Input/Detail
               if (onInput != null) ...[
@@ -266,8 +283,9 @@ class _MenuTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final effectiveIconColor =
-    enabled ? (iconColor ?? theme.iconTheme.color) : Colors.grey;
+    final effectiveIconColor = enabled
+        ? (iconColor ?? theme.iconTheme.color)
+        : Colors.grey;
 
     final baseStyle =
         theme.textTheme.bodyMedium ?? const TextStyle(fontSize: 14);

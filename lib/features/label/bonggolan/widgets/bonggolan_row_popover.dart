@@ -13,6 +13,7 @@ class BonggolanRowPopover extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onPrint;
+  final VoidCallback onAuditHistory;
 
   const BonggolanRowPopover({
     super.key,
@@ -21,6 +22,7 @@ class BonggolanRowPopover extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onPrint,
+    required this.onAuditHistory,
   });
 
   void _runAndClose(VoidCallback action) {
@@ -43,11 +45,15 @@ class BonggolanRowPopover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final divider = Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
+    final divider = Divider(
+      height: 0,
+      thickness: 0.6,
+      color: Colors.grey.shade300,
+    );
 
     // ambil izin sekali
     final perm = context.watch<PermissionViewModel>();
-    final canEdit   = perm.can('label_washing:update');
+    final canEdit = perm.can('label_washing:update');
     final canDelete = perm.can('label_washing:delete');
 
     return ConstrainedBox(
@@ -70,13 +76,21 @@ class BonggolanRowPopover extends StatelessWidget {
               child: Row(
                 children: [
                   Container(
-                    width: 40, height: 40,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.25),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.3),
+                        width: 1,
+                      ),
                     ),
-                    child: const Icon(Icons.label, color: Colors.white, size: 20),
+                    child: const Icon(
+                      Icons.label,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -85,14 +99,23 @@ class BonggolanRowPopover extends StatelessWidget {
                       children: [
                         Text(
                           header.noBonggolan,
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 3),
                         Text(
                           header.namaBonggolan!,
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.white.withOpacity(0.95)),
-                          overflow: TextOverflow.ellipsis, maxLines: 1,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withOpacity(0.95),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
                       ],
                     ),
@@ -100,13 +123,27 @@ class BonggolanRowPopover extends StatelessWidget {
                   const SizedBox(width: 8),
                   IconButton(
                     tooltip: 'Salin NoWashing',
-                    icon: Icon(Icons.copy_outlined, color: Colors.white.withOpacity(0.9)),
+                    icon: Icon(
+                      Icons.copy_outlined,
+                      color: Colors.white.withOpacity(0.9),
+                    ),
                     onPressed: () => _copyOnly(context),
-                    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    constraints: const BoxConstraints(
+                      minWidth: 40,
+                      minHeight: 40,
+                    ),
                     padding: EdgeInsets.zero,
                   ),
                 ],
               ),
+            ),
+            divider,
+
+            _MenuTile(
+              icon: Icons.history,
+              label: 'History',
+              enabled: true,
+              onTap: () => _runAndClose(onAuditHistory),
             ),
             divider,
 
@@ -126,7 +163,10 @@ class BonggolanRowPopover extends StatelessWidget {
               label: 'Print',
               enabled: true,
               onTap: () => _runAndClose(() async {
-                final rootCtx = Navigator.of(context, rootNavigator: true).context;
+                final rootCtx = Navigator.of(
+                  context,
+                  rootNavigator: true,
+                ).context;
 
                 final pdfService = PdfPrintService(
                   baseUrl: 'http://192.168.10.100:3000',
@@ -141,7 +181,6 @@ class BonggolanRowPopover extends StatelessWidget {
                   // system: 'pps', // opsional kalau mau override
                   // saveNameHint: 'Label_${header.noBonggolan}.pdf', // opsional; kalau kosong akan di-infer
                 );
-
               }),
             ),
             divider,
@@ -153,7 +192,9 @@ class BonggolanRowPopover extends StatelessWidget {
               enabled: canDelete,
               tooltipWhenDisabled: 'Tidak punya izin hapus',
               iconColor: canDelete ? Colors.red.shade600 : null,
-              textStyle: TextStyle(color: canDelete ? Colors.red.shade600 : Colors.grey),
+              textStyle: TextStyle(
+                color: canDelete ? Colors.red.shade600 : Colors.grey,
+              ),
               onTap: () => _runAndClose(onDelete),
             ),
           ],
@@ -186,10 +227,15 @@ class _MenuTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final effectiveIconColor = enabled ? (iconColor ?? theme.iconTheme.color) : Colors.grey;
-    final effectiveTextStyle = (textStyle ?? theme.textTheme.bodyMedium)?.copyWith(
-      color: enabled ? (textStyle?.color ?? theme.textTheme.bodyMedium?.color) : Colors.grey,
-    );
+    final effectiveIconColor = enabled
+        ? (iconColor ?? theme.iconTheme.color)
+        : Colors.grey;
+    final effectiveTextStyle = (textStyle ?? theme.textTheme.bodyMedium)
+        ?.copyWith(
+          color: enabled
+              ? (textStyle?.color ?? theme.textTheme.bodyMedium?.color)
+              : Colors.grey,
+        );
 
     final tile = InkWell(
       onTap: enabled ? onTap : null,
@@ -200,7 +246,11 @@ class _MenuTile extends StatelessWidget {
             Icon(icon, color: effectiveIconColor),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(label, style: effectiveTextStyle, overflow: TextOverflow.ellipsis),
+              child: Text(
+                label,
+                style: effectiveTextStyle,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),
@@ -208,7 +258,10 @@ class _MenuTile extends StatelessWidget {
     );
 
     if (!enabled && (tooltipWhenDisabled?.isNotEmpty ?? false)) {
-      return Tooltip(message: tooltipWhenDisabled!, child: Opacity(opacity: 0.55, child: tile));
+      return Tooltip(
+        message: tooltipWhenDisabled!,
+        child: Opacity(opacity: 0.55, child: tile),
+      );
     }
     return tile;
   }

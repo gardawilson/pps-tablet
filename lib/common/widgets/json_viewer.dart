@@ -152,9 +152,7 @@ class JsonViewer extends StatelessWidget {
             ),
           ),
           child: maxHeight != null
-              ? SingleChildScrollView(
-            child: _buildCodeText(formatted),
-          )
+              ? SingleChildScrollView(child: _buildCodeText(formatted))
               : _buildCodeText(formatted),
         ),
 

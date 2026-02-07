@@ -267,18 +267,29 @@ class _CornerPainter extends CustomPainter {
     canvas.drawLine(Offset(0, 0), Offset(0, cornerLen), p);
     // TR
     canvas.drawLine(
-        Offset(size.width, 0), Offset(size.width - cornerLen, 0), p);
+      Offset(size.width, 0),
+      Offset(size.width - cornerLen, 0),
+      p,
+    );
     canvas.drawLine(Offset(size.width, 0), Offset(size.width, cornerLen), p);
     // BL
+    canvas.drawLine(Offset(0, size.height), Offset(cornerLen, size.height), p);
     canvas.drawLine(
-        Offset(0, size.height), Offset(cornerLen, size.height), p);
-    canvas.drawLine(Offset(0, size.height),
-        Offset(0, size.height - cornerLen), p);
+      Offset(0, size.height),
+      Offset(0, size.height - cornerLen),
+      p,
+    );
     // BR
-    canvas.drawLine(Offset(size.width, size.height),
-        Offset(size.width - cornerLen, size.height), p);
-    canvas.drawLine(Offset(size.width, size.height),
-        Offset(size.width, size.height - cornerLen), p);
+    canvas.drawLine(
+      Offset(size.width, size.height),
+      Offset(size.width - cornerLen, size.height),
+      p,
+    );
+    canvas.drawLine(
+      Offset(size.width, size.height),
+      Offset(size.width, size.height - cornerLen),
+      p,
+    );
   }
 
   @override
@@ -335,4 +346,3 @@ QrScannerPanel(
   rotationTurns: 1, // 90° ke kanan
 ),
 */
-

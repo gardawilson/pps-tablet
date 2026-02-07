@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 
 class ErrorPresenter {
   static void showNetworkOrServerDialog(
-      BuildContext context, {
-        required String message,
-        required String errorType, // network/server
-        String? detailCode,        // backend_offline/no_route/dns/timeout/server_503...
-        VoidCallback? onRetry,
-      }) {
+    BuildContext context, {
+    required String message,
+    required String errorType, // network/server
+    String? detailCode, // backend_offline/no_route/dns/timeout/server_503...
+    VoidCallback? onRetry,
+  }) {
     if (!context.mounted) return;
 
     final title = _title(errorType, detailCode);
@@ -45,7 +45,8 @@ class ErrorPresenter {
   }
 
   static String _title(String errorType, String? detail) {
-    if (detail == 'server_503' || detail == 'maintenance') return 'Server Maintenance';
+    if (detail == 'server_503' || detail == 'maintenance')
+      return 'Server Maintenance';
     if (detail == 'backend_offline') return 'Backend Offline';
     if (detail == 'dns') return 'Alamat Server Tidak Ditemukan';
     if (detail == 'no_route') return 'Jaringan Tidak Menjangkau Server';
@@ -57,12 +58,15 @@ class ErrorPresenter {
   }
 
   static IconData _icon(String errorType, String? detail) {
-    if (detail == 'server_503' || detail == 'maintenance') return Icons.build_circle_outlined;
+    if (detail == 'server_503' || detail == 'maintenance')
+      return Icons.build_circle_outlined;
     if (detail == 'backend_offline') return Icons.power_off_outlined;
     if (detail == 'dns') return Icons.dns_outlined;
     if (detail == 'no_route') return Icons.router_outlined;
     if (detail == 'timeout') return Icons.timer_outlined;
 
-    return errorType == 'network' ? Icons.wifi_off_rounded : Icons.error_outline_rounded;
+    return errorType == 'network'
+        ? Icons.wifi_off_rounded
+        : Icons.error_outline_rounded;
   }
 }

@@ -21,18 +21,12 @@ import '../../../shared/plastic_type/jenis_plastik_model.dart';
 import '../../../shared/plastic_type/jenis_plastik_dropdown.dart';
 import '../../../shared/max_sak/max_sak_service.dart';
 
-
 class BrokerFormDialog extends StatefulWidget {
   final BrokerHeader? header;
   final List<BrokerDetail>? details;
   final Function(BrokerHeader, List<BrokerDetail>)? onSave;
 
-  const BrokerFormDialog({
-    super.key,
-    this.header,
-    this.details,
-    this.onSave,
-  });
+  const BrokerFormDialog({super.key, this.header, this.details, this.onSave});
 
   @override
   State<BrokerFormDialog> createState() => _BrokerFormDialogState();
@@ -56,9 +50,6 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
 
   DateTime _selectedDate = DateTime.now(); // <-- sumber kebenaran untuk tanggal
 
-
-
-
   @override
   void initState() {
     super.initState();
@@ -74,12 +65,19 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
       text: DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(seededDate),
     );
 
-    jenisCtrl = TextEditingController(text: widget.header?.namaJenisPlastik ?? '');
-    warehouseCtrl = TextEditingController(text: widget.header?.namaWarehouse ?? '');
-    noProduksiCtrl = TextEditingController(text: widget.header?.noProduksi ?? '');
-    noBongkarSusunCtrl = TextEditingController(text: widget.header?.noBongkarSusun ?? '');
+    jenisCtrl = TextEditingController(
+      text: widget.header?.namaJenisPlastik ?? '',
+    );
+    warehouseCtrl = TextEditingController(
+      text: widget.header?.namaWarehouse ?? '',
+    );
+    noProduksiCtrl = TextEditingController(
+      text: widget.header?.noProduksi ?? '',
+    );
+    noBongkarSusunCtrl = TextEditingController(
+      text: widget.header?.noBongkarSusun ?? '',
+    );
     detailList = List.from(widget.details ?? []);
-
 
     // 🔹 Jika form edit, tentukan mode awal otomatis
     if ((widget.header?.noProduksi ?? '').isNotEmpty) {
@@ -89,9 +87,7 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
     } else {
       _selectedMode = InputMode.production; // default
     }
-
   }
-
 
   @override
   void dispose() {
@@ -123,26 +119,17 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // KOLOM KIRI: Form Header
-                  Expanded(
-                    flex: 4,
-                    child: _buildLeftColumn(),
-                  ),
+                  Expanded(flex: 4, child: _buildLeftColumn()),
 
                   const SizedBox(width: 24),
 
                   // Divider Vertical
-                  Container(
-                    width: 1,
-                    color: Colors.grey.shade300,
-                  ),
+                  Container(width: 1, color: Colors.grey.shade300),
 
                   const SizedBox(width: 24),
 
                   // KOLOM KANAN: Detail List
-                  Expanded(
-                    flex: 2,
-                    child: _buildRightColumn(),
-                  ),
+                  Expanded(flex: 2, child: _buildRightColumn()),
                 ],
               ),
             ),
@@ -172,20 +159,17 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
         const SizedBox(width: 12),
         Text(
           isEdit ? 'Edit Label' : 'Tambah Label Baru',
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
       ],
     );
   }
 
-
   // KOLOM KIRI: Form Header
   Widget _buildLeftColumn() {
-    final bool isProductionEnabled = !isEdit && _selectedMode == InputMode.production;
-    final bool isBongkarEnabled    = !isEdit && _selectedMode == InputMode.bongkar;
+    final bool isProductionEnabled =
+        !isEdit && _selectedMode == InputMode.production;
+    final bool isBongkarEnabled = !isEdit && _selectedMode == InputMode.bongkar;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -203,10 +187,7 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                 const SizedBox(width: 8),
                 const Text(
                   "Header",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -229,29 +210,31 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                 if (d != null) {
                   setState(() {
                     _selectedDate = d;
-                    dateCreatedCtrl.text =
-                        DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(d);
+                    dateCreatedCtrl.text = DateFormat(
+                      'EEEE, dd MMM yyyy',
+                      'id_ID',
+                    ).format(d);
                   });
                 }
               },
             ),
 
-
             const SizedBox(height: 16),
 
             JenisPlastikDropdown(
-              preselectId: widget.header?.idJenisPlastik,   // preselect by ID dari header
+              preselectId:
+                  widget.header?.idJenisPlastik, // preselect by ID dari header
               hintText: 'Pilih jenis plastik',
               validator: (v) => v == null ? 'Wajib pilih jenis plastik' : null,
               autovalidateMode: AutovalidateMode.onUserInteraction,
               onChanged: (jp) {
                 _selectedJenis = jp;
-                jenisCtrl.text = jp?.jenis ?? '';          // tetap sinkron untuk tampilan teks
+                jenisCtrl.text =
+                    jp?.jenis ?? ''; // tetap sinkron untuk tampilan teks
                 // (opsional) kalau kamu masih ingin menyimpan di BrokerViewModel:
                 // context.read<BrokerViewModel>().selectedJenisPlastik = jp;
               },
             ),
-
 
             const SizedBox(height: 16),
 
@@ -262,11 +245,14 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                 Radio<InputMode>(
                   value: InputMode.production,
                   groupValue: _selectedMode,
-                  onChanged: isEdit ? null : (val) => setState(() => _selectedMode = val!),
+                  onChanged: isEdit
+                      ? null
+                      : (val) => setState(() => _selectedMode = val!),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: IgnorePointer( // benar-benar disable gesture saat tidak enabled
+                  child: IgnorePointer(
+                    // benar-benar disable gesture saat tidak enabled
                     ignoring: !isProductionEnabled,
                     child: Opacity(
                       opacity: isProductionEnabled ? 1 : 0.6, // feedback visual
@@ -277,10 +263,10 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                         enabled: isProductionEnabled, // tetap teruskan ke child
                         onChanged: isProductionEnabled
                             ? (wp) {
-                          setState(() {
-                            noProduksiCtrl.text = wp?.noProduksi ?? '';
-                          });
-                        }
+                                setState(() {
+                                  noProduksiCtrl.text = wp?.noProduksi ?? '';
+                                });
+                              }
                             : null, // null-kan saat disabled
                       ),
                     ),
@@ -298,7 +284,9 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                 Radio<InputMode>(
                   value: InputMode.bongkar,
                   groupValue: _selectedMode,
-                  onChanged: isEdit ? null : (val) => setState(() => _selectedMode = val!),
+                  onChanged: isEdit
+                      ? null
+                      : (val) => setState(() => _selectedMode = val!),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -312,10 +300,11 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                         enabled: isBongkarEnabled,
                         onChanged: isBongkarEnabled
                             ? (bs) {
-                          setState(() {
-                            noBongkarSusunCtrl.text = bs?.noBongkarSusun ?? '';
-                          });
-                        }
+                                setState(() {
+                                  noBongkarSusunCtrl.text =
+                                      bs?.noBongkarSusun ?? '';
+                                });
+                              }
                             : null,
                       ),
                     ),
@@ -323,7 +312,6 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                 ),
               ],
             ),
-
 
             // const SizedBox(height: 16),
             // WashingTextField(
@@ -373,8 +361,13 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                     backgroundColor: Colors.blue,
                     foregroundColor: Colors.white,
                     elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
               ],
@@ -396,11 +389,18 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.inventory_2, size: 20, color: Colors.blue.shade700),
+                      Icon(
+                        Icons.inventory_2,
+                        size: 20,
+                        color: Colors.blue.shade700,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         '$totalSak',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                     ],
                   ),
@@ -411,7 +411,10 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                       const SizedBox(width: 8),
                       Text(
                         '${totalBerat.toStringAsFixed(2)} kg',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                     ],
                   ),
@@ -433,7 +436,10 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                 children: [
                   // Header tabel
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.grey.shade100,
                       borderRadius: const BorderRadius.only(
@@ -485,12 +491,18 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: detailList.length,
-                      separatorBuilder: (_, __) =>
-                          Divider(height: 1, thickness: 1, color: Colors.grey.shade200),
+                      separatorBuilder: (_, __) => Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: Colors.grey.shade200,
+                      ),
                       itemBuilder: (context, index) {
                         final d = detailList[index];
                         return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 0,
+                          ),
                           child: Row(
                             children: [
                               Expanded(
@@ -516,13 +528,21 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                                   mainAxisAlignment: MainAxisAlignment.end,
                                   children: [
                                     IconButton(
-                                      icon: Icon(Icons.edit, color: Colors.blue.shade600, size: 20),
+                                      icon: Icon(
+                                        Icons.edit,
+                                        color: Colors.blue.shade600,
+                                        size: 20,
+                                      ),
                                       onPressed: () => _editDetail(d, index),
                                       constraints: const BoxConstraints(),
                                     ),
                                     const SizedBox(width: 4),
                                     IconButton(
-                                      icon: Icon(Icons.delete, color: Colors.red.shade600, size: 20),
+                                      icon: Icon(
+                                        Icons.delete,
+                                        color: Colors.red.shade600,
+                                        size: 20,
+                                      ),
                                       onPressed: () => _deleteDetail(index),
                                       constraints: const BoxConstraints(),
                                     ),
@@ -545,15 +565,11 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
     );
   }
 
-
   Widget _buildSimpleDetailList() {
     return ListView.separated(
       itemCount: detailList.length,
-      separatorBuilder: (_, __) => Divider(
-        height: 1,
-        thickness: 1,
-        color: Colors.grey.shade200,
-      ),
+      separatorBuilder: (_, __) =>
+          Divider(height: 1, thickness: 1, color: Colors.grey.shade200),
       itemBuilder: (context, index) {
         final d = detailList[index];
 
@@ -589,13 +605,21 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     IconButton(
-                      icon: Icon(Icons.edit, color: Colors.blue.shade600, size: 20),
+                      icon: Icon(
+                        Icons.edit,
+                        color: Colors.blue.shade600,
+                        size: 20,
+                      ),
                       onPressed: () => _editDetail(d, index),
                       constraints: const BoxConstraints(),
                     ),
                     const SizedBox(width: 4),
                     IconButton(
-                      icon: Icon(Icons.delete, color: Colors.red.shade600, size: 20),
+                      icon: Icon(
+                        Icons.delete,
+                        color: Colors.red.shade600,
+                        size: 20,
+                      ),
                       onPressed: () => _deleteDetail(index),
                       constraints: const BoxConstraints(),
                     ),
@@ -614,7 +638,7 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
       child: Padding(
         padding: const EdgeInsets.all(16.0), // ⬅️ padding 8 di semua sisi
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,   // vertikal di tengah
+          mainAxisAlignment: MainAxisAlignment.center, // vertikal di tengah
           crossAxisAlignment: CrossAxisAlignment.center, // horizontal di tengah
           children: [
             Icon(Icons.inbox, size: 64, color: Colors.grey.shade400),
@@ -635,9 +659,6 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
       ),
     );
   }
-
-
-
 
   void _addNewDetail({required int idBagian}) async {
     // Berapa SAK yang sudah ada di list saat ini
@@ -664,12 +685,12 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
         barrierDismissible: false, // opsional: biar harus tekan OK
         builder: (_) => const ErrorStatusDialog(
           title: 'Batas Tercapai',
-          message: 'Maksimal jumlah Sak telah tercapai. Hapus sebagian jika ingin menambah lagi.',
+          message:
+              'Maksimal jumlah Sak telah tercapai. Hapus sebagian jika ingin menambah lagi.',
         ),
       );
       return;
     }
-
 
     // 3) Prefill controller
     final beratCtrl = TextEditingController(text: defaultBerat.toString());
@@ -685,7 +706,9 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
       final clamped = v.clamp(1, remaining);
       setDialogState(() {
         jumlahSakCtrl.text = clamped.toString();
-        jumlahSakCtrl.selection = TextSelection.collapsed(offset: jumlahSakCtrl.text.length);
+        jumlahSakCtrl.selection = TextSelection.collapsed(
+          offset: jumlahSakCtrl.text.length,
+        );
         previewJumlah = clamped;
         jumlahSakError = null;
       });
@@ -701,8 +724,13 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
 
           return AlertDialog(
             backgroundColor: Colors.white,
-            insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 24,
+              vertical: 24,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
             contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
             actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -721,10 +749,7 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                 const SizedBox(width: 12),
                 const Text(
                   "Tambah Detail",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                 ),
               ],
             ),
@@ -761,12 +786,17 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                               errorText: beratError,
                               isDense: true,
                               contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 12),
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
                             ),
-                            keyboardType:
-                            const TextInputType.numberWithOptions(decimal: true),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
                             inputFormatters: [
-                              FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                              FilteringTextInputFormatter.allow(
+                                RegExp(r'[0-9.]'),
+                              ),
                             ],
                           ),
                         ),
@@ -790,11 +820,13 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                               errorText: jumlahSakError,
                               isDense: true,
                               contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 12),
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
                             ),
                             keyboardType: TextInputType.number,
                             inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly
+                              FilteringTextInputFormatter.digitsOnly,
                             ],
                             onChanged: (value) {
                               final v = int.tryParse(value) ?? 0;
@@ -807,7 +839,7 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                                 _setJumlah(setDialogState, remaining);
                                 setDialogState(() {
                                   jumlahSakError =
-                                  'Mencapai batas ($remaining sak)';
+                                      'Mencapai batas ($remaining sak)';
                                 });
                               } else {
                                 setDialogState(() {
@@ -828,7 +860,9 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                           child: Text(
                             "Berat untuk setiap sak",
                             style: TextStyle(
-                                fontSize: 12, color: Colors.grey.shade600),
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 24),
@@ -846,10 +880,14 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                 icon: const Icon(Icons.close),
                 label: const Text("BATAL"),
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
                   side: BorderSide(color: Colors.grey.shade400),
-                  shape:
-                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
                 onPressed: () => Navigator.pop(ctx),
               ),
@@ -859,10 +897,13 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF00897B),
                   foregroundColor: Colors.white,
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape:
-                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                   elevation: 2,
                 ),
                 onPressed: () {
@@ -892,14 +933,16 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                     setState(() {
                       final startNoSak = _getNextSakNumber();
                       for (int i = 0; i < jumlahBaru!; i++) {
-                        detailList.add(BrokerDetail(
-                          noBroker: noBrokerCtrl.text,
-                          noSak: startNoSak + i,
-                          berat: berat,
-                          dateUsage: DateTime.now().toString(),
-                          idLokasi: '-',
-                          isPartial: false,
-                        ));
+                        detailList.add(
+                          BrokerDetail(
+                            noBroker: noBrokerCtrl.text,
+                            noSak: startNoSak + i,
+                            berat: berat,
+                            dateUsage: DateTime.now().toString(),
+                            idLokasi: '-',
+                            isPartial: false,
+                          ),
+                        );
                       }
                     });
                     Navigator.pop(ctx);
@@ -911,22 +954,24 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
         },
       ),
     );
-
   }
-
 
   // Helper function untuk mendapatkan nomor SAK berikutnya
   int _getNextSakNumber() {
     if (detailList.isEmpty) return 1;
 
     // Cari nomor SAK terbesar
-    final maxSak = detailList.map((d) => d.noSak).reduce((a, b) => a > b ? a : b);
+    final maxSak = detailList
+        .map((d) => d.noSak)
+        .reduce((a, b) => a > b ? a : b);
     return maxSak + 1;
   }
 
   void _editDetail(BrokerDetail detail, int index) {
     final noSakCtrl = TextEditingController(text: detail.noSak.toString());
-    final beratCtrl = TextEditingController(text: detail.berat?.toString() ?? '');
+    final beratCtrl = TextEditingController(
+      text: detail.berat?.toString() ?? '',
+    );
 
     showDialog(
       context: context,
@@ -937,7 +982,9 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
 
         return AlertDialog(
           backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
           contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
           actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -956,10 +1003,7 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
               const SizedBox(width: 12),
               const Text(
                 "Edit Detail",
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
               ),
             ],
           ),
@@ -1001,8 +1045,9 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                       ),
                     ),
                   ],
@@ -1013,10 +1058,7 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     "Pastikan data sudah benar sebelum menyimpan.",
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 13,
-                    ),
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                   ),
                 ),
               ],
@@ -1029,10 +1071,14 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
               icon: const Icon(Icons.close),
               label: const Text("BATAL"),
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
                 side: BorderSide(color: Colors.grey.shade400),
-                shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
               onPressed: () => Navigator.pop(ctx),
             ),
@@ -1042,9 +1088,13 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange.shade700,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 elevation: 2,
               ),
               onPressed: () {
@@ -1078,8 +1128,6 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
         );
       },
     );
-
-
   }
 
   void _deleteDetail(int index) {
@@ -1103,7 +1151,6 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
     //   ),
     // );
   }
-
 
   Widget _buildActions() {
     return Row(
@@ -1142,48 +1189,61 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
             // Build header
             final headerToSave = widget.header == null
                 ? BrokerHeader(
-              noBroker: noBrokerCtrl.text.trim(),
-              idJenisPlastik: selected.idJenisPlastik,
-              namaJenisPlastik: selected.jenis,
-              idWarehouse: 5,
-              namaWarehouse: warehouseCtrl.text.trim(),
-              dateCreate: dateCreatedCtrl.text.trim(),
-              statusText: '',           // ga dikirim, server yang nentuin; biarkan kosong di client
-              idStatus: null,           // derived di model; tidak perlu diisi
-              createBy: '',             // optional
-              dateTimeCreate: '',       // optional
-              // kirim salah satu sesuai mode
-              noProduksi: _selectedMode == InputMode.production
-                  ? (noProduksiCtrl.text.trim().isEmpty ? null : noProduksiCtrl.text.trim())
-                  : null,
-              noBongkarSusun: _selectedMode == InputMode.bongkar
-                  ? (noBongkarSusunCtrl.text.trim().isEmpty ? null : noBongkarSusunCtrl.text.trim())
-                  : null,
-              // opsional:
-              // blok: blokCtrl.text.trim().isEmpty ? null : blokCtrl.text.trim(),
-              // idLokasi: idLokasiCtrl.text.trim().isEmpty ? null : idLokasiCtrl.text.trim(),
-            )
+                    noBroker: noBrokerCtrl.text.trim(),
+                    idJenisPlastik: selected.idJenisPlastik,
+                    namaJenisPlastik: selected.jenis,
+                    idWarehouse: 5,
+                    namaWarehouse: warehouseCtrl.text.trim(),
+                    dateCreate: _selectedDate.toIso8601String(),
+                    statusText:
+                        '', // ga dikirim, server yang nentuin; biarkan kosong di client
+                    idStatus: null, // derived di model; tidak perlu diisi
+                    createBy: '', // optional
+                    dateTimeCreate: '', // optional
+                    // kirim salah satu sesuai mode
+                    noProduksi: _selectedMode == InputMode.production
+                        ? (noProduksiCtrl.text.trim().isEmpty
+                              ? null
+                              : noProduksiCtrl.text.trim())
+                        : null,
+                    noBongkarSusun: _selectedMode == InputMode.bongkar
+                        ? (noBongkarSusunCtrl.text.trim().isEmpty
+                              ? null
+                              : noBongkarSusunCtrl.text.trim())
+                        : null,
+                    // opsional:
+                    // blok: blokCtrl.text.trim().isEmpty ? null : blokCtrl.text.trim(),
+                    // idLokasi: idLokasiCtrl.text.trim().isEmpty ? null : idLokasiCtrl.text.trim(),
+                  )
                 : widget.header!.copyWith(
-              idJenisPlastik: selected.idJenisPlastik,
-              namaJenisPlastik: selected.jenis,
-              namaWarehouse: warehouseCtrl.text.trim(),
-              dateCreate: dateCreatedCtrl.text.trim(),
-              noProduksi: _selectedMode == InputMode.production
-                  ? (noProduksiCtrl.text.trim().isEmpty ? null : noProduksiCtrl.text.trim())
-                  : null,
-              noBongkarSusun: _selectedMode == InputMode.bongkar
-                  ? (noBongkarSusunCtrl.text.trim().isEmpty ? null : noBongkarSusunCtrl.text.trim())
-                  : null,
-            );
-
+                    idJenisPlastik: selected.idJenisPlastik,
+                    namaJenisPlastik: selected.jenis,
+                    namaWarehouse: warehouseCtrl.text.trim(),
+                    dateCreate: _selectedDate.toIso8601String(),
+                    noProduksi: _selectedMode == InputMode.production
+                        ? (noProduksiCtrl.text.trim().isEmpty
+                              ? null
+                              : noProduksiCtrl.text.trim())
+                        : null,
+                    noBongkarSusun: _selectedMode == InputMode.bongkar
+                        ? (noBongkarSusunCtrl.text.trim().isEmpty
+                              ? null
+                              : noBongkarSusunCtrl.text.trim())
+                        : null,
+                  );
 
             // Minimal salah satu terisi
-            final hasNoProduksi = (headerToSave.noProduksi ?? '').trim().isNotEmpty;
-            final hasNoBongkar  = (headerToSave.noBongkarSusun ?? '').trim().isNotEmpty;
+            final hasNoProduksi = (headerToSave.noProduksi ?? '')
+                .trim()
+                .isNotEmpty;
+            final hasNoBongkar = (headerToSave.noBongkarSusun ?? '')
+                .trim()
+                .isNotEmpty;
             if (!hasNoProduksi && !hasNoBongkar) {
               await DialogService.instance.showError(
                 title: 'Validasi',
-                message: 'Isi NoProduksi atau NoBongkarSusun (minimal salah satu).',
+                message:
+                    'Isi NoProduksi atau NoBongkarSusun (minimal salah satu).',
               );
               return;
             }
@@ -1200,7 +1260,9 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
             try {
               // TAMPILKAN LOADING
               DialogService.instance.showLoading(
-                message: widget.header == null ? 'Membuat label...' : 'Menyimpan perubahan...',
+                message: widget.header == null
+                    ? 'Membuat label...'
+                    : 'Menyimpan perubahan...',
               );
 
               if (widget.header == null) {
@@ -1210,9 +1272,10 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                 // TUTUP LOADING
                 DialogService.instance.hideLoading();
 
-                final noWashing = res?['data']?['header']?['NoWashing']?.toString()
-                    ?? vm.lastCreatedNoBroker
-                    ?? '-';
+                final noWashing =
+                    res?['data']?['header']?['NoWashing']?.toString() ??
+                    vm.lastCreatedNoBroker ??
+                    '-';
 
                 // SUCCESS DIALOG
                 await DialogService.instance.showSuccess(
@@ -1222,18 +1285,30 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const SizedBox(height: 4),
-                      const Text('Nomor Washing:', style: TextStyle(color: Colors.black54)),
+                      const Text(
+                        'Nomor Washing:',
+                        style: TextStyle(color: Colors.black54),
+                      ),
                       const SizedBox(height: 4),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.green.withOpacity(.08),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.green.withOpacity(.35)),
+                          border: Border.all(
+                            color: Colors.green.withOpacity(.35),
+                          ),
                         ),
                         child: Text(
                           noWashing,
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: .3),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: .3,
+                          ),
                         ),
                       ),
                     ],
@@ -1243,25 +1318,29 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                       label: 'Nanti',
                       isPrimary: false,
                       onPressed: () {
-                        Navigator.of(AppNav.key.currentContext!).pop(); // tutup dialog
+                        Navigator.of(
+                          AppNav.key.currentContext!,
+                        ).pop(); // tutup dialog
                       },
                     ),
                     StatusAction(
                       label: 'Print',
                       isPrimary: true,
                       onPressed: () {
-                        Navigator.of(AppNav.key.currentContext!).pop(); // tutup dialog dulu
+                        Navigator.of(
+                          AppNav.key.currentContext!,
+                        ).pop(); // tutup dialog dulu
                         // _printLabel(noWashing);                         // lanjut aksi print
                       },
                     ),
                   ],
                 );
 
-
                 if (context.mounted) Navigator.pop(context); // tutup form
               } else {
                 // EDIT
-                final noWashing = widget.header!.noBroker; // pastikan model header punya ini
+                final noWashing =
+                    widget.header!.noBroker; // pastikan model header punya ini
                 if (noWashing == null || noWashing.isEmpty) {
                   DialogService.instance.hideLoading();
                   await DialogService.instance.showError(
@@ -1271,7 +1350,11 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                   return;
                 }
 
-                final res = await vm.updateBroker(noWashing, headerToSave, detailList);
+                final res = await vm.updateBroker(
+                  noWashing,
+                  headerToSave,
+                  detailList,
+                );
 
                 // TUTUP LOADING
                 DialogService.instance.hideLoading();
@@ -1300,7 +1383,9 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
             }
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: isEdit ? const Color(0xFFF57C00) : const Color(0xFF00897B),
+            backgroundColor: isEdit
+                ? const Color(0xFFF57C00)
+                : const Color(0xFF00897B),
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
           ),

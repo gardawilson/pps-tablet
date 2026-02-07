@@ -14,7 +14,7 @@ class AuditSession {
   final String sessionKey;
   final String documentNo;
 
-  /// CREATE | UPDATE | DELETE | CONSUME | UNCONSUME
+  /// CREATE | UPDATE | DELETE | CONSUME | UNCONSUME | PRODUCE | UNPRODUCE
   final String sessionAction;
 
   // =============================
@@ -33,9 +33,13 @@ class AuditSession {
   final String? detailsOldJson;
   final String? detailsNewJson;
 
-  // ✅ NEW: consume/unconsume (outer event list json)
+  // ✅ Consume/Unconsume (outer event list json)
   final String? consumeJson;
   final String? unconsumeJson;
+
+  // ✅ Produce/Unproduce (outer event list json)
+  final String? produceJson;
+  final String? unproduceJson;
 
   // =============================
   // Single aggregated output field
@@ -60,6 +64,8 @@ class AuditSession {
     this.detailsNewJson,
     this.consumeJson,
     this.unconsumeJson,
+    this.produceJson,
+    this.unproduceJson,
     this.outputChanges,
   });
 
@@ -92,12 +98,24 @@ class AuditSession {
   // Action helpers
   // =============================
   bool get isCreate => sessionAction.toUpperCase() == 'CREATE';
+  bool get isUpdate => sessionAction.toUpperCase() == 'UPDATE';
   bool get isDelete => sessionAction.toUpperCase() == 'DELETE';
 
-  /// ✅ Updated for new format: sessionAction = CONSUME / UNCONSUME
   bool get isConsume => sessionAction.toUpperCase() == 'CONSUME';
   bool get isUnconsume => sessionAction.toUpperCase() == 'UNCONSUME';
   bool get isConsumeSession => isConsume || isUnconsume;
+
+  bool get isProduce => sessionAction.toUpperCase() == 'PRODUCE';
+  bool get isUnproduce => sessionAction.toUpperCase() == 'UNPRODUCE';
+
+  bool get isAdjust => sessionAction.toUpperCase() == 'ADJUST';
+
+  bool get isProduceMutation =>
+      sessionAction.toUpperCase() == 'PRODUCE' ||
+      sessionAction.toUpperCase() == 'UNPRODUCE' ||
+      sessionAction.toUpperCase() == 'ADJUST';
+
+  bool get isProduceSession => isProduce || isUnproduce;
 
   // =============================
   // Parse JSON helpers
@@ -153,15 +171,47 @@ class AuditSession {
   }
 
   // =============================
-  // ✅ Consume / Unconsume (NEW FORMAT)
-  // Outer list = events
-  // Each event has TableName, Action, OldData/NewData (string JSON)
+  // Parse event payload string (OldData/NewData) into list of items
+  // Shared by both Consume and Produce
+  // =============================
+  List<Map<String, dynamic>> _parseEventItems(Map<String, dynamic> event) {
+    dynamic raw = event['OldData'] ?? event['NewData'];
+    if (raw == null) return [];
+
+    try {
+      dynamic decoded = raw;
+
+      // Decode until not String anymore (max 3 levels safety)
+      for (int i = 0; i < 3 && decoded is String; i++) {
+        decoded = json.decode(decoded);
+      }
+
+      if (decoded is List) {
+        return decoded
+            .whereType<Map>()
+            .map((e) => e.cast<String, dynamic>())
+            .toList();
+      }
+
+      if (decoded is Map) {
+        return [decoded.cast<String, dynamic>()];
+      }
+    } catch (e) {
+      print('⚠️ Failed to parse event item list: $e');
+    }
+
+    return [];
+  }
+
+  // =============================
+  // ✅ CONSUME / UNCONSUME
   // =============================
 
-  /// Outer events list
+  /// Outer events list for consume
   List<Map<String, dynamic>>? get consumeEvents =>
       _parseListJson(consumeJson, 'consumeJson');
 
+  /// Outer events list for unconsume
   List<Map<String, dynamic>>? get unconsumeEvents =>
       _parseListJson(unconsumeJson, 'unconsumeJson');
 
@@ -169,29 +219,7 @@ class AuditSession {
   List<Map<String, dynamic>>? get consumeUnifiedEvents =>
       consumeEvents ?? unconsumeEvents;
 
-  /// Parse the event payload string (OldData/NewData) into list of items
-  List<Map<String, dynamic>> _parseEventItems(Map<String, dynamic> event) {
-    // On UNCONSUME usually OldData has the removed relation; on CONSUME usually NewData has the inserted relation.
-    final raw = (event['OldData'] ?? event['NewData'])?.toString();
-    if (raw == null || raw.isEmpty) return [];
-
-    try {
-      final decoded = json.decode(raw);
-      if (decoded is List) {
-        return decoded.map((e) => (e as Map).cast<String, dynamic>()).toList();
-      }
-      if (decoded is Map) {
-        return [decoded.cast<String, dynamic>()];
-      }
-    } catch (e) {
-      // ignore: avoid_print
-      print('⚠️ Failed to parse consume event item list: $e');
-    }
-
-    return [];
-  }
-
-  /// Flattened items for quick rendering
+  /// Flattened items for consume
   List<Map<String, dynamic>>? get consumeItems {
     final events = consumeEvents;
     if (events == null || events.isEmpty) return null;
@@ -214,6 +242,7 @@ class AuditSession {
     return out.isEmpty ? null : out;
   }
 
+  /// Flattened items for unconsume
   List<Map<String, dynamic>>? get unconsumeItems {
     final events = unconsumeEvents;
     if (events == null || events.isEmpty) return null;
@@ -267,6 +296,141 @@ class AuditSession {
   }
 
   // =============================
+  // ✅ PRODUCE / UNPRODUCE
+  // =============================
+
+  bool get hasProduceAdd => produceItems != null && produceItems!.isNotEmpty;
+
+  bool get hasProduceRemove =>
+      unproduceItems != null && unproduceItems!.isNotEmpty;
+
+  int get produceAddedCount => produceItems?.length ?? 0;
+  int get produceRemovedCount => unproduceDiffItems.length;
+
+  /// Outer events list for produce
+  List<Map<String, dynamic>>? get produceEvents =>
+      _parseListJson(produceJson, 'produceJson');
+
+  /// Outer events list for unproduce
+  List<Map<String, dynamic>>? get unproduceEvents =>
+      _parseListJson(unproduceJson, 'unproduceJson');
+
+  /// Prefer produce else unproduce (for UI)
+  List<Map<String, dynamic>>? get produceUnifiedEvents =>
+      produceEvents ?? unproduceEvents;
+
+  /// Flattened items for produce
+  List<Map<String, dynamic>>? get produceItems {
+    final events = produceEvents;
+    if (events == null || events.isEmpty) return null;
+
+    final out = <Map<String, dynamic>>[];
+    for (final ev in events) {
+      final tableName = ev['TableName']?.toString();
+      final action = ev['Action']?.toString();
+
+      final items = _parseEventItems(ev);
+      for (final it in items) {
+        out.add({
+          ...it,
+          if (tableName != null) '_TableName': tableName,
+          if (action != null) '_Action': action,
+        });
+      }
+    }
+    return out.isEmpty ? null : out;
+  }
+
+  /// Flattened items for unproduce
+  List<Map<String, dynamic>>? get unproduceItems {
+    final events = unproduceEvents;
+    if (events == null || events.isEmpty) return null;
+
+    final out = <Map<String, dynamic>>[];
+    for (final ev in events) {
+      final tableName = ev['TableName']?.toString();
+      final action = ev['Action']?.toString();
+
+      final items = _parseEventItems(ev);
+      for (final it in items) {
+        out.add({
+          ...it,
+          if (tableName != null) '_TableName': tableName,
+          if (action != null) '_Action': action,
+        });
+      }
+    }
+    return out.isEmpty ? null : out;
+  }
+
+  /// ✅ Best single list for UI (produce or unproduce)
+  List<Map<String, dynamic>>? get produceUnifiedItems =>
+      produceItems ?? unproduceItems;
+
+  /// Grouping for UI: key = "TableName|Action"
+  Map<String, List<Map<String, dynamic>>> get produceGroups {
+    final items = produceItems ?? const <Map<String, dynamic>>[];
+    final groups = <String, List<Map<String, dynamic>>>{};
+
+    for (final it in items) {
+      final t = it['_TableName']?.toString() ?? '-';
+      final a = it['_Action']?.toString() ?? '-';
+      final key = '$t|$a';
+      (groups[key] ??= []).add(it);
+    }
+    return groups;
+  }
+
+  Map<String, List<Map<String, dynamic>>> get unproduceGroups {
+    final items = unproduceItems ?? const <Map<String, dynamic>>[];
+    final groups = <String, List<Map<String, dynamic>>>{};
+
+    for (final it in items) {
+      final t = it['_TableName']?.toString() ?? '-';
+      final a = it['_Action']?.toString() ?? '-';
+      final key = '$t|$a';
+      (groups[key] ??= []).add(it);
+    }
+    return groups;
+  }
+
+  /// 🔥 Items that were REMOVED (exist in unproduce but not in produce)
+  List<Map<String, dynamic>> get unproduceDiffItems {
+    final produced = produceItems ?? const [];
+    final unproduced = unproduceItems ?? const [];
+
+    if (produced.isEmpty || unproduced.isEmpty) {
+      return unproduced;
+    }
+
+    // Build set of produced NoSak
+    final producedSak = produced
+        .map((e) => e['NoSak'])
+        .where((e) => e != null)
+        .toSet();
+
+    // Keep only unproduced items not re-produced
+    return unproduced.where((item) {
+      final noSak = item['NoSak'];
+      return noSak != null && !producedSak.contains(noSak);
+    }).toList();
+  }
+
+  Map<String, List<Map<String, dynamic>>> get unproduceDiffGroups {
+    final items = unproduceDiffItems;
+    final groups = <String, List<Map<String, dynamic>>>{};
+
+    for (final it in items) {
+      final t = it['_TableName']?.toString() ?? '-';
+      final a = 'UNPRODUCE'; // force semantic action
+      final key = '$t|$a';
+      (groups[key] ??= []).add(it);
+    }
+
+    return groups;
+  }
+
+  // =============================
   // Output Changes (single object)
   // =============================
   Map<String, dynamic>? get outputData =>
@@ -281,9 +445,9 @@ class AuditSession {
   // fromJson with Scalar Support
   // =============================
   factory AuditSession.fromJson(
-      Map<String, dynamic> json, {
-        List<AuditFieldConfig>? fieldConfigs,
-      }) {
+    Map<String, dynamic> json, {
+    List<AuditFieldConfig>? fieldConfigs,
+  }) {
     final oldValues = <String, dynamic>{};
     final newValues = <String, dynamic>{};
 
@@ -359,6 +523,8 @@ class AuditSession {
       detailsNewJson: _sN(json['DetailsNewJson']),
       consumeJson: _sN(json['ConsumeJson']),
       unconsumeJson: _sN(json['UnconsumeJson']),
+      produceJson: _sN(json['ProduceJson']),
+      unproduceJson: _sN(json['UnproduceJson']),
       outputChanges: _sN(json['OutputChanges']),
     );
   }
@@ -369,8 +535,7 @@ class AuditSession {
   T? getOldValue<T>(String key) => oldValues[key] as T?;
   T? getNewValue<T>(String key) => newValues[key] as T?;
 
-  T? getCurrentValue<T>(String key) =>
-      (newValues[key] ?? oldValues[key]) as T?;
+  T? getCurrentValue<T>(String key) => (newValues[key] ?? oldValues[key]) as T?;
 
   bool hasFieldChanged(String key) => oldValues[key] != newValues[key];
 

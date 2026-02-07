@@ -1,5 +1,6 @@
 // lib/features/production/washing/view/washing_production_screen.dart
 import 'package:flutter/material.dart';
+import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:pps_tablet/features/production/washing/view/washing_production_input_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
@@ -20,8 +21,6 @@ import '../widgets/washing_delete_dialog.dart';
 import '../widgets/washing_production_action_bar.dart';
 import '../widgets/washing_production_form_dialog.dart';
 import '../widgets/washing_production_row_popover.dart';
-
-
 
 class WashingProductionScreen extends StatefulWidget {
   const WashingProductionScreen({super.key});
@@ -50,7 +49,7 @@ class _WashingProductionScreenState extends State<WashingProductionScreen> {
     required Offset globalPos,
   }) async {
     final overlayBox =
-    Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
+        Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
     if (overlayBox == null) return;
 
     // konversi global → lokal terhadap overlay
@@ -61,10 +60,14 @@ class _WashingProductionScreenState extends State<WashingProductionScreen> {
       barrierDismissible: true,
       barrierColor: Colors.black26,
       builder: (dialogCtx) {
-        final safeLeft =
-        local.dx.clamp(8.0, overlayBox.size.width - 320.0); // max width popover
-        final safeTop =
-        local.dy.clamp(8.0, overlayBox.size.height - 220.0); // max height popover
+        final safeLeft = local.dx.clamp(
+          8.0,
+          overlayBox.size.width - 320.0,
+        ); // max width popover
+        final safeTop = local.dy.clamp(
+          8.0,
+          overlayBox.size.height - 220.0,
+        ); // max height popover
 
         return Stack(
           children: [
@@ -109,7 +112,9 @@ class _WashingProductionScreenState extends State<WashingProductionScreen> {
                         onConfirm: () async {
                           final vm = context.read<WashingProductionViewModel>();
 
-                          final success = await vm.deleteProduksi(row.noProduksi);
+                          final success = await vm.deleteProduksi(
+                            row.noProduksi,
+                          );
 
                           // 1) Tutup dialog konfirmasi
                           if (ctx.mounted) Navigator.of(ctx).pop();
@@ -124,11 +129,13 @@ class _WashingProductionScreenState extends State<WashingProductionScreen> {
                               context: context,
                               builder: (_) => SuccessStatusDialog(
                                 title: 'Berhasil Menghapus',
-                                message: 'No. Produksi ${row.noProduksi} berhasil dihapus.',
+                                message:
+                                    'No. Produksi ${row.noProduksi} berhasil dihapus.',
                               ),
                             );
                           } else {
-                            final rawMsg = vm.saveError ?? 'Gagal menghapus data';
+                            final rawMsg =
+                                vm.saveError ?? 'Gagal menghapus data';
 
                             // ❌ dialog error
                             showDialog(
@@ -149,11 +156,15 @@ class _WashingProductionScreenState extends State<WashingProductionScreen> {
                 onPrint: () async {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content:
-                      Text('Fitur print Washing belum tersedia untuk saat ini.'),
+                      content: Text(
+                        'Fitur print Washing belum tersedia untuk saat ini.',
+                      ),
                       duration: Duration(milliseconds: 1200),
                     ),
                   );
+                },
+                onAuditHistory: () {
+                  _navigateToAuditHistory(row);
                 },
               ),
             ),
@@ -163,12 +174,21 @@ class _WashingProductionScreenState extends State<WashingProductionScreen> {
     );
   }
 
+  void _navigateToAuditHistory(WashingProduction header) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            AuditScreenWithPrefilledDoc(documentNo: header.noProduksi),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => WashingProductionViewModel(
-        repository: WashingProductionRepository(),
-      )..refreshPaged(),
+      create: (_) =>
+          WashingProductionViewModel(repository: WashingProductionRepository())
+            ..refreshPaged(),
       child: Consumer<WashingProductionViewModel>(
         builder: (context, vm, _) {
           final columns = <TableColumnSpec<WashingProduction>>[
@@ -188,8 +208,7 @@ class _WashingProductionScreenState extends State<WashingProductionScreen> {
               width: 130,
               headerAlign: TextAlign.left,
               cellAlign: TextAlign.left,
-              cellBuilder: (_, r) =>
-                  Text(formatDateToShortId(r.tglProduksi)),
+              cellBuilder: (_, r) => Text(formatDateToShortId(r.tglProduksi)),
             ),
             TableColumnSpec(
               title: 'SHIFT',
@@ -235,8 +254,7 @@ class _WashingProductionScreenState extends State<WashingProductionScreen> {
               width: 150,
               headerAlign: TextAlign.center,
               cellAlign: TextAlign.center,
-              cellBuilder: (_, r) =>
-                  Text('${r.jmlhAnggota}/${r.hadir}'),
+              cellBuilder: (_, r) => Text('${r.jmlhAnggota}/${r.hadir}'),
             ),
             TableColumnSpec(
               title: 'APPROVED',
@@ -244,13 +262,9 @@ class _WashingProductionScreenState extends State<WashingProductionScreen> {
               headerAlign: TextAlign.center,
               cellAlign: TextAlign.center,
               cellBuilder: (_, r) =>
-              (r.approveBy != null && r.approveBy!.isNotEmpty)
-                  ? const Icon(Icons.verified,
-                  size: 18, color: Colors.green)
-                  : const Text(
-                '-',
-                style: TextStyle(color: Colors.black54),
-              ),
+                  (r.approveBy != null && r.approveBy!.isNotEmpty)
+                  ? const Icon(Icons.verified, size: 18, color: Colors.green)
+                  : const Text('-', style: TextStyle(color: Colors.black54)),
             ),
           ];
 
@@ -290,7 +304,7 @@ class _WashingProductionScreenState extends State<WashingProductionScreen> {
                     columns: columns,
                     horizontalPadding: 16,
                     selectedPredicate: (r) =>
-                    r.noProduksi == _selectedNoProduksi,
+                        r.noProduksi == _selectedNoProduksi,
                     onRowTap: (r) =>
                         setState(() => _selectedNoProduksi = r.noProduksi),
 
@@ -335,8 +349,9 @@ class _WashingProductionScreenState extends State<WashingProductionScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content:
-          Text('Washing No. Produksi ${created.noProduksi} berhasil dibuat'),
+          content: Text(
+            'Washing No. Produksi ${created.noProduksi} berhasil dibuat',
+          ),
         ),
       );
     }
@@ -345,7 +360,10 @@ class _WashingProductionScreenState extends State<WashingProductionScreen> {
   // =========================================================
   //  DIALOG EDIT (kalau nanti sudah ada endpoint update)
   // =========================================================
-  Future<void> _openEditDialog(BuildContext context, WashingProduction row) async {
+  Future<void> _openEditDialog(
+    BuildContext context,
+    WashingProduction row,
+  ) async {
     final vm = context.read<WashingProductionViewModel>();
 
     // Open the form in EDIT mode by passing `header: row`
@@ -362,7 +380,11 @@ class _WashingProductionScreenState extends State<WashingProductionScreen> {
     if (updated != null) {
       // (Optional) Give feedback
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No. Produksi ${updated.noProduksi} berhasil diperbarui')),
+        SnackBar(
+          content: Text(
+            'No. Produksi ${updated.noProduksi} berhasil diperbarui',
+          ),
+        ),
       );
     }
   }

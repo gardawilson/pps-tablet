@@ -18,10 +18,7 @@ class AuditFieldConfig {
   bool get isRelational => type == AuditFieldType.relational;
 }
 
-enum AuditFieldType {
-  relational,
-  scalar,
-}
+enum AuditFieldType { relational, scalar }
 
 /// Module-specific audit configurations
 class AuditModuleConfig {
@@ -375,7 +372,6 @@ class AuditModuleConfig {
     fields: [
       // kalau di backend nanti kamu join nama operator/mesin,
       // pakai nameField. Kalau belum, nameField boleh null.
-
       AuditFieldConfig(
         idField: 'IdMesin',
         nameField: 'NamaMesin', // optional (kalau backend join)
@@ -437,7 +433,6 @@ class AuditModuleConfig {
       ),
     ],
   );
-
 
   static const brokerProduksi = AuditModuleConfig(
     module: 'broker_produksi',
@@ -585,7 +580,6 @@ class AuditModuleConfig {
       ),
     ],
   );
-
 
   static const gilinganProduksi = AuditModuleConfig(
     module: 'gilingan_produksi',
@@ -1044,7 +1038,6 @@ class AuditModuleConfig {
       ),
     ],
   );
-
 
   // =============================
   // Lookup helper

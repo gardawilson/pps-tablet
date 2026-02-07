@@ -1,5 +1,6 @@
 // lib/features/production/broker/view/broker_production_screen.dart
 import 'package:flutter/material.dart';
+import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
@@ -64,7 +65,7 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
     required Offset globalPos,
   }) async {
     final overlay =
-    Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
+        Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
     if (overlay == null) return;
 
     final local = overlay.globalToLocal(globalPos);
@@ -109,8 +110,9 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
                       return BrokerProductionDeleteDialog(
                         header: row,
                         onConfirm: () async {
-                          final success =
-                          await _viewModel.deleteProduksi(row.noProduksi);
+                          final success = await _viewModel.deleteProduksi(
+                            row.noProduksi,
+                          );
 
                           if (ctx.mounted) Navigator.of(ctx).pop();
                           if (!context.mounted) return;
@@ -121,7 +123,7 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
                               builder: (_) => SuccessStatusDialog(
                                 title: 'Berhasil Menghapus',
                                 message:
-                                'No. Produksi ${row.noProduksi} berhasil dihapus.',
+                                    'No. Produksi ${row.noProduksi} berhasil dihapus.',
                               ),
                             );
                           } else {
@@ -143,11 +145,23 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
                 onPrint: () async {
                   // optional
                 },
+                onAuditHistory: () {
+                  _navigateToAuditHistory(row);
+                },
               ),
             ),
           ],
         );
       },
+    );
+  }
+
+  void _navigateToAuditHistory(BrokerProduction header) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            AuditScreenWithPrefilledDoc(documentNo: header.noProduksi),
+      ),
     );
   }
 
@@ -237,7 +251,7 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
               headerAlign: TextAlign.center,
               cellAlign: TextAlign.center,
               cellBuilder: (_, r) =>
-              (r.approveBy != null && r.approveBy!.isNotEmpty)
+                  (r.approveBy != null && r.approveBy!.isNotEmpty)
                   ? const Icon(Icons.verified, size: 18, color: Colors.green)
                   : const Text('-', style: TextStyle(color: Colors.black54)),
             ),
@@ -281,7 +295,7 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
                     columns: columns,
                     horizontalPadding: 16,
                     selectedPredicate: (r) =>
-                    r.noProduksi == _selectedNoProduksi,
+                        r.noProduksi == _selectedNoProduksi,
                     onRowTap: (r) =>
                         setState(() => _selectedNoProduksi = r.noProduksi),
                     onRowLongPress: (r, globalPos) async {
@@ -345,18 +359,18 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
     if (created == true) {
       debugPrint('🟦 [BROKER_SCREEN] Success detected (create).');
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Label berhasil dibuat')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Label berhasil dibuat')));
     } else {
       debugPrint('🟦 [BROKER_SCREEN] Result was null or false: $created');
     }
   }
 
   Future<void> _openEditDialog(
-      BuildContext context,
-      BrokerProduction row,
-      ) async {
+    BuildContext context,
+    BrokerProduction row,
+  ) async {
     debugPrint('🟦 [BROKER_SCREEN] Opening edit dialog for: ${row.noProduksi}');
     debugPrint('🟦 [BROKER_SCREEN] Using VM hash=${_viewModel.hashCode}');
     debugPrint(
@@ -374,9 +388,7 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
         // ✅ Share the SAME VM instance
         return ChangeNotifierProvider<BrokerProductionViewModel>.value(
           value: _viewModel,
-          child: BrokerProductionFormDialog(
-            header: row,
-          ),
+          child: BrokerProductionFormDialog(header: row),
         );
       },
     );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:pps_tablet/features/production/sortir_reject/view/sortir_reject_input_screen.dart';
 import 'package:provider/provider.dart';
 
@@ -13,7 +14,6 @@ import '../widgets/sortir_reject_production_action_bar.dart';
 import '../widgets/sortir_reject_production_delete_dialog.dart';
 import '../widgets/sortir_reject_production_form_dialog.dart';
 import '../widgets/sortir_reject_production_row_popover.dart';
-
 
 // TODO: ganti ke input screen sortir reject kamu
 // import 'sortir_reject_production_input_screen.dart';
@@ -62,7 +62,7 @@ class _SortirRejectProductionScreenState
     required Offset globalPos,
   }) async {
     final overlay =
-    Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
+        Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
     if (overlay == null) return;
 
     final local = overlay.globalToLocal(globalPos);
@@ -111,8 +111,9 @@ class _SortirRejectProductionScreenState
                       return SortirRejectProductionDeleteDialog(
                         header: row,
                         onConfirm: () async {
-                          final success =
-                          await _viewModel.deleteSortirReject(row.noBJSortir);
+                          final success = await _viewModel.deleteSortirReject(
+                            row.noBJSortir,
+                          );
 
                           if (ctx.mounted) Navigator.of(ctx).pop();
                           if (!context.mounted) return;
@@ -123,7 +124,7 @@ class _SortirRejectProductionScreenState
                               builder: (_) => SuccessStatusDialog(
                                 title: 'Berhasil Menghapus',
                                 message:
-                                'No. BJ Sortir ${row.noBJSortir} berhasil dihapus.',
+                                    'No. BJ Sortir ${row.noBJSortir} berhasil dihapus.',
                               ),
                             );
                           } else {
@@ -142,11 +143,24 @@ class _SortirRejectProductionScreenState
                     },
                   );
                 },
+
+                onAuditHistory: () {
+                  _navigateToAuditHistory(row);
+                },
               ),
             ),
           ],
         );
       },
+    );
+  }
+
+  void _navigateToAuditHistory(SortirRejectProduction header) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            AuditScreenWithPrefilledDoc(documentNo: header.noBJSortir),
+      ),
     );
   }
 
@@ -237,7 +251,8 @@ class _SortirRejectProductionScreenState
                     pagingController: vm.pagingController,
                     columns: columns,
                     horizontalPadding: 16,
-                    selectedPredicate: (r) => r.noBJSortir == _selectedNoBJSortir,
+                    selectedPredicate: (r) =>
+                        r.noBJSortir == _selectedNoBJSortir,
                     onRowTap: (r) =>
                         setState(() => _selectedNoBJSortir = r.noBJSortir),
                     onRowLongPress: (r, globalPos) async {
@@ -259,7 +274,9 @@ class _SortirRejectProductionScreenState
 
   Future<void> _openCreateDialog() async {
     debugPrint('🟩 [SORTIR_REJECT_SCREEN] Opening create dialog...');
-    debugPrint('🟩 [SORTIR_REJECT_SCREEN] Using VM hash=${_viewModel.hashCode}');
+    debugPrint(
+      '🟩 [SORTIR_REJECT_SCREEN] Using VM hash=${_viewModel.hashCode}',
+    );
     debugPrint(
       '🟩 [SORTIR_REJECT_SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
     );
@@ -285,19 +302,22 @@ class _SortirRejectProductionScreenState
     if (created != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content:
-          Text('Sortir Reject ${created.noBJSortir} berhasil dibuat'),
+          content: Text('Sortir Reject ${created.noBJSortir} berhasil dibuat'),
         ),
       );
     }
   }
 
   Future<void> _openEditDialog(
-      BuildContext context,
-      SortirRejectProduction row,
-      ) async {
-    debugPrint('🟩 [SORTIR_REJECT_SCREEN] Opening edit dialog: ${row.noBJSortir}');
-    debugPrint('🟩 [SORTIR_REJECT_SCREEN] Using VM hash=${_viewModel.hashCode}');
+    BuildContext context,
+    SortirRejectProduction row,
+  ) async {
+    debugPrint(
+      '🟩 [SORTIR_REJECT_SCREEN] Opening edit dialog: ${row.noBJSortir}',
+    );
+    debugPrint(
+      '🟩 [SORTIR_REJECT_SCREEN] Using VM hash=${_viewModel.hashCode}',
+    );
     debugPrint(
       '🟩 [SORTIR_REJECT_SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
     );
@@ -325,7 +345,9 @@ class _SortirRejectProductionScreenState
     if (updated != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('No. BJ Sortir ${updated.noBJSortir} berhasil diperbarui'),
+          content: Text(
+            'No. BJ Sortir ${updated.noBJSortir} berhasil diperbarui',
+          ),
         ),
       );
     }

@@ -1,6 +1,7 @@
 // lib/features/production/packing/view/packing_production_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:pps_tablet/features/production/packing/view/packing_production_input_screen.dart';
 import 'package:provider/provider.dart';
 
@@ -23,7 +24,8 @@ class PackingProductionScreen extends StatefulWidget {
   const PackingProductionScreen({super.key});
 
   @override
-  State<PackingProductionScreen> createState() => _PackingProductionScreenState();
+  State<PackingProductionScreen> createState() =>
+      _PackingProductionScreenState();
 }
 
 class _PackingProductionScreenState extends State<PackingProductionScreen> {
@@ -64,7 +66,7 @@ class _PackingProductionScreenState extends State<PackingProductionScreen> {
     required Offset globalPos,
   }) async {
     final overlay =
-    Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
+        Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
     if (overlay == null) return;
 
     final local = overlay.globalToLocal(globalPos);
@@ -112,8 +114,9 @@ class _PackingProductionScreenState extends State<PackingProductionScreen> {
                       return PackingProductionDeleteDialog(
                         header: row,
                         onConfirm: () async {
-                          final success =
-                          await _viewModel.deleteProduksi(row.noPacking);
+                          final success = await _viewModel.deleteProduksi(
+                            row.noPacking,
+                          );
 
                           if (ctx.mounted) Navigator.of(ctx).pop();
                           if (!context.mounted) return;
@@ -124,7 +127,7 @@ class _PackingProductionScreenState extends State<PackingProductionScreen> {
                               builder: (_) => SuccessStatusDialog(
                                 title: 'Berhasil Menghapus',
                                 message:
-                                'No. Packing ${row.noPacking} berhasil dihapus.',
+                                    'No. Packing ${row.noPacking} berhasil dihapus.',
                               ),
                             );
                           } else {
@@ -147,11 +150,23 @@ class _PackingProductionScreenState extends State<PackingProductionScreen> {
                 onPrint: () {
                   // TODO: kalau nanti ada cetak / print packing
                 },
+                onAuditHistory: () {
+                  _navigateToAuditHistory(row);
+                },
               ),
             ),
           ],
         );
       },
+    );
+  }
+
+  void _navigateToAuditHistory(PackingProduction header) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            AuditScreenWithPrefilledDoc(documentNo: header.noPacking),
+      ),
     );
   }
 
@@ -322,17 +337,15 @@ class _PackingProductionScreenState extends State<PackingProductionScreen> {
 
     if (created == true) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Produksi packing berhasil dibuat'),
-        ),
+        const SnackBar(content: Text('Produksi packing berhasil dibuat')),
       );
     }
   }
 
   Future<void> _openEditDialog(
-      BuildContext context,
-      PackingProduction row,
-      ) async {
+    BuildContext context,
+    PackingProduction row,
+  ) async {
     debugPrint('🟩 [PACKING_SCREEN] Opening edit dialog: ${row.noPacking}');
     debugPrint('🟩 [PACKING_SCREEN] Using VM hash=${_viewModel.hashCode}');
     debugPrint(
@@ -354,9 +367,7 @@ class _PackingProductionScreenState extends State<PackingProductionScreen> {
       },
     );
 
-    debugPrint(
-      '🟩 [PACKING_SCREEN] Edit dialog closed: ${updated?.noPacking}',
-    );
+    debugPrint('🟩 [PACKING_SCREEN] Edit dialog closed: ${updated?.noPacking}');
 
     if (!mounted) return;
 

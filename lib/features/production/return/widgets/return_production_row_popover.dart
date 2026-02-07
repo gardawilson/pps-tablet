@@ -11,6 +11,7 @@ class ReturnProductionRowPopover extends StatelessWidget {
   final VoidCallback onClose;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onAuditHistory;
 
   const ReturnProductionRowPopover({
     super.key,
@@ -18,6 +19,7 @@ class ReturnProductionRowPopover extends StatelessWidget {
     required this.onClose,
     required this.onEdit,
     required this.onDelete,
+    required this.onAuditHistory,
   });
 
   void _runAndClose(VoidCallback action) {
@@ -40,8 +42,11 @@ class ReturnProductionRowPopover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final divider =
-    Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
+    final divider = Divider(
+      height: 0,
+      thickness: 0.6,
+      color: Colors.grey.shade300,
+    );
 
     final perm = context.watch<PermissionViewModel>();
 
@@ -77,8 +82,10 @@ class ReturnProductionRowPopover extends StatelessWidget {
             children: [
               // Header band
               Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: row.isLocked
@@ -134,7 +141,9 @@ class ReturnProductionRowPopover extends StatelessWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            row.isLocked ? row.lockInfoText : row.tanggalTextShort,
+                            row.isLocked
+                                ? row.lockInfoText
+                                : row.tanggalTextShort,
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w400,
@@ -163,7 +172,10 @@ class ReturnProductionRowPopover extends StatelessWidget {
                         color: Colors.white.withOpacity(0.9),
                       ),
                       onPressed: () => _copyOnly(context),
-                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                      constraints: const BoxConstraints(
+                        minWidth: 40,
+                        minHeight: 40,
+                      ),
                       padding: EdgeInsets.zero,
                     ),
                   ],
@@ -174,8 +186,10 @@ class ReturnProductionRowPopover extends StatelessWidget {
               // Lock warning banner
               if (row.isLocked) ...[
                 Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   color: Colors.red.shade50,
                   child: Row(
                     children: [
@@ -200,6 +214,14 @@ class ReturnProductionRowPopover extends StatelessWidget {
                 ),
                 divider,
               ],
+
+              _MenuTile(
+                icon: Icons.history,
+                label: 'History',
+                enabled: true,
+                onTap: () => _runAndClose(onAuditHistory),
+              ),
+              divider,
 
               // Edit
               _MenuTile(
@@ -253,9 +275,11 @@ class _MenuTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final effectiveIconColor =
-    enabled ? (iconColor ?? theme.iconTheme.color) : Colors.grey;
-    final baseStyle = theme.textTheme.bodyMedium ?? const TextStyle(fontSize: 14);
+    final effectiveIconColor = enabled
+        ? (iconColor ?? theme.iconTheme.color)
+        : Colors.grey;
+    final baseStyle =
+        theme.textTheme.bodyMedium ?? const TextStyle(fontSize: 14);
     final effectiveTextStyle = (textStyle ?? baseStyle).copyWith(
       color: enabled ? (textStyle?.color ?? baseStyle.color) : Colors.grey,
     );

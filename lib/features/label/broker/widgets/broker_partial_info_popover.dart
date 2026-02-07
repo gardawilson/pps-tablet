@@ -45,10 +45,7 @@ class _BrokerPartialInfoCard extends StatefulWidget {
   final int noSak;
   final VoidCallback onClose;
 
-  const _BrokerPartialInfoCard({
-    required this.noSak,
-    required this.onClose,
-  });
+  const _BrokerPartialInfoCard({required this.noSak, required this.onClose});
 
   @override
   State<_BrokerPartialInfoCard> createState() => _BrokerPartialInfoCardState();
@@ -65,7 +62,11 @@ class _BrokerPartialInfoCardState extends State<_BrokerPartialInfoCard> {
 
   @override
   Widget build(BuildContext context) {
-    final divider = Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
+    final divider = Divider(
+      height: 0,
+      thickness: 0.6,
+      color: Colors.grey.shade300,
+    );
 
     return Consumer<BrokerViewModel>(
       builder: (ctx, vm, __) {
@@ -99,7 +100,10 @@ class _BrokerPartialInfoCardState extends State<_BrokerPartialInfoCard> {
               children: [
                 // Header info - Blue Gradient Design
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [Colors.blue.shade400, Colors.blue.shade600],
@@ -116,7 +120,10 @@ class _BrokerPartialInfoCardState extends State<_BrokerPartialInfoCard> {
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.25),
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.3),
+                            width: 1,
+                          ),
                         ),
                         child: const Icon(
                           Icons.event_note,
@@ -143,7 +150,11 @@ class _BrokerPartialInfoCardState extends State<_BrokerPartialInfoCard> {
                             const SizedBox(height: 6),
                             Row(
                               children: [
-                                Icon(Icons.scale, size: 14, color: Colors.white.withOpacity(0.9)),
+                                Icon(
+                                  Icons.scale,
+                                  size: 14,
+                                  color: Colors.white.withOpacity(0.9),
+                                ),
                                 const SizedBox(width: 6),
                                 if (isLoading)
                                   Text(
@@ -176,7 +187,10 @@ class _BrokerPartialInfoCardState extends State<_BrokerPartialInfoCard> {
 
                 // Activities Header
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   child: Row(
                     children: [
                       Icon(Icons.list, size: 14, color: Colors.blue.shade600),
@@ -206,43 +220,51 @@ class _BrokerPartialInfoCardState extends State<_BrokerPartialInfoCard> {
                 Flexible(
                   child: isLoading
                       ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 40),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 36,
-                            height: 36,
-                            child: CircularProgressIndicator(strokeWidth: 2.8),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Memuat data...',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 40),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 36,
+                                  height: 36,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.8,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Memuat data...',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey.shade600,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                  )
+                        )
                       : ListView.separated(
-                    padding: EdgeInsets.zero,
-                    itemCount: rowCount,
-                    separatorBuilder: (_, __) => divider,
-                    itemBuilder: (_, i) {
-                      final r = displayRows[i];
-                      return _PartialRowItem(
-                        namaMesin: (r.namaMesin ?? '').isEmpty ? '-' : r.namaMesin!,
-                        noProduksi: (r.noProduksi ?? '').isEmpty ? '-' : r.noProduksi!,
-                        tglProduksi: (r.tglProduksi ?? '').isEmpty ? '-' : r.tglProduksi!,
-                        berat: r.berat,
-                      );
-                    },
-                  ),
+                          padding: EdgeInsets.zero,
+                          itemCount: rowCount,
+                          separatorBuilder: (_, __) => divider,
+                          itemBuilder: (_, i) {
+                            final r = displayRows[i];
+                            return _PartialRowItem(
+                              namaMesin: (r.namaMesin ?? '').isEmpty
+                                  ? '-'
+                                  : r.namaMesin!,
+                              noProduksi: (r.noProduksi ?? '').isEmpty
+                                  ? '-'
+                                  : r.noProduksi!,
+                              tglProduksi: (r.tglProduksi ?? '').isEmpty
+                                  ? '-'
+                                  : r.tglProduksi!,
+                              berat: r.berat,
+                            );
+                          },
+                        ),
                 ),
               ],
             ),
@@ -258,7 +280,11 @@ class _LoadingState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 220, maxWidth: 320, minHeight: 360),
+      constraints: const BoxConstraints(
+        minWidth: 220,
+        maxWidth: 320,
+        minHeight: 360,
+      ),
       child: Material(
         color: Colors.white,
         child: Column(
@@ -354,7 +380,11 @@ class _PartialRowItem extends StatelessWidget {
         child: Row(
           children: [
             // Leading icon
-            Icon(Icons.remove_circle_outline, color: Colors.red.shade600, size: 18),
+            Icon(
+              Icons.remove_circle_outline,
+              color: Colors.red.shade600,
+              size: 18,
+            ),
             const SizedBox(width: 12),
 
             // Content

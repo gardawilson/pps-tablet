@@ -13,6 +13,7 @@ class GilinganRowPopover extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onPrint;
+  final VoidCallback onAuditHistory;
 
   const GilinganRowPopover({
     super.key,
@@ -21,6 +22,7 @@ class GilinganRowPopover extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onPrint,
+    required this.onAuditHistory,
   });
 
   void _runAndClose(VoidCallback action) {
@@ -43,8 +45,11 @@ class GilinganRowPopover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final divider =
-    Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
+    final divider = Divider(
+      height: 0,
+      thickness: 0.6,
+      color: Colors.grey.shade300,
+    );
 
     // ambil izin sekali
     final perm = context.watch<PermissionViewModel>();
@@ -62,8 +67,7 @@ class GilinganRowPopover extends StatelessWidget {
           children: [
             // Header
             Container(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [Colors.blue.shade400, Colors.blue.shade600],
@@ -137,6 +141,14 @@ class GilinganRowPopover extends StatelessWidget {
             ),
             divider,
 
+            _MenuTile(
+              icon: Icons.history,
+              label: 'History',
+              enabled: true,
+              onTap: () => _runAndClose(onAuditHistory),
+            ),
+            divider,
+
             // Edit
             _MenuTile(
               icon: Icons.edit_outlined,
@@ -153,8 +165,10 @@ class GilinganRowPopover extends StatelessWidget {
               label: 'Print',
               enabled: true,
               onTap: () => _runAndClose(() async {
-                final rootCtx =
-                    Navigator.of(context, rootNavigator: true).context;
+                final rootCtx = Navigator.of(
+                  context,
+                  rootNavigator: true,
+                ).context;
 
                 final pdfService = PdfPrintService(
                   baseUrl: 'http://192.168.10.100:3000',
@@ -164,7 +178,8 @@ class GilinganRowPopover extends StatelessWidget {
                 // klik Print:
                 await pdfService.printReport80mm(
                   context: rootCtx,
-                  reportName: 'CrLabelGilingan', // <- sesuaikan dengan nama report kamu
+                  reportName:
+                      'CrLabelGilingan', // <- sesuaikan dengan nama report kamu
                   query: {'NoGilingan': header.noGilingan},
                   // system: 'pps',
                   // saveNameHint: 'Label_${header.noGilingan}.pdf',
@@ -215,14 +230,15 @@ class _MenuTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final effectiveIconColor =
-    enabled ? (iconColor ?? theme.iconTheme.color) : Colors.grey;
-    final effectiveTextStyle =
-    (textStyle ?? theme.textTheme.bodyMedium)?.copyWith(
-      color: enabled
-          ? (textStyle?.color ?? theme.textTheme.bodyMedium?.color)
-          : Colors.grey,
-    );
+    final effectiveIconColor = enabled
+        ? (iconColor ?? theme.iconTheme.color)
+        : Colors.grey;
+    final effectiveTextStyle = (textStyle ?? theme.textTheme.bodyMedium)
+        ?.copyWith(
+          color: enabled
+              ? (textStyle?.color ?? theme.textTheme.bodyMedium?.color)
+              : Colors.grey,
+        );
 
     final tile = InkWell(
       onTap: enabled ? onTap : null,

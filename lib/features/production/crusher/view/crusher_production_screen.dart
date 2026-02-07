@@ -1,5 +1,6 @@
 // lib/features/production/crusher/view/crusher_production_screen.dart
 import 'package:flutter/material.dart';
+import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 
@@ -30,7 +31,8 @@ class CrusherProductionScreen extends StatefulWidget {
   const CrusherProductionScreen({super.key});
 
   @override
-  State<CrusherProductionScreen> createState() => _CrusherProductionScreenState();
+  State<CrusherProductionScreen> createState() =>
+      _CrusherProductionScreenState();
 }
 
 class _CrusherProductionScreenState extends State<CrusherProductionScreen> {
@@ -48,7 +50,8 @@ class _CrusherProductionScreenState extends State<CrusherProductionScreen> {
     required CrusherProduction row,
     required Offset globalPos,
   }) async {
-    final overlay = Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
+    final overlay =
+        Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
     if (overlay == null) return;
 
     final local = overlay.globalToLocal(globalPos);
@@ -57,9 +60,10 @@ class _CrusherProductionScreenState extends State<CrusherProductionScreen> {
       context: context,
       barrierDismissible: true,
       barrierColor: Colors.black26,
-      builder: (dialogCtx) { // ⬅️ pakai dialogCtx
+      builder: (dialogCtx) {
+        // ⬅️ pakai dialogCtx
         final safeLeft = local.dx.clamp(8.0, overlay.size.width - 320.0);
-        final safeTop  = local.dy.clamp(8.0, overlay.size.height - 220.0);
+        final safeTop = local.dy.clamp(8.0, overlay.size.height - 220.0);
 
         return Stack(
           children: [
@@ -99,7 +103,9 @@ class _CrusherProductionScreenState extends State<CrusherProductionScreen> {
                         onConfirm: () async {
                           final vm = context.read<CrusherProductionViewModel>();
 
-                          final success = await vm.deleteProduksi(row.noCrusherProduksi);
+                          final success = await vm.deleteProduksi(
+                            row.noCrusherProduksi,
+                          );
 
                           // 1) Tutup dialog konfirmasi
                           if (ctx.mounted) Navigator.of(ctx).pop();
@@ -114,11 +120,13 @@ class _CrusherProductionScreenState extends State<CrusherProductionScreen> {
                               context: context,
                               builder: (_) => SuccessStatusDialog(
                                 title: 'Berhasil Menghapus',
-                                message: 'No. Crusher Produksi ${row.noCrusherProduksi} berhasil dihapus.',
+                                message:
+                                    'No. Crusher Produksi ${row.noCrusherProduksi} berhasil dihapus.',
                               ),
                             );
                           } else {
-                            final rawMsg = vm.saveError ?? 'Gagal menghapus data';
+                            final rawMsg =
+                                vm.saveError ?? 'Gagal menghapus data';
 
                             // ❌ dialog error
                             showDialog(
@@ -138,6 +146,10 @@ class _CrusherProductionScreenState extends State<CrusherProductionScreen> {
                 onPrint: () async {
                   // optional
                 },
+
+                onAuditHistory: () {
+                  _navigateToAuditHistory(row);
+                },
               ),
             ),
           ],
@@ -146,13 +158,21 @@ class _CrusherProductionScreenState extends State<CrusherProductionScreen> {
     );
   }
 
+  void _navigateToAuditHistory(CrusherProduction header) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            AuditScreenWithPrefilledDoc(documentNo: header.noCrusherProduksi),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => CrusherProductionViewModel(
-        repository: CrusherProductionRepository(),
-      )..refreshPaged(),
+      create: (_) =>
+          CrusherProductionViewModel(repository: CrusherProductionRepository())
+            ..refreshPaged(),
       child: Consumer<CrusherProductionViewModel>(
         builder: (context, vm, _) {
           final columns = <TableColumnSpec<CrusherProduction>>[
@@ -224,16 +244,16 @@ class _CrusherProductionScreenState extends State<CrusherProductionScreen> {
               width: 80,
               headerAlign: TextAlign.right,
               cellAlign: TextAlign.right,
-              cellBuilder: (_, r) => Text(
-                r.hourMeter != null ? '${r.hourMeter}' : '0',
-              ),
+              cellBuilder: (_, r) =>
+                  Text(r.hourMeter != null ? '${r.hourMeter}' : '0'),
             ),
             TableColumnSpec(
               title: 'ANGGOTA/HADIR',
               width: 150,
               headerAlign: TextAlign.center,
               cellAlign: TextAlign.center,
-              cellBuilder: (_, r) => Text('${r.jmlhAnggota ?? 0}/${r.hadir ?? 0}'),
+              cellBuilder: (_, r) =>
+                  Text('${r.jmlhAnggota ?? 0}/${r.hadir ?? 0}'),
             ),
             // TableColumnSpec(
             //   title: 'OUTPUT',
@@ -304,8 +324,11 @@ class _CrusherProductionScreenState extends State<CrusherProductionScreen> {
                     pagingController: vm.pagingController,
                     columns: columns,
                     horizontalPadding: 16,
-                    selectedPredicate: (r) => r.noCrusherProduksi == _selectedNoCrusherProduksi,
-                    onRowTap: (r) => setState(() => _selectedNoCrusherProduksi = r.noCrusherProduksi),
+                    selectedPredicate: (r) =>
+                        r.noCrusherProduksi == _selectedNoCrusherProduksi,
+                    onRowTap: (r) => setState(
+                      () => _selectedNoCrusherProduksi = r.noCrusherProduksi,
+                    ),
                     onRowLongPress: (r, globalPos) async {
                       await _showRowPopover(
                         context: context,
@@ -334,8 +357,7 @@ class _CrusherProductionScreenState extends State<CrusherProductionScreen> {
         onSave: (draft) async {
           try {
             // await vm.createProduksi(draft);
-            if (context.mounted) {
-            }
+            if (context.mounted) {}
           } catch (e) {
             // optional: show error
             if (context.mounted) {
@@ -355,7 +377,10 @@ class _CrusherProductionScreenState extends State<CrusherProductionScreen> {
     }
   }
 
-  Future<void> _openEditDialog(BuildContext context, CrusherProduction row) async {
+  Future<void> _openEditDialog(
+    BuildContext context,
+    CrusherProduction row,
+  ) async {
     final vm = context.read<CrusherProductionViewModel>();
 
     // Open the form in EDIT mode by passing `header: row`
@@ -373,10 +398,11 @@ class _CrusherProductionScreenState extends State<CrusherProductionScreen> {
       // (Optional) Give feedback
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('No. Crusher Produksi ${updated.noCrusherProduksi} berhasil diperbarui'),
+          content: Text(
+            'No. Crusher Produksi ${updated.noCrusherProduksi} berhasil diperbarui',
+          ),
         ),
       );
     }
   }
-
 }

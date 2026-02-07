@@ -9,7 +9,11 @@ class ReportEndpoints {
 
   static Uri exportPdf(Map<String, String> query) {
     if (useHttps) {
-      return Uri.https(hostWithPort, '/api/crystalreport/pps/export-pdf', query);
+      return Uri.https(
+        hostWithPort,
+        '/api/crystalreport/pps/export-pdf',
+        query,
+      );
     }
     return Uri.http(hostWithPort, '/api/crystalreport/pps/export-pdf', query);
   }

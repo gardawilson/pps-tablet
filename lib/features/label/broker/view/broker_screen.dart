@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/services/dialog_service.dart';
 import '../view_model/broker_view_model.dart';
@@ -41,7 +42,9 @@ class _BrokerScreenState extends State<BrokerScreen> {
     vm.setSelectedNoBroker(header.noBroker);
 
     // fetch detail terbaru untuk header ini
-    DialogService.instance.showLoading(message: 'Cek detail ${header.noBroker}...');
+    DialogService.instance.showLoading(
+      message: 'Cek detail ${header.noBroker}...',
+    );
     await vm.fetchDetails(header.noBroker);
     DialogService.instance.hideLoading();
 
@@ -75,7 +78,9 @@ class _BrokerScreenState extends State<BrokerScreen> {
     vm.setSelectedNoBroker(header.noBroker);
 
     // fetch detail terbaru untuk header ini
-    DialogService.instance.showLoading(message: 'Cek detail ${header.noBroker}...');
+    DialogService.instance.showLoading(
+      message: 'Cek detail ${header.noBroker}...',
+    );
     await vm.fetchDetails(header.noBroker);
     DialogService.instance.hideLoading();
 
@@ -101,8 +106,6 @@ class _BrokerScreenState extends State<BrokerScreen> {
     // aman -> tampilkan konfirmasi delete
     _confirmDelete(header);
   }
-
-
 
   // Popover animasi (custom)
   final InteractivePopover _popover = InteractivePopover();
@@ -168,7 +171,7 @@ class _BrokerScreenState extends State<BrokerScreen> {
         header: header,
         details: details,
         onSave: (headerData, detailsData) {
-          final vm = context.read<BrokerViewModel>();
+          context.read<BrokerViewModel>();
           if (header != null) {
             // vm.updateWashing(headerData, detailsData);
           } else {
@@ -195,8 +198,6 @@ class _BrokerScreenState extends State<BrokerScreen> {
     );
   }
 
-
-
   // Tutup popover (tidak mengubah selection — biarkan tetap menandai item aktif)
   void _closeContextMenu() {
     _popover.hide();
@@ -204,9 +205,9 @@ class _BrokerScreenState extends State<BrokerScreen> {
 
   /// Long-press handler: pindahkan highlight ke item & tampilkan popover.
   Future<void> _onItemLongPress(
-      BrokerHeader header,
-      Offset globalPosition,
-      ) async {
+    BrokerHeader header,
+    Offset globalPosition,
+  ) async {
     final vm = context.read<BrokerViewModel>();
 
     // Pindahkan highlight saat long-press
@@ -231,14 +232,27 @@ class _BrokerScreenState extends State<BrokerScreen> {
           _closeContextMenu();
           // TODO: print/preview
         },
+        // 🎯 NEW: Audit History callback
+        onAuditHistory: () {
+          _closeContextMenu();
+          _navigateToAuditHistory(header);
+        },
       ),
-      // animasi & penempatan cerdas
       preferAbove: true,
       verticalGap: 8,
       backdropOpacity: 0.06,
       duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutBack, // overshoot untuk SCALE tetap aman
+      curve: Curves.easeOutBack,
       startScale: 0.94,
+    );
+  }
+
+  void _navigateToAuditHistory(BrokerHeader header) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            AuditScreenWithPrefilledDoc(documentNo: header.noBroker),
+      ),
     );
   }
 
@@ -280,9 +294,9 @@ class _BrokerScreenState extends State<BrokerScreen> {
                     onSearchChanged: _onSearchChanged,
                     onClear: () {
                       searchCtrl.clear();
-                      context
-                          .read<BrokerViewModel>()
-                          .fetchBrokerHeaders(search: "");
+                      context.read<BrokerViewModel>().fetchBrokerHeaders(
+                        search: "",
+                      );
                     },
                     onAddPressed: _showFormDialog,
                   ),
@@ -311,9 +325,7 @@ class _BrokerScreenState extends State<BrokerScreen> {
           // Detail Panel
           Expanded(
             flex: 1,
-            child: BrokerDetailTable(
-              scrollController: _detailScrollController,
-            ),
+            child: BrokerDetailTable(scrollController: _detailScrollController),
           ),
         ],
       ),
@@ -339,14 +351,11 @@ class _BrokerScreenState extends State<BrokerScreen> {
 
       // (Opsional) scroll panel detail ke atas
       // _detailScrollController.jumpTo(0);
-
     } else {
       await DialogService.instance.showError(
         title: 'Gagal',
-        message: vm.errorMessage ?? 'Tidak dapat menghapus label.',
+        message: vm.errorMessage,
       );
     }
   }
-
-
 }

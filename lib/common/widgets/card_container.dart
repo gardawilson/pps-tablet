@@ -67,13 +67,13 @@ class CardContainer extends StatelessWidget {
         ),
         boxShadow: showShadow
             ? (customShadow ??
-            const [
-              BoxShadow(
-                color: Color(0x0A000000),
-                blurRadius: 1,
-                offset: Offset(0, 1),
-              ),
-            ])
+                  const [
+                    BoxShadow(
+                      color: Color(0x0A000000),
+                      blurRadius: 1,
+                      offset: Offset(0, 1),
+                    ),
+                  ])
             : null,
       ),
       child: child,

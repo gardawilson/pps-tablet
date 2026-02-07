@@ -14,6 +14,7 @@ class BrokerProductionRowPopover extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onPrint;
+  final VoidCallback onAuditHistory;
 
   const BrokerProductionRowPopover({
     super.key,
@@ -23,6 +24,7 @@ class BrokerProductionRowPopover extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onPrint,
+    required this.onAuditHistory,
   });
 
   void _runAndClose(VoidCallback action) {
@@ -45,11 +47,15 @@ class BrokerProductionRowPopover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final divider = Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
+    final divider = Divider(
+      height: 0,
+      thickness: 0.6,
+      color: Colors.grey.shade300,
+    );
 
     // Permissions (adjust keys to match your backend ACL if needed)
     final perm = context.watch<PermissionViewModel>();
-    final canEdit   = perm.can('label_broker:update');
+    final canEdit = perm.can('label_broker:update');
     final canDelete = perm.can('label_broker:delete');
 
     return ConstrainedBox(
@@ -65,7 +71,10 @@ class BrokerProductionRowPopover extends StatelessWidget {
             children: [
               // Header band
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [Colors.blue.shade400, Colors.blue.shade600],
@@ -76,13 +85,21 @@ class BrokerProductionRowPopover extends StatelessWidget {
                 child: Row(
                   children: [
                     Container(
-                      width: 40, height: 40,
+                      width: 40,
+                      height: 40,
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.25),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.3),
+                          width: 1,
+                        ),
                       ),
-                      child: const Icon(Icons.inventory_2, color: Colors.white, size: 20),
+                      child: const Icon(
+                        Icons.inventory_2,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -117,13 +134,27 @@ class BrokerProductionRowPopover extends StatelessWidget {
                     const SizedBox(width: 8),
                     // Copy NoProduksi (no tooltip)
                     IconButton(
-                      icon: Icon(Icons.copy_outlined, color: Colors.white.withOpacity(0.9)),
+                      icon: Icon(
+                        Icons.copy_outlined,
+                        color: Colors.white.withOpacity(0.9),
+                      ),
                       onPressed: () => _copyOnly(context),
-                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                      constraints: const BoxConstraints(
+                        minWidth: 40,
+                        minHeight: 40,
+                      ),
                       padding: EdgeInsets.zero,
                     ),
                   ],
                 ),
+              ),
+              divider,
+
+              _MenuTile(
+                icon: Icons.history,
+                label: 'History',
+                enabled: true,
+                onTap: () => _runAndClose(onAuditHistory),
               ),
               divider,
 
@@ -189,8 +220,11 @@ class _MenuTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final effectiveIconColor = enabled ? (iconColor ?? theme.iconTheme.color) : Colors.grey;
-    final baseStyle = theme.textTheme.bodyMedium ?? const TextStyle(fontSize: 14);
+    final effectiveIconColor = enabled
+        ? (iconColor ?? theme.iconTheme.color)
+        : Colors.grey;
+    final baseStyle =
+        theme.textTheme.bodyMedium ?? const TextStyle(fontSize: 14);
     final effectiveTextStyle = (textStyle ?? baseStyle).copyWith(
       color: enabled ? (textStyle?.color ?? baseStyle.color) : Colors.grey,
     );

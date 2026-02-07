@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/services/dialog_service.dart';
 import '../view_model/bonggolan_view_model.dart';
@@ -115,8 +116,6 @@ class _BonggolanScreenState extends State<BonggolanScreen> {
     );
   }
 
-
-
   // Tutup popover (tidak mengubah selection — biarkan tetap menandai item aktif)
   void _closeContextMenu() {
     _popover.hide();
@@ -124,9 +123,9 @@ class _BonggolanScreenState extends State<BonggolanScreen> {
 
   /// Long-press handler: pindahkan highlight ke item & tampilkan popover.
   Future<void> _onItemLongPress(
-      BonggolanHeader header,
-      Offset globalPosition,
-      ) async {
+    BonggolanHeader header,
+    Offset globalPosition,
+  ) async {
     final vm = context.read<BonggolanViewModel>();
 
     // Pindahkan highlight saat long-press
@@ -151,6 +150,10 @@ class _BonggolanScreenState extends State<BonggolanScreen> {
           _closeContextMenu();
           // TODO: print/preview
         },
+        onAuditHistory: () {
+          _closeContextMenu();
+          _navigateToAuditHistory(header);
+        },
       ),
       // animasi & penempatan cerdas
       preferAbove: true,
@@ -159,6 +162,15 @@ class _BonggolanScreenState extends State<BonggolanScreen> {
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutBack, // overshoot untuk SCALE tetap aman
       startScale: 0.94,
+    );
+  }
+
+  void _navigateToAuditHistory(BonggolanHeader header) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            AuditScreenWithPrefilledDoc(documentNo: header.noBonggolan),
+      ),
     );
   }
 
@@ -199,9 +211,9 @@ class _BonggolanScreenState extends State<BonggolanScreen> {
                     onSearchChanged: _onSearchChanged,
                     onClear: () {
                       searchCtrl.clear();
-                      context
-                          .read<BonggolanViewModel>()
-                          .fetchHeaders(search: "");
+                      context.read<BonggolanViewModel>().fetchHeaders(
+                        search: "",
+                      );
                     },
                     onAddPressed: _showFormDialog,
                   ),
@@ -255,7 +267,4 @@ class _BonggolanScreenState extends State<BonggolanScreen> {
       );
     }
   }
-
-
-
 }

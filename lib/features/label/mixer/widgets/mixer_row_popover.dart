@@ -12,6 +12,7 @@ class MixerRowPopover extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onPrint;
+  final VoidCallback onAuditHistory;
 
   const MixerRowPopover({
     super.key,
@@ -20,6 +21,7 @@ class MixerRowPopover extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onPrint,
+    required this.onAuditHistory,
   });
 
   void _runAndClose(VoidCallback action) {
@@ -42,11 +44,15 @@ class MixerRowPopover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final divider = Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
+    final divider = Divider(
+      height: 0,
+      thickness: 0.6,
+      color: Colors.grey.shade300,
+    );
 
     // izin
     final perm = context.watch<PermissionViewModel>();
-    final canEdit   = perm.can('label_mixer:update');
+    final canEdit = perm.can('label_mixer:update');
     final canDelete = perm.can('label_mixer:delete');
 
     return ConstrainedBox(
@@ -69,13 +75,21 @@ class MixerRowPopover extends StatelessWidget {
               child: Row(
                 children: [
                   Container(
-                    width: 40, height: 40,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.25),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.3),
+                        width: 1,
+                      ),
                     ),
-                    child: const Icon(Icons.label, color: Colors.white, size: 20),
+                    child: const Icon(
+                      Icons.label,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -84,14 +98,23 @@ class MixerRowPopover extends StatelessWidget {
                       children: [
                         Text(
                           header.noMixer,
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 3),
                         Text(
                           header.namaMixer,
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.white.withOpacity(0.95)),
-                          overflow: TextOverflow.ellipsis, maxLines: 1,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withOpacity(0.95),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
                       ],
                     ),
@@ -99,13 +122,27 @@ class MixerRowPopover extends StatelessWidget {
                   const SizedBox(width: 8),
                   IconButton(
                     tooltip: 'Salin noMixer',
-                    icon: Icon(Icons.copy_outlined, color: Colors.white.withOpacity(0.9)),
+                    icon: Icon(
+                      Icons.copy_outlined,
+                      color: Colors.white.withOpacity(0.9),
+                    ),
                     onPressed: () => _copyOnly(context),
-                    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    constraints: const BoxConstraints(
+                      minWidth: 40,
+                      minHeight: 40,
+                    ),
                     padding: EdgeInsets.zero,
                   ),
                 ],
               ),
+            ),
+            divider,
+
+            _MenuTile(
+              icon: Icons.history,
+              label: 'History',
+              enabled: true,
+              onTap: () => _runAndClose(onAuditHistory),
             ),
             divider,
 
@@ -125,7 +162,10 @@ class MixerRowPopover extends StatelessWidget {
               label: 'Print',
               enabled: true,
               onTap: () => _runAndClose(() async {
-                final rootCtx = Navigator.of(context, rootNavigator: true).context;
+                final rootCtx = Navigator.of(
+                  context,
+                  rootNavigator: true,
+                ).context;
 
                 // ambil dari Provider jika kamu mendaftarkan PdfPrintService secara global:
                 // final pdfService = context.read<PdfPrintService>();
@@ -143,7 +183,6 @@ class MixerRowPopover extends StatelessWidget {
                   // system: 'pps', // opsional kalau mau override
                   // saveNameHint: 'Label_${header.noWashing}.pdf', // opsional; kalau kosong akan di-infer
                 );
-
               }),
             ),
             divider,
@@ -155,7 +194,9 @@ class MixerRowPopover extends StatelessWidget {
               enabled: canDelete,
               tooltipWhenDisabled: 'Tidak punya izin hapus',
               iconColor: canDelete ? Colors.red.shade600 : null,
-              textStyle: TextStyle(color: canDelete ? Colors.red.shade600 : Colors.grey),
+              textStyle: TextStyle(
+                color: canDelete ? Colors.red.shade600 : Colors.grey,
+              ),
               onTap: () => _runAndClose(onDelete),
             ),
           ],
@@ -187,10 +228,15 @@ class _MenuTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final effectiveIconColor = enabled ? (iconColor ?? theme.iconTheme.color) : Colors.grey;
-    final effectiveTextStyle = (textStyle ?? theme.textTheme.bodyMedium)?.copyWith(
-      color: enabled ? (textStyle?.color ?? theme.textTheme.bodyMedium?.color) : Colors.grey,
-    );
+    final effectiveIconColor = enabled
+        ? (iconColor ?? theme.iconTheme.color)
+        : Colors.grey;
+    final effectiveTextStyle = (textStyle ?? theme.textTheme.bodyMedium)
+        ?.copyWith(
+          color: enabled
+              ? (textStyle?.color ?? theme.textTheme.bodyMedium?.color)
+              : Colors.grey,
+        );
 
     final tile = InkWell(
       onTap: enabled ? onTap : null,
@@ -200,14 +246,23 @@ class _MenuTile extends StatelessWidget {
           children: [
             Icon(icon, color: effectiveIconColor),
             const SizedBox(width: 12),
-            Expanded(child: Text(label, style: effectiveTextStyle, overflow: TextOverflow.ellipsis)),
+            Expanded(
+              child: Text(
+                label,
+                style: effectiveTextStyle,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
       ),
     );
 
     if (!enabled && (tooltipWhenDisabled?.isNotEmpty ?? false)) {
-      return Tooltip(message: tooltipWhenDisabled!, child: Opacity(opacity: 0.55, child: tile));
+      return Tooltip(
+        message: tooltipWhenDisabled!,
+        child: Opacity(opacity: 0.55, child: tile),
+      );
     }
     return tile;
   }

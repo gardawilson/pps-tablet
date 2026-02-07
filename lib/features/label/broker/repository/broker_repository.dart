@@ -21,11 +21,7 @@ class BrokerRepository {
   }) async {
     final body = await api.getJson(
       '/api/labels/broker',
-      query: {
-        'page': page,
-        'limit': limit,
-        'search': search,
-      },
+      query: {'page': page, 'limit': limit, 'search': search},
     );
 
     final List<dynamic> data = body['data'] ?? [];
@@ -68,14 +64,16 @@ class BrokerRepository {
     required BrokerHeader header,
     required List<BrokerDetail> details,
   }) async {
-    final hasNoProduksi = (header.noProduksi != null &&
-        header.noProduksi!.trim().isNotEmpty);
-    final hasNoBongkar = (header.noBongkarSusun != null &&
+    final hasNoProduksi =
+        (header.noProduksi != null && header.noProduksi!.trim().isNotEmpty);
+    final hasNoBongkar =
+        (header.noBongkarSusun != null &&
         header.noBongkarSusun!.trim().isNotEmpty);
 
     if (!hasNoProduksi && !hasNoBongkar) {
       throw ArgumentError(
-          'NoProduksi atau NoBongkarSusun harus diisi minimal salah satu.');
+        'NoProduksi atau NoBongkarSusun harus diisi minimal salah satu.',
+      );
     }
 
     final refKey = hasNoProduksi ? 'NoProduksi' : 'NoBongkarSusun';
@@ -88,10 +86,7 @@ class BrokerRepository {
         'IdWarehouse': 3,
       },
       'details': details
-          .map((d) => {
-        'NoSak': d.noSak,
-        'Berat': d.berat,
-      })
+          .map((d) => {'NoSak': d.noSak, 'Berat': d.berat})
           .toList(),
       refKey: refVal,
     };
@@ -99,20 +94,21 @@ class BrokerRepository {
     return api.postJson('/api/labels/broker', body: body);
   }
 
-  /// Update broker (header + details)
   Future<Map<String, dynamic>> updateBroker({
     required String noBroker,
     required BrokerHeader header,
     required List<BrokerDetail> details,
   }) async {
-    final hasNoProduksi = (header.noProduksi != null &&
-        header.noProduksi!.trim().isNotEmpty);
-    final hasNoBongkar = (header.noBongkarSusun != null &&
+    final hasNoProduksi =
+        (header.noProduksi != null && header.noProduksi!.trim().isNotEmpty);
+    final hasNoBongkar =
+        (header.noBongkarSusun != null &&
         header.noBongkarSusun!.trim().isNotEmpty);
 
     if (!hasNoProduksi && !hasNoBongkar) {
       throw ArgumentError(
-          'NoProduksi atau NoBongkarSusun harus diisi minimal salah satu (EDIT).');
+        'NoProduksi atau NoBongkarSusun harus diisi minimal salah satu (EDIT).',
+      );
     }
 
     final refKey = hasNoProduksi ? 'NoProduksi' : 'NoBongkarSusun';
@@ -121,16 +117,15 @@ class BrokerRepository {
     final headerMap = <String, dynamic>{
       'IdJenisPlastik': header.idJenisPlastik,
       'IdWarehouse': 3,
+      'DateCreate': header.dateCreate, // ✅ FIX
     }..removeWhere((k, v) => v == null);
 
     final body = <String, dynamic>{
       'header': headerMap,
       'details': details
-          .map((d) => {
-        'NoSak': d.noSak,
-        'Berat': d.berat,
-        'IdLokasi': d.idLokasi,
-      })
+          .map(
+            (d) => {'NoSak': d.noSak, 'Berat': d.berat, 'IdLokasi': d.idLokasi},
+          )
           .toList(),
       refKey: refVal,
     };

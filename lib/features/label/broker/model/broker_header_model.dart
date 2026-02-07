@@ -1,19 +1,19 @@
 class BrokerHeader {
-  final String noBroker;                 // NoBroker
-  final int idJenisPlastik;              // IdJenisPlastik
-  final String namaJenisPlastik;         // NamaJenisPlastik
-  final int idWarehouse;                 // IdWarehouse
-  final String namaWarehouse;            // NamaWarehouse
-  final String dateCreate;               // DateCreate
+  final String noBroker; // NoBroker
+  final int idJenisPlastik; // IdJenisPlastik
+  final String namaJenisPlastik; // NamaJenisPlastik
+  final int idWarehouse; // IdWarehouse
+  final String namaWarehouse; // NamaWarehouse
+  final String dateCreate; // DateCreate
 
   /// Server gives 'PASS'/'HOLD'
-  final String statusText;               // StatusText
+  final String statusText; // StatusText
   /// Derived from statusText (PASS=true, HOLD=false, else null)
   final bool? idStatus;
 
   // Lokasi
-  final String? blok;                    // Blok
-  final String? idLokasi;                // IdLokasi (keep as String)
+  final String? blok; // Blok
+  final String? idLokasi; // IdLokasi (keep as String)
 
   // Quality / notes (optional)
   final double? density;
@@ -28,9 +28,10 @@ class BrokerHeader {
   final double? moisture3;
 
   // Produksi / Mesin / Bongkar Susun (from your new joins)
-  final String? noProduksi;              // NoProduksi (MAX(...) or STRING_AGG result)
-  final String? namaMesin;               // NamaMesin
-  final String? noBongkarSusun;          // NoBongkarSusun (MAX(...) or STRING_AGG result)
+  final String? noProduksi; // NoProduksi (MAX(...) or STRING_AGG result)
+  final String? namaMesin; // NamaMesin
+  final String?
+  noBongkarSusun; // NoBongkarSusun (MAX(...) or STRING_AGG result)
 
   // Keep optional to avoid breaking other screens
   final String? createBy;

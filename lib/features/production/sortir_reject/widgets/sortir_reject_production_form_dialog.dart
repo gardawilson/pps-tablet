@@ -16,11 +16,7 @@ class SortirRejectProductionFormDialog extends StatefulWidget {
   final SortirRejectProduction? header;
   final Function(SortirRejectProduction)? onSave;
 
-  const SortirRejectProductionFormDialog({
-    super.key,
-    this.header,
-    this.onSave,
-  });
+  const SortirRejectProductionFormDialog({super.key, this.header, this.onSave});
 
   @override
   State<SortirRejectProductionFormDialog> createState() =>
@@ -46,14 +42,18 @@ class _SortirRejectProductionFormDialogState
   void initState() {
     super.initState();
 
-    noBJSortirCtrl =
-        TextEditingController(text: widget.header?.noBJSortir ?? '');
+    noBJSortirCtrl = TextEditingController(
+      text: widget.header?.noBJSortir ?? '',
+    );
 
     final seededDate = widget.header?.tanggal ?? DateTime.now();
     _selectedDate = seededDate;
 
     dateCtrl = TextEditingController(
-      text: DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(seededDate.toLocal()),
+      text: DateFormat(
+        'EEEE, dd MMM yyyy',
+        'id_ID',
+      ).format(seededDate.toLocal()),
     );
   }
 
@@ -81,9 +81,9 @@ class _SortirRejectProductionFormDialogState
         _selectedWarehouse?.idWarehouse ?? widget.header?.idWarehouse;
 
     if (warehouseId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Warehouse wajib dipilih')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Warehouse wajib dipilih')));
       return;
     }
 
@@ -166,9 +166,7 @@ class _SortirRejectProductionFormDialogState
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
-            isLocked
-                ? Icons.lock
-                : (isEdit ? Icons.edit : Icons.add),
+            isLocked ? Icons.lock : (isEdit ? Icons.edit : Icons.add),
             color: isLocked
                 ? Colors.red.shade700
                 : (isEdit ? Colors.orange.shade700 : Colors.green.shade700),
@@ -182,8 +180,10 @@ class _SortirRejectProductionFormDialogState
             children: [
               Text(
                 isEdit ? 'Edit Sortir Reject' : 'Tambah Sortir Reject',
-                style:
-                const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               if (isLocked) ...[
                 const SizedBox(height: 4),
@@ -218,8 +218,10 @@ class _SortirRejectProductionFormDialogState
             children: [
               if (isLocked) ...[
                 Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.red.shade50,
                     borderRadius: BorderRadius.circular(8),
@@ -227,8 +229,11 @@ class _SortirRejectProductionFormDialogState
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.warning_amber_rounded,
-                          size: 18, color: Colors.red.shade700),
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        size: 18,
+                        color: Colors.red.shade700,
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
@@ -265,8 +270,10 @@ class _SortirRejectProductionFormDialogState
                   if (d != null) {
                     setState(() {
                       _selectedDate = d;
-                      dateCtrl.text =
-                          DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(d);
+                      dateCtrl.text = DateFormat(
+                        'EEEE, dd MMM yyyy',
+                        'id_ID',
+                      ).format(d);
                     });
                   }
                 },
@@ -290,10 +297,7 @@ class _SortirRejectProductionFormDialogState
               const SizedBox(height: 8),
               Text(
                 'Username akan diambil otomatis dari token login.',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey.shade700,
-                ),
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
               ),
             ],
           ),

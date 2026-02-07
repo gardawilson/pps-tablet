@@ -12,6 +12,7 @@ class WashingRowPopover extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onPrint;
+  final VoidCallback onAuditHistory;
 
   const WashingRowPopover({
     super.key,
@@ -20,6 +21,7 @@ class WashingRowPopover extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onPrint,
+    required this.onAuditHistory,
   });
 
   void _runAndClose(VoidCallback action) {
@@ -42,8 +44,11 @@ class WashingRowPopover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final divider =
-    Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
+    final divider = Divider(
+      height: 0,
+      thickness: 0.6,
+      color: Colors.grey.shade300,
+    );
 
     // ambil izin sekali
     final perm = context.watch<PermissionViewModel>();
@@ -80,7 +85,11 @@ class WashingRowPopover extends StatelessWidget {
                         width: 1,
                       ),
                     ),
-                    child: const Icon(Icons.label, color: Colors.white, size: 20),
+                    child: const Icon(
+                      Icons.label,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -113,14 +122,27 @@ class WashingRowPopover extends StatelessWidget {
                   const SizedBox(width: 8),
                   IconButton(
                     tooltip: 'Salin NoWashing',
-                    icon: Icon(Icons.copy_outlined,
-                        color: Colors.white.withOpacity(0.9)),
+                    icon: Icon(
+                      Icons.copy_outlined,
+                      color: Colors.white.withOpacity(0.9),
+                    ),
                     onPressed: () => _copyOnly(context),
-                    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    constraints: const BoxConstraints(
+                      minWidth: 40,
+                      minHeight: 40,
+                    ),
                     padding: EdgeInsets.zero,
                   ),
                 ],
               ),
+            ),
+            divider,
+
+            _MenuTile(
+              icon: Icons.history,
+              label: 'History',
+              enabled: true,
+              onTap: () => _runAndClose(onAuditHistory),
             ),
             divider,
 
@@ -140,7 +162,10 @@ class WashingRowPopover extends StatelessWidget {
               label: 'Print',
               enabled: true,
               onTap: () => _runAndClose(() async {
-                final rootCtx = Navigator.of(context, rootNavigator: true).context;
+                final rootCtx = Navigator.of(
+                  context,
+                  rootNavigator: true,
+                ).context;
 
                 final pdfService = PdfPrintService(
                   baseUrl: 'http://192.168.10.100:3000',
@@ -198,8 +223,9 @@ class _MenuTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final effectiveIconColor =
-    enabled ? (iconColor ?? theme.iconTheme.color) : Colors.grey;
+    final effectiveIconColor = enabled
+        ? (iconColor ?? theme.iconTheme.color)
+        : Colors.grey;
 
     final baseText = textStyle ?? theme.textTheme.bodyMedium;
     final effectiveTextStyle = baseText?.copyWith(

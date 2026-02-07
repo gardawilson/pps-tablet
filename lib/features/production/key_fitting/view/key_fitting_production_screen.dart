@@ -1,6 +1,7 @@
 // lib/features/production/key_fitting/view/key_fitting_production_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
@@ -26,7 +27,8 @@ class KeyFittingProductionScreen extends StatefulWidget {
       _KeyFittingProductionScreenState();
 }
 
-class _KeyFittingProductionScreenState extends State<KeyFittingProductionScreen> {
+class _KeyFittingProductionScreenState
+    extends State<KeyFittingProductionScreen> {
   final TextEditingController _searchCtl = TextEditingController();
   String? _selectedNoProduksi;
 
@@ -64,7 +66,7 @@ class _KeyFittingProductionScreenState extends State<KeyFittingProductionScreen>
     required Offset globalPos,
   }) async {
     final overlay =
-    Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
+        Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
     if (overlay == null) return;
 
     final local = overlay.globalToLocal(globalPos);
@@ -109,8 +111,9 @@ class _KeyFittingProductionScreenState extends State<KeyFittingProductionScreen>
                       return KeyFittingProductionDeleteDialog(
                         header: row,
                         onConfirm: () async {
-                          final success =
-                          await _viewModel.deleteProduksi(row.noProduksi);
+                          final success = await _viewModel.deleteProduksi(
+                            row.noProduksi,
+                          );
 
                           if (ctx.mounted) Navigator.of(ctx).pop();
                           if (!context.mounted) return;
@@ -121,7 +124,7 @@ class _KeyFittingProductionScreenState extends State<KeyFittingProductionScreen>
                               builder: (_) => SuccessStatusDialog(
                                 title: 'Berhasil Menghapus',
                                 message:
-                                'No. Produksi ${row.noProduksi} berhasil dihapus.',
+                                    'No. Produksi ${row.noProduksi} berhasil dihapus.',
                               ),
                             );
                           } else {
@@ -143,11 +146,23 @@ class _KeyFittingProductionScreenState extends State<KeyFittingProductionScreen>
                 onPrint: () {
                   // TODO: kalau nanti ada cetak label pasang kunci
                 },
+                onAuditHistory: () {
+                  _navigateToAuditHistory(row);
+                },
               ),
             ),
           ],
         );
       },
+    );
+  }
+
+  void _navigateToAuditHistory(KeyFittingProduction header) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            AuditScreenWithPrefilledDoc(documentNo: header.noProduksi),
+      ),
     );
   }
 
@@ -271,7 +286,7 @@ class _KeyFittingProductionScreenState extends State<KeyFittingProductionScreen>
                     columns: columns,
                     horizontalPadding: 16,
                     selectedPredicate: (r) =>
-                    r.noProduksi == _selectedNoProduksi,
+                        r.noProduksi == _selectedNoProduksi,
                     onRowTap: (r) =>
                         setState(() => _selectedNoProduksi = r.noProduksi),
                     onRowLongPress: (r, globalPos) async {
@@ -319,17 +334,15 @@ class _KeyFittingProductionScreenState extends State<KeyFittingProductionScreen>
 
     if (created == true) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Produksi pasang kunci berhasil dibuat'),
-        ),
+        const SnackBar(content: Text('Produksi pasang kunci berhasil dibuat')),
       );
     }
   }
 
   Future<void> _openEditDialog(
-      BuildContext context,
-      KeyFittingProduction row,
-      ) async {
+    BuildContext context,
+    KeyFittingProduction row,
+  ) async {
     debugPrint('🟦 [KEYFITTING_SCREEN] Opening edit dialog: ${row.noProduksi}');
     debugPrint('🟦 [KEYFITTING_SCREEN] Using VM hash=${_viewModel.hashCode}');
     debugPrint(
@@ -360,7 +373,9 @@ class _KeyFittingProductionScreenState extends State<KeyFittingProductionScreen>
     if (updated != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('No. Produksi ${updated.noProduksi} berhasil diperbarui'),
+          content: Text(
+            'No. Produksi ${updated.noProduksi} berhasil diperbarui',
+          ),
         ),
       );
     }

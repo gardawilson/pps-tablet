@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 
 import '../../../core/network/endpoints.dart';
 import '../../../core/services/token_storage.dart';
-import '../model/audit_session_model.dart';
 
 class AuditRepository {
   /// Fetch audit history - AUTO-DETECT MODULE from document prefix

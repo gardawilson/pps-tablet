@@ -25,7 +25,8 @@ class BJJualLookupLabelDialog extends StatefulWidget {
   });
 
   @override
-  State<BJJualLookupLabelDialog> createState() => _BJJualLookupLabelDialogState();
+  State<BJJualLookupLabelDialog> createState() =>
+      _BJJualLookupLabelDialogState();
 }
 
 class _BJJualLookupLabelDialogState extends State<BJJualLookupLabelDialog> {
@@ -112,7 +113,11 @@ class _BJJualLookupLabelDialogState extends State<BJJualLookupLabelDialog> {
     _didAutoSelect = true;
   }
 
-  void _toggleRow(BJJualInputViewModel vm, int index, Map<String, dynamic> row) {
+  void _toggleRow(
+    BJJualInputViewModel vm,
+    int index,
+    Map<String, dynamic> row,
+  ) {
     if (_isDisabled(index)) return;
     setState(() {
       if (_localPickedIndices.contains(index)) {
@@ -123,7 +128,10 @@ class _BJJualLookupLabelDialogState extends State<BJJualLookupLabelDialog> {
     });
   }
 
-  void _selectAllNew(BJJualInputViewModel vm, ProductionLabelLookupResult result) {
+  void _selectAllNew(
+    BJJualInputViewModel vm,
+    ProductionLabelLookupResult result,
+  ) {
     setState(() {
       _localPickedIndices.clear();
       for (int i = 0; i < result.data.length; i++) {
@@ -132,7 +140,10 @@ class _BJJualLookupLabelDialogState extends State<BJJualLookupLabelDialog> {
     });
   }
 
-  void _commitSelection(BJJualInputViewModel vm, ProductionLabelLookupResult result) {
+  void _commitSelection(
+    BJJualInputViewModel vm,
+    ProductionLabelLookupResult result,
+  ) {
     if (_localPickedIndices.isEmpty) return;
 
     vm.clearPicks();
@@ -174,10 +185,10 @@ class _BJJualLookupLabelDialogState extends State<BJJualLookupLabelDialog> {
   }
 
   _Presence _presenceForRow(
-      BJJualInputViewModel vm,
-      Map<String, dynamic> row,
-      ProductionLabelLookupResult ctx,
-      ) {
+    BJJualInputViewModel vm,
+    Map<String, dynamic> row,
+    ProductionLabelLookupResult ctx,
+  ) {
     final sk = ctx.simpleKey(row);
     if (vm.isInTempKeys(sk)) return _Presence.temp;
     return _Presence.none;
@@ -213,7 +224,9 @@ class _BJJualLookupLabelDialogState extends State<BJJualLookupLabelDialog> {
         final labelCode = sample == null ? '-' : _labelCodeOf(sample);
 
         // untuk BJ Jual, label yang kamu lookup biasanya Barang Jadi
-        final namaJenis = sample == null ? prefixType.displayName : 'Barang Jadi';
+        final namaJenis = sample == null
+            ? prefixType.displayName
+            : 'Barang Jadi';
 
         int newCount = 0;
         for (int i = 0; i < result.data.length; i++) {
@@ -221,9 +234,14 @@ class _BJJualLookupLabelDialogState extends State<BJJualLookupLabelDialog> {
         }
 
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           elevation: 8,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 24,
+          ),
           child: Container(
             constraints: const BoxConstraints(maxWidth: 720, maxHeight: 600),
             decoration: BoxDecoration(
@@ -255,8 +273,11 @@ class _BJJualLookupLabelDialogState extends State<BJJualLookupLabelDialog> {
                           color: Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.shopping_cart_outlined,
-                            size: 28, color: Colors.white),
+                        child: const Icon(
+                          Icons.shopping_cart_outlined,
+                          size: 28,
+                          color: Colors.white,
+                        ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
@@ -284,7 +305,10 @@ class _BJJualLookupLabelDialogState extends State<BJJualLookupLabelDialog> {
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(20),
@@ -304,10 +328,15 @@ class _BJJualLookupLabelDialogState extends State<BJJualLookupLabelDialog> {
 
                 // COLUMN HEADERS
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade50,
-                    border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+                    border: Border(
+                      bottom: BorderSide(color: Colors.grey.shade200),
+                    ),
                   ),
                   child: Row(
                     children: const [
@@ -403,7 +432,9 @@ class _BJJualLookupLabelDialogState extends State<BJJualLookupLabelDialog> {
                               color: Colors.transparent,
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(12),
-                                onTap: isDuplicate ? null : () => _toggleRow(vm, idx, rawRow),
+                                onTap: isDuplicate
+                                    ? null
+                                    : () => _toggleRow(vm, idx, rawRow),
                                 child: Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
@@ -419,12 +450,14 @@ class _BJJualLookupLabelDialogState extends State<BJJualLookupLabelDialog> {
                                     borderRadius: BorderRadius.circular(12),
                                     boxShadow: picked && !isDuplicate
                                         ? [
-                                      BoxShadow(
-                                        color: Colors.indigo.withOpacity(0.1),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ]
+                                            BoxShadow(
+                                              color: Colors.indigo.withOpacity(
+                                                0.1,
+                                              ),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ]
                                         : null,
                                   ),
                                   child: Row(
@@ -436,11 +469,17 @@ class _BJJualLookupLabelDialogState extends State<BJJualLookupLabelDialog> {
                                         alignment: Alignment.center,
                                         child: Checkbox(
                                           value: picked && !isDuplicate,
-                                          onChanged: isDuplicate ? null : (_) => _toggleRow(vm, idx, rawRow),
+                                          onChanged: isDuplicate
+                                              ? null
+                                              : (_) =>
+                                                    _toggleRow(vm, idx, rawRow),
                                           shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(6),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
                                           ),
-                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                          materialTapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
                                         ),
                                       ),
 
@@ -451,10 +490,14 @@ class _BJJualLookupLabelDialogState extends State<BJJualLookupLabelDialog> {
                                           children: [
                                             if (isPartial) ...[
                                               Container(
-                                                padding: const EdgeInsets.all(4),
+                                                padding: const EdgeInsets.all(
+                                                  4,
+                                                ),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.amber.withOpacity(0.2),
-                                                  borderRadius: BorderRadius.circular(6),
+                                                  color: Colors.amber
+                                                      .withOpacity(0.2),
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
                                                 ),
                                                 child: const Icon(
                                                   Icons.content_cut,
@@ -486,19 +529,32 @@ class _BJJualLookupLabelDialogState extends State<BJJualLookupLabelDialog> {
                                         child: Align(
                                           alignment: Alignment.centerRight,
                                           child: Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 6,
+                                            ),
                                             decoration: BoxDecoration(
                                               gradient: LinearGradient(
                                                 colors: isPcsEdited
-                                                    ? [Colors.amber.shade300, Colors.amber.shade400]
+                                                    ? [
+                                                        Colors.amber.shade300,
+                                                        Colors.amber.shade400,
+                                                      ]
                                                     : statusText != null
                                                     ? [
-                                                  statusColor!.withOpacity(0.2),
-                                                  statusColor.withOpacity(0.3)
-                                                ]
-                                                    : [Colors.green.shade100, Colors.green.shade200],
+                                                        statusColor!
+                                                            .withOpacity(0.2),
+                                                        statusColor.withOpacity(
+                                                          0.3,
+                                                        ),
+                                                      ]
+                                                    : [
+                                                        Colors.green.shade100,
+                                                        Colors.green.shade200,
+                                                      ],
                                               ),
-                                              borderRadius: BorderRadius.circular(20),
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
                                             ),
                                             child: Text(
                                               '$beratTxt kg',
@@ -522,7 +578,8 @@ class _BJJualLookupLabelDialogState extends State<BJJualLookupLabelDialog> {
                                       SizedBox(
                                         width: 220,
                                         child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.end,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.end,
                                           children: [
                                             // Edit PCS (hanya partial)
                                             if (isPartial && !isDuplicate)
@@ -530,45 +587,79 @@ class _BJJualLookupLabelDialogState extends State<BJJualLookupLabelDialog> {
                                                 height: 32,
                                                 child: OutlinedButton.icon(
                                                   style: OutlinedButton.styleFrom(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                                    side: BorderSide(color: Colors.amber.shade600, width: 1.5),
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 10,
+                                                          vertical: 4,
+                                                        ),
+                                                    side: BorderSide(
+                                                      color:
+                                                          Colors.amber.shade600,
+                                                      width: 1.5,
+                                                    ),
                                                     shape: RoundedRectangleBorder(
-                                                      borderRadius: BorderRadius.circular(8),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            8,
+                                                          ),
                                                     ),
                                                   ),
-                                                  icon: Icon(Icons.edit_outlined,
-                                                      size: 14, color: Colors.amber.shade700),
+                                                  icon: Icon(
+                                                    Icons.edit_outlined,
+                                                    size: 14,
+                                                    color:
+                                                        Colors.amber.shade700,
+                                                  ),
                                                   label: Text(
                                                     'Edit Pcs',
                                                     style: TextStyle(
                                                       fontSize: 11,
-                                                      fontWeight: FontWeight.w600,
-                                                      color: Colors.amber.shade700,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color:
+                                                          Colors.amber.shade700,
                                                     ),
                                                   ),
                                                   onPressed: () async {
                                                     if (originalPcs != null) {
-                                                      final newPcs = await _showPcsInputDialog(
-                                                        context,
-                                                        maxPcs: originalPcs,
-                                                        currentPcs: _editedPcs[idx],
-                                                      );
-                                                      if (newPcs != null && mounted) {
-                                                        setState(() => _editedPcs[idx] = newPcs);
+                                                      final newPcs =
+                                                          await _showPcsInputDialog(
+                                                            context,
+                                                            maxPcs: originalPcs,
+                                                            currentPcs:
+                                                                _editedPcs[idx],
+                                                          );
+                                                      if (newPcs != null &&
+                                                          mounted) {
+                                                        setState(
+                                                          () =>
+                                                              _editedPcs[idx] =
+                                                                  newPcs,
+                                                        );
                                                       }
                                                     }
                                                   },
                                                 ),
                                               ),
 
-                                            if (isPartial && !isDuplicate) const SizedBox(width: 8),
+                                            if (isPartial && !isDuplicate)
+                                              const SizedBox(width: 8),
 
-                                            if (isPartial) _badge('PARTIAL', Colors.amber.shade700),
+                                            if (isPartial)
+                                              _badge(
+                                                'PARTIAL',
+                                                Colors.amber.shade700,
+                                              ),
 
                                             if (statusText != null)
                                               Padding(
-                                                padding: const EdgeInsets.only(left: 8),
-                                                child: _badge(statusText!, statusColor!),
+                                                padding: const EdgeInsets.only(
+                                                  left: 8,
+                                                ),
+                                                child: _badge(
+                                                  statusText!,
+                                                  statusColor!,
+                                                ),
                                               ),
                                           ],
                                         ),
@@ -590,7 +681,9 @@ class _BJJualLookupLabelDialogState extends State<BJJualLookupLabelDialog> {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade50,
-                    border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                    border: Border(
+                      top: BorderSide(color: Colors.grey.shade200),
+                    ),
                     borderRadius: const BorderRadius.only(
                       bottomLeft: Radius.circular(16),
                       bottomRight: Radius.circular(16),
@@ -625,7 +718,10 @@ class _BJJualLookupLabelDialogState extends State<BJJualLookupLabelDialog> {
 
                       if (_localPickedIndices.isNotEmpty)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           margin: const EdgeInsets.only(right: 12),
                           decoration: BoxDecoration(
                             color: Colors.indigo.shade100,
@@ -654,7 +750,10 @@ class _BJJualLookupLabelDialogState extends State<BJJualLookupLabelDialog> {
                         style: FilledButton.styleFrom(
                           backgroundColor: Colors.indigo.shade600,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
@@ -758,10 +857,10 @@ class _BJJualLookupLabelDialogState extends State<BJJualLookupLabelDialog> {
   }
 
   Future<int?> _showPcsInputDialog(
-      BuildContext context, {
-        required int maxPcs,
-        int? currentPcs,
-      }) async {
+    BuildContext context, {
+    required int maxPcs,
+    int? currentPcs,
+  }) async {
     final controller = TextEditingController(
       text: currentPcs?.toString() ?? '',
     );

@@ -113,6 +113,7 @@ class _SessionDetail extends StatelessWidget {
         session.consumeUnifiedItems!.isNotEmpty;
 
     final hasProduceBlock =
+        !session.isUpdate &&
         session.produceUnifiedItems != null &&
         session.produceUnifiedItems!.isNotEmpty;
 

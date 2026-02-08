@@ -283,14 +283,10 @@ class _InputLabelCard extends StatelessWidget {
     final hasOldNewBerat = (oldBerat != null || newBerat != null);
     if (hasOldNewBerat && oldBerat != newBerat) {
       final oldBeratStr = oldBerat != null
-          ? (oldBerat is num
-                ? oldBerat.toStringAsFixed(2)
-                : oldBerat.toString())
+          ? (oldBerat.toStringAsFixed(2))
           : '-';
       final newBeratStr = newBerat != null
-          ? (newBerat is num
-                ? newBerat.toStringAsFixed(2)
-                : newBerat.toString())
+          ? (newBerat.toStringAsFixed(2))
           : '-';
 
       badges.add(

@@ -3,16 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/services/dialog_service.dart';
+import '../../../../common/widgets/interactive_popover.dart';
 import '../view_model/broker_view_model.dart';
 import '../model/broker_header_model.dart';
 import '../model/broker_detail_model.dart';
-import '../widgets/interactive_popover.dart';
 import '../widgets/broker_row_popover.dart';
 import '../widgets/broker_action_bar.dart';
 import '../widgets/broker_header_table.dart';
 import '../widgets/broker_detail_table.dart';
 import '../widgets/broker_form_dialog.dart';
 import '../widgets/broker_delete_dialog.dart';
+import '../widgets/broker_qc_dialog.dart';
 
 class BrokerScreen extends StatefulWidget {
   const BrokerScreen({super.key});
@@ -105,6 +106,53 @@ class _BrokerScreenState extends State<BrokerScreen> {
 
     // aman -> tampilkan konfirmasi delete
     _confirmDelete(header);
+  }
+
+  Future<void> _onQcHeader(BrokerHeader header) async {
+    final vm = context.read<BrokerViewModel>();
+    vm.setSelectedNoBroker(header.noBroker);
+
+    final qc = await showDialog<BrokerQcResult>(
+      context: context,
+      builder: (_) => BrokerQcDialog(header: header),
+    );
+
+    if (!mounted || qc == null) return;
+
+    DialogService.instance.showLoading(
+      message: 'Menyimpan QC ${header.noBroker}...',
+    );
+
+    final res = await vm.updateBrokerQc(
+      noBroker: header.noBroker,
+      density1: qc.density1,
+      density2: qc.density2,
+      density3: qc.density3,
+      moisture1: qc.moisture1,
+      moisture2: qc.moisture2,
+      moisture3: qc.moisture3,
+      maxMeltTemp: qc.maxMeltTemp,
+      minMeltTemp: qc.minMeltTemp,
+      mfi: qc.mfi,
+      visualNote: qc.visualNote,
+    );
+
+    DialogService.instance.hideLoading();
+
+    if (!mounted) return;
+    if (res != null) {
+      await DialogService.instance.showSuccess(
+        title: 'QC Tersimpan',
+        message: 'Nilai QC untuk ${header.noBroker} berhasil diperbarui.',
+      );
+    } else {
+      await DialogService.instance.showError(
+        title: 'Gagal',
+        message: vm.errorMessage.isNotEmpty
+            ? vm.errorMessage
+            : 'Tidak dapat memperbarui data QC.',
+      );
+    }
   }
 
   // Popover animasi (custom)
@@ -209,6 +257,9 @@ class _BrokerScreenState extends State<BrokerScreen> {
     Offset globalPosition,
   ) async {
     final vm = context.read<BrokerViewModel>();
+    final screenHeight = MediaQuery.of(context).size.height;
+    final adaptiveMaxHeight =
+        (screenHeight - 32).clamp(480.0, 820.0).toDouble();
 
     // Pindahkan highlight saat long-press
     vm.setSelectedNoBroker(header.noBroker);
@@ -237,9 +288,14 @@ class _BrokerScreenState extends State<BrokerScreen> {
           _closeContextMenu();
           _navigateToAuditHistory(header);
         },
+        onQc: () async {
+          _closeContextMenu();
+          await _onQcHeader(header);
+        },
       ),
       preferAbove: true,
       verticalGap: 8,
+      maxHeight: adaptiveMaxHeight,
       backdropOpacity: 0.06,
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutBack,

@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:pps_tablet/core/utils/date_formatter.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../common/widgets/interactive_popover.dart';
 import '../view_model/packing_view_model.dart';
-import './interactive_popover.dart';
 
-/// Show the partial info for Packing (Barang Jadi)
-/// as an InteractivePopover with instant display
 Future<void> showPackingPartialInfoPopover({
   required BuildContext context,
   required PackingViewModel vm,
@@ -16,12 +14,14 @@ Future<void> showPackingPartialInfoPopover({
 }) async {
   if (!context.mounted) return;
 
-  // 🟦 Tampilkan popover dulu (state loading)
+  final screenHeight = MediaQuery.of(context).size.height;
+  final adaptiveMaxHeight = (screenHeight - 32).clamp(360.0, 700.0).toDouble();
+
   await popover.show(
     context: context,
     globalPosition: globalPosition,
     maxWidth: 300,
-    maxHeight: 360,
+    maxHeight: adaptiveMaxHeight,
     backdropOpacity: 0.04,
     preferAbove: true,
     verticalGap: 10,
@@ -29,14 +29,10 @@ Future<void> showPackingPartialInfoPopover({
     startOpacity: 0.0,
     child: ChangeNotifierProvider.value(
       value: vm,
-      child: _PackingPartialInfoCard(
-        noBJ: noBJ,
-        onClose: () => popover.hide(),
-      ),
+      child: _PackingPartialInfoCard(noBJ: noBJ, onClose: () => popover.hide()),
     ),
   );
 
-  // 🟦 Baru fetch data (popover sudah tampil)
   await vm.loadPartialInfo(noBJ: noBJ);
 }
 
@@ -44,10 +40,7 @@ class _PackingPartialInfoCard extends StatefulWidget {
   final String noBJ;
   final VoidCallback onClose;
 
-  const _PackingPartialInfoCard({
-    required this.noBJ,
-    required this.onClose,
-  });
+  const _PackingPartialInfoCard({required this.noBJ, required this.onClose});
 
   @override
   State<_PackingPartialInfoCard> createState() =>
@@ -65,8 +58,18 @@ class _PackingPartialInfoCardState extends State<_PackingPartialInfoCard> {
 
   @override
   Widget build(BuildContext context) {
-    final divider =
-    Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
+    const atlasBlue = Color(0xFF0C66E4);
+    const atlasBlueSubtle = Color(0xFFE9F2FF);
+    const atlasSurface = Color(0xFFF7F8F9);
+    const atlasBorder = Color(0xFFDCDFE4);
+    const atlasText = Color(0xFF172B4D);
+    const atlasSubtleText = Color(0xFF44546F);
+
+    final divider = const Divider(
+      height: 0,
+      thickness: 0.8,
+      color: atlasBorder,
+    );
 
     return Consumer<PackingViewModel>(
       builder: (ctx, vm, __) {
@@ -75,17 +78,14 @@ class _PackingPartialInfoCardState extends State<_PackingPartialInfoCard> {
         final info = vm.partialInfo;
         final isEmpty = info == null || info.rows.isEmpty;
 
-        // Error state
         if (hasError && !isLoading) {
           return _ErrorState(error: vm.partialError!);
         }
 
-        // Empty state
         if (isEmpty && !isLoading) {
           return const _EmptyState();
         }
 
-        // Data / loading state
         final displayRows = isLoading ? <dynamic>[] : (info?.rows ?? []);
         final totalPcs = isLoading ? 0.0 : (info?.totalPartialPcs ?? 0.0);
         final rowCount = displayRows.length;
@@ -97,42 +97,32 @@ class _PackingPartialInfoCardState extends State<_PackingPartialInfoCard> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // HEADER (blue gradient)
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 16,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.blue.shade400, Colors.blue.shade600],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  decoration: const BoxDecoration(
+                    color: atlasBlueSubtle,
+                    border: Border(bottom: BorderSide(color: atlasBorder)),
                   ),
                   child: Row(
                     children: [
-                      // Icon box
                       Container(
-                        width: 44,
-                        height: 44,
+                        width: 40,
+                        height: 40,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.25),
+                          color: atlasBlue.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.3),
-                            width: 1,
+                            color: atlasBlue.withValues(alpha: 0.24),
                           ),
                         ),
                         child: const Icon(
-                          Icons.inventory_2_outlined,
-                          color: Colors.white,
-                          size: 24,
+                          Icons.shopping_cart_checkout_outlined,
+                          color: atlasBlue,
+                          size: 20,
                         ),
                       ),
-                      const SizedBox(width: 14),
-
-                      // Title & subtitle
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -140,46 +130,47 @@ class _PackingPartialInfoCardState extends State<_PackingPartialInfoCard> {
                             const Text(
                               'Partial Barang Jadi',
                               style: TextStyle(
-                                fontSize: 18,
+                                fontSize: 15,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.white,
+                                color: atlasText,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 2),
                             Text(
                               widget.noBJ,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 12,
-                                color: Colors.white.withOpacity(0.9),
+                                fontWeight: FontWeight.w600,
+                                color: atlasSubtleText,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 6),
                             Row(
                               children: [
-                                Icon(
+                                const Icon(
                                   Icons.countertops,
                                   size: 14,
-                                  color: Colors.white.withOpacity(0.9),
+                                  color: atlasSubtleText,
                                 ),
                                 const SizedBox(width: 6),
                                 if (isLoading)
-                                  Text(
+                                  const Text(
                                     'Memuat...',
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600,
-                                      color: Colors.white.withOpacity(0.95),
+                                      color: atlasSubtleText,
                                     ),
                                   )
                                 else
                                   Text(
                                     'Total: ${totalPcs.toStringAsFixed(2)} pcs',
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600,
-                                      color: Colors.white.withOpacity(0.95),
+                                      color: atlasSubtleText,
                                     ),
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -192,20 +183,19 @@ class _PackingPartialInfoCardState extends State<_PackingPartialInfoCard> {
                   ),
                 ),
                 divider,
-
-                // SMALL HEADER
                 Container(
+                  width: double.infinity,
+                  color: atlasSurface,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
                     vertical: 8,
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.list,
-                          size: 14, color: Colors.blue.shade600),
+                      const Icon(Icons.list, size: 14, color: atlasBlue),
                       const SizedBox(width: 6),
                       if (isLoading)
-                        SizedBox(
+                        const SizedBox(
                           width: 16,
                           height: 14,
                           child: CircularProgressIndicator(strokeWidth: 2),
@@ -213,10 +203,10 @@ class _PackingPartialInfoCardState extends State<_PackingPartialInfoCard> {
                       else
                         Text(
                           'Partials ($rowCount)',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: Colors.blue.shade600,
+                            color: atlasBlue,
                           ),
                         ),
                     ],
@@ -224,60 +214,55 @@ class _PackingPartialInfoCardState extends State<_PackingPartialInfoCard> {
                 ),
                 const SizedBox(height: 2),
                 divider,
-
-                // LIST
                 Flexible(
                   child: isLoading
                       ? Center(
-                    child: Padding(
-                      padding:
-                      const EdgeInsets.symmetric(vertical: 40),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 36,
-                            height: 36,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2.8),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Memuat data...',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 40),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const SizedBox(
+                                  width: 36,
+                                  height: 36,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.8,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Memuat data...',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey.shade600,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                  )
+                        )
                       : ListView.separated(
-                    padding: EdgeInsets.zero,
-                    itemCount: rowCount,
-                    separatorBuilder: (_, __) => divider,
-                    itemBuilder: (_, i) {
-                      final r = displayRows[i];
-                      return _PartialRowItem(
-                        namaPembeli:
-                        (r.namaPembeli ?? '').isEmpty
-                            ? '-'
-                            : r.namaPembeli!,
-                        noBJJual:
-                        (r.noBJJual ?? '').isEmpty
-                            ? '-'
-                            : r.noBJJual!,
-                        tanggalJual:
-                        (r.tanggalJual ?? '').isEmpty
-                            ? '-'
-                            : r.tanggalJual!,
-                        remark: (r.remark ?? '').toString(),
-                        pcs: r.pcs,
-                      );
-                    },
-                  ),
+                          padding: EdgeInsets.zero,
+                          itemCount: rowCount,
+                          separatorBuilder: (_, __) => divider,
+                          itemBuilder: (_, i) {
+                            final r = displayRows[i];
+                            return _PartialRowItem(
+                              namaPembeli: (r.namaPembeli ?? '').isEmpty
+                                  ? '-'
+                                  : r.namaPembeli!,
+                              noBJJual: (r.noBJJual ?? '').isEmpty
+                                  ? '-'
+                                  : r.noBJJual!,
+                              tanggalJual: (r.tanggalJual ?? '').isEmpty
+                                  ? '-'
+                                  : r.tanggalJual!,
+                              remark: (r.remark ?? '').toString(),
+                              pcs: r.pcs,
+                            );
+                          },
+                        ),
                 ),
               ],
             ),
@@ -288,7 +273,6 @@ class _PackingPartialInfoCardState extends State<_PackingPartialInfoCard> {
   }
 }
 
-// ERROR STATE
 class _ErrorState extends StatelessWidget {
   final String error;
   const _ErrorState({required this.error});
@@ -311,7 +295,6 @@ class _ErrorState extends StatelessWidget {
   }
 }
 
-// EMPTY STATE
 class _EmptyState extends StatelessWidget {
   const _EmptyState();
 
@@ -333,11 +316,10 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-// ROW ITEM
 class _PartialRowItem extends StatelessWidget {
   final String namaPembeli;
   final String noBJJual;
-  final String tanggalJual; // yyyy-MM-dd atau '-'
+  final String tanggalJual;
   final String remark;
   final double pcs;
 
@@ -352,26 +334,24 @@ class _PartialRowItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-
-    final hasRemark =
-        remark.trim().isNotEmpty && remark.trim() != 'null';
+    final hasRemark = remark.trim().isNotEmpty && remark.trim() != 'null';
 
     return InkWell(
-      onTap: null, // read-only
+      onTap: null,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           children: [
-            Icon(Icons.shopping_cart_checkout,
-                color: Colors.green.shade600, size: 18),
+            Icon(
+              Icons.remove_circle_outline,
+              color: Colors.red.shade600,
+              size: 18,
+            ),
             const SizedBox(width: 12),
-
-            // Content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Nama Pembeli
                   Text(
                     namaPembeli,
                     style: textTheme.bodyMedium?.copyWith(
@@ -381,8 +361,6 @@ class _PartialRowItem extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-
-                  // NoBJJual
                   Row(
                     children: [
                       const Icon(Icons.tag, size: 12, color: Colors.grey),
@@ -399,16 +377,17 @@ class _PartialRowItem extends StatelessWidget {
                       ),
                     ],
                   ),
-
-                  // Tanggal jual
                   Row(
                     children: [
-                      const Icon(Icons.calendar_today,
-                          size: 12, color: Colors.grey),
+                      const Icon(
+                        Icons.calendar_today,
+                        size: 12,
+                        color: Colors.grey,
+                      ),
                       const SizedBox(width: 4),
                       Flexible(
                         child: Text(
-                          (tanggalJual == '-' || tanggalJual.isEmpty)
+                          tanggalJual == '-' || tanggalJual.isEmpty
                               ? '-'
                               : formatDateToFullId(tanggalJual),
                           style: textTheme.bodySmall?.copyWith(
@@ -420,14 +399,11 @@ class _PartialRowItem extends StatelessWidget {
                       ),
                     ],
                   ),
-
-                  // Remark (opsional)
-                  if (hasRemark) ...[
+                  if (hasRemark)
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.notes,
-                            size: 12, color: Colors.grey),
+                        const Icon(Icons.notes, size: 12, color: Colors.grey),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
@@ -441,17 +417,12 @@ class _PartialRowItem extends StatelessWidget {
                         ),
                       ],
                     ),
-                  ],
                 ],
               ),
             ),
-
             const SizedBox(width: 10),
-
-            // PCS tag
             Container(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: Colors.orange.shade50,
                 borderRadius: BorderRadius.circular(999),

@@ -106,7 +106,9 @@ class MixerViewModel extends ChangeNotifier {
       final moreItems = result['items'] as List<MixerHeader>;
       items.addAll(moreItems);
 
-      debugPrint("📥 Mixer load more page $_page, total items: ${items.length}");
+      debugPrint(
+        "📥 Mixer load more page $_page, total items: ${items.length}",
+      );
     } catch (e) {
       errorMessage = e.toString();
       debugPrint("❌ Error loadMore (Mixer): $errorMessage");
@@ -132,7 +134,9 @@ class MixerViewModel extends ChangeNotifier {
 
     try {
       details = await repository.fetchDetails(noMixer);
-      debugPrint("✅ Mixer details loaded for $noMixer, count: ${details.length}");
+      debugPrint(
+        "✅ Mixer details loaded for $noMixer, count: ${details.length}",
+      );
     } catch (e) {
       detailError = e.toString();
       debugPrint("❌ Error fetchDetails($noMixer): $detailError");
@@ -146,17 +150,17 @@ class MixerViewModel extends ChangeNotifier {
   //  CREATE MIXER
   // =============================
   Future<Map<String, dynamic>?> createMixer(
-      MixerHeader header,
-      List<MixerDetail> details, {
-        required String outputCode, // <-- wajib, diisi dari UI
-      }) async {
+    MixerHeader header,
+    List<MixerDetail> details, {
+    required String outputCode, // <-- wajib, diisi dari UI
+  }) async {
     try {
       isLoading = true;
       notifyListeners();
 
       debugPrint(
         "➡️ [MixerVM] createMixer noMixer=${header.noMixer}, "
-            "outputCode=$outputCode, details=${details.length}",
+        "outputCode=$outputCode, details=${details.length}",
       );
 
       final res = await repository.createMixer(
@@ -189,9 +193,9 @@ class MixerViewModel extends ChangeNotifier {
   //  UPDATE MIXER
   // =============================
   Future<Map<String, dynamic>?> updateMixer(
-      MixerHeader header,
-      List<MixerDetail> details,
-      ) async {
+    MixerHeader header,
+    List<MixerDetail> details,
+  ) async {
     final noMixer = header.noMixer;
     try {
       isLoading = true;
@@ -199,7 +203,7 @@ class MixerViewModel extends ChangeNotifier {
 
       debugPrint(
         "➡️ [MixerVM] updateMixer noMixer=$noMixer, "
-            "details=${details.length}",
+        "details=${details.length}",
       );
 
       final res = await repository.updateMixer(
@@ -219,6 +223,43 @@ class MixerViewModel extends ChangeNotifier {
     } catch (e) {
       errorMessage = e.toString();
       debugPrint("❌ Error updateMixer: $errorMessage");
+      return null;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Map<String, dynamic>?> updateMixerQc({
+    required String noMixer,
+    required double? moisture1,
+    required double? moisture2,
+    required double? moisture3,
+    required double? minMeltTemp,
+    required double? maxMeltTemp,
+    required double? mfi,
+  }) async {
+    try {
+      isLoading = true;
+      errorMessage = '';
+      notifyListeners();
+
+      final res = await repository.updateMixerQc(
+        noMixer: noMixer,
+        moisture1: moisture1,
+        moisture2: moisture2,
+        moisture3: moisture3,
+        minMeltTemp: minMeltTemp,
+        maxMeltTemp: maxMeltTemp,
+        mfi: mfi,
+      );
+
+      await fetchHeaders(search: _search);
+      setSelectedNoMixer(noMixer);
+      return res;
+    } catch (e) {
+      errorMessage = e.toString();
+      debugPrint("❌ Error updateMixerQc: $errorMessage");
       return null;
     } finally {
       isLoading = false;

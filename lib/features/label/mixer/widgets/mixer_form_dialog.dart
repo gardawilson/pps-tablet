@@ -30,12 +30,7 @@ class MixerFormDialog extends StatefulWidget {
   final List<MixerDetail>? details;
   final Function(MixerHeader, List<MixerDetail>)? onSave; // optional callback
 
-  const MixerFormDialog({
-    super.key,
-    this.header,
-    this.details,
-    this.onSave,
-  });
+  const MixerFormDialog({super.key, this.header, this.details, this.onSave});
 
   @override
   State<MixerFormDialog> createState() => _MixerFormDialogState();
@@ -63,6 +58,21 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
   /// - "BG.XXXX" → dari BongkarSusunOutputMixer
   String? _selectedOutputCode;
 
+  String _initialProductionLikeCode() {
+    final output = (widget.header?.outputCode ?? '').trim();
+    if (output.toUpperCase().startsWith('I.') ||
+        output.toUpperCase().startsWith('S.')) {
+      return output;
+    }
+    return (widget.header?.noProduksi ?? '').trim();
+  }
+
+  String _initialBongkarCode() {
+    final output = (widget.header?.outputCode ?? '').trim();
+    if (output.toUpperCase().startsWith('BG.')) return output;
+    return (widget.header?.noBongkarSusun ?? '').trim();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -80,19 +90,24 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
     );
 
     jenisCtrl = TextEditingController(text: widget.header?.namaMixer ?? '');
-    noProduksiCtrl =
-        TextEditingController(text: widget.header?.noProduksi ?? '');
-    noBongkarSusunCtrl =
-        TextEditingController(text: widget.header?.noBongkarSusun ?? '');
+    noProduksiCtrl = TextEditingController(text: _initialProductionLikeCode());
+    noBongkarSusunCtrl = TextEditingController(text: _initialBongkarCode());
 
     detailList = List.from(widget.details ?? []);
 
     // Auto-select mode based on existing header when editing
     if (widget.header != null) {
+      final outputCode = (widget.header!.outputCode ?? '').trim().toUpperCase();
       final np = (widget.header!.noProduksi ?? '').trim();
       final nb = (widget.header!.noBongkarSusun ?? '').trim();
 
-      if (np.isNotEmpty && np.toUpperCase().startsWith('S.')) {
+      if (outputCode.startsWith('S.')) {
+        _selectedMode = InputMode.inject;
+      } else if (outputCode.startsWith('I.')) {
+        _selectedMode = InputMode.production;
+      } else if (outputCode.startsWith('BG.')) {
+        _selectedMode = InputMode.bongkar;
+      } else if (np.isNotEmpty && np.toUpperCase().startsWith('S.')) {
         _selectedMode = InputMode.inject;
       } else if (np.isNotEmpty) {
         _selectedMode = InputMode.production;
@@ -138,18 +153,12 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // LEFT: Header form
-                  Expanded(
-                    flex: 4,
-                    child: _buildLeftColumn(),
-                  ),
+                  Expanded(flex: 4, child: _buildLeftColumn()),
                   const SizedBox(width: 24),
                   Container(width: 1, color: Colors.grey.shade300),
                   const SizedBox(width: 24),
                   // RIGHT: Detail list
-                  Expanded(
-                    flex: 2,
-                    child: _buildRightColumn(),
-                  ),
+                  Expanded(flex: 2, child: _buildRightColumn()),
                 ],
               ),
             ),
@@ -180,10 +189,7 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
         const SizedBox(width: 12),
         Text(
           isEdit ? 'Edit Label Mixer' : 'Tambah Label Mixer',
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
       ],
     );
@@ -193,10 +199,8 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
   Widget _buildLeftColumn() {
     final bool isProductionEnabled =
         !isEdit && _selectedMode == InputMode.production;
-    final bool isInjectEnabled =
-        !isEdit && _selectedMode == InputMode.inject;
-    final bool isBongkarEnabled =
-        !isEdit && _selectedMode == InputMode.bongkar;
+    final bool isInjectEnabled = !isEdit && _selectedMode == InputMode.inject;
+    final bool isBongkarEnabled = !isEdit && _selectedMode == InputMode.bongkar;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -214,10 +218,7 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                 const SizedBox(width: 8),
                 const Text(
                   "Header",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -242,8 +243,10 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                 if (d != null) {
                   setState(() {
                     _selectedDate = d;
-                    dateCreatedCtrl.text =
-                        DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(d);
+                    dateCreatedCtrl.text = DateFormat(
+                      'EEEE, dd MMM yyyy',
+                      'id_ID',
+                    ).format(d);
                   });
                 }
               },
@@ -275,14 +278,14 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                   onChanged: isEdit
                       ? null
                       : (val) {
-                    setState(() {
-                      _selectedMode = val!;
-                      // ganti mode → clear output code & bongkar
-                      _selectedOutputCode = null;
-                      noProduksiCtrl.clear();
-                      noBongkarSusunCtrl.clear();
-                    });
-                  },
+                          setState(() {
+                            _selectedMode = val!;
+                            // ganti mode → clear output code & bongkar
+                            _selectedOutputCode = null;
+                            noProduksiCtrl.clear();
+                            noBongkarSusunCtrl.clear();
+                          });
+                        },
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -291,23 +294,28 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                     child: Opacity(
                       opacity: isProductionEnabled ? 1 : 0.6,
                       child: MixerProductionDropdown(
-                        preselectNoProduksi:
-                        (widget.header?.noProduksi ?? '').toUpperCase().startsWith('I.')
-                            ? widget.header?.noProduksi
+                        preselectNoProduksi: isEdit
+                            ? (() {
+                                final code = _initialProductionLikeCode();
+                                return code.toUpperCase().startsWith('I.')
+                                    ? code
+                                    : null;
+                              })()
                             : null,
                         preselectNamaMesin: widget.header?.namaMesin,
                         date: _selectedDate,
                         enabled: isProductionEnabled,
                         onChanged: isProductionEnabled
                             ? (wp) {
-                          setState(() {
-                            final code = wp?.noProduksi?.trim() ?? '';
-                            noProduksiCtrl.text = code;
-                            // ASUMSI: wp.noProduksi sudah termasuk prefix "I."
-                            _selectedOutputCode =
-                            code.isEmpty ? null : code;
-                          });
-                        }
+                                setState(() {
+                                  final code = (wp?.noProduksi ?? '').trim();
+                                  noProduksiCtrl.text = code;
+                                  // ASUMSI: wp.noProduksi sudah termasuk prefix "I."
+                                  _selectedOutputCode = code.isEmpty
+                                      ? null
+                                      : code;
+                                });
+                              }
                             : null,
                       ),
                     ),
@@ -327,13 +335,13 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                   onChanged: isEdit
                       ? null
                       : (val) {
-                    setState(() {
-                      _selectedMode = val!;
-                      _selectedOutputCode = null;
-                      noProduksiCtrl.clear();
-                      noBongkarSusunCtrl.clear();
-                    });
-                  },
+                          setState(() {
+                            _selectedMode = val!;
+                            _selectedOutputCode = null;
+                            noProduksiCtrl.clear();
+                            noBongkarSusunCtrl.clear();
+                          });
+                        },
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -342,23 +350,28 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                     child: Opacity(
                       opacity: isInjectEnabled ? 1 : 0.6,
                       child: InjectProductionDropdown(
-                        preselectNoProduksi:
-                        (widget.header?.noProduksi ?? '').toUpperCase().startsWith('S.')
-                            ? widget.header?.noProduksi
+                        preselectNoProduksi: isEdit
+                            ? (() {
+                                final code = _initialProductionLikeCode();
+                                return code.toUpperCase().startsWith('S.')
+                                    ? code
+                                    : null;
+                              })()
                             : null,
                         preselectNamaMesin: widget.header?.namaMesin,
                         date: _selectedDate,
                         enabled: isInjectEnabled,
                         onChanged: isInjectEnabled
                             ? (ip) {
-                          setState(() {
-                            final code = ip?.noProduksi?.trim() ?? '';
-                            noProduksiCtrl.text = code;
-                            // ASUMSI: ip.noProduksi sudah "S.000000..."
-                            _selectedOutputCode =
-                            code.isEmpty ? null : code;
-                          });
-                        }
+                                setState(() {
+                                  final code = (ip?.noProduksi ?? '').trim();
+                                  noProduksiCtrl.text = code;
+                                  // ASUMSI: ip.noProduksi sudah "S.000000..."
+                                  _selectedOutputCode = code.isEmpty
+                                      ? null
+                                      : code;
+                                });
+                              }
                             : null,
                       ),
                     ),
@@ -378,14 +391,14 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                   onChanged: isEdit
                       ? null
                       : (val) {
-                    setState(() {
-                      _selectedMode = val!;
-                      // ganti mode → clear output code & produksi/inject
-                      _selectedOutputCode = null;
-                      noProduksiCtrl.clear();
-                      noBongkarSusunCtrl.clear();
-                    });
-                  },
+                          setState(() {
+                            _selectedMode = val!;
+                            // ganti mode → clear output code & produksi/inject
+                            _selectedOutputCode = null;
+                            noProduksiCtrl.clear();
+                            noBongkarSusunCtrl.clear();
+                          });
+                        },
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -394,22 +407,24 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                     child: Opacity(
                       opacity: isBongkarEnabled ? 1 : 0.6,
                       child: BongkarSusunDropdown(
-                        preselectNoBongkarSusun:
-                        widget.header?.noBongkarSusun,
+                        preselectNoBongkarSusun: isEdit
+                            ? _initialBongkarCode()
+                            : null,
                         date: _selectedDate,
                         enabled: isBongkarEnabled,
                         onChanged: isBongkarEnabled
                             ? (bs) {
-                          setState(() {
-                            final code =
-                                bs?.noBongkarSusun?.trim() ?? '';
-                            noBongkarSusunCtrl.text = code;
+                                setState(() {
+                                  final code = (bs?.noBongkarSusun ?? '')
+                                      .trim();
+                                  noBongkarSusunCtrl.text = code;
 
-                            // ASUMSI: bs.noBongkarSusun sudah "BG.0000000X"
-                            _selectedOutputCode =
-                            code.isEmpty ? null : code;
-                          });
-                        }
+                                  // ASUMSI: bs.noBongkarSusun sudah "BG.0000000X"
+                                  _selectedOutputCode = code.isEmpty
+                                      ? null
+                                      : code;
+                                });
+                              }
                             : null,
                       ),
                     ),
@@ -426,8 +441,10 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
   // ===== RIGHT COLUMN: DETAIL LIST =====
   Widget _buildRightColumn() {
     final totalSak = detailList.length;
-    final totalBerat =
-    detailList.fold<double>(0, (a, b) => a + (b.berat ?? 0.0));
+    final totalBerat = detailList.fold<double>(
+      0,
+      (a, b) => a + (b.berat ?? 0.0),
+    );
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -486,8 +503,11 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.inventory_2,
-                          size: 20, color: Colors.blue.shade700),
+                      Icon(
+                        Icons.inventory_2,
+                        size: 20,
+                        color: Colors.blue.shade700,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         '$totalSak',
@@ -498,15 +518,10 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                       ),
                     ],
                   ),
-                  Container(
-                    height: 30,
-                    width: 1,
-                    color: Colors.grey.shade300,
-                  ),
+                  Container(height: 30, width: 1, color: Colors.grey.shade300),
                   Row(
                     children: [
-                      Icon(Icons.scale,
-                          size: 20, color: Colors.blue.shade700),
+                      Icon(Icons.scale, size: 20, color: Colors.blue.shade700),
                       const SizedBox(width: 8),
                       Text(
                         '${totalBerat.toStringAsFixed(2)} kg',
@@ -578,11 +593,7 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                       ],
                     ),
                   ),
-                  Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: Colors.grey.shade300,
-                  ),
+                  Divider(height: 1, thickness: 1, color: Colors.grey.shade300),
                   if (detailList.isEmpty)
                     _buildEmptyDetailState()
                   else
@@ -715,7 +726,7 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
         builder: (_) => const ErrorStatusDialog(
           title: 'Batas Tercapai',
           message:
-          'Maksimal jumlah Sak telah tercapai. Hapus sebagian jika ingin menambah lagi.',
+              'Maksimal jumlah Sak telah tercapai. Hapus sebagian jika ingin menambah lagi.',
         ),
       );
       return;
@@ -732,8 +743,9 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
       final clamped = v.clamp(1, remaining);
       setDialogState(() {
         jumlahSakCtrl.text = clamped.toString();
-        jumlahSakCtrl.selection =
-            TextSelection.collapsed(offset: jumlahSakCtrl.text.length);
+        jumlahSakCtrl.selection = TextSelection.collapsed(
+          offset: jumlahSakCtrl.text.length,
+        );
         previewJumlah = clamped;
         jumlahSakError = null;
       });
@@ -748,10 +760,13 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
 
           return AlertDialog(
             backgroundColor: Colors.white,
-            insetPadding:
-            const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-            shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 24,
+              vertical: 24,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
             contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
             actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -763,16 +778,12 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                     color: Color(0xFFB2DFDB),
                     shape: BoxShape.circle,
                   ),
-                  child:
-                  const Icon(Icons.add_circle, color: Color(0xFF00897B)),
+                  child: const Icon(Icons.add_circle, color: Color(0xFF00897B)),
                 ),
                 const SizedBox(width: 12),
                 const Text(
                   "Tambah Detail",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                 ),
               ],
             ),
@@ -804,27 +815,28 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                                 vertical: 12,
                               ),
                             ),
-                            keyboardType:
-                            const TextInputType.numberWithOptions(
-                                decimal: true),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
                             inputFormatters: [
                               FilteringTextInputFormatter.allow(
-                                  RegExp(r'[0-9.]')),
+                                RegExp(r'[0-9.]'),
+                              ),
                             ],
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Text("×",
-                            style:
-                            TextStyle(fontSize: 18, color: Colors.grey)),
+                        const Text(
+                          "×",
+                          style: TextStyle(fontSize: 18, color: Colors.grey),
+                        ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: TextField(
                             controller: jumlahSakCtrl,
                             decoration: InputDecoration(
                               labelText: "Jumlah (sak)",
-                              prefixIcon:
-                              const Icon(Icons.inventory_2_rounded),
+                              prefixIcon: const Icon(Icons.inventory_2_rounded),
                               filled: true,
                               fillColor: Colors.grey.shade50,
                               border: OutlineInputBorder(
@@ -852,7 +864,7 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                                 _setJumlah(setDialogState, remaining);
                                 setDialogState(() {
                                   jumlahSakError =
-                                  'Mencapai batas ($remaining sak)';
+                                      'Mencapai batas ($remaining sak)';
                                 });
                               } else {
                                 setDialogState(() {
@@ -889,7 +901,9 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                 label: const Text("BATAL"),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 20, vertical: 12),
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
                   side: BorderSide(color: Colors.grey.shade400),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -904,7 +918,9 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                   backgroundColor: const Color(0xFF00897B),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 24, vertical: 12),
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -961,16 +977,18 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
 
   int _getNextSakNumber() {
     if (detailList.isEmpty) return 1;
-    final maxSak =
-    detailList.map((d) => d.noSak).reduce((a, b) => a > b ? a : b);
+    final maxSak = detailList
+        .map((d) => d.noSak)
+        .reduce((a, b) => a > b ? a : b);
     return maxSak + 1;
   }
 
   // ===== EDIT DETAIL =====
   void _editDetail(MixerDetail detail, int index) {
     final noSakCtrl = TextEditingController(text: detail.noSak.toString());
-    final beratCtrl =
-    TextEditingController(text: detail.berat?.toString() ?? '');
+    final beratCtrl = TextEditingController(
+      text: detail.berat?.toString() ?? '',
+    );
 
     showDialog(
       context: context,
@@ -980,8 +998,9 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
 
         return AlertDialog(
           backgroundColor: Colors.white,
-          shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
           contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
           actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -998,10 +1017,7 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
               const SizedBox(width: 12),
               const Text(
                 "Edit Detail",
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
               ),
             ],
           ),
@@ -1041,7 +1057,8 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                           ),
                         ),
                         keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
+                          decimal: true,
+                        ),
                       ),
                     ),
                   ],
@@ -1052,10 +1069,7 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     "Pastikan data sudah benar sebelum menyimpan.",
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 13,
-                    ),
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                   ),
                 ),
               ],
@@ -1066,8 +1080,10 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
               icon: const Icon(Icons.close),
               label: const Text("BATAL"),
               style: OutlinedButton.styleFrom(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
                 side: BorderSide(color: Colors.grey.shade400),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -1081,8 +1097,10 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange.shade700,
                 foregroundColor: Colors.white,
-                padding:
-                const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -1106,8 +1124,7 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content:
-                      Text("Mohon isi No SAK dan Berat dengan benar."),
+                      content: Text("Mohon isi No SAK dan Berat dengan benar."),
                       backgroundColor: Colors.redAccent,
                       behavior: SnackBarBehavior.floating,
                     ),
@@ -1165,55 +1182,59 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
             // Build header
             final headerToSave = widget.header == null
                 ? MixerHeader(
-              noMixer: noMixerCtrl.text.trim(),
-              idMixer: selected.idMixer,
-              namaMixer: selected.jenis,
-              dateCreate: dateCreatedCtrl.text.trim(),
-              statusText: '',
-              idStatus: null,
-              // output source:
-              noProduksi: (_selectedMode == InputMode.production ||
-                  _selectedMode == InputMode.inject)
-                  ? (noProduksiCtrl.text.trim().isEmpty
-                  ? null
-                  : noProduksiCtrl.text.trim())
-                  : null,
-              noBongkarSusun: _selectedMode == InputMode.bongkar
-                  ? (noBongkarSusunCtrl.text.trim().isEmpty
-                  ? null
-                  : noBongkarSusunCtrl.text.trim())
-                  : null,
-              createBy: '',
-              dateTimeCreate: '',
-            )
+                    noMixer: noMixerCtrl.text.trim(),
+                    idMixer: selected.idMixer,
+                    namaMixer: selected.jenis,
+                    dateCreate: dateCreatedCtrl.text.trim(),
+                    statusText: '',
+                    idStatus: null,
+                    // output source:
+                    noProduksi:
+                        (_selectedMode == InputMode.production ||
+                            _selectedMode == InputMode.inject)
+                        ? (noProduksiCtrl.text.trim().isEmpty
+                              ? null
+                              : noProduksiCtrl.text.trim())
+                        : null,
+                    noBongkarSusun: _selectedMode == InputMode.bongkar
+                        ? (noBongkarSusunCtrl.text.trim().isEmpty
+                              ? null
+                              : noBongkarSusunCtrl.text.trim())
+                        : null,
+                    createBy: '',
+                    dateTimeCreate: '',
+                  )
                 : widget.header!.copyWith(
-              idMixer: selected.idMixer,
-              namaMixer: selected.jenis,
-              dateCreate: dateCreatedCtrl.text.trim(),
-              noProduksi: (_selectedMode == InputMode.production ||
-                  _selectedMode == InputMode.inject)
-                  ? (noProduksiCtrl.text.trim().isEmpty
-                  ? null
-                  : noProduksiCtrl.text.trim())
-                  : null,
-              noBongkarSusun: _selectedMode == InputMode.bongkar
-                  ? (noBongkarSusunCtrl.text.trim().isEmpty
-                  ? null
-                  : noBongkarSusunCtrl.text.trim())
-                  : null,
-            );
+                    idMixer: selected.idMixer,
+                    namaMixer: selected.jenis,
+                    dateCreate: dateCreatedCtrl.text.trim(),
+                    noProduksi:
+                        (_selectedMode == InputMode.production ||
+                            _selectedMode == InputMode.inject)
+                        ? (noProduksiCtrl.text.trim().isEmpty
+                              ? null
+                              : noProduksiCtrl.text.trim())
+                        : null,
+                    noBongkarSusun: _selectedMode == InputMode.bongkar
+                        ? (noBongkarSusunCtrl.text.trim().isEmpty
+                              ? null
+                              : noBongkarSusunCtrl.text.trim())
+                        : null,
+                  );
 
             // at least one reference must be filled
-            final hasNoProduksi =
-                (headerToSave.noProduksi ?? '').trim().isNotEmpty;
-            final hasNoBongkar =
-                (headerToSave.noBongkarSusun ?? '').trim().isNotEmpty;
+            final hasNoProduksi = (headerToSave.noProduksi ?? '')
+                .trim()
+                .isNotEmpty;
+            final hasNoBongkar = (headerToSave.noBongkarSusun ?? '')
+                .trim()
+                .isNotEmpty;
 
             if (!hasNoProduksi && !hasNoBongkar) {
               await DialogService.instance.showError(
                 title: 'Lengkapi Data!',
                 message:
-                'Wajib pilih Proses Produksi, Inject, atau Bongkar Susun',
+                    'Wajib pilih Proses Produksi, Inject, atau Bongkar Susun',
               );
               return;
             }
@@ -1226,7 +1247,7 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                 await DialogService.instance.showError(
                   title: 'Validasi',
                   message:
-                  'Output code belum terbentuk.\nPilih NoProduksi / Inject / Bongkar yang valid.',
+                      'Output code belum terbentuk.\nPilih NoProduksi / Inject / Bongkar yang valid.',
                 );
                 return;
               }
@@ -1250,8 +1271,8 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
 
                 final noMixer =
                     res?['data']?['header']?['NoMixer']?.toString() ??
-                        vm.lastCreatedNoMixer ??
-                        '-';
+                    vm.lastCreatedNoMixer ??
+                    '-';
 
                 await DialogService.instance.showSuccess(
                   title: 'Berhasil!',
@@ -1341,18 +1362,15 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
             }
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor:
-            isEdit ? const Color(0xFFF57C00) : const Color(0xFF00897B),
+            backgroundColor: isEdit
+                ? const Color(0xFFF57C00)
+                : const Color(0xFF00897B),
             foregroundColor: Colors.white,
-            padding:
-            const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
           ),
           child: Text(
             isEdit ? 'SIMPAN' : 'SIMPAN',
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
           ),
         ),
       ],

@@ -65,13 +65,11 @@ class _InjectProductionDropdownState extends State<InjectProductionDropdown> {
 
     if (pre.isNotEmpty) {
       // EDIT MODE: build single local item (local stub)
-      final now = DateTime.now(); // local time is fine for stub
-
       final item = InjectProduction(
         noProduksi: pre,
 
         // stub values (akan terisi real saat fetch detail / open screen)
-        tglProduksi: now,
+        tglProduksi: DateTime.now().toUtc(),
         idMesin: 0,
         namaMesin: (widget.preselectNamaMesin ?? '').trim(),
         idOperator: 0,
@@ -119,7 +117,6 @@ class _InjectProductionDropdownState extends State<InjectProductionDropdown> {
     await _fetchForCurrentDate();
   }
 
-
   Future<void> _fetchForCurrentDate() async {
     final vm = context.read<InjectProductionViewModel>();
 
@@ -157,15 +154,15 @@ class _InjectProductionDropdownState extends State<InjectProductionDropdown> {
   Widget build(BuildContext context) {
     return Consumer<InjectProductionViewModel>(
       builder: (context, vm, _) {
-        List<InjectProduction> base =
-        _usePreselectedOnly ? _localItems : vm.items;
+        List<InjectProduction> base = _usePreselectedOnly
+            ? _localItems
+            : vm.items;
 
         if (widget.shiftFilter != null) {
           base = base.where((e) => e.shift == widget.shiftFilter).toList();
         }
 
-        final hasMatch =
-        base.any((e) => e.noProduksi == _value?.noProduksi);
+        final hasMatch = base.any((e) => e.noProduksi == _value?.noProduksi);
         final safeValue = hasMatch ? _value : null;
 
         final isLoading = _usePreselectedOnly ? false : vm.isLoading;
@@ -179,14 +176,16 @@ class _InjectProductionDropdownState extends State<InjectProductionDropdown> {
 
           value: safeValue,
           items: base,
-          itemAsString: (e) => '${e.noProduksi} | ${e.namaMesin} (SHIFT ${e.shift ?? ''})'.trim(),
+          itemAsString: (e) =>
+              '${e.noProduksi} | ${e.namaMesin} (SHIFT ${e.shift ?? ''})'
+                  .trim(),
           compareFn: (a, b) => a.noProduksi == b.noProduksi,
 
           onChanged: widget.enabled
               ? (val) {
-            setState(() => _value = val);
-            widget.onChanged?.call(val);
-          }
+                  setState(() => _value = val);
+                  widget.onChanged?.call(val);
+                }
               : null,
           enabled: widget.enabled,
 
@@ -198,10 +197,10 @@ class _InjectProductionDropdownState extends State<InjectProductionDropdown> {
           hint: isLoading
               ? 'Memuat...'
               : (hasError
-              ? 'Terjadi error'
-              : (base.isEmpty
-              ? (widget.hintText ?? 'Tidak ada data')
-              : 'PILIH')),
+                    ? 'Terjadi error'
+                    : (base.isEmpty
+                          ? (widget.hintText ?? 'Tidak ada data')
+                          : 'PILIH')),
         );
       },
     );

@@ -247,6 +247,48 @@ class MixerRepository {
     throw Exception('Failed to update mixer (status: ${resp.statusCode})');
   }
 
+  Future<Map<String, dynamic>> updateMixerQc({
+    required String noMixer,
+    required double? moisture1,
+    required double? moisture2,
+    required double? moisture3,
+    required double? minMeltTemp,
+    required double? maxMeltTemp,
+    required double? mfi,
+  }) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse("${ApiConstants.baseUrl}/api/labels/mixer/$noMixer");
+
+    final body = <String, dynamic>{
+      "header": {
+        "Moisture": moisture1,
+        "Moisture2": moisture2,
+        "Moisture3": moisture3,
+        "MinMeltTemp": minMeltTemp,
+        "MaxMeltTemp": maxMeltTemp,
+        "MFI": mfi,
+      },
+    };
+
+    final resp = await http.put(
+      url,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: json.encode(body),
+    );
+
+    print("➡️ PUT Update Mixer QC: $url");
+    print("📦 Body: ${json.encode(body)}");
+    print("⬅️ Response [${resp.statusCode}]: ${resp.body}");
+
+    if (resp.statusCode == 200) {
+      return json.decode(resp.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to update mixer QC (status: ${resp.statusCode})');
+  }
+
   /// Delete mixer by NoMixer
   Future<void> deleteMixer(String noMixer) async {
     final token = await TokenStorage.getToken();

@@ -133,6 +133,37 @@ class BrokerRepository {
     return api.putJson('/api/labels/broker/$noBroker', body: body);
   }
 
+  Future<Map<String, dynamic>> updateBrokerQc({
+    required String noBroker,
+    required double? density1,
+    required double? density2,
+    required double? density3,
+    required double? moisture1,
+    required double? moisture2,
+    required double? moisture3,
+    required double? maxMeltTemp,
+    required double? minMeltTemp,
+    required double? mfi,
+    required String? visualNote,
+  }) async {
+    final body = <String, dynamic>{
+      'header': {
+        'Density': density1,
+        'Density2': density2,
+        'Density3': density3,
+        'Moisture': moisture1,
+        'Moisture2': moisture2,
+        'Moisture3': moisture3,
+        'MaxMeltTemp': maxMeltTemp,
+        'MinMeltTemp': minMeltTemp,
+        'MFI': mfi,
+        'VisualNote': visualNote,
+      },
+    };
+
+    return api.putJson('/api/labels/broker/$noBroker', body: body);
+  }
+
   /// Delete broker by NoBroker
   Future<void> deleteBroker(String noBroker) async {
     await api.deleteJson('/api/labels/broker/$noBroker');

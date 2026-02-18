@@ -1,27 +1,27 @@
 // lib/features/bonggolan/model/reject_header_model.dart
 class BonggolanHeader {
   // Core
-  final String noBonggolan;       // NoBonggolan
-  final String dateCreate;        // DateCreate (string/ISO from API)
-  final int idBonggolan;          // IdBonggolan
-  final String? namaBonggolan;    // NamaBonggolan (join MstBonggolan)
-  final int idWarehouse;          // IdWarehouse
-  final String? namaWarehouse;    // NamaWarehouse (join)
-  final String? blok;             // Blok
-  final String? idLokasi;         // IdLokasi (stringified)
-  final double? berat;            // Berat
-  final String statusText;        // PASS/HOLD
+  final String noBonggolan; // NoBonggolan
+  final String dateCreate; // DateCreate (string/ISO from API)
+  final int idBonggolan; // IdBonggolan
+  final String? namaBonggolan; // NamaBonggolan (join MstBonggolan)
+  final int? idWarehouse; // IdWarehouse
+  final String? namaWarehouse; // NamaWarehouse (join)
+  final String? blok; // Blok
+  final String? idLokasi; // IdLokasi (stringified)
+  final double? berat; // Berat
+  final String statusText; // PASS/HOLD
 
   // Outputs (Broker)
-  final String? brokerNoProduksi;   // BrokerNoProduksi
-  final String? brokerNamaMesin;    // BrokerNamaMesin
+  final String? brokerNoProduksi; // BrokerNoProduksi
+  final String? brokerNamaMesin; // BrokerNamaMesin
 
   // Outputs (Inject)
-  final String? injectNoProduksi;   // InjectNoProduksi
-  final String? injectNamaMesin;    // InjectNamaMesin
+  final String? injectNoProduksi; // InjectNoProduksi
+  final String? injectNamaMesin; // InjectNamaMesin
 
   // Bongkar Susun
-  final String? noBongkarSusun;     // NoBongkarSusun
+  final String? noBongkarSusun; // NoBongkarSusun
 
   const BonggolanHeader({
     required this.noBonggolan,
@@ -44,17 +44,17 @@ class BonggolanHeader {
   // Convenience: prefer Inject* then fallback to Broker*
   String? get refNoProduksi =>
       (injectNoProduksi != null && injectNoProduksi!.isNotEmpty)
-          ? injectNoProduksi
-          : (brokerNoProduksi != null && brokerNoProduksi!.isNotEmpty)
-          ? brokerNoProduksi
-          : null;
+      ? injectNoProduksi
+      : (brokerNoProduksi != null && brokerNoProduksi!.isNotEmpty)
+      ? brokerNoProduksi
+      : null;
 
   String? get refNamaMesin =>
       (injectNamaMesin != null && injectNamaMesin!.isNotEmpty)
-          ? injectNamaMesin
-          : (brokerNamaMesin != null && brokerNamaMesin!.isNotEmpty)
-          ? brokerNamaMesin
-          : null;
+      ? injectNamaMesin
+      : (brokerNamaMesin != null && brokerNamaMesin!.isNotEmpty)
+      ? brokerNamaMesin
+      : null;
 
   factory BonggolanHeader.fromJson(Map<String, dynamic> json) {
     double? _toDouble(dynamic v) {
@@ -73,7 +73,7 @@ class BonggolanHeader {
 
     return BonggolanHeader(
       noBonggolan: json['NoBonggolan'] ?? '',
-      dateCreate:  json['DateCreate'] ?? '',
+      dateCreate: json['DateCreate'] ?? '',
       idBonggolan: _toInt(json['IdBonggolan']),
       namaBonggolan: json['NamaBonggolan'],
       idWarehouse: _toInt(json['IdWarehouse']),

@@ -1,19 +1,22 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../common/widgets/label_popover_widgets.dart';
 import '../../../../core/utils/pdf_print_service.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../model/gilingan_header_model.dart';
 
-class GilinganRowPopover extends StatelessWidget {
+class GilinganRowPopover extends StatefulWidget {
   final GilinganHeader header;
-
   final VoidCallback onClose;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onPrint;
   final VoidCallback onAuditHistory;
+  final VoidCallback onPartialInfo;
 
   const GilinganRowPopover({
     super.key,
@@ -23,249 +26,213 @@ class GilinganRowPopover extends StatelessWidget {
     required this.onDelete,
     required this.onPrint,
     required this.onAuditHistory,
+    required this.onPartialInfo,
   });
 
+  @override
+  State<GilinganRowPopover> createState() => _GilinganRowPopoverState();
+}
+
+class _GilinganRowPopoverState extends State<GilinganRowPopover> {
+  static const _copyFeedbackDuration = Duration(milliseconds: 1200);
+  bool _copied = false;
+  Timer? _copiedResetTimer;
+
   void _runAndClose(VoidCallback action) {
-    onClose();
+    widget.onClose();
     action();
   }
 
-  Future<void> _copyOnly(BuildContext context) async {
-    await Clipboard.setData(ClipboardData(text: header.noGilingan));
-    final m = ScaffoldMessenger.maybeOf(context);
-    m?.hideCurrentSnackBar();
-    m?.showSnackBar(
-      SnackBar(
-        content: Text('NoGilingan "${header.noGilingan}" disalin'),
-        duration: const Duration(milliseconds: 1200),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+  Future<void> _copyOnly() async {
+    await Clipboard.setData(ClipboardData(text: widget.header.noGilingan));
+    if (!mounted) return;
+
+    _copiedResetTimer?.cancel();
+    setState(() => _copied = true);
+    _copiedResetTimer = Timer(_copyFeedbackDuration, () {
+      if (mounted) {
+        setState(() => _copied = false);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _copiedResetTimer?.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final divider = Divider(
+    const atlasBlue = Color(0xFF0C66E4);
+    const atlasBlueSubtle = Color(0xFFE9F2FF);
+    const atlasBorder = Color(0xFFDCDFE4);
+    const atlasText = Color(0xFF172B4D);
+    const atlasSubtleText = Color(0xFF44546F);
+
+    final divider = const Divider(
       height: 0,
-      thickness: 0.6,
-      color: Colors.grey.shade300,
+      thickness: 0.8,
+      color: atlasBorder,
     );
 
-    // ambil izin sekali
     final perm = context.watch<PermissionViewModel>();
-    // NOTE: sementara ikut route-mu yang masih pakai 'label_crusher:*'
-    // kalau nanti sudah ada permission 'label_gilingan:*', tinggal ganti.
     final canEdit = perm.can('label_gilingan:update');
     final canDelete = perm.can('label_gilingan:delete');
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 220, maxWidth: 280),
+      constraints: const BoxConstraints(minWidth: 240, maxWidth: 320),
       child: Material(
         color: Colors.white,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.blue.shade400, Colors.blue.shade600],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+        elevation: 10,
+        shadowColor: const Color(0xFF091E42).withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                decoration: const BoxDecoration(
+                  color: atlasBlueSubtle,
+                  border: Border(bottom: BorderSide(color: atlasBorder)),
                 ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.25),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
-                        width: 1,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: atlasBlue.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: atlasBlue.withValues(alpha: 0.24),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.settings_input_component_outlined,
+                        color: atlasBlue,
+                        size: 20,
                       ),
                     ),
-                    child: const Icon(
-                      Icons.label,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          header.noGilingan,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.header.noGilingan,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: atlasText,
+                              height: 1.2,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          header.namaGilingan ?? '-',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white.withOpacity(0.95),
+                          const SizedBox(height: 2),
+                          Text(
+                            (widget.header.namaGilingan ?? '').trim().isEmpty
+                                ? 'Gilingan'
+                                : widget.header.namaGilingan!.trim(),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: atlasSubtleText,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Salin',
+                      onPressed: _copyOnly,
+                      icon: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 180),
+                        transitionBuilder: (child, animation) =>
+                            ScaleTransition(scale: animation, child: child),
+                        child: Icon(
+                          _copied ? Icons.check_rounded : Icons.copy_rounded,
+                          key: ValueKey(_copied),
+                          color: atlasBlue,
+                          size: 18,
                         ),
-                      ],
+                      ),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        side: const BorderSide(color: atlasBorder),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    tooltip: 'Salin NoGilingan',
-                    icon: Icon(
-                      Icons.copy_outlined,
-                      color: Colors.white.withOpacity(0.9),
-                    ),
-                    onPressed: () => _copyOnly(context),
-                    constraints: const BoxConstraints(
-                      minWidth: 40,
-                      minHeight: 40,
-                    ),
-                    padding: EdgeInsets.zero,
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            divider,
-
-            _MenuTile(
-              icon: Icons.history,
-              label: 'History',
-              enabled: true,
-              onTap: () => _runAndClose(onAuditHistory),
-            ),
-            divider,
-
-            // Edit
-            _MenuTile(
-              icon: Icons.edit_outlined,
-              label: 'Edit',
-              enabled: canEdit,
-              tooltipWhenDisabled: 'Tidak punya izin edit',
-              onTap: () => _runAndClose(onEdit),
-            ),
-            divider,
-
-            // Print
-            _MenuTile(
-              icon: Icons.print_outlined,
-              label: 'Print',
-              enabled: true,
-              onTap: () => _runAndClose(() async {
-                final rootCtx = Navigator.of(
-                  context,
-                  rootNavigator: true,
-                ).context;
-
-                final pdfService = PdfPrintService(
-                  baseUrl: 'http://192.168.10.100:3000',
-                  defaultSystem: 'pps',
-                );
-
-                // klik Print:
-                await pdfService.printReport80mm(
-                  context: rootCtx,
-                  reportName:
-                      'CrLabelGilingan', // <- sesuaikan dengan nama report kamu
-                  query: {'NoGilingan': header.noGilingan},
-                  // system: 'pps',
-                  // saveNameHint: 'Label_${header.noGilingan}.pdf',
-                );
-              }),
-            ),
-            divider,
-
-            // Delete
-            _MenuTile(
-              icon: Icons.delete_outline,
-              label: 'Delete',
-              enabled: canDelete,
-              tooltipWhenDisabled: 'Tidak punya izin hapus',
-              iconColor: canDelete ? Colors.red.shade600 : null,
-              textStyle: TextStyle(
-                color: canDelete ? Colors.red.shade600 : Colors.grey,
+              divider,
+              LabelPopoverMenuTile(
+                icon: Icons.history_rounded,
+                label: 'History',
+                enabled: true,
+                onTap: () => _runAndClose(widget.onAuditHistory),
               ),
-              onTap: () => _runAndClose(onDelete),
-            ),
-          ],
+              divider,
+              LabelPopoverMenuTile(
+                icon: Icons.splitscreen_outlined,
+                label: 'Info Partial',
+                enabled: widget.header.isPartialBool,
+                tooltipWhenDisabled: 'Label ini tidak memiliki partial',
+                onTap: () => _runAndClose(widget.onPartialInfo),
+              ),
+              divider,
+              LabelPopoverMenuTile(
+                icon: Icons.edit_outlined,
+                label: 'Edit',
+                enabled: canEdit,
+                tooltipWhenDisabled: 'Tidak punya izin edit',
+                onTap: () => _runAndClose(widget.onEdit),
+              ),
+              divider,
+              LabelPopoverMenuTile(
+                icon: Icons.print_outlined,
+                label: 'Print',
+                enabled: true,
+                onTap: () => _runAndClose(() async {
+                  final rootCtx = Navigator.of(
+                    context,
+                    rootNavigator: true,
+                  ).context;
+
+                  final pdfService = PdfPrintService(
+                    baseUrl: 'http://192.168.10.100:3000',
+                    defaultSystem: 'pps',
+                  );
+
+                  await pdfService.printReport80mm(
+                    context: rootCtx,
+                    reportName: 'CrLabelGilingan',
+                    query: {'NoGilingan': widget.header.noGilingan},
+                  );
+                }),
+              ),
+              divider,
+              LabelPopoverMenuTile(
+                icon: Icons.delete_outline,
+                label: 'Delete',
+                enabled: canDelete,
+                tooltipWhenDisabled: 'Tidak punya izin hapus',
+                iconColor: const Color(0xFFC9372C),
+                textStyle: const TextStyle(
+                  color: Color(0xFFC9372C),
+                  fontWeight: FontWeight.w600,
+                ),
+                onTap: () => _runAndClose(widget.onDelete),
+              ),
+            ],
+          ),
         ),
       ),
     );
-  }
-}
-
-/// Tile menu – bisa dipakai ulang
-class _MenuTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final bool enabled;
-  final String? tooltipWhenDisabled;
-  final Color? iconColor;
-  final TextStyle? textStyle;
-
-  const _MenuTile({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.enabled = true,
-    this.tooltipWhenDisabled,
-    this.iconColor,
-    this.textStyle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final effectiveIconColor = enabled
-        ? (iconColor ?? theme.iconTheme.color)
-        : Colors.grey;
-    final effectiveTextStyle = (textStyle ?? theme.textTheme.bodyMedium)
-        ?.copyWith(
-          color: enabled
-              ? (textStyle?.color ?? theme.textTheme.bodyMedium?.color)
-              : Colors.grey,
-        );
-
-    final tile = InkWell(
-      onTap: enabled ? onTap : null,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: [
-            Icon(icon, color: effectiveIconColor),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                label,
-                style: effectiveTextStyle,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (!enabled && (tooltipWhenDisabled?.isNotEmpty ?? false)) {
-      return Tooltip(
-        message: tooltipWhenDisabled!,
-        child: Opacity(opacity: 0.55, child: tile),
-      );
-    }
-    return tile;
   }
 }

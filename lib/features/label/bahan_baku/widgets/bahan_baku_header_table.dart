@@ -10,7 +10,8 @@ class BahanBakuHeaderTable extends StatelessWidget {
   final ValueChanged<BahanBakuHeader> onItemTap;
 
   /// Kirim header + posisi global saat long-press (untuk popover)
-  final void Function(BahanBakuHeader header, Offset globalPosition)? onItemLongPress;
+  final void Function(BahanBakuHeader header, Offset globalPosition)?
+  onItemLongPress;
 
   const BahanBakuHeaderTable({
     super.key,
@@ -67,7 +68,10 @@ class BahanBakuHeaderTable extends StatelessWidget {
 
   Widget _buildTableHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12), // ⬅️ padding dikurangi
+      padding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 12,
+      ), // ⬅️ padding dikurangi
       decoration: BoxDecoration(
         color: const Color(0xFF1565C0),
         border: Border(
@@ -79,7 +83,7 @@ class BahanBakuHeaderTable extends StatelessWidget {
           SizedBox(
             width: 140, // ⬅️ dari 180 → 140
             child: Text(
-              'NO. BB',  // ⬅️ singkat dari "NO. BAHAN BAKU"
+              'NO. BB', // ⬅️ singkat dari "NO. BAHAN BAKU"
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 13, // ⬅️ dari 14 → 13
@@ -164,7 +168,10 @@ class BahanBakuHeaderTable extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           curve: Curves.easeInOut,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14), // ⬅️ padding dikurangi
+          padding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 14,
+          ), // ⬅️ padding dikurangi
           decoration: BoxDecoration(
             color: bgColor,
             border: Border(
@@ -176,6 +183,7 @@ class BahanBakuHeaderTable extends StatelessWidget {
             ),
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(
                 width: 140, // ⬅️ sesuaikan dengan header
@@ -186,7 +194,7 @@ class BahanBakuHeaderTable extends StatelessWidget {
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                     color: isSelected ? Colors.blue.shade900 : Colors.black87,
                   ),
-                  overflow: TextOverflow.ellipsis,
+                  softWrap: true,
                 ),
               ),
               SizedBox(
@@ -194,7 +202,7 @@ class BahanBakuHeaderTable extends StatelessWidget {
                 child: Text(
                   formatDateToShortId(item.dateCreate),
                   style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
-                  overflow: TextOverflow.ellipsis,
+                  softWrap: true,
                 ),
               ),
               Expanded(
@@ -202,7 +210,7 @@ class BahanBakuHeaderTable extends StatelessWidget {
                 child: Text(
                   item.namaSupplier,
                   style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
-                  overflow: TextOverflow.ellipsis,
+                  softWrap: true,
                 ),
               ),
               SizedBox(
@@ -210,7 +218,7 @@ class BahanBakuHeaderTable extends StatelessWidget {
                 child: Text(
                   item.noPlat ?? '-',
                   style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
-                  overflow: TextOverflow.ellipsis,
+                  softWrap: true,
                 ),
               ),
               Expanded(
@@ -218,7 +226,7 @@ class BahanBakuHeaderTable extends StatelessWidget {
                 child: Text(
                   item.createBy ?? '-',
                   style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
-                  overflow: TextOverflow.ellipsis,
+                  softWrap: true,
                 ),
               ),
             ],

@@ -1,391 +1,366 @@
 // lib/features/production/bahan_baku/widgets/bahan_baku_pallet_popover.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../common/widgets/label_popover_widgets.dart';
 import '../../../../core/utils/pdf_print_service.dart';
-import '../../../../core/services/token_storage.dart';
 import '../model/bahan_baku_pallet.dart';
 
-class BahanBakuPalletPopover extends StatelessWidget {
+class BahanBakuPalletPopover extends StatefulWidget {
   final BahanBakuPallet pallet;
   final VoidCallback onClose;
-  final VoidCallback onViewDetails;
+  final VoidCallback onInputQc;
 
-  /// kalau mau override dari luar (optional)
   final VoidCallback? onPrint;
-
-  /// base URL API crystalreport kamu
   final String apiBaseUrl;
-
-  /// username optional (kalau tidak diisi, coba ambil dari TokenStorage)
   final String? username;
 
   const BahanBakuPalletPopover({
     super.key,
     required this.pallet,
     required this.onClose,
-    required this.onViewDetails,
+    required this.onInputQc,
     this.onPrint,
     this.apiBaseUrl = 'https://192.168.10.100:3000',
     this.username,
   });
 
+  @override
+  State<BahanBakuPalletPopover> createState() => _BahanBakuPalletPopoverState();
+}
+
+class _BahanBakuPalletPopoverState extends State<BahanBakuPalletPopover> {
+  static const _copyFeedbackDuration = Duration(milliseconds: 1200);
+  bool _copied = false;
+  Timer? _copiedResetTimer;
+
   void _runAndClose(VoidCallback action) {
-    onClose();
+    widget.onClose();
     action();
   }
 
-  Future<void> _copyNoPallet(BuildContext context) async {
-    await Clipboard.setData(ClipboardData(text: pallet.noPallet));
-    final m = ScaffoldMessenger.maybeOf(context);
-    m?.hideCurrentSnackBar();
-    m?.showSnackBar(
-      SnackBar(
-        content: Text('NoPallet "${pallet.noPallet}" disalin'),
-        duration: const Duration(milliseconds: 1200),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+  Future<void> _copyNoPallet() async {
+    await Clipboard.setData(ClipboardData(text: widget.pallet.noPallet));
+    if (!mounted) return;
+
+    _copiedResetTimer?.cancel();
+    setState(() => _copied = true);
+    _copiedResetTimer = Timer(_copyFeedbackDuration, () {
+      if (mounted) {
+        setState(() => _copied = false);
+      }
+    });
   }
 
   Future<String?> _resolveUsername() async {
-    if (username != null && username!.trim().isNotEmpty) return username!.trim();
-
-    // Kalau TokenStorage kamu punya method getUsername(), pakai ini.
-    // Jika beda namanya, sesuaikan.
-    try {
-      final u = "await TokenStorage.getUsername()";
-      if (u != null && u.trim().isNotEmpty) return u.trim();
-    } catch (_) {}
-
-    return null; // biarkan null kalau memang tidak ada
+    if (widget.username != null && widget.username!.trim().isNotEmpty) {
+      return widget.username!.trim();
+    }
+    return null;
   }
 
   Future<void> _defaultPrint(BuildContext context) async {
     final rootCtx = Navigator.of(context, rootNavigator: true).context;
-
     final u = await _resolveUsername();
 
-    // ✅ siapkan query yang sama dengan endpoint contoh kamu
     final query = <String, String>{
       'reportName': 'LabelPalletBB',
-      'NoBahanBaku': pallet.noBahanBaku,
-      'NoPallet': pallet.noPallet,
+      'NoBahanBaku': widget.pallet.noBahanBaku,
+      'NoPallet': widget.pallet.noPallet,
       if (u != null) 'Username': u,
     };
 
-    // ✅ build URL + log
-    final base = apiBaseUrl.replaceAll(RegExp(r'\/+$'), ''); // trim trailing /
+    final base = widget.apiBaseUrl.replaceAll(RegExp(r'\/+$'), '');
     final qs = query.entries
-        .map((e) => '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value)}')
+        .map(
+          (e) =>
+              '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value)}',
+        )
         .join('&');
 
     final urlToLog = '$base/api/crystalreport/pps/export-pdf?$qs';
     debugPrint('[BB-PRINT] $urlToLog');
-
-    // (optional) log juga query object biar gampang compare
     debugPrint('[BB-PRINT] query=$query');
 
-    final pdfService = PdfPrintService(
-      baseUrl: base,
-      defaultSystem: 'pps',
-    );
-
-    // ✅ panggil service kamu seperti biasa
+    final pdfService = PdfPrintService(baseUrl: base, defaultSystem: 'pps');
     await pdfService.printReport80mm(
       context: rootCtx,
       reportName: 'LabelPalletBB',
       query: {
-        'NoBahanBaku': pallet.noBahanBaku,
-        'NoPallet': pallet.noPallet,
+        'NoBahanBaku': widget.pallet.noBahanBaku,
+        'NoPallet': widget.pallet.noPallet,
         if (u != null) 'Username': u,
       },
     );
   }
 
+  @override
+  void dispose() {
+    _copiedResetTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final divider = Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
+    const atlasBlue = Color(0xFF0C66E4);
+    const atlasBlueSubtle = Color(0xFFE9F2FF);
+    const atlasSurface = Color(0xFFF7F8F9);
+    const atlasBorder = Color(0xFFDCDFE4);
+    const atlasText = Color(0xFF172B4D);
+    const atlasSubtleText = Color(0xFF44546F);
 
-    final isPassed = pallet.idStatus == 1;
-    final statusColor = isPassed ? Colors.green : Colors.orange;
+    final divider = const Divider(
+      height: 0,
+      thickness: 0.8,
+      color: atlasBorder,
+    );
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 240, maxWidth: 300),
+      constraints: const BoxConstraints(minWidth: 240, maxWidth: 320),
       child: Material(
         color: Colors.white,
+        elevation: 10,
+        shadowColor: const Color(0xFF091E42).withOpacity(0.18),
         borderRadius: BorderRadius.circular(12),
-        elevation: 8,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.blue.shade400, Colors.blue.shade600],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+        clipBehavior: Clip.antiAlias,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                decoration: const BoxDecoration(
+                  color: atlasBlueSubtle,
+                  border: Border(bottom: BorderSide(color: atlasBorder)),
                 ),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.25),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: atlasBlue.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: atlasBlue.withOpacity(0.24)),
+                      ),
+                      child: const Icon(
+                        Icons.inventory_2_outlined,
+                        color: atlasBlue,
+                        size: 20,
+                      ),
                     ),
-                    child: const Icon(Icons.view_module, color: Colors.white, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          pallet.noPallet,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${widget.pallet.noBahanBaku} - ${widget.pallet.noPallet}',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: atlasText,
+                              height: 1.2,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          pallet.namaJenisPlastik,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white.withOpacity(0.95),
+                          const SizedBox(height: 2),
+                          Text(
+                            widget.pallet.namaJenisPlastik,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: atlasSubtleText,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    tooltip: 'Salin NoPallet',
-                    icon: Icon(Icons.copy_outlined, color: Colors.white.withOpacity(0.9)),
-                    onPressed: () => _copyNoPallet(context),
-                    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                    padding: EdgeInsets.zero,
-                  ),
-                ],
-              ),
-            ),
-
-            // Info Section (tetap seperti punyamu)
-            Container(
-              padding: const EdgeInsets.all(12),
-              color: Colors.grey.shade50,
-              child: Column(
-                children: [
-                  _buildInfoRow(
-                    icon: Icons.category,
-                    label: 'Jenis',
-                    value: pallet.namaJenisPlastik,
-                  ),
-                  const SizedBox(height: 8),
-                  _buildInfoRow(
-                    icon: Icons.warehouse,
-                    label: 'Warehouse',
-                    value: pallet.namaWarehouse,
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildInfoRow(
-                          icon: Icons.flag,
-                          label: 'Status',
-                          value: pallet.statusText,
-                          valueColor: statusColor.shade700,
+                    IconButton(
+                      tooltip: 'Salin',
+                      onPressed: _copyNoPallet,
+                      icon: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 180),
+                        transitionBuilder: (child, animation) =>
+                            ScaleTransition(scale: animation, child: child),
+                        child: Icon(
+                          _copied ? Icons.check_rounded : Icons.copy_rounded,
+                          key: ValueKey(_copied),
+                          color: atlasBlue,
+                          size: 18,
                         ),
                       ),
-                      if (pallet.blok != null || pallet.idLokasi != null)
-                        Expanded(
-                          child: _buildInfoRow(
-                            icon: Icons.location_on,
-                            label: 'Lokasi',
-                            value: '${pallet.blok ?? ''}${pallet.idLokasi ?? ''}',
-                          ),
-                        ),
-                    ],
-                  ),
-                  if (pallet.keterangan != null && pallet.keterangan!.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    _buildInfoRow(
-                      icon: Icons.note,
-                      label: 'Keterangan',
-                      value: pallet.keterangan!,
-                      maxLines: 2,
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        side: const BorderSide(color: atlasBorder),
+                      ),
                     ),
                   ],
-                ],
+                ),
               ),
-            ),
-
-            divider,
-
-            // View Details
-            _MenuTile(
-              icon: Icons.info_outline,
-              label: 'View Details',
-              enabled: true,
-              onTap: () => _runAndClose(onViewDetails),
-            ),
-
-            divider,
-
-            // Print (SAMA seperti broker: klik -> tampilkan PDF)
-            _MenuTile(
-              icon: Icons.print_outlined,
-              label: 'Print',
-              enabled: true,
-              onTap: () => _runAndClose(() async {
-                if (onPrint != null) {
-                  onPrint!();
-                } else {
-                  await _defaultPrint(context);
-                }
-              }),
-            ),
-
-            divider,
-
-            if (_hasQCData())
-              _MenuTile(
+              Container(
+                width: double.infinity,
+                color: atlasSurface,
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [_buildInfoQcCard()],
+                ),
+              ),
+              divider,
+              LabelPopoverMenuTile(
                 icon: Icons.science_outlined,
-                label: 'Info Quality Control',
+                label: 'Input QC',
                 enabled: true,
-                onTap: () => _runAndClose(() => _showQCInfo(context)),
+                onTap: () => _runAndClose(widget.onInputQc),
               ),
-          ],
+              divider,
+              LabelPopoverMenuTile(
+                icon: Icons.print_outlined,
+                label: 'Print',
+                enabled: true,
+                onTap: () => _runAndClose(() async {
+                  if (widget.onPrint != null) {
+                    widget.onPrint!();
+                  } else {
+                    await _defaultPrint(context);
+                  }
+                }),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildInfoRow({
-    required IconData icon,
-    required String label,
-    required String value,
-    Color? valueColor,
-    int maxLines = 1,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 16, color: Colors.grey.shade600),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildInfoQcCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFDCDFE4)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Quality Control',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF44546F),
+              letterSpacing: 0.2,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
             children: [
-              Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: valueColor ?? Colors.black87,
+              Expanded(
+                child: _buildCardItem(
+                  'Tenggelam',
+                  _formatTenggelam(widget.pallet.tenggelam),
                 ),
-                maxLines: maxLines,
-                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildCardItem(
+                  'Density 1',
+                  _formatQcValue(widget.pallet.density),
+                ),
               ),
             ],
           ),
-        ),
-      ],
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildCardItem(
+                  'Density 2',
+                  _formatQcValue(widget.pallet.density2),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildCardItem(
+                  'Density 3',
+                  _formatQcValue(widget.pallet.density3),
+                ),
+              ),
+            ],
+          ),
+          if ((widget.pallet.keterangan ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _buildCardItem(
+              'Keterangan',
+              widget.pallet.keterangan!.trim(),
+              maxLines: 2,
+            ),
+          ],
+        ],
+      ),
     );
   }
 
-  bool _hasQCData() {
-    return pallet.moisture != null ||
-        pallet.meltingIndex != null ||
-        pallet.elasticity != null ||
-        pallet.tenggelam != null ||
-        pallet.density != null ||
-        pallet.density2 != null ||
-        pallet.density3 != null;
-  }
-
-  void _showQCInfo(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.science, color: Colors.blue.shade700),
-            const SizedBox(width: 8),
-            const Text('Quality Control Data'),
-          ],
-        ),
-        content: const Text('... (tetap seperti punyamu)'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Tutup'),
+  Widget _buildCardItem(
+    String label,
+    String value, {
+    Color? valueColor,
+    int maxLines = 1,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F8F9),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFEBECF0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF6B778C),
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            maxLines: maxLines,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: valueColor ?? const Color(0xFF172B4D),
+            ),
           ),
         ],
       ),
     );
   }
-}
 
-class _MenuTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final bool enabled;
-  final String? tooltipWhenDisabled;
-  final Color? iconColor;
-  final TextStyle? textStyle;
-
-  const _MenuTile({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.enabled = true,
-    this.tooltipWhenDisabled,
-    this.iconColor,
-    this.textStyle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final effectiveIconColor = enabled ? (iconColor ?? theme.iconTheme.color) : Colors.grey;
-    final effectiveTextStyle = (textStyle ?? theme.textTheme.bodyMedium)?.copyWith(
-      color: enabled ? (textStyle?.color ?? theme.textTheme.bodyMedium?.color) : Colors.grey,
-    );
-
-    final tile = InkWell(
-      onTap: enabled ? onTap : null,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        child: Row(
-          children: [
-            Icon(icon, color: effectiveIconColor, size: 20),
-            const SizedBox(width: 12),
-            Expanded(child: Text(label, style: effectiveTextStyle, overflow: TextOverflow.ellipsis)),
-          ],
-        ),
-      ),
-    );
-
-    if (!enabled && (tooltipWhenDisabled?.isNotEmpty ?? false)) {
-      return Tooltip(message: tooltipWhenDisabled!, child: Opacity(opacity: 0.55, child: tile));
+  String _formatTenggelam(double? value) {
+    if (value == null) return '-';
+    if ((value - 5).abs() < 0.0001 || (value - 0.05).abs() < 0.0001) {
+      return '5%';
     }
-    return tile;
+    if ((value - 10).abs() < 0.0001 || (value - 0.10).abs() < 0.0001) {
+      return '10%';
+    }
+    return '${value.toStringAsFixed(2)}%';
+  }
+
+  String _formatQcValue(double? value) {
+    if (value == null) return '-';
+    return value.toStringAsFixed(3);
   }
 }

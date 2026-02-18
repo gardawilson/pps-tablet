@@ -59,10 +59,7 @@ class _PackingCreateDraft {
 class PackingFormDialog extends StatefulWidget {
   final PackingHeader? header;
 
-  const PackingFormDialog({
-    super.key,
-    this.header,
-  });
+  const PackingFormDialog({super.key, this.header});
 
   @override
   State<PackingFormDialog> createState() => _PackingFormDialogState();
@@ -146,16 +143,16 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
     pcsCtrl = TextEditingController(
       text: (widget.header?.pcs != null)
           ? widget.header!.pcs!.toStringAsFixed(
-        widget.header!.pcs! % 1 == 0 ? 0 : 3,
-      )
+              widget.header!.pcs! % 1 == 0 ? 0 : 3,
+            )
           : '',
     );
 
     beratCtrl = TextEditingController(
       text: (widget.header?.berat != null)
           ? widget.header!.berat!.toStringAsFixed(
-        widget.header!.berat! % 1 == 0 ? 0 : 3,
-      )
+              widget.header!.berat! % 1 == 0 ? 0 : 3,
+            )
           : '',
     );
 
@@ -267,7 +264,8 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
 
     final vm = context.read<PackingViewModel>();
 
-    final bool isInjectCreate = !isEdit && _selectedMode == PackingInputMode.inject;
+    final bool isInjectCreate =
+        !isEdit && _selectedMode == PackingInputMode.inject;
 
     int? idBJVal = isInjectCreate ? null : _selectedType?.idBj;
 
@@ -315,7 +313,8 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
         if (_selectedMode == null) {
           await DialogService.instance.showError(
             title: 'PILIH PROSES',
-            message: 'Pilih sumber proses (Packing / Inject / Bongkar Susun / Retur).',
+            message:
+                'Pilih sumber proses (Packing / Inject / Bongkar Susun / Retur).',
           );
           return;
         }
@@ -347,7 +346,9 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
 
           case PackingInputMode.inject:
             if (_selectedInject == null) {
-              setState(() => _injectError = 'Pilih nomor produksi Inject (S.).');
+              setState(
+                () => _injectError = 'Pilih nomor produksi Inject (S.).',
+              );
               hasProcessError = true;
             } else {
               injectCode = _selectedInject!.noProduksi;
@@ -356,7 +357,9 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
 
           case PackingInputMode.bongkarSusun:
             if (_selectedBongkar == null) {
-              setState(() => _bongkarError = 'Pilih nomor Bongkar Susun (BG.).');
+              setState(
+                () => _bongkarError = 'Pilih nomor Bongkar Susun (BG.).',
+              );
               hasProcessError = true;
             } else {
               bongkarSusunCode = _selectedBongkar!.noBongkarSusun;
@@ -388,7 +391,8 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
           if (totalBerat == null || totalBerat <= 0) {
             await DialogService.instance.showError(
               title: 'DATA INJECT TIDAK LENGKAP',
-              message: 'Berat produk hasil timbang dari Inject belum tersedia atau 0.\n'
+              message:
+                  'Berat produk hasil timbang dari Inject belum tersedia atau 0.\n'
                   'Pastikan data Inject sudah lengkap sebelum menyimpan Packing.',
             );
             return;
@@ -398,7 +402,7 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
             await DialogService.instance.showError(
               title: 'PCS TIDAK VALID',
               message:
-              'PCS wajib diisi dan harus lebih besar dari 0 untuk perhitungan berat otomatis.',
+                  'PCS wajib diisi dan harus lebih besar dari 0 untuk perhitungan berat otomatis.',
             );
             return;
           }
@@ -466,7 +470,10 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
                 ),
                 const SizedBox(height: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.green.withOpacity(.08),
                     borderRadius: BorderRadius.circular(8),
@@ -495,7 +502,10 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
                 ),
                 const SizedBox(height: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.green.withOpacity(.08),
                     borderRadius: BorderRadius.circular(8),
@@ -536,7 +546,10 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
       }
     } catch (e) {
       DialogService.instance.hideLoading();
-      await DialogService.instance.showError(title: 'Error', message: e.toString());
+      await DialogService.instance.showError(
+        title: 'Error',
+        message: e.toString(),
+      );
     }
   }
 
@@ -573,7 +586,8 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
           );
 
           final data = res['data'] as Map<String, dynamic>? ?? {};
-          final List<dynamic> newHeaders = (data['headers'] as List?)?.cast<dynamic>() ?? [];
+          final List<dynamic> newHeaders =
+              (data['headers'] as List?)?.cast<dynamic>() ?? [];
           return newHeaders;
         },
       ),
@@ -595,9 +609,7 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
             Expanded(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(flex: 4, child: _buildLeftColumn()),
-                ],
+                children: [Expanded(flex: 4, child: _buildLeftColumn())],
               ),
             ),
             const SizedBox(height: 16),
@@ -676,7 +688,8 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
       fontSize: 12,
     );
 
-    final isPackingEnabled = !isEdit && _selectedMode == PackingInputMode.packing;
+    final isPackingEnabled =
+        !isEdit && _selectedMode == PackingInputMode.packing;
     final isInjectEnabled = !isEdit && _selectedMode == PackingInputMode.inject;
     final isBongkarEnabled =
         !isEdit && _selectedMode == PackingInputMode.bongkarSusun;
@@ -701,7 +714,11 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.description, color: Colors.blue.shade700, size: 20),
+                  Icon(
+                    Icons.description,
+                    color: Colors.blue.shade700,
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   const Text(
                     'Header',
@@ -729,8 +746,10 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
                   if (d != null) {
                     setState(() {
                       _selectedDate = d;
-                      dateCreatedCtrl.text =
-                          DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(d);
+                      dateCreatedCtrl.text = DateFormat(
+                        'EEEE, dd MMM yyyy',
+                        'id_ID',
+                      ).format(d);
                     });
                   }
                 },
@@ -740,10 +759,7 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
 
               const Text(
                 'Proses',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
 
@@ -772,15 +788,16 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
                               enabled: isInjectEnabled,
                               onChanged: isInjectEnabled
                                   ? (ip) {
-                                if (_selectedMode != PackingInputMode.inject) {
-                                  _selectMode(PackingInputMode.inject);
-                                }
-                                setState(() {
-                                  _selectedInject = ip;
-                                  _injectError = null;
-                                });
-                                _reloadInjectPackingAndRecalc();
-                              }
+                                      if (_selectedMode !=
+                                          PackingInputMode.inject) {
+                                        _selectMode(PackingInputMode.inject);
+                                      }
+                                      setState(() {
+                                        _selectedInject = ip;
+                                        _injectError = null;
+                                      });
+                                      _reloadInjectPackingAndRecalc();
+                                    }
                                   : null,
                             ),
                             if (_injectError != null) ...[
@@ -822,14 +839,15 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
                               enabled: isPackingEnabled,
                               onChanged: isPackingEnabled
                                   ? (pp) {
-                                if (_selectedMode != PackingInputMode.packing) {
-                                  _selectMode(PackingInputMode.packing);
-                                }
-                                setState(() {
-                                  _selectedPacking = pp;
-                                  _packingError = null;
-                                });
-                              }
+                                      if (_selectedMode !=
+                                          PackingInputMode.packing) {
+                                        _selectMode(PackingInputMode.packing);
+                                      }
+                                      setState(() {
+                                        _selectedPacking = pp;
+                                        _packingError = null;
+                                      });
+                                    }
                                   : null,
                             ),
                             if (_packingError != null) ...[
@@ -865,19 +883,23 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             BongkarSusunDropdown(
-                              preselectNoBongkarSusun: _preBongkarNoBongkarSusun,
+                              preselectNoBongkarSusun:
+                                  _preBongkarNoBongkarSusun,
                               date: _selectedDate,
                               enabled: isBongkarEnabled,
                               onChanged: isBongkarEnabled
                                   ? (bs) {
-                                if (_selectedMode != PackingInputMode.bongkarSusun) {
-                                  _selectMode(PackingInputMode.bongkarSusun);
-                                }
-                                setState(() {
-                                  _selectedBongkar = bs;
-                                  _bongkarError = null;
-                                });
-                              }
+                                      if (_selectedMode !=
+                                          PackingInputMode.bongkarSusun) {
+                                        _selectMode(
+                                          PackingInputMode.bongkarSusun,
+                                        );
+                                      }
+                                      setState(() {
+                                        _selectedBongkar = bs;
+                                        _bongkarError = null;
+                                      });
+                                    }
                                   : null,
                             ),
                             if (_bongkarError != null) ...[
@@ -919,14 +941,15 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
                               enabled: isReturEnabled,
                               onChanged: isReturEnabled
                                   ? (ret) {
-                                if (_selectedMode != PackingInputMode.retur) {
-                                  _selectMode(PackingInputMode.retur);
-                                }
-                                setState(() {
-                                  _selectedRetur = ret;
-                                  _returError = null;
-                                });
-                              }
+                                      if (_selectedMode !=
+                                          PackingInputMode.retur) {
+                                        _selectMode(PackingInputMode.retur);
+                                      }
+                                      setState(() {
+                                        _selectedRetur = ret;
+                                        _returError = null;
+                                      });
+                                    }
                                   : null,
                             ),
                             if (_returError != null) ...[
@@ -945,7 +968,8 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
 
               if (isCreateInjectMode) ...[
                 PackingByInjectSection(
-                  noProduksi: _selectedInject?.noProduksi ?? _preInjectNoProduksi,
+                  noProduksi:
+                      _selectedInject?.noProduksi ?? _preInjectNoProduksi,
                   title: 'Jenis Packing',
                   icon: Icons.category_outlined,
                 ),
@@ -955,8 +979,10 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
                   preselectId: widget.header?.idBJ,
                   hintText: 'Pilih jenis Packing',
                   validator: (v) {
-                    if (_selectedMode == PackingInputMode.inject && !isEdit) return null;
-                    if (_selectedMode == PackingInputMode.inject && isEdit) return null;
+                    if (_selectedMode == PackingInputMode.inject && !isEdit)
+                      return null;
+                    if (_selectedMode == PackingInputMode.inject && isEdit)
+                      return null;
                     return v == null ? 'Wajib pilih jenis Packing' : null;
                   },
                   autovalidateMode: AutovalidateMode.onUserInteraction,
@@ -974,7 +1000,9 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
                     child: SizedBox(
                       child: TextFormField(
                         controller: pcsCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(
                             RegExp(r'^\d*([.,]\d{0,3})?$'),
@@ -1007,7 +1035,9 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
                       child: TextFormField(
                         controller: beratCtrl,
                         enabled: !isBeratAuto,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(
                             RegExp(r'^\d*([.,]\d{0,3})?$'),
@@ -1015,7 +1045,9 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
                         ],
                         decoration: InputDecoration(
                           labelText: 'Berat (kg)',
-                          hintText: isBeratAuto ? 'Auto dari PCS & Inject' : '0',
+                          hintText: isBeratAuto
+                              ? 'Auto dari PCS & Inject'
+                              : '0',
                           prefixIcon: const Icon(Icons.monitor_weight_outlined),
                           suffixText: 'kg',
                           border: OutlineInputBorder(
@@ -1061,7 +1093,9 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
         ElevatedButton(
           onPressed: _submit,
           style: ElevatedButton.styleFrom(
-            backgroundColor: isEdit ? const Color(0xFFF57C00) : const Color(0xFF00897B),
+            backgroundColor: isEdit
+                ? const Color(0xFFF57C00)
+                : const Color(0xFF00897B),
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
           ),

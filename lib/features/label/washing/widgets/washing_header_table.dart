@@ -9,7 +9,8 @@ class WashingHeaderTable extends StatelessWidget {
   final ValueChanged<WashingHeader> onItemTap;
 
   /// Kirim header + posisi global saat long-press (untuk popover)
-  final void Function(WashingHeader header, Offset globalPosition) onItemLongPress;
+  final void Function(WashingHeader header, Offset globalPosition)
+  onItemLongPress;
 
   const WashingHeaderTable({
     super.key,
@@ -76,7 +77,7 @@ class WashingHeaderTable extends StatelessWidget {
       child: Row(
         children: const [
           SizedBox(
-            width: 150,
+            width: 120,
             child: Text(
               'NO. WASHING',
               style: TextStyle(
@@ -133,6 +134,20 @@ class WashingHeaderTable extends StatelessWidget {
               ),
             ),
           ),
+          SizedBox(
+            width: 72,
+            child: Center(
+              child: Text(
+                'QC',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Colors.white,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -174,15 +189,13 @@ class WashingHeaderTable extends StatelessWidget {
           child: Row(
             children: [
               SizedBox(
-                width: 150,
+                width: 120,
                 child: Text(
                   item.noWashing,
                   style: TextStyle(
                     fontSize: 15,
-                    fontWeight:
-                    isSelected ? FontWeight.bold : FontWeight.w500,
-                    color:
-                    isSelected ? Colors.blue.shade900 : Colors.black87,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    color: isSelected ? Colors.blue.shade900 : Colors.black87,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -207,8 +220,8 @@ class WashingHeaderTable extends StatelessWidget {
                   (item.namaMesin?.isNotEmpty == true)
                       ? item.namaMesin!
                       : (item.noBongkarSusun?.isNotEmpty == true
-                      ? item.noBongkarSusun!
-                      : '-'),
+                            ? item.noBongkarSusun!
+                            : '-'),
                   style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -219,6 +232,14 @@ class WashingHeaderTable extends StatelessWidget {
                   _formatBlokLokasi(item.blok, item.idLokasi),
                   style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
                   overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              SizedBox(
+                width: 72,
+                child: Center(
+                  child: _isQCCompleted(item)
+                      ? const _QcDoneLozenge()
+                      : const _QcOpenLozenge(),
                 ),
               ),
             ],
@@ -236,10 +257,9 @@ class WashingHeaderTable extends StatelessWidget {
       return '-';
     }
 
-    // kalau keduanya ada → gabung tanpa spasi (contoh: A1)
+    // kalau keduanya ada -> gabung tanpa spasi (contoh: A1)
     return '${blok ?? ''}${idLokasi ?? ''}';
   }
-
 
   Widget _buildErrorState(String message) {
     return Center(
@@ -253,6 +273,68 @@ class WashingHeaderTable extends StatelessWidget {
             style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
           ),
         ],
+      ),
+    );
+  }
+
+  bool _isQCCompleted(WashingHeader item) {
+    return (item.density != null) ||
+        (item.density2 != null) ||
+        (item.density3 != null) ||
+        (item.moisture != null) ||
+        (item.moisture2 != null) ||
+        (item.moisture3 != null);
+  }
+}
+
+class _QcDoneLozenge extends StatelessWidget {
+  const _QcDoneLozenge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE3FCEF),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF216E4E)),
+          SizedBox(width: 4),
+          Text(
+            'Done',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF216E4E),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QcOpenLozenge extends StatelessWidget {
+  const _QcOpenLozenge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFDFE1E6),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: const Text(
+        'Open',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF44546F),
+        ),
       ),
     );
   }

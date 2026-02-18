@@ -2,17 +2,18 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
+import '../../../../common/widgets/interactive_popover.dart';
 import '../../../../core/services/dialog_service.dart';
 import '../view_model/mixer_view_model.dart';
 import '../model/mixer_header_model.dart';
 import '../model/mixer_detail_model.dart';
-import '../widgets/interactive_popover.dart';
 import '../widgets/mixer_row_popover.dart';
 import '../widgets/mixer_action_bar.dart';
 import '../widgets/mixer_header_table.dart';
 import '../widgets/mixer_detail_table.dart';
 import '../widgets/mixer_form_dialog.dart';
 import '../widgets/mixer_delete_dialog.dart';
+import '../widgets/mixer_qc_dialog.dart';
 
 class MixerScreen extends StatefulWidget {
   const MixerScreen({super.key});
@@ -109,6 +110,49 @@ class _MixerScreenState extends State<MixerScreen> {
     _confirmDelete(header);
   }
 
+  Future<void> _onQcHeader(MixerHeader header) async {
+    final vm = context.read<MixerViewModel>();
+    vm.setSelectedNoMixer(header.noMixer);
+
+    final qc = await showDialog<MixerQcResult>(
+      context: context,
+      builder: (_) => MixerQcDialog(header: header),
+    );
+
+    if (!mounted || qc == null) return;
+
+    DialogService.instance.showLoading(
+      message: 'Menyimpan QC ${header.noMixer}...',
+    );
+
+    final res = await vm.updateMixerQc(
+      noMixer: header.noMixer,
+      moisture1: qc.moisture1,
+      moisture2: qc.moisture2,
+      moisture3: qc.moisture3,
+      minMeltTemp: qc.minMeltTemp,
+      maxMeltTemp: qc.maxMeltTemp,
+      mfi: qc.mfi,
+    );
+
+    DialogService.instance.hideLoading();
+    if (!mounted) return;
+
+    if (res != null) {
+      await DialogService.instance.showSuccess(
+        title: 'QC Tersimpan',
+        message: 'Nilai QC untuk ${header.noMixer} berhasil diperbarui.',
+      );
+    } else {
+      await DialogService.instance.showError(
+        title: 'Gagal',
+        message: vm.errorMessage.isNotEmpty
+            ? vm.errorMessage
+            : 'Tidak dapat memperbarui data QC.',
+      );
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -170,7 +214,6 @@ class _MixerScreenState extends State<MixerScreen> {
         header: header,
         details: details,
         onSave: (headerData, detailsData) {
-          final vm = context.read<MixerViewModel>();
           if (header != null) {
             // vm.updateWashing(headerData, detailsData);
           } else {
@@ -208,6 +251,9 @@ class _MixerScreenState extends State<MixerScreen> {
     Offset globalPosition,
   ) async {
     final vm = context.read<MixerViewModel>();
+    final screenHeight = MediaQuery.of(context).size.height;
+    final adaptiveMaxHeight =
+        (screenHeight - 32).clamp(480.0, 820.0).toDouble();
 
     // Pindahkan highlight saat long-press
     vm.setSelectedNoMixer(header.noMixer);
@@ -237,10 +283,15 @@ class _MixerScreenState extends State<MixerScreen> {
           _closeContextMenu();
           _navigateToAuditHistory(header);
         },
+        onQc: () async {
+          _closeContextMenu();
+          await _onQcHeader(header);
+        },
       ),
       // animasi & penempatan cerdas
       preferAbove: true,
       verticalGap: 8,
+      maxHeight: adaptiveMaxHeight,
       backdropOpacity: 0.06,
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutBack, // overshoot untuk SCALE tetap aman
@@ -353,7 +404,9 @@ class _MixerScreenState extends State<MixerScreen> {
     } else {
       await DialogService.instance.showError(
         title: 'Gagal',
-        message: vm.errorMessage ?? 'Tidak dapat menghapus label.',
+        message: vm.errorMessage.isNotEmpty
+            ? vm.errorMessage
+            : 'Tidak dapat menghapus label.',
       );
     }
   }

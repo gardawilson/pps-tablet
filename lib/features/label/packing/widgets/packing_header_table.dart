@@ -81,7 +81,7 @@ class PackingHeaderTable extends StatelessWidget {
               if (isPartial) ...[
                 const SizedBox(width: 4),
                 Tooltip(
-                  message: 'Klik untuk lihat detail partial',
+                  message: 'Lihat detail partial dari menu row popover',
                   child: Icon(
                     Icons.info_outline,
                     size: 16,

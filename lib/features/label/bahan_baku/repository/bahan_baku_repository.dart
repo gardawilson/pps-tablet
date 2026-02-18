@@ -19,11 +19,7 @@ class BahanBakuRepository {
   }) async {
     final body = await api.getJson(
       '/api/labels/bahan-baku',
-      query: {
-        'page': page,
-        'limit': limit,
-        'search': search,
-      },
+      query: {'page': page, 'limit': limit, 'search': search},
     );
 
     final List<dynamic> data = body['data'] ?? [];
@@ -76,5 +72,38 @@ class BahanBakuRepository {
     return details
         .map((e) => BahanBakuPalletDetail.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  Future<Map<String, dynamic>> updatePalletQc({
+    required String noBahanBaku,
+    required BahanBakuPallet pallet,
+    required double? tenggelam,
+    required double? density1,
+    required double? density2,
+    required double? density3,
+  }) async {
+    final body = <String, dynamic>{
+      'header': {
+        'IdJenisPlastik': pallet.idJenisPlastik,
+        'IdWarehouse': pallet.idWarehouse,
+        'IdStatus': pallet.idStatus,
+        'Keterangan': (pallet.keterangan ?? '').trim(),
+        'Tenggelam': tenggelam,
+        'Density': density1,
+        'Density2': density2,
+        'Density3': density3,
+        'Moisture': pallet.moisture,
+        'MeltingIndex': pallet.meltingIndex,
+        'Elasticity': pallet.elasticity,
+      },
+    };
+
+    final encodedNoBahanBaku = Uri.encodeComponent(noBahanBaku);
+    final encodedNoPallet = Uri.encodeComponent(pallet.noPallet);
+
+    return api.putJson(
+      '/api/labels/bahan-baku/$encodedNoBahanBaku/pallet/$encodedNoPallet',
+      body: body,
+    );
   }
 }

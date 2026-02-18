@@ -1,11 +1,10 @@
 // lib/view/widgets/reject_partial_info_popover.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:pps_tablet/core/utils/date_formatter.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../common/widgets/interactive_popover.dart';
 import '../view_model/broker_view_model.dart';
-import './interactive_popover.dart';
 
 /// Show the partial info as an InteractivePopover with instant display
 Future<void> showBrokerPartialInfoPopover({

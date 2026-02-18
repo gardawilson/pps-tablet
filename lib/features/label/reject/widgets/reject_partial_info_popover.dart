@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:pps_tablet/core/utils/date_formatter.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../common/widgets/interactive_popover.dart';
 import '../view_model/reject_view_model.dart';
-import './interactive_popover.dart';
 
-/// Show the partial info for Reject
-/// as an InteractivePopover with instant display
 Future<void> showRejectPartialInfoPopover({
   required BuildContext context,
   required RejectViewModel vm,
@@ -16,12 +14,14 @@ Future<void> showRejectPartialInfoPopover({
 }) async {
   if (!context.mounted) return;
 
-  // 🟦 Tampilkan popover dulu (state loading)
+  final screenHeight = MediaQuery.of(context).size.height;
+  final adaptiveMaxHeight = (screenHeight - 32).clamp(360.0, 700.0).toDouble();
+
   await popover.show(
     context: context,
     globalPosition: globalPosition,
     maxWidth: 300,
-    maxHeight: 360,
+    maxHeight: adaptiveMaxHeight,
     backdropOpacity: 0.04,
     preferAbove: true,
     verticalGap: 10,
@@ -36,7 +36,6 @@ Future<void> showRejectPartialInfoPopover({
     ),
   );
 
-  // 🟦 Baru fetch data (popover sudah tampil)
   await vm.loadPartialInfo(noReject: noReject);
 }
 
@@ -50,8 +49,7 @@ class _RejectPartialInfoCard extends StatefulWidget {
   });
 
   @override
-  State<_RejectPartialInfoCard> createState() =>
-      _RejectPartialInfoCardState();
+  State<_RejectPartialInfoCard> createState() => _RejectPartialInfoCardState();
 }
 
 class _RejectPartialInfoCardState extends State<_RejectPartialInfoCard> {
@@ -65,8 +63,18 @@ class _RejectPartialInfoCardState extends State<_RejectPartialInfoCard> {
 
   @override
   Widget build(BuildContext context) {
-    final divider =
-    Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
+    const atlasBlue = Color(0xFF0C66E4);
+    const atlasBlueSubtle = Color(0xFFE9F2FF);
+    const atlasSurface = Color(0xFFF7F8F9);
+    const atlasBorder = Color(0xFFDCDFE4);
+    const atlasText = Color(0xFF172B4D);
+    const atlasSubtleText = Color(0xFF44546F);
+
+    final divider = const Divider(
+      height: 0,
+      thickness: 0.8,
+      color: atlasBorder,
+    );
 
     return Consumer<RejectViewModel>(
       builder: (ctx, vm, __) {
@@ -75,17 +83,14 @@ class _RejectPartialInfoCardState extends State<_RejectPartialInfoCard> {
         final info = vm.partialInfo;
         final isEmpty = info == null || info.rows.isEmpty;
 
-        // Error state
         if (hasError && !isLoading) {
           return _ErrorState(error: vm.partialError!);
         }
 
-        // Empty state
         if (isEmpty && !isLoading) {
           return const _EmptyState();
         }
 
-        // Data / loading state
         final displayRows = isLoading ? <dynamic>[] : (info?.rows ?? []);
         final totalBerat = isLoading ? 0.0 : (info?.totalPartialBerat ?? 0.0);
         final rowCount = displayRows.length;
@@ -97,42 +102,32 @@ class _RejectPartialInfoCardState extends State<_RejectPartialInfoCard> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // HEADER (blue gradient)
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 16,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.blue.shade400, Colors.blue.shade600],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  decoration: const BoxDecoration(
+                    color: atlasBlueSubtle,
+                    border: Border(bottom: BorderSide(color: atlasBorder)),
                   ),
                   child: Row(
                     children: [
-                      // Icon box
                       Container(
-                        width: 44,
-                        height: 44,
+                        width: 40,
+                        height: 40,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.25),
+                          color: atlasBlue.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.3),
-                            width: 1,
+                            color: atlasBlue.withValues(alpha: 0.24),
                           ),
                         ),
                         child: const Icon(
                           Icons.delete_outline,
-                          color: Colors.white,
-                          size: 24,
+                          color: atlasBlue,
+                          size: 20,
                         ),
                       ),
-                      const SizedBox(width: 14),
-
-                      // Title & subtitle
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -140,46 +135,47 @@ class _RejectPartialInfoCardState extends State<_RejectPartialInfoCard> {
                             const Text(
                               'Partial Reject',
                               style: TextStyle(
-                                fontSize: 18,
+                                fontSize: 15,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.white,
+                                color: atlasText,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 2),
                             Text(
                               widget.noReject,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 12,
-                                color: Colors.white.withOpacity(0.9),
+                                fontWeight: FontWeight.w600,
+                                color: atlasSubtleText,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 6),
                             Row(
                               children: [
-                                Icon(
+                                const Icon(
                                   Icons.scale,
                                   size: 14,
-                                  color: Colors.white.withOpacity(0.9),
+                                  color: atlasSubtleText,
                                 ),
                                 const SizedBox(width: 6),
                                 if (isLoading)
-                                  Text(
+                                  const Text(
                                     'Memuat...',
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600,
-                                      color: Colors.white.withOpacity(0.95),
+                                      color: atlasSubtleText,
                                     ),
                                   )
                                 else
                                   Text(
                                     'Total: ${totalBerat.toStringAsFixed(2)} kg',
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600,
-                                      color: Colors.white.withOpacity(0.95),
+                                      color: atlasSubtleText,
                                     ),
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -192,17 +188,16 @@ class _RejectPartialInfoCardState extends State<_RejectPartialInfoCard> {
                   ),
                 ),
                 divider,
-
-                // SMALL HEADER
                 Container(
+                  width: double.infinity,
+                  color: atlasSurface,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
                     vertical: 8,
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.list,
-                          size: 14, color: Colors.blue.shade600),
+                      const Icon(Icons.list, size: 14, color: atlasBlue),
                       const SizedBox(width: 6),
                       if (isLoading)
                         const SizedBox(
@@ -213,10 +208,10 @@ class _RejectPartialInfoCardState extends State<_RejectPartialInfoCard> {
                       else
                         Text(
                           'Partials ($rowCount)',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: Colors.blue.shade600,
+                            color: atlasBlue,
                           ),
                         ),
                     ],
@@ -224,54 +219,52 @@ class _RejectPartialInfoCardState extends State<_RejectPartialInfoCard> {
                 ),
                 const SizedBox(height: 2),
                 divider,
-
-                // LIST
                 Flexible(
                   child: isLoading
                       ? Center(
-                    child: Padding(
-                      padding:
-                      const EdgeInsets.symmetric(vertical: 40),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const SizedBox(
-                            width: 36,
-                            height: 36,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2.8),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Memuat data...',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 40),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const SizedBox(
+                                  width: 36,
+                                  height: 36,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.8,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Memuat data...',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey.shade600,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                  )
+                        )
                       : ListView.separated(
-                    padding: EdgeInsets.zero,
-                    itemCount: rowCount,
-                    separatorBuilder: (_, __) => divider,
-                    itemBuilder: (_, i) {
-                      final r = displayRows[i];
-                      return _PartialRowItem(
-                        noRejectPartial: r.noRejectPartial,
-                        sourceType: r.sourceType,
-                        noProduksi: r.noProduksi,
-                        tanggalProduksi: r.tanggalProduksi,
-                        namaMesin: r.namaMesin,
-                        jamProduksi: r.jamProduksi,
-                        shift: r.shift,
-                        berat: r.berat,
-                      );
-                    },
-                  ),
+                          padding: EdgeInsets.zero,
+                          itemCount: rowCount,
+                          separatorBuilder: (_, __) => divider,
+                          itemBuilder: (_, i) {
+                            final r = displayRows[i];
+                            return _PartialRowItem(
+                              noRejectPartial: r.noRejectPartial,
+                              sourceType: r.sourceType,
+                              noProduksi: r.noProduksi,
+                              tanggalProduksi: r.tanggalProduksi,
+                              namaMesin: r.namaMesin,
+                              jamProduksi: r.jamProduksi,
+                              shift: r.shift,
+                              berat: r.berat,
+                            );
+                          },
+                        ),
                 ),
               ],
             ),
@@ -282,7 +275,6 @@ class _RejectPartialInfoCardState extends State<_RejectPartialInfoCard> {
   }
 }
 
-// ERROR STATE
 class _ErrorState extends StatelessWidget {
   final String error;
   const _ErrorState({required this.error});
@@ -305,7 +297,6 @@ class _ErrorState extends StatelessWidget {
   }
 }
 
-// EMPTY STATE
 class _EmptyState extends StatelessWidget {
   const _EmptyState();
 
@@ -327,12 +318,11 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-// ROW ITEM
 class _PartialRowItem extends StatelessWidget {
   final String noRejectPartial;
-  final String? sourceType;       // 'BROKER' / null
+  final String? sourceType;
   final String? noProduksi;
-  final String? tanggalProduksi;  // yyyy-MM-dd
+  final String? tanggalProduksi;
   final String? namaMesin;
   final String? jamProduksi;
   final String? shift;
@@ -353,9 +343,7 @@ class _PartialRowItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    final isConsumed =
-        sourceType != null && sourceType!.trim().isNotEmpty;
-
+    final isConsumed = sourceType != null && sourceType!.trim().isNotEmpty;
     final mesin = (namaMesin ?? '').trim();
     final kodeProduksi = (noProduksi ?? '').trim();
     final tgl = (tanggalProduksi ?? '').trim();
@@ -364,16 +352,9 @@ class _PartialRowItem extends StatelessWidget {
         ? (mesin.isNotEmpty ? mesin : 'Dipakai $sourceType')
         : 'Belum dipakai';
 
-    final subtitleProduksi =
-    kodeProduksi.isEmpty ? '-' : kodeProduksi;
+    final subtitleProduksi = kodeProduksi.isEmpty ? '-' : kodeProduksi;
 
-    String tanggalDisplay;
-    if (tgl.isEmpty || tgl == '-') {
-      tanggalDisplay = '-';
-    } else {
-      // tanggalProduksi sudah yyyy-MM-dd dari API
-      tanggalDisplay = formatDateToFullId(tgl);
-    }
+    final tanggalDisplay = (tgl.isEmpty || tgl == '-') ? '-' : formatDateToFullId(tgl);
 
     final jamShiftParts = <String>[];
     if (jamProduksi != null && jamProduksi!.trim().isNotEmpty) {
@@ -382,31 +363,24 @@ class _PartialRowItem extends StatelessWidget {
     if (shift != null && shift!.trim().isNotEmpty) {
       jamShiftParts.add('Shift ${shift!.trim()}');
     }
-    final jamShiftText =
-    jamShiftParts.isEmpty ? '-' : jamShiftParts.join(' • ');
+    final jamShiftText = jamShiftParts.isEmpty ? '-' : jamShiftParts.join(' | ');
 
     return InkWell(
-      onTap: null, // read-only
+      onTap: null,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           children: [
             Icon(
-              isConsumed
-                  ? Icons.link
-                  : Icons.inventory_outlined,
-              color:
-              isConsumed ? Colors.green.shade600 : Colors.grey.shade600,
+              isConsumed ? Icons.link : Icons.inventory_outlined,
+              color: isConsumed ? Colors.green.shade600 : Colors.grey.shade600,
               size: 18,
             ),
             const SizedBox(width: 12),
-
-            // Content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Mesin / status konsumsi
                   Text(
                     labelTop,
                     style: textTheme.bodyMedium?.copyWith(
@@ -416,16 +390,13 @@ class _PartialRowItem extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-
-                  // NoRejectPartial + NoProduksi
                   Row(
                     children: [
-                      const Icon(Icons.tag,
-                          size: 12, color: Colors.grey),
+                      const Icon(Icons.tag, size: 12, color: Colors.grey),
                       const SizedBox(width: 4),
                       Flexible(
                         child: Text(
-                          '$noRejectPartial → $subtitleProduksi',
+                          '$noRejectPartial -> $subtitleProduksi',
                           style: textTheme.bodySmall?.copyWith(
                             color: Colors.grey.shade700,
                           ),
@@ -435,12 +406,9 @@ class _PartialRowItem extends StatelessWidget {
                       ),
                     ],
                   ),
-
-                  // Tanggal produksi
                   Row(
                     children: [
-                      const Icon(Icons.calendar_today,
-                          size: 12, color: Colors.grey),
+                      const Icon(Icons.calendar_today, size: 12, color: Colors.grey),
                       const SizedBox(width: 4),
                       Flexible(
                         child: Text(
@@ -454,12 +422,9 @@ class _PartialRowItem extends StatelessWidget {
                       ),
                     ],
                   ),
-
-                  // Jam + shift
                   Row(
                     children: [
-                      const Icon(Icons.access_time,
-                          size: 12, color: Colors.grey),
+                      const Icon(Icons.access_time, size: 12, color: Colors.grey),
                       const SizedBox(width: 4),
                       Flexible(
                         child: Text(
@@ -476,13 +441,9 @@ class _PartialRowItem extends StatelessWidget {
                 ],
               ),
             ),
-
             const SizedBox(width: 10),
-
-            // BERAT tag
             Container(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: Colors.orange.shade50,
                 borderRadius: BorderRadius.circular(999),

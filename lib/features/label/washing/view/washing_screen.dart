@@ -3,21 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../common/widgets/interactive_popover.dart';
 import '../../../../core/services/dialog_service.dart';
 import '../view_model/washing_view_model.dart';
 import '../model/washing_header_model.dart';
 import '../model/washing_detail_model.dart';
-
-import '../widgets/interactive_popover.dart';
 import '../widgets/washing_row_popover.dart';
 import '../widgets/washing_action_bar.dart';
 import '../widgets/washing_header_table.dart';
 import '../widgets/washing_detail_table.dart';
 import '../widgets/washing_form_dialog.dart';
 import '../widgets/washing_delete_dialog.dart';
-
-// NEW: dialog history
-import '../widgets/washing_history_dialog.dart';
+import '../widgets/washing_qc_dialog.dart';
 
 class WashingTableScreen extends StatefulWidget {
   const WashingTableScreen({super.key});
@@ -98,14 +95,7 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
       builder: (_) => WashingFormDialog(
         header: header,
         details: details,
-        onSave: (headerData, detailsData) {
-          final vm = context.read<WashingViewModel>();
-          if (header != null) {
-            // vm.updateWashing(headerData, detailsData);
-          } else {
-            // vm.createWashing(headerData, detailsData);
-          }
-        },
+        onSave: (headerData, detailsData) {},
       ),
     );
   }
@@ -160,6 +150,49 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
     _confirmDelete(header);
   }
 
+  Future<void> _onQcHeader(WashingHeader header) async {
+    final vm = context.read<WashingViewModel>();
+    vm.setSelectedNoWashing(header.noWashing);
+
+    final qc = await showDialog<WashingQcResult>(
+      context: context,
+      builder: (_) => WashingQcDialog(header: header),
+    );
+
+    if (!mounted || qc == null) return;
+
+    DialogService.instance.showLoading(
+      message: 'Menyimpan QC ${header.noWashing}...',
+    );
+
+    final res = await vm.updateWashingQc(
+      noWashing: header.noWashing,
+      density1: qc.density1,
+      density2: qc.density2,
+      density3: qc.density3,
+      moisture1: qc.moisture1,
+      moisture2: qc.moisture2,
+      moisture3: qc.moisture3,
+    );
+
+    DialogService.instance.hideLoading();
+    if (!mounted) return;
+
+    if (res != null) {
+      await DialogService.instance.showSuccess(
+        title: 'QC Tersimpan',
+        message: 'Nilai QC untuk ${header.noWashing} berhasil diperbarui.',
+      );
+    } else {
+      await DialogService.instance.showError(
+        title: 'Gagal',
+        message: vm.errorMessage.isNotEmpty
+            ? vm.errorMessage
+            : 'Tidak dapat memperbarui data QC.',
+      );
+    }
+  }
+
   void _confirmDelete(WashingHeader header) {
     showDialog(
       context: context,
@@ -192,7 +225,9 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
     } else {
       await DialogService.instance.showError(
         title: 'Gagal',
-        message: vm.errorMessage ?? 'Tidak dapat menghapus label.',
+        message: vm.errorMessage.isNotEmpty
+            ? vm.errorMessage
+            : 'Tidak dapat menghapus label.',
       );
     }
   }
@@ -203,6 +238,9 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
     Offset globalPosition,
   ) async {
     final vm = context.read<WashingViewModel>();
+    final screenHeight = MediaQuery.of(context).size.height;
+    final adaptiveMaxHeight =
+        (screenHeight - 32).clamp(480.0, 820.0).toDouble();
     vm.setSelectedNoWashing(header.noWashing);
 
     _popover.show(
@@ -228,9 +266,14 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
           _closeContextMenu();
           _navigateToAuditHistory(header);
         },
+        onQc: () async {
+          _closeContextMenu();
+          await _onQcHeader(header);
+        },
       ),
       preferAbove: true,
       verticalGap: 8,
+      maxHeight: adaptiveMaxHeight,
       backdropOpacity: 0.06,
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutBack,

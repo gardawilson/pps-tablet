@@ -51,8 +51,14 @@ class InjectProductionInputs {
       broker: _listOf(j['broker'], (m) => BrokerItem.fromJson(m)),
       mixer: _listOf(j['mixer'], (m) => MixerItem.fromJson(m)),
       gilingan: _listOf(j['gilingan'], (m) => GilinganItem.fromJson(m)),
-      furnitureWip: _listOf(j['furnitureWip'], (m) => FurnitureWipItem.fromJson(m)),
-      cabinetMaterial: _listOf(j['cabinetMaterial'], (m) => CabinetMaterialItem.fromJson(m)),
+      furnitureWip: _listOf(
+        j['furnitureWip'],
+        (m) => FurnitureWipItem.fromJson(m),
+      ),
+      cabinetMaterial: _listOf(
+        j['cabinetMaterial'],
+        (m) => CabinetMaterialItem.fromJson(m),
+      ),
       summary: _toSummary(j['summary']),
     );
   }
@@ -63,41 +69,45 @@ class InjectProductionInputs {
 
   double totalBeratMixer() => mixer.fold(0.0, (s, it) => s + (it.berat ?? 0));
 
-  double totalBeratGilingan() => gilingan.fold(0.0, (s, it) => s + (it.berat ?? 0));
+  double totalBeratGilingan() =>
+      gilingan.fold(0.0, (s, it) => s + (it.berat ?? 0));
 
-  double totalBeratFurnitureWip() => furnitureWip.fold(0.0, (s, it) => s + (it.berat ?? 0));
+  double totalBeratFurnitureWip() =>
+      furnitureWip.fold(0.0, (s, it) => s + (it.berat ?? 0));
 
   // ============ TOTAL PCS ============
 
-  int totalPcsFurnitureWip() => furnitureWip.fold(0, (s, it) => s + (it.pcs ?? 0));
+  int totalPcsFurnitureWip() =>
+      furnitureWip.fold(0, (s, it) => s + (it.pcs ?? 0));
 
-  int totalPcsMaterial() => cabinetMaterial.fold(0, (s, it) => s + (it.pcs ?? 0));
+  int totalPcsMaterial() =>
+      cabinetMaterial.fold(0, (s, it) => s + (it.pcs ?? 0));
 
   // ============ GRAND TOTALS ============
 
   /// Total berat semua input (Broker + Mixer + Gilingan + FurnitureWIP)
   double totalBerat() =>
       totalBeratBroker() +
-          totalBeratMixer() +
-          totalBeratGilingan() +
-          totalBeratFurnitureWip();
+      totalBeratMixer() +
+      totalBeratGilingan() +
+      totalBeratFurnitureWip();
 
   /// Total items count (all categories)
   int totalItems() =>
       broker.length +
-          mixer.length +
-          gilingan.length +
-          furnitureWip.length +
-          cabinetMaterial.length;
+      mixer.length +
+      gilingan.length +
+      furnitureWip.length +
+      cabinetMaterial.length;
 
   // ============ EMPTY CHECK ============
 
   bool get isEmpty =>
       broker.isEmpty &&
-          mixer.isEmpty &&
-          gilingan.isEmpty &&
-          furnitureWip.isEmpty &&
-          cabinetMaterial.isEmpty;
+      mixer.isEmpty &&
+      gilingan.isEmpty &&
+      furnitureWip.isEmpty &&
+      cabinetMaterial.isEmpty;
 
   bool get isNotEmpty => !isEmpty;
 
@@ -140,7 +150,8 @@ class InjectProductionInputs {
   int countMixer() => summary['mixer'] ?? mixer.length;
   int countGilingan() => summary['gilingan'] ?? gilingan.length;
   int countFurnitureWip() => summary['furnitureWip'] ?? furnitureWip.length;
-  int countCabinetMaterial() => summary['cabinetMaterial'] ?? cabinetMaterial.length;
+  int countCabinetMaterial() =>
+      summary['cabinetMaterial'] ?? cabinetMaterial.length;
 
   // ============ PARTIAL GROUPING (per category) ============
 
@@ -172,16 +183,16 @@ class InjectProductionInputs {
 
   int get totalFullItems =>
       fullBroker.length +
-          fullMixer.length +
-          fullGilingan.length +
-          fullFurnitureWip.length +
-          cabinetMaterial.length; // material tidak ada partial
+      fullMixer.length +
+      fullGilingan.length +
+      fullFurnitureWip.length +
+      cabinetMaterial.length; // material tidak ada partial
 
   int get totalPartialItems =>
       partialBroker.length +
-          partialMixer.length +
-          partialGilingan.length +
-          partialFurnitureWip.length;
+      partialMixer.length +
+      partialGilingan.length +
+      partialFurnitureWip.length;
 
   // ============ CATEGORY GROUPING ============
 
@@ -195,8 +206,7 @@ class InjectProductionInputs {
   };
 
   /// Get non-empty categories only
-  Map<String, List<dynamic>> get nonEmptyCategories =>
-      Map.fromEntries(
-        groupedByCategory.entries.where((e) => e.value.isNotEmpty),
-      );
+  Map<String, List<dynamic>> get nonEmptyCategories => Map.fromEntries(
+    groupedByCategory.entries.where((e) => e.value.isNotEmpty),
+  );
 }

@@ -244,6 +244,52 @@ class BrokerViewModel extends ChangeNotifier {
     }
   }
 
+  Future<Map<String, dynamic>?> updateBrokerQc({
+    required String noBroker,
+    required double? density1,
+    required double? density2,
+    required double? density3,
+    required double? moisture1,
+    required double? moisture2,
+    required double? moisture3,
+    required double? maxMeltTemp,
+    required double? minMeltTemp,
+    required double? mfi,
+    required String? visualNote,
+  }) async {
+    try {
+      isLoading = true;
+      errorMessage = '';
+      notifyListeners();
+
+      final res = await repository.updateBrokerQc(
+        noBroker: noBroker,
+        density1: density1,
+        density2: density2,
+        density3: density3,
+        moisture1: moisture1,
+        moisture2: moisture2,
+        moisture3: moisture3,
+        maxMeltTemp: maxMeltTemp,
+        minMeltTemp: minMeltTemp,
+        mfi: mfi,
+        visualNote: visualNote,
+      );
+
+      await fetchBrokerHeaders(search: _search);
+      setSelectedNoBroker(noBroker);
+
+      return res;
+    } catch (e) {
+      errorMessage = e.toString();
+      debugPrint("❌ Error updateBrokerQc: $errorMessage");
+      return null;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<bool> deleteWashing(String noBroker) async {
     try {
       isLoading = true;

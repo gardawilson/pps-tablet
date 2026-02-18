@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:pps_tablet/core/utils/date_formatter.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../common/widgets/interactive_popover.dart';
 import '../view_model/gilingan_view_model.dart';
-import './interactive_popover.dart';
 
 /// Show the partial info for Gilingan as an InteractivePopover with instant display
 Future<void> showGilinganPartialInfoPopover({
@@ -65,8 +64,18 @@ class _GilinganPartialInfoCardState extends State<_GilinganPartialInfoCard> {
 
   @override
   Widget build(BuildContext context) {
-    final divider =
-    Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
+    const atlasBlue = Color(0xFF0C66E4);
+    const atlasBlueSubtle = Color(0xFFE9F2FF);
+    const atlasSurface = Color(0xFFF7F8F9);
+    const atlasBorder = Color(0xFFDCDFE4);
+    const atlasText = Color(0xFF172B4D);
+    const atlasSubtleText = Color(0xFF44546F);
+
+    final divider = const Divider(
+      height: 0,
+      thickness: 0.8,
+      color: atlasBorder,
+    );
 
     return Consumer<GilinganViewModel>(
       builder: (ctx, vm, __) {
@@ -87,8 +96,7 @@ class _GilinganPartialInfoCardState extends State<_GilinganPartialInfoCard> {
 
         // Data state / loading
         final displayRows = isLoading ? <dynamic>[] : (info?.rows ?? []);
-        final totalWeight =
-        isLoading ? 0.0 : (info?.totalPartialWeight ?? 0.0);
+        final totalWeight = isLoading ? 0.0 : (info?.totalPartialWeight ?? 0.0);
         final rowCount = displayRows.length;
 
         return ConstrainedBox(
@@ -98,59 +106,53 @@ class _GilinganPartialInfoCardState extends State<_GilinganPartialInfoCard> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // HEADER (blue gradient)
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.blue.shade400, Colors.blue.shade600],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  decoration: const BoxDecoration(
+                    color: atlasBlueSubtle,
+                    border: Border(bottom: BorderSide(color: atlasBorder)),
                   ),
                   child: Row(
                     children: [
-                      // Icon box
                       Container(
-                        width: 44,
-                        height: 44,
+                        width: 40,
+                        height: 40,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.25),
+                          color: atlasBlue.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.3),
-                            width: 1,
+                            color: atlasBlue.withValues(alpha: 0.24),
                           ),
                         ),
                         child: const Icon(
                           Icons.event_note,
-                          color: Colors.white,
-                          size: 24,
+                          color: atlasBlue,
+                          size: 20,
                         ),
                       ),
-                      const SizedBox(width: 14),
-
-                      // Title & subtitle
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Partial Gilingan',
-                              style: const TextStyle(
-                                fontSize: 18,
+                              style: TextStyle(
+                                fontSize: 15,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.white,
+                                color: atlasText,
+                                height: 1.2,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 2),
                             Text(
                               widget.noGilingan,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 12,
-                                color: Colors.white.withOpacity(0.9),
+                                fontWeight: FontWeight.w600,
+                                color: atlasSubtleText,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -160,25 +162,25 @@ class _GilinganPartialInfoCardState extends State<_GilinganPartialInfoCard> {
                                 Icon(
                                   Icons.scale,
                                   size: 14,
-                                  color: Colors.white.withOpacity(0.9),
+                                  color: atlasSubtleText,
                                 ),
                                 const SizedBox(width: 6),
                                 if (isLoading)
-                                  Text(
+                                  const Text(
                                     'Memuat...',
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600,
-                                      color: Colors.white.withOpacity(0.95),
+                                      color: atlasSubtleText,
                                     ),
                                   )
                                 else
                                   Text(
                                     'Total: ${totalWeight.toStringAsFixed(2)} kg',
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600,
-                                      color: Colors.white.withOpacity(0.95),
+                                      color: atlasSubtleText,
                                     ),
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -192,17 +194,19 @@ class _GilinganPartialInfoCardState extends State<_GilinganPartialInfoCard> {
                 ),
                 divider,
 
-                // SMALL HEADER
                 Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  width: double.infinity,
+                  color: atlasSurface,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   child: Row(
                     children: [
-                      Icon(Icons.list,
-                          size: 14, color: Colors.blue.shade600),
+                      const Icon(Icons.list, size: 14, color: atlasBlue),
                       const SizedBox(width: 6),
                       if (isLoading)
-                        SizedBox(
+                        const SizedBox(
                           width: 16,
                           height: 14,
                           child: CircularProgressIndicator(strokeWidth: 2),
@@ -210,10 +214,10 @@ class _GilinganPartialInfoCardState extends State<_GilinganPartialInfoCard> {
                       else
                         Text(
                           'Partials ($rowCount)',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: Colors.blue.shade600,
+                            color: atlasBlue,
                           ),
                         ),
                     ],
@@ -226,51 +230,51 @@ class _GilinganPartialInfoCardState extends State<_GilinganPartialInfoCard> {
                 Flexible(
                   child: isLoading
                       ? Center(
-                    child: Padding(
-                      padding:
-                      const EdgeInsets.symmetric(vertical: 40),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 36,
-                            height: 36,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2.8),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Memuat data...',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 40),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 36,
+                                  height: 36,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.8,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Memuat data...',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey.shade600,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                  )
+                        )
                       : ListView.separated(
-                    padding: EdgeInsets.zero,
-                    itemCount: rowCount,
-                    separatorBuilder: (_, __) => divider,
-                    itemBuilder: (_, i) {
-                      final r = displayRows[i];
-                      return _PartialRowItem(
-                        namaMesin: (r.namaMesin ?? '').isEmpty
-                            ? '-'
-                            : r.namaMesin!,
-                        noProduksi: (r.noProduksi ?? '').isEmpty
-                            ? '-'
-                            : r.noProduksi!,
-                        tglProduksi: (r.tglProduksi ?? '').isEmpty
-                            ? '-'
-                            : r.tglProduksi!,
-                        berat: r.berat,
-                      );
-                    },
-                  ),
+                          padding: EdgeInsets.zero,
+                          itemCount: rowCount,
+                          separatorBuilder: (_, __) => divider,
+                          itemBuilder: (_, i) {
+                            final r = displayRows[i];
+                            return _PartialRowItem(
+                              namaMesin: (r.namaMesin ?? '').isEmpty
+                                  ? '-'
+                                  : r.namaMesin!,
+                              noProduksi: (r.noProduksi ?? '').isEmpty
+                                  ? '-'
+                                  : r.noProduksi!,
+                              tglProduksi: (r.tglProduksi ?? '').isEmpty
+                                  ? '-'
+                                  : r.tglProduksi!,
+                              berat: r.berat,
+                            );
+                          },
+                        ),
                 ),
               ],
             ),
@@ -348,8 +352,11 @@ class _PartialRowItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           children: [
-            Icon(Icons.remove_circle_outline,
-                color: Colors.red.shade600, size: 18),
+            Icon(
+              Icons.remove_circle_outline,
+              color: Colors.red.shade600,
+              size: 18,
+            ),
             const SizedBox(width: 12),
 
             // Content
@@ -389,8 +396,11 @@ class _PartialRowItem extends StatelessWidget {
                   // Date
                   Row(
                     children: [
-                      const Icon(Icons.calendar_today,
-                          size: 12, color: Colors.grey),
+                      const Icon(
+                        Icons.calendar_today,
+                        size: 12,
+                        color: Colors.grey,
+                      ),
                       const SizedBox(width: 4),
                       Flexible(
                         child: Text(
@@ -414,8 +424,7 @@ class _PartialRowItem extends StatelessWidget {
 
             // Weight tag
             Container(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: Colors.orange.shade50,
                 borderRadius: BorderRadius.circular(999),

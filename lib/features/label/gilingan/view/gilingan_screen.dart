@@ -5,11 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../common/widgets/interactive_popover.dart';
 import '../../../../core/services/dialog_service.dart';
 import '../view_model/gilingan_view_model.dart';
 import '../model/gilingan_header_model.dart';
-
-import '../widgets/interactive_popover.dart';
 import '../widgets/gilingan_row_popover.dart';
 import '../widgets/gilingan_action_bar.dart';
 import '../widgets/gilingan_header_table.dart';
@@ -153,6 +152,9 @@ class _GilinganScreenState extends State<GilinganScreen> {
     Offset globalPosition,
   ) async {
     final vm = context.read<GilinganViewModel>();
+    final screenHeight = MediaQuery.of(context).size.height;
+    final adaptiveMaxHeight =
+        (screenHeight - 32).clamp(480.0, 820.0).toDouble();
 
     // Pindah highlight ke row ini
     vm.setSelected(header.noGilingan);
@@ -163,6 +165,10 @@ class _GilinganScreenState extends State<GilinganScreen> {
       child: GilinganRowPopover(
         header: header,
         onClose: _closeContextMenu,
+        onPartialInfo: () async {
+          _closeContextMenu();
+          await _showPartialInfoPopover(header);
+        },
         onEdit: () async {
           _closeContextMenu();
           await _onEditHeader(header);
@@ -183,6 +189,7 @@ class _GilinganScreenState extends State<GilinganScreen> {
       ),
       preferAbove: true,
       verticalGap: 8,
+      maxHeight: adaptiveMaxHeight,
       backdropOpacity: 0.06,
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutBack,
@@ -199,12 +206,13 @@ class _GilinganScreenState extends State<GilinganScreen> {
     );
   }
 
-  /// Tap handler khusus untuk row yang punya partial: tampilkan popover partial.
-  Future<void> _onPartialTap(
+  /// Hanya dipakai dari menu "Info Partial" di row popover.
+  Future<void> _showPartialInfoPopover(
     GilinganHeader header,
-    Offset globalPosition,
   ) async {
     final vm = context.read<GilinganViewModel>();
+    final size = MediaQuery.of(context).size;
+    final defaultPos = Offset(size.width * 0.5, size.height * 0.3);
 
     // Set selected row
     vm.setSelected(header.noGilingan);
@@ -215,7 +223,7 @@ class _GilinganScreenState extends State<GilinganScreen> {
       vm: vm,
       noGilingan: header.noGilingan,
       popover: _popover,
-      globalPosition: globalPosition,
+      globalPosition: defaultPos,
     );
   }
 
@@ -273,8 +281,12 @@ class _GilinganScreenState extends State<GilinganScreen> {
                       },
                       // Long-press: row popover (Edit / Print / Delete)
                       onItemLongPress: _onItemLongPress,
-                      // Tap khusus untuk row partial (isPartialBool == true)
-                      onPartialTap: _onPartialTap,
+                      // Dinonaktifkan: info partial hanya lewat row popover.
+                      onPartialTap: (header, _) {
+                        context.read<GilinganViewModel>().setSelected(
+                          header.noGilingan,
+                        );
+                      },
                     ),
                   ),
                 ],

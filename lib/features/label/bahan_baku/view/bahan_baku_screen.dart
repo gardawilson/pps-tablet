@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../../core/services/dialog_service.dart';
 import '../model/bahan_baku_header.dart';
 import '../model/bahan_baku_pallet.dart';
 import '../view_model/bahan_baku_view_model.dart';
@@ -9,6 +10,7 @@ import '../widgets/bahan_baku_action_bar.dart';
 import '../widgets/bahan_baku_header_table.dart';
 import '../widgets/bahan_baku_pallet_table.dart';
 import '../widgets/bahan_baku_pallet_detail_table.dart';
+import '../widgets/bahan_baku_qc_dialog.dart';
 
 class BahanBakuScreen extends StatefulWidget {
   const BahanBakuScreen({super.key});
@@ -91,13 +93,54 @@ class _BahanBakuScreenState extends State<BahanBakuScreen> {
       return;
     }
 
-    vm.fetchPalletDetails(
-      noBahanBaku: noBahanBaku,
-      noPallet: pallet.noPallet,
-    );
+    vm.fetchPalletDetails(noBahanBaku: noBahanBaku, noPallet: pallet.noPallet);
 
     if (_detailScrollController.hasClients) {
       _detailScrollController.jumpTo(0);
+    }
+  }
+
+  Future<void> _onInputQcTap(BahanBakuPallet pallet) async {
+    final vm = context.read<BahanBakuViewModel>();
+    final noBahanBaku = vm.currentNoBahanBaku;
+    if (noBahanBaku == null || noBahanBaku.isEmpty) return;
+
+    final qc = await showDialog<BahanBakuQcResult>(
+      context: context,
+      builder: (_) => BahanBakuQcDialog(pallet: pallet),
+    );
+
+    if (!mounted || qc == null) return;
+
+    DialogService.instance.showLoading(
+      message: 'Menyimpan QC ${pallet.noPallet}...',
+    );
+
+    final res = await vm.updatePalletQc(
+      noBahanBaku: noBahanBaku,
+      pallet: pallet,
+      tenggelam: qc.tenggelam,
+      density1: qc.density1,
+      density2: qc.density2,
+      density3: qc.density3,
+    );
+
+    DialogService.instance.hideLoading();
+    if (!mounted) return;
+
+    if (res != null) {
+      await DialogService.instance.showSuccess(
+        title: 'QC Tersimpan',
+        message:
+            'Nilai QC untuk pallet ${pallet.noPallet} berhasil diperbarui.',
+      );
+    } else {
+      await DialogService.instance.showError(
+        title: 'Gagal',
+        message: vm.errorMessage.isNotEmpty
+            ? vm.errorMessage
+            : 'Tidak dapat memperbarui data QC pallet.',
+      );
     }
   }
 
@@ -139,9 +182,9 @@ class _BahanBakuScreenState extends State<BahanBakuScreen> {
                     onSearchChanged: _onSearchChanged,
                     onClear: () {
                       searchCtrl.clear();
-                      context
-                          .read<BahanBakuViewModel>()
-                          .fetchBahanBakuHeaders(search: "");
+                      context.read<BahanBakuViewModel>().fetchBahanBakuHeaders(
+                        search: "",
+                      );
                     },
                   ),
                   Expanded(
@@ -164,6 +207,7 @@ class _BahanBakuScreenState extends State<BahanBakuScreen> {
             child: BahanBakuPalletTable(
               scrollController: _palletScrollController,
               onPalletTap: _onPalletTap,
+              onInputQcTap: _onInputQcTap,
             ),
           ),
 

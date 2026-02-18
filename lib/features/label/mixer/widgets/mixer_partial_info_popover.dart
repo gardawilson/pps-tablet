@@ -4,8 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:pps_tablet/core/utils/date_formatter.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../common/widgets/interactive_popover.dart';
 import '../view_model/mixer_view_model.dart';
-import './interactive_popover.dart';
 
 /// Show the partial info for Mixer as an InteractivePopover with instant display
 Future<void> showMixerPartialInfoPopover({
@@ -30,10 +30,7 @@ Future<void> showMixerPartialInfoPopover({
     startOpacity: 0.0,
     child: ChangeNotifierProvider.value(
       value: vm,
-      child: _MixerPartialInfoCard(
-        noSak: noSak,
-        onClose: () => popover.hide(),
-      ),
+      child: _MixerPartialInfoCard(noSak: noSak, onClose: () => popover.hide()),
     ),
   );
 
@@ -45,10 +42,7 @@ class _MixerPartialInfoCard extends StatefulWidget {
   final int noSak;
   final VoidCallback onClose;
 
-  const _MixerPartialInfoCard({
-    required this.noSak,
-    required this.onClose,
-  });
+  const _MixerPartialInfoCard({required this.noSak, required this.onClose});
 
   @override
   State<_MixerPartialInfoCard> createState() => _MixerPartialInfoCardState();
@@ -65,8 +59,11 @@ class _MixerPartialInfoCardState extends State<_MixerPartialInfoCard> {
 
   @override
   Widget build(BuildContext context) {
-    final divider =
-    Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
+    final divider = Divider(
+      height: 0,
+      thickness: 0.6,
+      color: Colors.grey.shade300,
+    );
 
     return Consumer<MixerViewModel>(
       builder: (ctx, vm, __) {
@@ -99,8 +96,10 @@ class _MixerPartialInfoCardState extends State<_MixerPartialInfoCard> {
               children: [
                 // HEADER (blue gradient)
                 Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [Colors.blue.shade400, Colors.blue.shade600],
@@ -184,12 +183,13 @@ class _MixerPartialInfoCardState extends State<_MixerPartialInfoCard> {
 
                 // SMALL HEADER
                 Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   child: Row(
                     children: [
-                      Icon(Icons.list,
-                          size: 14, color: Colors.blue.shade600),
+                      Icon(Icons.list, size: 14, color: Colors.blue.shade600),
                       const SizedBox(width: 6),
                       if (isLoading)
                         SizedBox(
@@ -216,50 +216,51 @@ class _MixerPartialInfoCardState extends State<_MixerPartialInfoCard> {
                 Flexible(
                   child: isLoading
                       ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 40),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 36,
-                            height: 36,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2.8),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Memuat data...',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 40),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 36,
+                                  height: 36,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.8,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Memuat data...',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey.shade600,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                  )
+                        )
                       : ListView.separated(
-                    padding: EdgeInsets.zero,
-                    itemCount: rowCount,
-                    separatorBuilder: (_, __) => divider,
-                    itemBuilder: (_, i) {
-                      final r = displayRows[i];
-                      return _PartialRowItem(
-                        namaMesin: (r.namaMesin ?? '').isEmpty
-                            ? '-'
-                            : r.namaMesin!,
-                        noProduksi: (r.noProduksi ?? '').isEmpty
-                            ? '-'
-                            : r.noProduksi!,
-                        tglProduksi: (r.tglProduksi ?? '').isEmpty
-                            ? '-'
-                            : r.tglProduksi!,
-                        berat: r.berat,
-                      );
-                    },
-                  ),
+                          padding: EdgeInsets.zero,
+                          itemCount: rowCount,
+                          separatorBuilder: (_, __) => divider,
+                          itemBuilder: (_, i) {
+                            final r = displayRows[i];
+                            return _PartialRowItem(
+                              namaMesin: (r.namaMesin ?? '').isEmpty
+                                  ? '-'
+                                  : r.namaMesin!,
+                              noProduksi: (r.noProduksi ?? '').isEmpty
+                                  ? '-'
+                                  : r.noProduksi!,
+                              tglProduksi: (r.tglProduksi ?? '').isEmpty
+                                  ? '-'
+                                  : r.tglProduksi!,
+                              berat: r.berat,
+                            );
+                          },
+                        ),
                 ),
               ],
             ),
@@ -374,8 +375,11 @@ class _PartialRowItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           children: [
-            Icon(Icons.remove_circle_outline,
-                color: Colors.red.shade600, size: 18),
+            Icon(
+              Icons.remove_circle_outline,
+              color: Colors.red.shade600,
+              size: 18,
+            ),
             const SizedBox(width: 12),
 
             // Content
@@ -415,8 +419,11 @@ class _PartialRowItem extends StatelessWidget {
                   // Date
                   Row(
                     children: [
-                      const Icon(Icons.calendar_today,
-                          size: 12, color: Colors.grey),
+                      const Icon(
+                        Icons.calendar_today,
+                        size: 12,
+                        color: Colors.grey,
+                      ),
                       const SizedBox(width: 4),
                       Flexible(
                         child: Text(
@@ -440,8 +447,7 @@ class _PartialRowItem extends StatelessWidget {
 
             // Weight tag
             Container(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: Colors.orange.shade50,
                 borderRadius: BorderRadius.circular(999),

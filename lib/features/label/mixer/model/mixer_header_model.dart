@@ -1,44 +1,48 @@
 class MixerHeader {
-  final String noMixer;      // NoMixer
-  final int idMixer;         // IdMixer
-  final String namaMixer;    // NamaMixer (from MstMixer.Jenis)
-  final String dateCreate;   // DateCreate (string as sent by API)
+  final String noMixer; // NoMixer
+  final int idMixer; // IdMixer
+  final String namaMixer; // NamaMixer (from MstMixer.Jenis)
+  final String dateCreate; // DateCreate (string as sent by API)
 
   /// Server gives 'PASS' / 'HOLD'
-  final String statusText;   // StatusText
+  final String statusText; // StatusText
   /// Derived from statusText (PASS=true, HOLD=false, else null)
   final bool? idStatus;
 
   // Location
-  final String? blok;        // Blok
-  final int? idLokasi;       // IdLokasi (INT in DB)
+  final String? blok; // Blok
+  final int? idLokasi; // IdLokasi (INT in DB)
 
   // Quality / process fields (optional)
-  final double? moisture;    // Moisture
+  final double? moisture; // Moisture
   final double? maxMeltTemp; // MaxMeltTemp
   final double? minMeltTemp; // MinMeltTemp
-  final double? mfi;         // MFI
-  final double? moisture2;   // Moisture2
-  final double? moisture3;   // Moisture3
+  final double? mfi; // MFI
+  final double? moisture2; // Moisture2
+  final double? moisture3; // Moisture3
 
   // ==== OUTPUT GENERIC (baru, mengikuti Furniture WIP) ====
   /// Contoh: 'MIXER_PRODUKSI', 'BONGKAR_SUSUN'
   final String? outputType;
+
   /// Contoh: 'H.0000012345' atau 'BG.0000000123'
   final String? outputCode;
+
   /// Contoh: 'MESIN INJECT 09' atau 'Bongkar Susun'
   final String? outputNamaMesin;
 
   // ==== LEGACY / helper (turunan dari output generic) ====
   /// Kalau outputType == 'MIXER_PRODUKSI' -> sama dengan outputCode, selain itu null.
   final String? noProduksi;
+
   /// Kalau outputType == 'BONGKAR_SUSUN' -> sama dengan outputCode, selain itu null.
   final String? noBongkarSusun;
+
   /// Biasanya sama dengan outputNamaMesin (untuk backward compatibility).
   final String? namaMesin;
 
   // Audit (optional)
-  final String? createBy;       // CreateBy
+  final String? createBy; // CreateBy
   final String? dateTimeCreate; // DateTimeCreate
 
   const MixerHeader({
@@ -110,7 +114,8 @@ class MixerHeader {
     final legacyNamaMesin = json['NamaMesin']?.toString();
 
     // OutputType final:
-    final effOutputType = rawOutputType ??
+    final effOutputType =
+        rawOutputType ??
         (legacyNoProduksi != null
             ? 'MIXER_PRODUKSI'
             : legacyNoBongkarSusun != null
@@ -118,19 +123,21 @@ class MixerHeader {
             : null);
 
     // OutputCode final:
-    final effOutputCode = rawOutputCode ?? legacyNoProduksi ?? legacyNoBongkarSusun;
+    final effOutputCode =
+        rawOutputCode ?? legacyNoProduksi ?? legacyNoBongkarSusun;
 
     // OutputNamaMesin final:
-    final effOutputNamaMesin = rawOutputNamaMesin ??
-        (effOutputType == 'BONGKAR_SUSUN'
-            ? 'Bongkar Susun'
-            : legacyNamaMesin);
+    final effOutputNamaMesin =
+        rawOutputNamaMesin ??
+        (effOutputType == 'BONGKAR_SUSUN' ? 'Bongkar Susun' : legacyNamaMesin);
 
     // Derived legacy fields:
-    final effNoProduksi =
-    effOutputType == 'MIXER_PRODUKSI' ? effOutputCode : null;
-    final effNoBongkarSusun =
-    effOutputType == 'BONGKAR_SUSUN' ? effOutputCode : null;
+    final effNoProduksi = effOutputType == 'MIXER_PRODUKSI'
+        ? effOutputCode
+        : null;
+    final effNoBongkarSusun = effOutputType == 'BONGKAR_SUSUN'
+        ? effOutputCode
+        : null;
 
     return MixerHeader(
       noMixer: json['NoMixer']?.toString() ?? '',

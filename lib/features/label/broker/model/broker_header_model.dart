@@ -2,8 +2,8 @@ class BrokerHeader {
   final String noBroker; // NoBroker
   final int idJenisPlastik; // IdJenisPlastik
   final String namaJenisPlastik; // NamaJenisPlastik
-  final int idWarehouse; // IdWarehouse
-  final String namaWarehouse; // NamaWarehouse
+  final int? idWarehouse; // IdWarehouse
+  final String? namaWarehouse; // NamaWarehouse
   final String dateCreate; // DateCreate
 
   /// Server gives 'PASS'/'HOLD'

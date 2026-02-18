@@ -5,11 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../common/widgets/interactive_popover.dart';
 import '../../../../core/services/dialog_service.dart';
 import '../view_model/furniture_wip_view_model.dart';
 import '../model/furniture_wip_header_model.dart';
-
-import '../widgets/interactive_popover.dart';
 import '../widgets/furniture_wip_row_popover.dart';
 import '../widgets/furniture_wip_action_bar.dart';
 import '../widgets/furniture_wip_header_table.dart';
@@ -128,6 +127,9 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
     Offset globalPosition,
   ) async {
     final vm = context.read<FurnitureWipViewModel>();
+    final screenHeight = MediaQuery.of(context).size.height;
+    final adaptiveMaxHeight =
+        (screenHeight - 32).clamp(480.0, 820.0).toDouble();
 
     // Pindah highlight ke row ini
     vm.setSelected(header.noFurnitureWip);
@@ -138,6 +140,10 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
       child: FurnitureWipRowPopover(
         header: header,
         onClose: _closeContextMenu,
+        onPartialInfo: () async {
+          _closeContextMenu();
+          await _showPartialInfoPopover(header);
+        },
         onEdit: () async {
           _closeContextMenu();
           await _onEditHeader(header);
@@ -158,6 +164,7 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
       ),
       preferAbove: true,
       verticalGap: 8,
+      maxHeight: adaptiveMaxHeight,
       backdropOpacity: 0.06,
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutBack,
@@ -174,10 +181,8 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
     );
   }
 
-  /// Tap handler khusus untuk row yang punya partial.
-  /// Karena HorizontalPagedTable tidak kirim Offset posisi tap,
-  /// kita pilih posisi "default" di layar (misal tengah-atas).
-  Future<void> _onPartialTap(FurnitureWipHeader header) async {
+  /// Hanya dipakai dari menu "Info Partial" di row popover.
+  Future<void> _showPartialInfoPopover(FurnitureWipHeader header) async {
     final vm = context.read<FurnitureWipViewModel>();
 
     // Set selected row
@@ -186,7 +191,7 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
     final size = MediaQuery.of(context).size;
     final defaultPos = Offset(size.width * 0.5, size.height * 0.3);
 
-    // Tampilkan popover partial menggunakan controller yang sama
+    // Tampilkan popover partial menggunakan controller yang sama.
     await showFurnitureWipPartialInfoPopover(
       context: context,
       vm: vm,
@@ -255,7 +260,10 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
                           // Long-press: row popover (Edit / Print / Delete)
                           onItemLongPress: _onItemLongPress,
                           // Tap khusus untuk row partial (isPartialBool == true)
-                          onPartialTap: _onPartialTap,
+                          // Dinonaktifkan: info partial hanya lewat row popover.
+                          onPartialTap: (header) {
+                            vm.setSelected(header.noFurnitureWip);
+                          },
                         );
                       },
                     ),

@@ -169,12 +169,52 @@ class BahanBakuViewModel extends ChangeNotifier {
         noBahanBaku: noBahanBaku,
         noPallet: noPallet,
       );
-      debugPrint("✅ Details loaded for $noBahanBaku/$noPallet, count: ${details.length}");
+      debugPrint(
+        "✅ Details loaded for $noBahanBaku/$noPallet, count: ${details.length}",
+      );
     } catch (e) {
       detailError = e.toString();
-      debugPrint("❌ Error fetchPalletDetails($noBahanBaku/$noPallet): $detailError");
+      debugPrint(
+        "❌ Error fetchPalletDetails($noBahanBaku/$noPallet): $detailError",
+      );
     } finally {
       isDetailLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Map<String, dynamic>?> updatePalletQc({
+    required String noBahanBaku,
+    required BahanBakuPallet pallet,
+    required double? tenggelam,
+    required double? density1,
+    required double? density2,
+    required double? density3,
+  }) async {
+    try {
+      isLoading = true;
+      errorMessage = '';
+      notifyListeners();
+
+      final res = await repository.updatePalletQc(
+        noBahanBaku: noBahanBaku,
+        pallet: pallet,
+        tenggelam: tenggelam,
+        density1: density1,
+        density2: density2,
+        density3: density3,
+      );
+
+      await fetchPallets(noBahanBaku);
+      setSelectedNoPallet(pallet.noPallet);
+
+      return res;
+    } catch (e) {
+      errorMessage = e.toString();
+      debugPrint("❌ Error updatePalletQc: $errorMessage");
+      return null;
+    } finally {
+      isLoading = false;
       notifyListeners();
     }
   }

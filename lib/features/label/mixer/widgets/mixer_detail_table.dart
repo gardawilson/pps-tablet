@@ -2,9 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../common/widgets/info_line.dart';
+import '../../../../common/widgets/interactive_popover.dart';
 import '../view_model/mixer_view_model.dart';
-
-import './interactive_popover.dart';
 import 'mixer_partial_info_popover.dart';
 
 class MixerDetailTable extends StatefulWidget {

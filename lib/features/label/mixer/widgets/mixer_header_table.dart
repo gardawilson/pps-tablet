@@ -10,7 +10,8 @@ class MixerHeaderTable extends StatelessWidget {
   final ValueChanged<MixerHeader> onItemTap;
 
   /// Kirim header + posisi global saat long-press (untuk popover)
-  final void Function(MixerHeader header, Offset globalPosition) onItemLongPress;
+  final void Function(MixerHeader header, Offset globalPosition)
+  onItemLongPress;
 
   const MixerHeaderTable({
     super.key,
@@ -80,7 +81,7 @@ class MixerHeaderTable extends StatelessWidget {
       child: const Row(
         children: [
           SizedBox(
-            width: 150,
+            width: 120,
             child: Text(
               'NO. MIXER',
               style: TextStyle(
@@ -134,6 +135,20 @@ class MixerHeaderTable extends StatelessWidget {
                 fontSize: 14,
                 color: Colors.white,
                 letterSpacing: 0.5,
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 72,
+            child: Center(
+              child: Text(
+                'QC',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Colors.white,
+                  letterSpacing: 0.5,
+                ),
               ),
             ),
           ),
@@ -199,27 +214,23 @@ class MixerHeaderTable extends StatelessWidget {
             children: [
               // NO. MIXER
               SizedBox(
-                width: 150,
+                width: 120,
                 child: Text(
                   item.noMixer,
                   style: TextStyle(
                     fontSize: 15,
-                    fontWeight:
-                    isSelected ? FontWeight.bold : FontWeight.w500,
-                    color:
-                    isSelected ? Colors.blue.shade900 : Colors.black87,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    color: isSelected ? Colors.blue.shade900 : Colors.black87,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-
               // TANGGAL
               SizedBox(
                 width: 130,
                 child: Text(
                   formatDateToShortId(item.dateCreate),
-                  style:
-                  TextStyle(fontSize: 15, color: Colors.grey.shade800),
+                  style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -228,8 +239,7 @@ class MixerHeaderTable extends StatelessWidget {
               Expanded(
                 child: Text(
                   item.namaMixer,
-                  style:
-                  TextStyle(fontSize: 15, color: Colors.grey.shade800),
+                  style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -268,9 +278,17 @@ class MixerHeaderTable extends StatelessWidget {
                 width: 120,
                 child: Text(
                   _formatBlokLokasi(item.blok, item.idLokasi),
-                  style:
-                  TextStyle(fontSize: 15, color: Colors.grey.shade800),
+                  style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
                   overflow: TextOverflow.ellipsis,
+                ),
+              ),
+
+              SizedBox(
+                width: 72,
+                child: Center(
+                  child: _isQCCompleted(item)
+                      ? const _QcDoneLozenge()
+                      : const _QcOpenLozenge(),
                 ),
               ),
             ],
@@ -282,15 +300,23 @@ class MixerHeaderTable extends StatelessWidget {
 
   String _formatBlokLokasi(String? blok, dynamic idLokasi) {
     final hasBlok = blok != null && blok.trim().isNotEmpty;
-    final hasLokasi =
-        idLokasi != null && idLokasi.toString().trim().isNotEmpty;
+    final hasLokasi = idLokasi != null && idLokasi.toString().trim().isNotEmpty;
 
     if (!hasBlok && !hasLokasi) {
       return '-';
     }
 
-    // kalau keduanya ada → gabung tanpa spasi (contoh: A1)
+    // kalau keduanya ada -> gabung tanpa spasi (contoh: A1)
     return '${blok ?? ''}${idLokasi ?? ''}';
+  }
+
+  bool _isQCCompleted(MixerHeader item) {
+    return (item.moisture != null) ||
+        (item.moisture2 != null) ||
+        (item.moisture3 != null) ||
+        (item.minMeltTemp != null) ||
+        (item.maxMeltTemp != null) ||
+        (item.mfi != null);
   }
 
   Widget _buildErrorState(String message) {
@@ -305,6 +331,59 @@ class MixerHeaderTable extends StatelessWidget {
             style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _QcDoneLozenge extends StatelessWidget {
+  const _QcDoneLozenge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE3FCEF),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF216E4E)),
+          SizedBox(width: 4),
+          Text(
+            'Done',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF216E4E),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QcOpenLozenge extends StatelessWidget {
+  const _QcOpenLozenge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFDFE1E6),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: const Text(
+        'Open',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF44546F),
+        ),
       ),
     );
   }

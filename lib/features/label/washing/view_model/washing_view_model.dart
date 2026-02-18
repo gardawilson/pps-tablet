@@ -84,7 +84,7 @@ class WashingViewModel extends ChangeNotifier {
 
       if (preselectId != null && jenisList.isNotEmpty) {
         selectedJenisPlastik = jenisList.firstWhere(
-              (e) => e.idJenisPlastik == preselectId,
+          (e) => e.idJenisPlastik == preselectId,
           orElse: () => jenisList.first,
         );
       }
@@ -130,7 +130,9 @@ class WashingViewModel extends ChangeNotifier {
       _totalPages = (result['totalPages'] ?? 1) as int;
       _total = (result['total'] ?? items.length) as int;
 
-      debugPrint('✅ fetchWashingHeaders page=$_page items=${items.length} total=$_total');
+      debugPrint(
+        '✅ fetchWashingHeaders page=$_page items=${items.length} total=$_total',
+      );
     } catch (e, st) {
       errorMessage = e.toString();
       debugPrint('❌ fetchWashingHeaders error: $e');
@@ -161,7 +163,9 @@ class WashingViewModel extends ChangeNotifier {
       final moreItems = (result['items'] as List<WashingHeader>);
       items.addAll(moreItems);
 
-      debugPrint('📥 loadMore page=$_page add=${moreItems.length} totalNow=${items.length}');
+      debugPrint(
+        '📥 loadMore page=$_page add=${moreItems.length} totalNow=${items.length}',
+      );
     } catch (e, st) {
       errorMessage = e.toString();
       debugPrint('❌ loadMore error: $e');
@@ -200,15 +204,18 @@ class WashingViewModel extends ChangeNotifier {
   // Create
   // =============================
   Future<Map<String, dynamic>?> createWashing(
-      WashingHeader header,
-      List<WashingDetail> detailsData,
-      ) async {
+    WashingHeader header,
+    List<WashingDetail> detailsData,
+  ) async {
     try {
       isLoading = true;
       errorMessage = '';
       notifyListeners();
 
-      final res = await repository.createWashing(header: header, details: detailsData);
+      final res = await repository.createWashing(
+        header: header,
+        details: detailsData,
+      );
 
       lastCreatedNoWashing = res['data']?['header']?['NoWashing'] as String?;
 
@@ -236,10 +243,10 @@ class WashingViewModel extends ChangeNotifier {
   // Update
   // =============================
   Future<Map<String, dynamic>?> updateWashing(
-      String noWashing,
-      WashingHeader header,
-      List<WashingDetail> detailsData,
-      ) async {
+    String noWashing,
+    WashingHeader header,
+    List<WashingDetail> detailsData,
+  ) async {
     try {
       isLoading = true;
       errorMessage = '';
@@ -261,6 +268,45 @@ class WashingViewModel extends ChangeNotifier {
     } catch (e, st) {
       errorMessage = e.toString();
       debugPrint('❌ updateWashing error: $e');
+      debugPrint('$st');
+      return null;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Map<String, dynamic>?> updateWashingQc({
+    required String noWashing,
+    required double? density1,
+    required double? density2,
+    required double? density3,
+    required double? moisture1,
+    required double? moisture2,
+    required double? moisture3,
+  }) async {
+    try {
+      isLoading = true;
+      errorMessage = '';
+      notifyListeners();
+
+      final res = await repository.updateWashingQc(
+        noWashing: noWashing,
+        density1: density1,
+        density2: density2,
+        density3: density3,
+        moisture1: moisture1,
+        moisture2: moisture2,
+        moisture3: moisture3,
+      );
+
+      await fetchWashingHeaders(search: _search);
+      setSelectedNoWashing(noWashing);
+
+      return res;
+    } catch (e, st) {
+      errorMessage = e.toString();
+      debugPrint('❌ updateWashingQc error: $e');
       debugPrint('$st');
       return null;
     } finally {

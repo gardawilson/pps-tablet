@@ -32,8 +32,9 @@ class WashingRepository {
       final body = json.decode(response.body);
 
       final List<dynamic> data = body['data'] ?? [];
-      final List<WashingHeader> items =
-      data.map((e) => WashingHeader.fromJson(e)).toList();
+      final List<WashingHeader> items = data
+          .map((e) => WashingHeader.fromJson(e))
+          .toList();
 
       // meta bisa beda tergantung API kamu, cek apakah body sudah ada
       final meta = body['meta'] ?? {};
@@ -51,7 +52,6 @@ class WashingRepository {
       );
     }
   }
-
 
   /// Ambil detail washing berdasarkan NoWashing
   Future<List<WashingDetail>> fetchDetails(String noWashing) async {
@@ -81,7 +81,6 @@ class WashingRepository {
     }
   }
 
-
   /// Create washing (header + details)
   Future<Map<String, dynamic>> createWashing({
     required WashingHeader header,
@@ -91,11 +90,16 @@ class WashingRepository {
     final url = Uri.parse("${ApiConstants.baseUrl}/api/labels/washing");
 
     // 🔎 Validasi NoProduksi / NoBongkarSusun: salah satu wajib ada
-    final hasNoProduksi = (header.noProduksi != null && header.noProduksi!.trim().isNotEmpty);
-    final hasNoBongkar = (header.noBongkarSusun != null && header.noBongkarSusun!.trim().isNotEmpty);
+    final hasNoProduksi =
+        (header.noProduksi != null && header.noProduksi!.trim().isNotEmpty);
+    final hasNoBongkar =
+        (header.noBongkarSusun != null &&
+        header.noBongkarSusun!.trim().isNotEmpty);
 
     if (!hasNoProduksi && !hasNoBongkar) {
-      throw ArgumentError("NoProduksi atau NoBongkarSusun harus diisi minimal salah satu.");
+      throw ArgumentError(
+        "NoProduksi atau NoBongkarSusun harus diisi minimal salah satu.",
+      );
     }
 
     // 🔁 Tentukan field referensi yang dikirim
@@ -107,7 +111,7 @@ class WashingRepository {
       "header": {
         "IdJenisPlastik": header.idJenisPlastik,
         "DateCreate": toDbDateString(header.dateCreate),
-        "IdWarehouse": 2,          // pastikan form kamu mengisi ini
+        "IdWarehouse": 2, // pastikan form kamu mengisi ini
         // "CreateBy": header.createBy ?? "mobile",     // fallback
         // "IdStatus": header.idStatus ?? 1,            // fallback
         // "Blok": header.blok ?? "A",                  // jika model punya; jika tidak, sesuaikan
@@ -115,10 +119,9 @@ class WashingRepository {
         // "Density": header.density,                   // jika null akan jadi null
         // "Moisture": header.moisture,
       },
-      "details": details.map((d) => {
-        "NoSak": d.noSak,
-        "Berat": d.berat,
-      }).toList(),
+      "details": details
+          .map((d) => {"NoSak": d.noSak, "Berat": d.berat})
+          .toList(),
       refKey: refVal, // hanya satu dari keduanya yg dikirim
     };
 
@@ -142,22 +145,28 @@ class WashingRepository {
     throw Exception('Gagal create washing (status: ${resp.statusCode})');
   }
 
-
   /// Update washing (header + details) by NoWashing
   Future<Map<String, dynamic>> updateWashing({
-    required String noWashing,            // contoh: "B.0000031886"
+    required String noWashing, // contoh: "B.0000031886"
     required WashingHeader header,
     required List<WashingDetail> details,
   }) async {
     final token = await TokenStorage.getToken();
-    final url = Uri.parse("${ApiConstants.baseUrl}/api/labels/washing/$noWashing");
+    final url = Uri.parse(
+      "${ApiConstants.baseUrl}/api/labels/washing/$noWashing",
+    );
 
     // ➕ Validasi referensi (opsional, sesuai BE kamu)
-    final hasNoProduksi = (header.noProduksi != null && header.noProduksi!.trim().isNotEmpty);
-    final hasNoBongkar  = (header.noBongkarSusun != null && header.noBongkarSusun!.trim().isNotEmpty);
+    final hasNoProduksi =
+        (header.noProduksi != null && header.noProduksi!.trim().isNotEmpty);
+    final hasNoBongkar =
+        (header.noBongkarSusun != null &&
+        header.noBongkarSusun!.trim().isNotEmpty);
 
     if (!hasNoProduksi && !hasNoBongkar) {
-      throw ArgumentError("NoProduksi atau NoBongkarSusun harus diisi minimal salah satu (EDIT).");
+      throw ArgumentError(
+        "NoProduksi atau NoBongkarSusun harus diisi minimal salah satu (EDIT).",
+      );
     }
 
     final refKey = hasNoProduksi ? 'NoProduksi' : 'NoBongkarSusun';
@@ -167,7 +176,7 @@ class WashingRepository {
     // Hanya kirim field yang tidak null (biar aman).
     final headerMap = <String, dynamic>{
       "IdJenisPlastik": header.idJenisPlastik,
-      "IdWarehouse": 2,      // atau isi defaultmu
+      "IdWarehouse": 2, // atau isi defaultmu
       // "CreateBy": (header.createBy?.isNotEmpty ?? false) ? header.createBy : "mobile",
       // "IdStatus": header.idStatus,                 // boleh null -> akan dihapus di bawah
       // Optional:
@@ -179,11 +188,15 @@ class WashingRepository {
 
     final body = <String, dynamic>{
       "header": headerMap,
-      "details": details.map((d) => {
-        "NoSak": d.noSak,
-        "Berat": d.berat,
-        "IdLokasi": d.idLokasi, // kirim null jika memang null
-      }).toList(),
+      "details": details
+          .map(
+            (d) => {
+              "NoSak": d.noSak,
+              "Berat": d.berat,
+              "IdLokasi": d.idLokasi, // kirim null jika memang null
+            },
+          )
+          .toList(),
       refKey: refVal,
     };
 
@@ -207,11 +220,57 @@ class WashingRepository {
     throw Exception('Gagal update washing (status: ${resp.statusCode})');
   }
 
+  /// Update QC washing (header-only) by NoWashing
+  Future<Map<String, dynamic>> updateWashingQc({
+    required String noWashing,
+    required double? density1,
+    required double? density2,
+    required double? density3,
+    required double? moisture1,
+    required double? moisture2,
+    required double? moisture3,
+  }) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse(
+      "${ApiConstants.baseUrl}/api/labels/washing/$noWashing",
+    );
+
+    final body = <String, dynamic>{
+      "header": {
+        "Density": density1,
+        "Density2": density2,
+        "Density3": density3,
+        "Moisture": moisture1,
+        "Moisture2": moisture2,
+        "Moisture3": moisture3,
+      },
+    };
+
+    final resp = await http.put(
+      url,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: json.encode(body),
+    );
+
+    print("➡️ PUT Update Washing QC: $url");
+    print("📦 Body: ${json.encode(body)}");
+    print("⬅️ Response [${resp.statusCode}]: ${resp.body}");
+
+    if (resp.statusCode == 200) {
+      return json.decode(resp.body) as Map<String, dynamic>;
+    }
+    throw Exception('Gagal update QC washing (status: ${resp.statusCode})');
+  }
 
   /// Delete washing by NoWashing
   Future<void> deleteWashing(String noWashing) async {
     final token = await TokenStorage.getToken();
-    final url = Uri.parse("${ApiConstants.baseUrl}/api/labels/washing/$noWashing");
+    final url = Uri.parse(
+      "${ApiConstants.baseUrl}/api/labels/washing/$noWashing",
+    );
 
     final resp = await http.delete(
       url,
@@ -225,13 +284,15 @@ class WashingRepository {
     print("⬅️ Response [${resp.statusCode}]: ${resp.body}");
 
     // banyak API mengembalikan 200/202/204 untuk delete yang sukses
-    if (resp.statusCode == 200 || resp.statusCode == 202 || resp.statusCode == 204) {
+    if (resp.statusCode == 200 ||
+        resp.statusCode == 202 ||
+        resp.statusCode == 204) {
       return;
     }
     // kalau BE kirim pesan error, naikkan biar bisa ditampilkan
-    final msg = (resp.body.isNotEmpty) ? resp.body : 'Gagal delete (status: ${resp.statusCode})';
+    final msg = (resp.body.isNotEmpty)
+        ? resp.body
+        : 'Gagal delete (status: ${resp.statusCode})';
     throw Exception(msg);
   }
-
-
 }

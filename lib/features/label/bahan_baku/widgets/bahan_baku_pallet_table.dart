@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../common/widgets/info_line.dart';
-import '../../bonggolan/widgets/interactive_popover.dart';
+import '../../../../common/widgets/interactive_popover.dart';
 import '../model/bahan_baku_pallet.dart';
 import '../view_model/bahan_baku_view_model.dart';
 import 'bahan_baku_pallet_popover.dart';
@@ -10,11 +10,13 @@ import 'bahan_baku_pallet_popover.dart';
 class BahanBakuPalletTable extends StatefulWidget {
   final ScrollController scrollController;
   final ValueChanged<BahanBakuPallet> onPalletTap;
+  final ValueChanged<BahanBakuPallet> onInputQcTap;
 
   const BahanBakuPalletTable({
     super.key,
     required this.scrollController,
     required this.onPalletTap,
+    required this.onInputQcTap,
   });
 
   @override
@@ -47,6 +49,9 @@ class _BahanBakuPalletTableState extends State<BahanBakuPalletTable> {
   void _showPalletPopover(BahanBakuPallet pallet, Offset globalPosition) {
     // ✅ disable popover kalau pallet empty
     if (pallet.isEmpty) return;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final adaptiveMaxHeight =
+        (screenHeight - 32).clamp(480.0, 820.0).toDouble();
 
     _popover.show(
       context: context,
@@ -54,18 +59,17 @@ class _BahanBakuPalletTableState extends State<BahanBakuPalletTable> {
       child: BahanBakuPalletPopover(
         pallet: pallet,
         onClose: () => _popover.hide(),
-        onViewDetails: () => widget.onPalletTap(pallet),
+        onInputQc: () => widget.onInputQcTap(pallet),
 
         // ✅ biarkan popover pakai default print (PdfPrintService + reportName LabelPalletBB)
         // onPrint: null,  // boleh ditulis atau cukup dihapus param-nya
-
         apiBaseUrl: 'http://192.168.10.100:3000',
         // username: 'ADMIN', // opsional kalau kamu mau hardcode / inject
       ),
 
-
       preferAbove: true,
       verticalGap: 8,
+      maxHeight: adaptiveMaxHeight,
       backdropOpacity: 0.06,
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutBack,
@@ -93,17 +97,27 @@ class _BahanBakuPalletTableState extends State<BahanBakuPalletTable> {
           final pallets = vm.pallets;
 
           final int palletActual = pallets.length;
-          final int palletSisa = pallets.where((p) => p.isEmpty == false).length;
+          final int palletSisa = pallets
+              .where((p) => p.isEmpty == false)
+              .length;
 
-          final int sakActual =
-          pallets.fold<int>(0, (sum, p) => sum + (p.sakActual));
-          final int sakSisa =
-          pallets.fold<int>(0, (sum, p) => sum + (p.sakSisa));
+          final int sakActual = pallets.fold<int>(
+            0,
+            (sum, p) => sum + (p.sakActual),
+          );
+          final int sakSisa = pallets.fold<int>(
+            0,
+            (sum, p) => sum + (p.sakSisa),
+          );
 
-          final double beratActual =
-          pallets.fold<double>(0.0, (sum, p) => sum + (p.beratActual));
-          final double beratSisa =
-          pallets.fold<double>(0.0, (sum, p) => sum + (p.beratSisa));
+          final double beratActual = pallets.fold<double>(
+            0.0,
+            (sum, p) => sum + (p.beratActual),
+          );
+          final double beratSisa = pallets.fold<double>(
+            0.0,
+            (sum, p) => sum + (p.beratSisa),
+          );
 
           // masih boleh dipakai kalau kamu tetap ingin statistik status
           // final passPallets = pallets.where((p) => p.idStatus == 1).length;
@@ -203,9 +217,7 @@ class _BahanBakuPalletTableState extends State<BahanBakuPalletTable> {
   }
 
   Widget _buildLoadingState() {
-    return const Expanded(
-      child: Center(child: CircularProgressIndicator()),
-    );
+    return const Expanded(child: Center(child: CircularProgressIndicator()));
   }
 
   Widget _buildEmptyState() {
@@ -231,12 +243,14 @@ class _BahanBakuPalletTableState extends State<BahanBakuPalletTable> {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
         color: const Color(0xFF1565C0),
-        border: Border(bottom: BorderSide(color: Colors.grey.shade300, width: 2)),
+        border: Border(
+          bottom: BorderSide(color: Colors.grey.shade300, width: 2),
+        ),
       ),
       child: const Row(
         children: [
           SizedBox(
-            width: 110,
+            width: 90,
             child: Text(
               'PALLET',
               style: TextStyle(
@@ -272,6 +286,19 @@ class _BahanBakuPalletTableState extends State<BahanBakuPalletTable> {
               ),
             ),
           ),
+          SizedBox(
+            width: 72,
+            child: Text(
+              'QC',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                color: Colors.white,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -295,8 +322,9 @@ class _BahanBakuPalletTableState extends State<BahanBakuPalletTable> {
         final textColorMain = isDisabled
             ? Colors.grey.shade500
             : (isSelected ? Colors.blue.shade900 : Colors.black87);
-        final textColorSub =
-        isDisabled ? Colors.grey.shade500 : Colors.grey.shade800;
+        final textColorSub = isDisabled
+            ? Colors.grey.shade500
+            : Colors.grey.shade800;
 
         return Opacity(
           opacity: isDisabled ? 0.55 : 1.0,
@@ -305,17 +333,20 @@ class _BahanBakuPalletTableState extends State<BahanBakuPalletTable> {
             onLongPressStart: isDisabled
                 ? null
                 : (details) =>
-                _showPalletPopover(pallet, details.globalPosition),
+                      _showPalletPopover(pallet, details.globalPosition),
             onSecondaryTapDown: isDisabled
                 ? null
-                : (details) => _showPalletPopover(pallet, details.globalPosition),
+                : (details) =>
+                      _showPalletPopover(pallet, details.globalPosition),
             child: InkWell(
               onTap: isDisabled ? null : () => widget.onPalletTap(pallet),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
                 curve: Curves.easeInOut,
-                padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: bgColor,
                   border: Border(
@@ -327,9 +358,10 @@ class _BahanBakuPalletTableState extends State<BahanBakuPalletTable> {
                   ),
                 ),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     SizedBox(
-                      width: 110,
+                      width: 90,
                       child: Row(
                         children: [
                           Expanded(
@@ -342,7 +374,7 @@ class _BahanBakuPalletTableState extends State<BahanBakuPalletTable> {
                                     : FontWeight.w600,
                                 color: textColorMain,
                               ),
-                              overflow: TextOverflow.ellipsis,
+                              softWrap: true,
                             ),
                           ),
                           if (isDisabled) ...[
@@ -361,7 +393,7 @@ class _BahanBakuPalletTableState extends State<BahanBakuPalletTable> {
                       child: Text(
                         pallet.namaJenisPlastik,
                         style: TextStyle(fontSize: 13, color: textColorSub),
-                        overflow: TextOverflow.ellipsis,
+                        softWrap: true,
                       ),
                     ),
                     SizedBox(
@@ -369,8 +401,16 @@ class _BahanBakuPalletTableState extends State<BahanBakuPalletTable> {
                       child: Text(
                         _formatBlokLokasi(pallet.blok, pallet.idLokasi),
                         style: TextStyle(fontSize: 13, color: textColorSub),
-                        overflow: TextOverflow.ellipsis,
+                        softWrap: true,
                         textAlign: TextAlign.center,
+                      ),
+                    ),
+                    SizedBox(
+                      width: 72,
+                      child: Center(
+                        child: _isQCCompleted(pallet)
+                            ? const _QcDoneLozenge()
+                            : const _QcOpenLozenge(),
                       ),
                     ),
                   ],
@@ -390,4 +430,65 @@ class _BahanBakuPalletTableState extends State<BahanBakuPalletTable> {
     if (!hasBlok && !hasLokasi) return '-';
     return '${blok ?? ''}${idLokasi ?? ''}';
   }
+
+  bool _isQCCompleted(BahanBakuPallet pallet) {
+    return (pallet.tenggelam != null) ||
+        (pallet.density != null) ||
+        (pallet.density2 != null) ||
+        (pallet.density3 != null);
+  }
 }
+
+class _QcDoneLozenge extends StatelessWidget {
+  const _QcDoneLozenge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE3FCEF),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF216E4E)),
+          SizedBox(width: 4),
+          Text(
+            'Done',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF216E4E),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QcOpenLozenge extends StatelessWidget {
+  const _QcOpenLozenge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFDFE1E6),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: const Text(
+        'Open',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF44546F),
+        ),
+      ),
+    );
+  }
+}
+

@@ -7,10 +7,7 @@ import '../view_model/bahan_baku_view_model.dart';
 class BahanBakuPalletDetailTable extends StatefulWidget {
   final ScrollController scrollController;
 
-  const BahanBakuPalletDetailTable({
-    super.key,
-    required this.scrollController,
-  });
+  const BahanBakuPalletDetailTable({super.key, required this.scrollController});
 
   @override
   State<BahanBakuPalletDetailTable> createState() =>
@@ -45,8 +42,9 @@ class _BahanBakuPalletDetailTableState
           final totalSak = vm.details.length;
 
           // ✅ available = DateUsage null
-          final availableDetails =
-          vm.details.where((d) => !_isUsed(d.dateUsage)).toList();
+          final availableDetails = vm.details
+              .where((d) => !_isUsed(d.dateUsage))
+              .toList();
 
           final availableSak = availableDetails.length;
 
@@ -144,8 +142,11 @@ class _BahanBakuPalletDetailTableState
                         Expanded(
                           child: Row(
                             children: [
-                              Icon(Icons.call_split,
-                                  size: 16, color: Colors.red.shade700),
+                              Icon(
+                                Icons.call_split,
+                                size: 16,
+                                color: Colors.red.shade700,
+                              ),
                               const SizedBox(width: 6),
                               Text(
                                 'Partial: $partialCount',
@@ -162,8 +163,11 @@ class _BahanBakuPalletDetailTableState
                         Expanded(
                           child: Row(
                             children: [
-                              Icon(Icons.water_drop,
-                                  size: 16, color: Colors.blue.shade700),
+                              Icon(
+                                Icons.water_drop,
+                                size: 16,
+                                color: Colors.blue.shade700,
+                              ),
                               const SizedBox(width: 6),
                               Text(
                                 'Lembab: $lembabCount',
@@ -188,9 +192,7 @@ class _BahanBakuPalletDetailTableState
   }
 
   Widget _buildLoadingState() {
-    return const Expanded(
-      child: Center(child: CircularProgressIndicator()),
-    );
+    return const Expanded(child: Center(child: CircularProgressIndicator()));
   }
 
   Widget _buildEmptyState() {
@@ -216,7 +218,9 @@ class _BahanBakuPalletDetailTableState
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
         color: const Color(0xFF1565C0),
-        border: Border(bottom: BorderSide(color: Colors.grey.shade300, width: 2)),
+        border: Border(
+          bottom: BorderSide(color: Colors.grey.shade300, width: 2),
+        ),
       ),
       child: const Row(
         children: [
@@ -293,6 +297,7 @@ class _BahanBakuPalletDetailTableState
               border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
             ),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(
                   width: 50,
@@ -303,7 +308,7 @@ class _BahanBakuPalletDetailTableState
                       fontWeight: FontWeight.w600,
                       color: sakColor,
                     ),
-                    overflow: TextOverflow.ellipsis,
+                    softWrap: true,
                   ),
                 ),
                 Expanded(
@@ -311,7 +316,9 @@ class _BahanBakuPalletDetailTableState
                     _kg(d.berat),
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight: partial || lembab ? FontWeight.w800 : FontWeight.w600,
+                      fontWeight: partial || lembab
+                          ? FontWeight.w800
+                          : FontWeight.w600,
                       color: beratTextColor,
                     ),
                   ),
@@ -365,7 +372,10 @@ class _BahanBakuPalletDetailTableState
                       if (!partial && !lembab)
                         Text(
                           '-',
-                          style: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade400,
+                          ),
                         ),
                     ],
                   ),

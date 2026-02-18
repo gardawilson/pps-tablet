@@ -2,10 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
+import '../../../../common/widgets/interactive_popover.dart';
 import '../../../../core/services/dialog_service.dart';
 import '../view_model/bonggolan_view_model.dart';
 import '../model/bonggolan_header_model.dart';
-import '../widgets/interactive_popover.dart';
 import '../widgets/bonggolan_row_popover.dart';
 import '../widgets/bonggolan_action_bar.dart';
 import '../widgets/bonggolan_header_table.dart';
@@ -89,7 +89,6 @@ class _BonggolanScreenState extends State<BonggolanScreen> {
       builder: (_) => BonggolanFormDialog(
         header: header,
         onSave: (headerData) {
-          final vm = context.read<BonggolanViewModel>();
           if (header != null) {
             // vm.updateWashing(headerData, detailsData);
           } else {
@@ -127,6 +126,9 @@ class _BonggolanScreenState extends State<BonggolanScreen> {
     Offset globalPosition,
   ) async {
     final vm = context.read<BonggolanViewModel>();
+    final screenHeight = MediaQuery.of(context).size.height;
+    final adaptiveMaxHeight =
+        (screenHeight - 32).clamp(480.0, 820.0).toDouble();
 
     // Pindahkan highlight saat long-press
     vm.setSelected(header.noBonggolan);
@@ -158,6 +160,7 @@ class _BonggolanScreenState extends State<BonggolanScreen> {
       // animasi & penempatan cerdas
       preferAbove: true,
       verticalGap: 8,
+      maxHeight: adaptiveMaxHeight,
       backdropOpacity: 0.06,
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutBack, // overshoot untuk SCALE tetap aman

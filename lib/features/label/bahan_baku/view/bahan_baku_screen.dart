@@ -172,7 +172,7 @@ class _BahanBakuScreenState extends State<BahanBakuScreen> {
         children: [
           // 1️⃣ Header Table (Kiri) - FLEX DIKURANGI
           Expanded(
-            flex: 5, // ⬅️ dari 3 ke 5 untuk lebih lebar
+            flex: 6, // ⬅️ dari 3 ke 5 untuk lebih lebar
             child: Container(
               color: Colors.white,
               child: Column(
@@ -203,7 +203,7 @@ class _BahanBakuScreenState extends State<BahanBakuScreen> {
 
           // 2️⃣ Pallet Table (Tengah)
           Expanded(
-            flex: 4, // ⬅️ dari 2 ke 4
+            flex: 5, // ⬅️ dari 2 ke 4
             child: BahanBakuPalletTable(
               scrollController: _palletScrollController,
               onPalletTap: _onPalletTap,
@@ -216,7 +216,7 @@ class _BahanBakuScreenState extends State<BahanBakuScreen> {
 
           // 3️⃣ Detail Table (Kanan)
           Expanded(
-            flex: 2, // ⬅️ dari 1 ke 2
+            flex: 3, // ⬅️ dari 1 ke 2
             child: BahanBakuPalletDetailTable(
               scrollController: _detailScrollController,
             ),

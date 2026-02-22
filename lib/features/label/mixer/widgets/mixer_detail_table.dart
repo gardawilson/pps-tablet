@@ -1,18 +1,19 @@
-// lib/view/widgets/mixer_detail_table.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+import '../../../../common/widgets/atlas_data_table.dart';
 import '../../../../common/widgets/info_line.dart';
 import '../../../../common/widgets/interactive_popover.dart';
+import '../model/mixer_detail_model.dart';
 import '../view_model/mixer_view_model.dart';
 import 'mixer_partial_info_popover.dart';
 
 class MixerDetailTable extends StatefulWidget {
+  static const _colSakWidth = 50.0;
+
   final ScrollController scrollController;
 
-  const MixerDetailTable({
-    super.key,
-    required this.scrollController,
-  });
+  const MixerDetailTable({super.key, required this.scrollController});
 
   @override
   State<MixerDetailTable> createState() => _MixerDetailTableState();
@@ -65,13 +66,11 @@ class _MixerDetailTableState extends State<MixerDetailTable> {
       child: Consumer<MixerViewModel>(
         builder: (context, vm, _) {
           final totalSak = vm.details.length;
-
-          // ✅ available = DateUsage null (partial tetap masuk sini selama dateUsage null)
-          final availableDetails =
-          vm.details.where((d) => !_isUsed(d.dateUsage)).toList();
+          final availableDetails = vm.details
+              .where((d) => !_isUsed(d.dateUsage))
+              .toList();
 
           final availableSak = availableDetails.length;
-
           final totalBerat = _sumBerat(vm.details);
           final availableBerat = _sumBerat(availableDetails);
 
@@ -87,11 +86,23 @@ class _MixerDetailTableState extends State<MixerDetailTable> {
               if (!vm.isDetailLoading && vm.details.isEmpty) _buildEmptyState(),
               if (!vm.isDetailLoading && vm.details.isNotEmpty)
                 Expanded(
-                  child: Column(
-                    children: [
-                      _buildTableHeader(),
-                      Expanded(child: _buildTableBody(vm)),
-                    ],
+                  child: AtlasDataTable<MixerDetail>(
+                    columns: _buildColumns(),
+                    items: vm.details,
+                    scrollController: widget.scrollController,
+                    onRowTapWithPosition: (item, globalPosition) {
+                      final partial = item.isPartial == true;
+                      final used = _isUsed(item.dateUsage);
+                      if (partial && !used) {
+                        showMixerPartialInfoPopover(
+                          context: context,
+                          vm: vm,
+                          noSak: item.noSak,
+                          popover: _popover,
+                          globalPosition: globalPosition,
+                        );
+                      }
+                    },
                   ),
                 ),
             ],
@@ -99,6 +110,46 @@ class _MixerDetailTableState extends State<MixerDetailTable> {
         },
       ),
     );
+  }
+
+  List<AtlasTableColumn<MixerDetail>> _buildColumns() {
+    return [
+      AtlasTableColumn<MixerDetail>(
+        title: 'SAK',
+        width: MixerDetailTable._colSakWidth,
+        cellBuilder: (context, item, rowState) {
+          final used = _isUsed(item.dateUsage);
+          return Text(
+            item.noSak.toString(),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: used ? Colors.grey.shade600 : Colors.black87,
+            ),
+            softWrap: true,
+          );
+        },
+      ),
+      AtlasTableColumn<MixerDetail>(
+        title: 'BERAT (KG)',
+        showDivider: false,
+        cellBuilder: (context, item, rowState) {
+          final used = _isUsed(item.dateUsage);
+          final partial = item.isPartial == true;
+          final beratColor = partial ? Colors.red : rowState.textColor;
+
+          return Text(
+            item.berat?.toStringAsFixed(2) ?? '-',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: partial ? FontWeight.w800 : FontWeight.w600,
+              color: used ? Colors.grey.shade500 : beratColor,
+            ),
+            softWrap: true,
+          );
+        },
+      ),
+    ];
   }
 
   Widget _buildHeader({
@@ -157,9 +208,7 @@ class _MixerDetailTableState extends State<MixerDetailTable> {
   }
 
   Widget _buildLoadingState() {
-    return const Expanded(
-      child: Center(child: CircularProgressIndicator()),
-    );
+    return const Expanded(child: Center(child: CircularProgressIndicator()));
   }
 
   Widget _buildEmptyState() {
@@ -177,118 +226,6 @@ class _MixerDetailTableState extends State<MixerDetailTable> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildTableHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1565C0),
-        border: Border(bottom: BorderSide(color: Colors.grey.shade300, width: 2)),
-      ),
-      child: const Row(
-        children: [
-          SizedBox(
-            width: 80,
-            child: Text(
-              'SAK',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              'BERAT (KG)',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTableBody(MixerViewModel vm) {
-    return ListView.builder(
-      controller: widget.scrollController,
-      itemCount: vm.details.length,
-      itemBuilder: (context, index) {
-        final d = vm.details[index];
-        final isEven = index % 2 == 0;
-
-        final partial = d.isPartial == true;
-        final used = _isUsed(d.dateUsage); // ✅ disable only based on dateUsage
-
-        final bg = used
-            ? Colors.grey.shade100
-            : (isEven ? Colors.white : Colors.grey.shade50);
-
-        final sakColor = used ? Colors.grey.shade600 : Colors.black87;
-
-        // ✅ partial merah, tapi kalau used → pudar via opacity
-        final beratColor = partial ? Colors.red : Colors.grey.shade800;
-        final beratTextColor = used ? Colors.grey.shade500 : beratColor;
-
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapDown: (details) {
-            // popover hanya partial & belum used
-            if (partial && !used) {
-              showMixerPartialInfoPopover(
-                context: context,
-                vm: vm,
-                noSak: d.noSak,
-                popover: _popover,
-                globalPosition: details.globalPosition,
-              );
-            }
-          },
-          child: Opacity(
-            opacity: used ? 0.55 : 1,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: bg,
-                border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-              ),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 80,
-                    child: Text(
-                      d.noSak.toString(),
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: sakColor,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      d.berat?.toStringAsFixed(2) ?? '-',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: partial ? FontWeight.w800 : FontWeight.w600,
-                        color: beratTextColor,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 }

@@ -14,15 +14,20 @@ class StockOpnameAscendDetailScreen extends StatefulWidget {
   final String tgl;
   final List<int> idWarehouses;
 
-
-  const StockOpnameAscendDetailScreen({super.key, required this.noSO, required this.tgl, required this.idWarehouses,
+  const StockOpnameAscendDetailScreen({
+    super.key,
+    required this.noSO,
+    required this.tgl,
+    required this.idWarehouses,
   });
 
   @override
-  State<StockOpnameAscendDetailScreen> createState() => _StockOpnameAscendDetailScreenState();
+  State<StockOpnameAscendDetailScreen> createState() =>
+      _StockOpnameAscendDetailScreenState();
 }
 
-class _StockOpnameAscendDetailScreenState extends State<StockOpnameAscendDetailScreen> {
+class _StockOpnameAscendDetailScreenState
+    extends State<StockOpnameAscendDetailScreen> {
   int? _selectedFamilyID;
 
   // cache controller tetap di parent agar lifecycle-nya aman
@@ -33,7 +38,9 @@ class _StockOpnameAscendDetailScreenState extends State<StockOpnameAscendDetailS
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      debugPrint("ASCEND DETAIL → noSO=${widget.noSO}, idWarehouses=${widget.idWarehouses}");
+      debugPrint(
+        "ASCEND DETAIL → noSO=${widget.noSO}, idWarehouses=${widget.idWarehouses}",
+      );
 
       context.read<StockOpnameFamilyViewModel>().fetchFamilies(widget.noSO);
     });
@@ -51,7 +58,9 @@ class _StockOpnameAscendDetailScreenState extends State<StockOpnameAscendDetailS
     final familyVM = context.read<StockOpnameFamilyViewModel>();
 
     if (ascendVM.items.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Tidak ada data untuk disimpan")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Tidak ada data untuk disimpan")),
+      );
       return;
     }
 
@@ -71,15 +80,22 @@ class _StockOpnameAscendDetailScreenState extends State<StockOpnameAscendDetailS
       if (_selectedFamilyID != null) {
         await ascendVM.fetchAscendItems(widget.noSO, _selectedFamilyID!);
       }
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("✅ Data berhasil disimpan & di-refresh")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("✅ Data berhasil disimpan & di-refresh")),
+      );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("❌ Gagal menyimpan data")));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("❌ Gagal menyimpan data")));
     }
   }
 
   void _onFamilySelected(int familyID) {
     setState(() => _selectedFamilyID = familyID);
-    context.read<StockOpnameAscendViewModel>().fetchAscendItems(widget.noSO, familyID);
+    context.read<StockOpnameAscendViewModel>().fetchAscendItems(
+      widget.noSO,
+      familyID,
+    );
     _qtyFoundControllers.clear();
     _remarkControllers.clear();
   }
@@ -102,7 +118,13 @@ class _StockOpnameAscendDetailScreenState extends State<StockOpnameAscendDetailS
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Row(
                 children: [

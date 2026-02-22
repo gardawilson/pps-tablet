@@ -6,10 +6,7 @@ import 'package:pps_tablet/features/production/inject/repository/inject_producti
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
-import '../../../../common/widgets/horizontal_paged_table.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
-import '../../../../common/widgets/table_column_spec.dart';
-import '../../../../core/utils/date_formatter.dart';
 
 import '../../../cetakan/repository/cetakan_repository.dart';
 import '../../../cetakan/view_model/cetakan_view_model.dart';
@@ -23,6 +20,7 @@ import '../view_model/inject_production_view_model.dart';
 import '../widgets/inject_production_action_bar.dart';
 import '../widgets/inject_production_delete_dialog.dart';
 import '../widgets/inject_production_form_dialog.dart';
+import '../widgets/inject_production_header_table.dart';
 import '../widgets/inject_production_row_popover.dart';
 import 'inject_production_input_screen.dart';
 
@@ -37,33 +35,21 @@ class _InjectProductionScreenState extends State<InjectProductionScreen> {
   final TextEditingController _searchCtl = TextEditingController();
   String? _selectedNoProduksi;
 
-  // ✅ Store VM instance as field
   late final InjectProductionViewModel _viewModel;
 
   @override
   void initState() {
     super.initState();
-
-    // ✅ Create VM once in initState
     _viewModel = InjectProductionViewModel(
       repository: InjectProductionRepository(),
     );
-
-    debugPrint(
-      '🟦🟦🟦 [INJECT_SCREEN] initState: Created VM hash=${_viewModel.hashCode}',
-    );
-    debugPrint(
-      '🟦🟦🟦 [INJECT_SCREEN] initState: PagingController hash=${_viewModel.pagingController.hashCode}',
-    );
-
-    // Initialize first load
     _viewModel.refreshPaged();
   }
 
   @override
   void dispose() {
     _searchCtl.dispose();
-    _viewModel.dispose(); // ✅ Dispose VM
+    _viewModel.dispose();
     super.dispose();
   }
 
@@ -135,13 +121,13 @@ class _InjectProductionScreenState extends State<InjectProductionScreen> {
                               ),
                             );
                           } else {
-                            final rawMsg =
-                                _viewModel.saveError ?? 'Gagal menghapus data';
                             showDialog(
                               context: context,
                               builder: (_) => ErrorStatusDialog(
                                 title: 'Gagal Menghapus!',
-                                message: rawMsg,
+                                message:
+                                    _viewModel.saveError ??
+                                    'Gagal menghapus data',
                               ),
                             );
                           }
@@ -150,9 +136,7 @@ class _InjectProductionScreenState extends State<InjectProductionScreen> {
                     },
                   );
                 },
-                onPrint: () {
-                  // TODO: kalau nanti ada cetak label inject
-                },
+                onPrint: () {},
                 onAuditHistory: () {
                   _navigateToAuditHistory(row);
                 },
@@ -173,115 +157,98 @@ class _InjectProductionScreenState extends State<InjectProductionScreen> {
     );
   }
 
+  Future<void> _openCreateDialog(BuildContext ctx) async {
+    final created = await showDialog<InjectProduction>(
+      context: ctx,
+      barrierDismissible: false,
+      builder: (_) => MultiProvider(
+        providers: [
+          ChangeNotifierProvider<InjectProductionViewModel>.value(
+            value: _viewModel,
+          ),
+          ChangeNotifierProvider(
+            create: (_) => CetakanViewModel(repository: CetakanRepository()),
+          ),
+          ChangeNotifierProvider(
+            create: (_) => WarnaViewModel(repository: WarnaRepository()),
+          ),
+          ChangeNotifierProvider(
+            create: (_) => FurnitureMaterialLookupViewModel(
+              repository: FurnitureMaterialLookupRepository(),
+            ),
+          ),
+        ],
+        child: const InjectProductionFormDialog(),
+      ),
+    );
+    if (!mounted || !ctx.mounted) return;
+    if (created != null) {
+      _viewModel.refreshPaged();
+      setState(() => _selectedNoProduksi = created.noProduksi);
+      showDialog(
+        context: ctx,
+        builder: (_) => SuccessStatusDialog(
+          title: 'Berhasil Membuat',
+          message: 'No. Produksi ${created.noProduksi} berhasil dibuat.',
+        ),
+      );
+    }
+  }
+
+  Future<void> _openEditDialog(
+    BuildContext ctx,
+    InjectProduction row,
+  ) async {
+    final updated = await showDialog<InjectProduction>(
+      context: ctx,
+      barrierDismissible: false,
+      builder: (_) => MultiProvider(
+        providers: [
+          ChangeNotifierProvider<InjectProductionViewModel>.value(
+            value: _viewModel,
+          ),
+          ChangeNotifierProvider(
+            create: (_) => CetakanViewModel(repository: CetakanRepository()),
+          ),
+          ChangeNotifierProvider(
+            create: (_) => WarnaViewModel(repository: WarnaRepository()),
+          ),
+          ChangeNotifierProvider(
+            create: (_) => FurnitureMaterialLookupViewModel(
+              repository: FurnitureMaterialLookupRepository(),
+            ),
+          ),
+        ],
+        child: InjectProductionFormDialog(header: row),
+      ),
+    );
+    if (!mounted || !ctx.mounted) return;
+    if (updated != null) {
+      _viewModel.refreshPaged();
+      showDialog(
+        context: ctx,
+        builder: (_) => SuccessStatusDialog(
+          title: 'Berhasil Mengupdate',
+          message: 'No. Produksi ${updated.noProduksi} berhasil diperbarui.',
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // ✅ Use .value to provide existing VM instance
     return ChangeNotifierProvider<InjectProductionViewModel>.value(
       value: _viewModel,
       child: Consumer<InjectProductionViewModel>(
         builder: (context, vm, _) {
-          debugPrint(
-            '🟦 [INJECT_SCREEN] Consumer.builder() called, VM hash=${vm.hashCode}',
-          );
-          debugPrint(
-            '🟦 [INJECT_SCREEN] Consumer pagingController: hash=${vm.pagingController.hashCode}',
-          );
-
-          final columns = <TableColumnSpec<InjectProduction>>[
-            TableColumnSpec(
-              title: 'NO. PRODUKSI',
-              width: 170,
-              headerAlign: TextAlign.left,
-              cellAlign: TextAlign.left,
-              cellBuilder: (_, r) => Text(
-                r.noProduksi,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'TANGGAL',
-              width: 130,
-              headerAlign: TextAlign.left,
-              cellAlign: TextAlign.left,
-              cellBuilder: (_, r) => Text(formatDateToShortId(r.tglProduksi)),
-            ),
-            TableColumnSpec(
-              title: 'SHIFT',
-              width: 70,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) => Text('${r.shift}'),
-            ),
-            TableColumnSpec(
-              title: 'MESIN',
-              width: 180,
-              cellBuilder: (_, r) => Text(
-                r.namaMesin,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'OPERATOR',
-              width: 200,
-              cellBuilder: (_, r) => Text(
-                r.namaOperator,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            // ✅ JAM column (similar to Mixer's JAM KERJA)
-            TableColumnSpec(
-              title: 'JAM',
-              width: 100,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) => Text(
-                r.jam != null && r.jam! > 0 ? '${r.jam} jam' : '-',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'JAM KERJA',
-              width: 140,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) => Text(
-                '${r.hourStart ?? '--:--'} - ${r.hourEnd ?? '--:--'}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'HM',
-              width: 80,
-              headerAlign: TextAlign.right,
-              cellAlign: TextAlign.right,
-              cellBuilder: (_, r) => Text('${r.hourMeter ?? 0}'),
-            ),
-            TableColumnSpec(
-              title: 'BERAT (kg)',
-              width: 100,
-              headerAlign: TextAlign.right,
-              cellAlign: TextAlign.right,
-              cellBuilder: (_, r) => Text('${r.beratProdukHasilTimbang ?? 0}'),
-            ),
-          ];
-
           return Scaffold(
             appBar: AppBar(
               title: const Text('Inject Production'),
               actions: [
                 IconButton(
                   icon: const Icon(Icons.refresh),
-                  onPressed: () {
-                    debugPrint(
-                      '🟦 [INJECT_SCREEN] Manual refresh button pressed, VM hash=${vm.hashCode}',
-                    );
-                    vm.refreshPaged();
-                  },
+                  tooltip: 'Refresh',
+                  onPressed: vm.refreshPaged,
                 ),
               ],
             ),
@@ -294,15 +261,11 @@ class _InjectProductionScreenState extends State<InjectProductionScreen> {
                     _searchCtl.clear();
                     vm.clearFilters();
                   },
-                  onAddPressed: _openCreateDialog,
+                  onAddPressed: () => _openCreateDialog(context),
                 ),
                 Expanded(
-                  child: HorizontalPagedTable<InjectProduction>(
-                    pagingController: vm.pagingController,
-                    columns: columns,
-                    horizontalPadding: 16,
-                    selectedPredicate: (r) =>
-                        r.noProduksi == _selectedNoProduksi,
+                  child: InjectProductionHeaderTable(
+                    selectedNoProduksi: _selectedNoProduksi,
                     onRowTap: (r) =>
                         setState(() => _selectedNoProduksi = r.noProduksi),
                     onRowLongPress: (r, globalPos) async {
@@ -320,124 +283,5 @@ class _InjectProductionScreenState extends State<InjectProductionScreen> {
         },
       ),
     );
-  }
-
-  Future<void> _openCreateDialog() async {
-    debugPrint('🟦 [INJECT_SCREEN] Opening create dialog...');
-    debugPrint('🟦 [INJECT_SCREEN] Using VM hash=${_viewModel.hashCode}');
-    debugPrint(
-      '🟦 [INJECT_SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
-    );
-
-    if (!mounted) return;
-
-    final created = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        debugPrint('🟦 [INJECT_SCREEN] Building create dialog...');
-
-        // ✅ MultiProvider: Share VM + provide dependencies for form
-        return MultiProvider(
-          providers: [
-            // Main VM - use .value to share existing instance
-            ChangeNotifierProvider<InjectProductionViewModel>.value(
-              value: _viewModel,
-            ),
-            // Dependencies for form - create new instances
-            ChangeNotifierProvider(
-              create: (_) => CetakanViewModel(repository: CetakanRepository()),
-            ),
-            ChangeNotifierProvider(
-              create: (_) => WarnaViewModel(repository: WarnaRepository()),
-            ),
-            ChangeNotifierProvider(
-              create: (_) => FurnitureMaterialLookupViewModel(
-                repository: FurnitureMaterialLookupRepository(),
-              ),
-            ),
-          ],
-          child: const InjectProductionFormDialog(),
-        );
-      },
-    );
-
-    debugPrint('🟦 [INJECT_SCREEN] Dialog closed, result: $created');
-
-    if (!mounted) return;
-
-    if (created == true) {
-      debugPrint('🟦 [INJECT_SCREEN] Success detected (create).');
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Produksi inject berhasil dibuat')),
-      );
-    } else {
-      debugPrint('🟦 [INJECT_SCREEN] Result was null or false: $created');
-    }
-  }
-
-  Future<void> _openEditDialog(
-    BuildContext context,
-    InjectProduction row,
-  ) async {
-    debugPrint('🟦 [INJECT_SCREEN] Opening edit dialog for: ${row.noProduksi}');
-    debugPrint('🟦 [INJECT_SCREEN] Using VM hash=${_viewModel.hashCode}');
-    debugPrint(
-      '🟦 [INJECT_SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
-    );
-
-    if (!mounted) return;
-
-    final updated = await showDialog<InjectProduction>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        debugPrint('🟦 [INJECT_SCREEN] Building edit dialog...');
-
-        // ✅ MultiProvider: Share VM + provide dependencies for form
-        return MultiProvider(
-          providers: [
-            // Main VM - use .value to share existing instance
-            ChangeNotifierProvider<InjectProductionViewModel>.value(
-              value: _viewModel,
-            ),
-            // Dependencies for form - create new instances
-            ChangeNotifierProvider(
-              create: (_) => CetakanViewModel(repository: CetakanRepository()),
-            ),
-            ChangeNotifierProvider(
-              create: (_) => WarnaViewModel(repository: WarnaRepository()),
-            ),
-            ChangeNotifierProvider(
-              create: (_) => FurnitureMaterialLookupViewModel(
-                repository: FurnitureMaterialLookupRepository(),
-              ),
-            ),
-          ],
-          child: InjectProductionFormDialog(header: row),
-        );
-      },
-    );
-
-    debugPrint(
-      '🟦 [INJECT_SCREEN] Edit dialog closed, result: ${updated?.noProduksi}',
-    );
-
-    if (!mounted) return;
-
-    if (updated != null) {
-      debugPrint('🟦 [INJECT_SCREEN] Success detected (update).');
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'No. Produksi ${updated.noProduksi} berhasil diperbarui',
-          ),
-        ),
-      );
-    } else {
-      debugPrint('🟦 [INJECT_SCREEN] Result was null');
-    }
   }
 }

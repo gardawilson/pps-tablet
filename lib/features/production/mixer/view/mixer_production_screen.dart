@@ -5,16 +5,14 @@ import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart'
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
-import '../../../../common/widgets/horizontal_paged_table.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
-import '../../../../common/widgets/table_column_spec.dart';
-import '../../../../core/utils/date_formatter.dart';
 
 import '../model/mixer_production_model.dart';
 import '../view_model/mixer_production_view_model.dart';
 import '../widgets/mixer_production_action_bar.dart';
 import '../widgets/mixer_production_delete_dialog.dart';
 import '../widgets/mixer_production_form_dialog.dart';
+import '../widgets/mixer_production_header_table.dart';
 import '../widgets/mixer_production_row_popover.dart';
 import 'mixer_production_input_screen.dart';
 
@@ -29,31 +27,19 @@ class _MixerProductionScreenState extends State<MixerProductionScreen> {
   final TextEditingController _searchCtl = TextEditingController();
   String? _selectedNoProduksi;
 
-  // ✅ Store VM instance as field
   late final MixerProductionViewModel _viewModel;
 
   @override
   void initState() {
     super.initState();
-
-    // ✅ Create VM once in initState
     _viewModel = MixerProductionViewModel();
-
-    debugPrint(
-      '🟦🟦🟦 [MIXER_SCREEN] initState: Created VM hash=${_viewModel.hashCode}',
-    );
-    debugPrint(
-      '🟦🟦🟦 [MIXER_SCREEN] initState: PagingController hash=${_viewModel.pagingController.hashCode}',
-    );
-
-    // Initialize first load
     _viewModel.refreshPaged();
   }
 
   @override
   void dispose() {
     _searchCtl.dispose();
-    _viewModel.dispose(); // ✅ Dispose VM
+    _viewModel.dispose();
     super.dispose();
   }
 
@@ -125,13 +111,13 @@ class _MixerProductionScreenState extends State<MixerProductionScreen> {
                               ),
                             );
                           } else {
-                            final rawMsg =
-                                _viewModel.saveError ?? 'Gagal menghapus data';
                             showDialog(
                               context: context,
                               builder: (_) => ErrorStatusDialog(
                                 title: 'Gagal Menghapus!',
-                                message: rawMsg,
+                                message:
+                                    _viewModel.saveError ??
+                                    'Gagal menghapus data',
                               ),
                             );
                           }
@@ -140,9 +126,7 @@ class _MixerProductionScreenState extends State<MixerProductionScreen> {
                     },
                   );
                 },
-                onPrint: () {
-                  // TODO: kalau nanti ada cetak label mixer
-                },
+                onPrint: () {},
                 onAuditHistory: () {
                   _navigateToAuditHistory(row);
                 },
@@ -163,116 +147,65 @@ class _MixerProductionScreenState extends State<MixerProductionScreen> {
     );
   }
 
+  Future<void> _openCreateDialog(BuildContext ctx) async {
+    final created = await showDialog<MixerProduction>(
+      context: ctx,
+      barrierDismissible: false,
+      builder: (_) => ChangeNotifierProvider<MixerProductionViewModel>.value(
+        value: _viewModel,
+        child: const MixerProductionFormDialog(),
+      ),
+    );
+    if (!mounted || !ctx.mounted) return;
+    if (created != null) {
+      _viewModel.refreshPaged();
+      setState(() => _selectedNoProduksi = created.noProduksi);
+      showDialog(
+        context: ctx,
+        builder: (_) => SuccessStatusDialog(
+          title: 'Berhasil Membuat',
+          message: 'No. Produksi ${created.noProduksi} berhasil dibuat.',
+        ),
+      );
+    }
+  }
+
+  Future<void> _openEditDialog(BuildContext ctx, MixerProduction row) async {
+    final updated = await showDialog<MixerProduction>(
+      context: ctx,
+      barrierDismissible: false,
+      builder: (_) => ChangeNotifierProvider<MixerProductionViewModel>.value(
+        value: _viewModel,
+        child: MixerProductionFormDialog(header: row),
+      ),
+    );
+    if (!mounted || !ctx.mounted) return;
+    if (updated != null) {
+      _viewModel.refreshPaged();
+      showDialog(
+        context: ctx,
+        builder: (_) => SuccessStatusDialog(
+          title: 'Berhasil Mengupdate',
+          message: 'No. Produksi ${updated.noProduksi} berhasil diperbarui.',
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // ✅ Use .value to provide existing VM instance
     return ChangeNotifierProvider<MixerProductionViewModel>.value(
       value: _viewModel,
       child: Consumer<MixerProductionViewModel>(
         builder: (context, vm, _) {
-          debugPrint(
-            '🟦 [MIXER_SCREEN] Consumer.builder() called, VM hash=${vm.hashCode}',
-          );
-          debugPrint(
-            '🟦 [MIXER_SCREEN] Consumer pagingController: hash=${vm.pagingController.hashCode}',
-          );
-
-          final columns = <TableColumnSpec<MixerProduction>>[
-            TableColumnSpec(
-              title: 'NO. PRODUKSI',
-              width: 160,
-              headerAlign: TextAlign.left,
-              cellAlign: TextAlign.left,
-              cellBuilder: (_, r) => Text(
-                r.noProduksi,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'TANGGAL',
-              width: 130,
-              headerAlign: TextAlign.left,
-              cellAlign: TextAlign.left,
-              cellBuilder: (_, r) => Text(formatDateToShortId(r.tglProduksi)),
-            ),
-            TableColumnSpec(
-              title: 'SHIFT',
-              width: 70,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) => Text('${r.shift}'),
-            ),
-            TableColumnSpec(
-              title: 'MESIN',
-              width: 180,
-              cellBuilder: (_, r) => Text(
-                r.namaMesin,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'OPERATOR',
-              width: 200,
-              cellBuilder: (_, r) => Text(
-                r.namaOperator,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            // ✅ JAM KERJA column (unique to Mixer)
-            TableColumnSpec(
-              title: 'JAM KERJA',
-              width: 100,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) => Text(
-                '${r.jamKerja} jam',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'JAM',
-              width: 140,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) => Text(
-                '${r.hourStart ?? '--:--'} - ${r.hourEnd ?? '--:--'}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'HM',
-              width: 80,
-              headerAlign: TextAlign.right,
-              cellAlign: TextAlign.right,
-              cellBuilder: (_, r) => Text('${r.hourMeter ?? 0}'),
-            ),
-            TableColumnSpec(
-              title: 'ANGGOTA/HADIR',
-              width: 150,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) =>
-                  Text('${r.jmlhAnggota ?? 0}/${r.hadir ?? 0}'),
-            ),
-          ];
-
           return Scaffold(
             appBar: AppBar(
               title: const Text('Mixer Production'),
               actions: [
                 IconButton(
                   icon: const Icon(Icons.refresh),
-                  onPressed: () {
-                    debugPrint(
-                      '🟦 [MIXER_SCREEN] Manual refresh button pressed, VM hash=${vm.hashCode}',
-                    );
-                    vm.refreshPaged();
-                  },
+                  tooltip: 'Refresh',
+                  onPressed: vm.refreshPaged,
                 ),
               ],
             ),
@@ -285,15 +218,11 @@ class _MixerProductionScreenState extends State<MixerProductionScreen> {
                     _searchCtl.clear();
                     vm.clearFilters();
                   },
-                  onAddPressed: _openCreateDialog,
+                  onAddPressed: () => _openCreateDialog(context),
                 ),
                 Expanded(
-                  child: HorizontalPagedTable<MixerProduction>(
-                    pagingController: vm.pagingController,
-                    columns: columns,
-                    horizontalPadding: 16,
-                    selectedPredicate: (r) =>
-                        r.noProduksi == _selectedNoProduksi,
+                  child: MixerProductionHeaderTable(
+                    selectedNoProduksi: _selectedNoProduksi,
                     onRowTap: (r) =>
                         setState(() => _selectedNoProduksi = r.noProduksi),
                     onRowLongPress: (r, globalPos) async {
@@ -311,90 +240,5 @@ class _MixerProductionScreenState extends State<MixerProductionScreen> {
         },
       ),
     );
-  }
-
-  Future<void> _openCreateDialog() async {
-    debugPrint('🟦 [MIXER_SCREEN] Opening create dialog...');
-    debugPrint('🟦 [MIXER_SCREEN] Using VM hash=${_viewModel.hashCode}');
-    debugPrint(
-      '🟦 [MIXER_SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
-    );
-
-    if (!mounted) return;
-
-    final created = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        debugPrint('🟦 [MIXER_SCREEN] Building create dialog...');
-
-        // ✅ Share the SAME VM instance using .value
-        return ChangeNotifierProvider<MixerProductionViewModel>.value(
-          value: _viewModel,
-          child: const MixerProductionFormDialog(),
-        );
-      },
-    );
-
-    debugPrint('🟦 [MIXER_SCREEN] Dialog closed, result: $created');
-
-    if (!mounted) return;
-
-    if (created == true) {
-      debugPrint('🟦 [MIXER_SCREEN] Success detected (create).');
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Produksi mixer berhasil dibuat')),
-      );
-    } else {
-      debugPrint('🟦 [MIXER_SCREEN] Result was null or false: $created');
-    }
-  }
-
-  Future<void> _openEditDialog(
-    BuildContext context,
-    MixerProduction row,
-  ) async {
-    debugPrint('🟦 [MIXER_SCREEN] Opening edit dialog for: ${row.noProduksi}');
-    debugPrint('🟦 [MIXER_SCREEN] Using VM hash=${_viewModel.hashCode}');
-    debugPrint(
-      '🟦 [MIXER_SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
-    );
-
-    if (!mounted) return;
-
-    final updated = await showDialog<MixerProduction>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        debugPrint('🟦 [MIXER_SCREEN] Building edit dialog...');
-
-        // ✅ Share the SAME VM instance
-        return ChangeNotifierProvider<MixerProductionViewModel>.value(
-          value: _viewModel,
-          child: MixerProductionFormDialog(header: row),
-        );
-      },
-    );
-
-    debugPrint(
-      '🟦 [MIXER_SCREEN] Edit dialog closed, result: ${updated?.noProduksi}',
-    );
-
-    if (!mounted) return;
-
-    if (updated != null) {
-      debugPrint('🟦 [MIXER_SCREEN] Success detected (update).');
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'No. Produksi ${updated.noProduksi} berhasil diperbarui',
-          ),
-        ),
-      );
-    } else {
-      debugPrint('🟦 [MIXER_SCREEN] Result was null');
-    }
   }
 }

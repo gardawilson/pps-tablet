@@ -118,8 +118,6 @@ class _GilinganProductionFormDialogState
   }
 
   Future<void> _submit() async {
-    debugPrint('📝 [GILINGAN_FORM] _submit() started');
-
     // cek overlap dulu
     final ovm = context.read<OverlapViewModel>();
     if (ovm.hasOverlap) {
@@ -184,15 +182,9 @@ class _GilinganProductionFormDialogState
     final hadir = int.tryParse(hadirCtrl.text.trim());
     final hourMeter = double.tryParse(hourMeterCtrl.text.trim());
 
-    // ✅ Read VM from PARENT Screen context
     final prodVm = context.read<GilinganProductionViewModel>();
-    debugPrint('📝 [GILINGAN_FORM] Got VM from context: VM hash=${prodVm.hashCode}');
-    debugPrint(
-      '📝 [GILINGAN_FORM] Got controller from VM: controller hash=${prodVm.pagingController.hashCode}',
-    );
 
     // show loading
-    debugPrint('📝 [GILINGAN_FORM] Showing loading dialog...');
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -203,7 +195,6 @@ class _GilinganProductionFormDialogState
 
     try {
       if (isEdit) {
-        debugPrint('📝 [GILINGAN_FORM] Calling updateProduksi...');
         result = await prodVm.updateProduksi(
           noProduksi: widget.header!.noProduksi,
           tglProduksi: _selectedDate,
@@ -216,11 +207,7 @@ class _GilinganProductionFormDialogState
           hadir: hadir,
           hourMeter: hourMeter,
         );
-        debugPrint(
-          '📝 [GILINGAN_FORM] updateProduksi returned: ${result?.noProduksi}',
-        );
       } else {
-        debugPrint('📝 [GILINGAN_FORM] Calling createProduksi...');
         result = await prodVm.createProduksi(
           tglProduksi: _selectedDate,
           idMesin: mesinId,
@@ -232,54 +219,21 @@ class _GilinganProductionFormDialogState
           hadir: hadir,
           hourMeter: hourMeter,
         );
-        debugPrint(
-          '📝 [GILINGAN_FORM] createProduksi returned: ${result?.noProduksi}',
-        );
       }
-    } catch (e) {
-      debugPrint('❌ [GILINGAN_FORM] Exception during save: $e');
     } finally {
-      debugPrint('📝 [GILINGAN_FORM] Popping loading dialog...');
-      if (mounted) {
-        Navigator.of(context).pop();
-        debugPrint('📝 [GILINGAN_FORM] Loading dialog popped');
-      }
+      if (mounted) Navigator.of(context).pop();
     }
 
-    if (!mounted) {
-      debugPrint('📝 [GILINGAN_FORM] Widget not mounted after save, returning');
-      return;
-    }
-
-    debugPrint('📝 [GILINGAN_FORM] Checking result: ${result?.noProduksi}');
+    if (!mounted) return;
 
     if (result != null) {
-      debugPrint('📝 [GILINGAN_FORM] Success detected: ${result.noProduksi}');
-
       widget.onSave?.call(result);
-
-      if (isEdit) {
-        debugPrint('📝 [GILINGAN_FORM] Edit mode - closing with GilinganProduction result');
-        Navigator.of(context).pop(result);
-        debugPrint('📝 [GILINGAN_FORM] Dialog popped with result');
-      } else {
-        debugPrint('📝 [GILINGAN_FORM] Create mode - closing with true');
-        Navigator.of(context).pop(true);
-        debugPrint('📝 [GILINGAN_FORM] Dialog popped with true');
-      }
+      Navigator.of(context).pop(result); // tutup dialog form & kembalikan result
     } else {
-      debugPrint('❌ [GILINGAN_FORM] Result is null, showing error');
-      debugPrint('❌ [GILINGAN_FORM] Error message: ${prodVm.saveError}');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(prodVm.saveError ?? 'Gagal menyimpan data'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text(prodVm.saveError ?? 'Gagal menyimpan data')),
       );
-      debugPrint('❌ [GILINGAN_FORM] SnackBar shown, keeping dialog open');
     }
-
-    debugPrint('📝 [GILINGAN_FORM] _submit() completed');
   }
 
   /// Panggil cek-overlap via ViewModel hanya jika input sudah lengkap
@@ -307,15 +261,6 @@ class _GilinganProductionFormDialogState
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('📝 [GILINGAN_FORM] build() called');
-
-    // ✅ Verify we're using the correct VM
-    final vm = context.read<GilinganProductionViewModel>();
-    debugPrint('📝 [GILINGAN_FORM] VM from context: hash=${vm.hashCode}');
-    debugPrint(
-      '📝 [GILINGAN_FORM] Controller from VM: hash=${vm.pagingController.hashCode}',
-    );
-
     return ChangeNotifierProvider(
       create: (_) => OverlapViewModel(repository: OverlapRepository()),
       child: Dialog(

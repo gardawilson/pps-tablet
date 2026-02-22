@@ -113,7 +113,7 @@ class _SortirRejectProductionFormDialogState
         );
       }
     } catch (e) {
-      debugPrint('❌ [SORTIR_REJECT_FORM] Exception during save: $e');
+      // error handled via prodVm.saveError
     } finally {
       if (mounted) Navigator.of(context).pop(); // close loading
     }

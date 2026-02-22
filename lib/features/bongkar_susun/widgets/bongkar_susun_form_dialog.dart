@@ -72,109 +72,55 @@ class _BongkarSusunFormDialogState extends State<BongkarSusunFormDialog> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    debugPrint('📝 [FORM] _submit() started');
-
-    // ✅ Read VM from PARENT Screen context
     final prodVm = context.read<BongkarSusunViewModel>();
-    debugPrint('📝 [FORM] Got VM from context: VM hash=${prodVm.hashCode}');
-    debugPrint(
-      '📝 [FORM] Got controller from VM: controller hash=${prodVm.pagingController.hashCode}',
-    );
 
     final rawNote = noteCtrl.text.trim();
     final note = rawNote.isEmpty ? null : rawNote;
 
-    debugPrint('📝 [FORM] Showing loading dialog...');
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const Center(
-        child: CircularProgressIndicator(),
-      ),
+      builder: (_) => const Center(child: CircularProgressIndicator()),
     );
 
     BongkarSusun? result;
 
     try {
       if (isEdit) {
-        debugPrint('📝 [FORM] Calling updateBongkarSusun...');
         result = await prodVm.updateBongkarSusun(
           noBongkarSusun: widget.header!.noBongkarSusun,
           tanggal: _selectedDate,
           note: note,
         );
-        debugPrint(
-          '📝 [FORM] updateBongkarSusun returned: ${result?.noBongkarSusun}',
-        );
       } else {
-        debugPrint('📝 [FORM] Calling createBongkarSusun...');
         result = await prodVm.createBongkarSusun(
           tanggal: _selectedDate,
           note: note,
         );
-        debugPrint(
-          '📝 [FORM] createBongkarSusun returned: ${result?.noBongkarSusun}',
-        );
       }
     } catch (e) {
-      debugPrint('❌ [FORM] Exception during save: $e');
+      // error handled via prodVm.saveError
     } finally {
-      debugPrint('📝 [FORM] Popping loading dialog...');
-      if (mounted) {
-        Navigator.of(context).pop();
-        debugPrint('📝 [FORM] Loading dialog popped');
-      }
+      if (mounted) Navigator.of(context).pop();
     }
 
-    if (!mounted) {
-      debugPrint('📝 [FORM] Widget not mounted after save, returning');
-      return;
-    }
-
-    debugPrint('📝 [FORM] Checking result: ${result?.noBongkarSusun}');
+    if (!mounted) return;
 
     if (result != null) {
-      debugPrint('📝 [FORM] Success detected: ${result.noBongkarSusun}');
-
       widget.onSave?.call(result);
-
-      if (isEdit) {
-        debugPrint('📝 [FORM] Edit mode - closing with BongkarSusun result');
-        Navigator.of(context).pop(result);
-        debugPrint('📝 [FORM] Dialog popped with result');
-      } else {
-        debugPrint('📝 [FORM] Create mode - closing with true');
-        Navigator.of(context).pop(true);
-        debugPrint('📝 [FORM] Dialog popped with true');
-      }
+      Navigator.of(context).pop(result);
     } else {
-      debugPrint('❌ [FORM] Result is null, showing error');
-      debugPrint('❌ [FORM] Error message: ${prodVm.saveError}');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(prodVm.saveError ?? 'Gagal menyimpan data'),
           backgroundColor: Colors.red,
         ),
       );
-      debugPrint('❌ [FORM] SnackBar shown, keeping dialog open');
     }
-
-    debugPrint('📝 [FORM] _submit() completed');
   }
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('📝 [FORM] build() called');
-
-    // ✅ Verify we're using the correct VM
-    final vm = context.read<BongkarSusunViewModel>();
-    debugPrint('📝 [FORM] VM from context: hash=${vm.hashCode}');
-    debugPrint(
-      '📝 [FORM] Controller from VM: hash=${vm.pagingController.hashCode}',
-    );
-
-    // ✅✅✅ CRITICAL: NO ChangeNotifierProvider here!
-    // Just return Dialog directly
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Container(

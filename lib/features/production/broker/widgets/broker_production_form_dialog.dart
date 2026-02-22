@@ -268,17 +268,7 @@ class _BrokerProductionFormDialogState
 
       widget.onSave?.call(result);
 
-      if (isEdit) {
-        debugPrint(
-          '📝 [BROKER_FORM] Edit mode - closing with BrokerProduction result',
-        );
-        Navigator.of(context).pop(result);
-        debugPrint('📝 [BROKER_FORM] Dialog popped with result');
-      } else {
-        debugPrint('📝 [BROKER_FORM] Create mode - closing with true');
-        Navigator.of(context).pop(true);
-        debugPrint('📝 [BROKER_FORM] Dialog popped with true');
-      }
+      Navigator.of(context).pop(result);
     } else {
       debugPrint('❌ [BROKER_FORM] Result is null, showing error');
       debugPrint('❌ [BROKER_FORM] Error message: ${prodVm.saveError}');

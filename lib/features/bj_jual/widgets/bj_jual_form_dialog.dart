@@ -64,8 +64,6 @@ class _BJJualFormDialogState extends State<BJJualFormDialog> {
   }
 
   Future<void> _submit() async {
-    debugPrint('📝 [BJ_JUAL_FORM] _submit() started');
-
     if (!_formKey.currentState!.validate()) return;
 
     final pembeliId = _selectedPembeli?.idPembeli ?? widget.header?.idPembeli;
@@ -105,7 +103,7 @@ class _BJJualFormDialogState extends State<BJJualFormDialog> {
         );
       }
     } catch (e) {
-      debugPrint('❌ [BJ_JUAL_FORM] Exception during save: $e');
+      // ignore
     } finally {
       if (mounted) Navigator.of(context).pop(); // close loading
     }
@@ -115,11 +113,7 @@ class _BJJualFormDialogState extends State<BJJualFormDialog> {
     if (result != null) {
       widget.onSave?.call(result);
 
-      if (isEdit) {
-        Navigator.of(context).pop(result);
-      } else {
-        Navigator.of(context).pop(true);
-      }
+      Navigator.of(context).pop(result);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

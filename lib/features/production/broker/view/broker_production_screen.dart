@@ -4,20 +4,16 @@ import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart'
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
-import '../../../../common/widgets/horizontal_paged_table.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
-import '../../../../common/widgets/table_column_spec.dart';
 import '../view_model/broker_production_view_model.dart';
 import '../model/broker_production_model.dart';
-import '../../../../core/utils/date_formatter.dart';
 
 // Action bar
 import '../widgets/broker_delete_dialog.dart';
 import '../widgets/broker_production_action_bar.dart';
-// Inputs screen (Scan action)
 import '../widgets/broker_production_form_dialog.dart';
+import '../widgets/broker_production_header_table.dart';
 import 'broker_production_input_screen.dart';
-// ⬇️ New: the popover panel
 import '../widgets/broker_production_row_popover.dart';
 
 class BrokerProductionScreen extends StatefulWidget {
@@ -31,31 +27,19 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
   final _searchCtl = TextEditingController();
   String? _selectedNoProduksi;
 
-  // ✅ Store VM instance as field
   late final BrokerProductionViewModel _viewModel;
 
   @override
   void initState() {
     super.initState();
-
-    // ✅ Create VM once in initState
     _viewModel = BrokerProductionViewModel();
-
-    debugPrint(
-      '🟦🟦🟦 [BROKER_SCREEN] initState: Created VM hash=${_viewModel.hashCode}',
-    );
-    debugPrint(
-      '🟦🟦🟦 [BROKER_SCREEN] initState: PagingController hash=${_viewModel.pagingController.hashCode}',
-    );
-
-    // Initialize first load
     _viewModel.refreshPaged();
   }
 
   @override
   void dispose() {
     _searchCtl.dispose();
-    _viewModel.dispose(); // ✅ Dispose VM
+    _viewModel.dispose();
     super.dispose();
   }
 
@@ -142,9 +126,7 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
                     },
                   );
                 },
-                onPrint: () async {
-                  // optional
-                },
+                onPrint: () async {},
                 onAuditHistory: () {
                   _navigateToAuditHistory(row);
                 },
@@ -167,96 +149,10 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ Use .value to provide existing VM instance
     return ChangeNotifierProvider<BrokerProductionViewModel>.value(
       value: _viewModel,
       child: Consumer<BrokerProductionViewModel>(
         builder: (context, vm, _) {
-          debugPrint(
-            '🟦 [BROKER_SCREEN] Consumer.builder() called, VM hash=${vm.hashCode}',
-          );
-          debugPrint(
-            '🟦 [BROKER_SCREEN] Consumer pagingController: hash=${vm.pagingController.hashCode}',
-          );
-
-          final columns = <TableColumnSpec<BrokerProduction>>[
-            TableColumnSpec(
-              title: 'NO. PRODUKSI',
-              width: 160,
-              headerAlign: TextAlign.left,
-              cellAlign: TextAlign.left,
-              cellBuilder: (_, r) => Text(
-                r.noProduksi,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'TANGGAL',
-              width: 130,
-              headerAlign: TextAlign.left,
-              cellAlign: TextAlign.left,
-              cellBuilder: (_, r) => Text(formatDateToShortId(r.tglProduksi)),
-            ),
-            TableColumnSpec(
-              title: 'SHIFT',
-              width: 70,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) => Text('${r.shift}'),
-            ),
-            TableColumnSpec(
-              title: 'MESIN',
-              width: 180,
-              cellBuilder: (_, r) => Text(
-                r.namaMesin,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'OPERATOR',
-              width: 200,
-              cellBuilder: (_, r) => Text(
-                r.namaOperator,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'JAM',
-              width: 70,
-              headerAlign: TextAlign.right,
-              cellAlign: TextAlign.right,
-              cellBuilder: (_, r) => Text('${r.jamKerja}'),
-            ),
-            TableColumnSpec(
-              title: 'HM',
-              width: 80,
-              headerAlign: TextAlign.right,
-              cellAlign: TextAlign.right,
-              cellBuilder: (_, r) => Text('${r.hourMeter ?? 0}'),
-            ),
-            TableColumnSpec(
-              title: 'ANGGOTA/HADIR',
-              width: 150,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) =>
-                  Text('${r.jmlhAnggota ?? 0}/${r.hadir ?? 0}'),
-            ),
-            TableColumnSpec(
-              title: 'APPROVED',
-              width: 110,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) =>
-                  (r.approveBy != null && r.approveBy!.isNotEmpty)
-                  ? const Icon(Icons.verified, size: 18, color: Colors.green)
-                  : const Text('-', style: TextStyle(color: Colors.black54)),
-            ),
-          ];
-
           return Scaffold(
             appBar: AppBar(
               title: const Text('Broker Production'),
@@ -269,12 +165,7 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
                 else
                   IconButton(
                     icon: const Icon(Icons.refresh),
-                    onPressed: () {
-                      debugPrint(
-                        '🟦 [BROKER_SCREEN] Manual refresh button pressed, VM hash=${vm.hashCode}',
-                      );
-                      vm.refreshPaged();
-                    },
+                    onPressed: vm.refreshPaged,
                   ),
               ],
             ),
@@ -287,15 +178,11 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
                     _searchCtl.clear();
                     vm.clearFilters();
                   },
-                  onAddPressed: _openCreateDialog,
+                  onAddPressed: () => _openCreateDialog(context),
                 ),
                 Expanded(
-                  child: HorizontalPagedTable<BrokerProduction>(
-                    pagingController: vm.pagingController,
-                    columns: columns,
-                    horizontalPadding: 16,
-                    selectedPredicate: (r) =>
-                        r.noProduksi == _selectedNoProduksi,
+                  child: BrokerProductionHeaderTable(
+                    selectedNoProduksi: _selectedNoProduksi,
                     onRowTap: (r) =>
                         setState(() => _selectedNoProduksi = r.noProduksi),
                     onRowLongPress: (r, globalPos) async {
@@ -315,102 +202,46 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
     );
   }
 
-  Future<void> _openCreateDialog() async {
-    debugPrint('🟦 [BROKER_SCREEN] Opening create dialog...');
-    debugPrint('🟦 [BROKER_SCREEN] Using VM hash=${_viewModel.hashCode}');
-    debugPrint(
-      '🟦 [BROKER_SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
-    );
-
-    if (!mounted) return;
-
-    final created = await showDialog<bool>(
-      context: context,
+  Future<void> _openCreateDialog(BuildContext ctx) async {
+    final created = await showDialog<BrokerProduction>(
+      context: ctx,
       barrierDismissible: false,
-      builder: (dialogContext) {
-        debugPrint('🟦 [BROKER_SCREEN] Building create dialog...');
-
-        // ✅ Share the SAME VM instance using .value
-        return ChangeNotifierProvider<BrokerProductionViewModel>.value(
-          value: _viewModel,
-          child: BrokerProductionFormDialog(
-            onSave: (draft) async {
-              try {
-                if (context.mounted) {
-                  // VM already auto-refreshed in createProduksi
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Gagal membuat label: $e')),
-                  );
-                }
-              }
-            },
-          ),
-        );
-      },
+      builder: (_) => const BrokerProductionFormDialog(),
     );
 
-    debugPrint('🟦 [BROKER_SCREEN] Dialog closed, result: $created');
+    if (!mounted || !ctx.mounted) return;
 
-    if (!mounted) return;
-
-    if (created == true) {
-      debugPrint('🟦 [BROKER_SCREEN] Success detected (create).');
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Label berhasil dibuat')));
-    } else {
-      debugPrint('🟦 [BROKER_SCREEN] Result was null or false: $created');
+    if (created != null) {
+      _viewModel.refreshPaged();
+      setState(() => _selectedNoProduksi = created.noProduksi);
+      showDialog(
+        context: ctx,
+        builder: (_) => SuccessStatusDialog(
+          title: 'Berhasil Membuat',
+          message: 'No. Produksi ${created.noProduksi} berhasil dibuat.',
+        ),
+      );
     }
   }
 
-  Future<void> _openEditDialog(
-    BuildContext context,
-    BrokerProduction row,
-  ) async {
-    debugPrint('🟦 [BROKER_SCREEN] Opening edit dialog for: ${row.noProduksi}');
-    debugPrint('🟦 [BROKER_SCREEN] Using VM hash=${_viewModel.hashCode}');
-    debugPrint(
-      '🟦 [BROKER_SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
-    );
-
-    if (!mounted) return;
-
+  Future<void> _openEditDialog(BuildContext ctx, BrokerProduction row) async {
     final updated = await showDialog<BrokerProduction>(
-      context: context,
+      context: ctx,
       barrierDismissible: false,
-      builder: (dialogContext) {
-        debugPrint('🟦 [BROKER_SCREEN] Building edit dialog...');
-
-        // ✅ Share the SAME VM instance
-        return ChangeNotifierProvider<BrokerProductionViewModel>.value(
-          value: _viewModel,
-          child: BrokerProductionFormDialog(header: row),
-        );
-      },
+      builder: (_) => BrokerProductionFormDialog(header: row),
     );
 
-    debugPrint(
-      '🟦 [BROKER_SCREEN] Edit dialog closed, result: ${updated?.noProduksi}',
-    );
-
-    if (!mounted) return;
+    if (!mounted || !ctx.mounted) return;
 
     if (updated != null) {
-      debugPrint('🟦 [BROKER_SCREEN] Success detected (update).');
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'No. Produksi ${updated.noProduksi} berhasil diperbarui',
-          ),
+      _viewModel.refreshPaged();
+      showDialog(
+        context: ctx,
+        builder: (_) => SuccessStatusDialog(
+          title: 'Berhasil Mengupdate',
+          message: 'No. Produksi ${updated.noProduksi} berhasil diperbarui.',
         ),
       );
-    } else {
-      debugPrint('🟦 [BROKER_SCREEN] Result was null');
     }
   }
 }

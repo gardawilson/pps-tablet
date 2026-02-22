@@ -3,13 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:pps_tablet/features/production/washing/view/washing_production_input_screen.dart';
 import 'package:provider/provider.dart';
-import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
-import '../../../../common/widgets/horizontal_paged_table.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
-import '../../../../common/widgets/table_column_spec.dart';
-import '../../../../core/utils/date_formatter.dart';
 
 // VM + Repo + Model washing
 import '../view_model/washing_production_view_model.dart';
@@ -20,6 +16,7 @@ import '../model/washing_production_model.dart';
 import '../widgets/washing_delete_dialog.dart';
 import '../widgets/washing_production_action_bar.dart';
 import '../widgets/washing_production_form_dialog.dart';
+import '../widgets/washing_production_header_table.dart';
 import '../widgets/washing_production_row_popover.dart';
 
 class WashingProductionScreen extends StatefulWidget {
@@ -191,83 +188,6 @@ class _WashingProductionScreenState extends State<WashingProductionScreen> {
             ..refreshPaged(),
       child: Consumer<WashingProductionViewModel>(
         builder: (context, vm, _) {
-          final columns = <TableColumnSpec<WashingProduction>>[
-            TableColumnSpec(
-              title: 'NO. PRODUKSI',
-              width: 160,
-              headerAlign: TextAlign.left,
-              cellAlign: TextAlign.left,
-              cellBuilder: (_, r) => Text(
-                r.noProduksi,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'TANGGAL',
-              width: 130,
-              headerAlign: TextAlign.left,
-              cellAlign: TextAlign.left,
-              cellBuilder: (_, r) => Text(formatDateToShortId(r.tglProduksi)),
-            ),
-            TableColumnSpec(
-              title: 'SHIFT',
-              width: 70,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) => Text('${r.shift}'),
-            ),
-            TableColumnSpec(
-              title: 'MESIN',
-              width: 180,
-              cellBuilder: (_, r) => Text(
-                r.namaMesin,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'OPERATOR',
-              width: 200,
-              cellBuilder: (_, r) => Text(
-                r.namaOperator,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'JAM',
-              width: 70,
-              headerAlign: TextAlign.right,
-              cellAlign: TextAlign.right,
-              cellBuilder: (_, r) => Text('${r.jamKerja}'),
-            ),
-            TableColumnSpec(
-              title: 'HM',
-              width: 80,
-              headerAlign: TextAlign.right,
-              cellAlign: TextAlign.right,
-              cellBuilder: (_, r) => Text('${r.hourMeter}'),
-            ),
-            TableColumnSpec(
-              title: 'ANGGOTA/HADIR',
-              width: 150,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) => Text('${r.jmlhAnggota}/${r.hadir}'),
-            ),
-            TableColumnSpec(
-              title: 'APPROVED',
-              width: 110,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) =>
-                  (r.approveBy != null && r.approveBy!.isNotEmpty)
-                  ? const Icon(Icons.verified, size: 18, color: Colors.green)
-                  : const Text('-', style: TextStyle(color: Colors.black54)),
-            ),
-          ];
-
           return Scaffold(
             appBar: AppBar(
               title: const Text('Washing Production'),
@@ -286,7 +206,6 @@ class _WashingProductionScreenState extends State<WashingProductionScreen> {
             ),
             body: Column(
               children: [
-                // 🔹 ACTION BAR (search + create) — mirip BrokerProductionActionBar
                 WashingProductionActionBar(
                   controller: _searchCtl,
                   onSearchChanged: (value) => vm.setSearchDebounced(value),
@@ -294,21 +213,13 @@ class _WashingProductionScreenState extends State<WashingProductionScreen> {
                     _searchCtl.clear();
                     vm.clearFilters();
                   },
-                  onAddPressed: _openCreateDialog,
+                  onAddPressed: () => _openCreateDialog(context),
                 ),
-
-                // 🔹 TABLE
                 Expanded(
-                  child: HorizontalPagedTable<WashingProduction>(
-                    pagingController: vm.pagingController,
-                    columns: columns,
-                    horizontalPadding: 16,
-                    selectedPredicate: (r) =>
-                        r.noProduksi == _selectedNoProduksi,
+                  child: WashingProductionHeaderTable(
+                    selectedNoProduksi: _selectedNoProduksi,
                     onRowTap: (r) =>
                         setState(() => _selectedNoProduksi = r.noProduksi),
-
-                    // format sama dengan broker: long-press + posisi global
                     onRowLongPress: (row, globalPos) async {
                       await _showRowPopover(
                         context: context,
@@ -329,29 +240,23 @@ class _WashingProductionScreenState extends State<WashingProductionScreen> {
   // =========================================================
   //  DIALOG CREATE (format mirip broker, tapi simple)
   // =========================================================
-  Future<void> _openCreateDialog() async {
-    // VM sebenarnya dipakai di dalam dialog via Provider,
-    // jadi di sini kita hanya terima hasilnya saja.
+  Future<void> _openCreateDialog(BuildContext ctx) async {
     final created = await showDialog<WashingProduction>(
-      context: context,
+      context: ctx,
       barrierDismissible: false,
-      builder: (ctx) => WashingProductionFormDialog(
-        header: null, // mode create
-      ),
+      builder: (_) => const WashingProductionFormDialog(header: null),
     );
 
-    if (!mounted) return;
+    if (!mounted || !ctx.mounted) return;
 
     if (created != null) {
-      setState(() {
-        _selectedNoProduksi = created.noProduksi;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Washing No. Produksi ${created.noProduksi} berhasil dibuat',
-          ),
+      ctx.read<WashingProductionViewModel>().refreshPaged();
+      setState(() => _selectedNoProduksi = created.noProduksi);
+      showDialog(
+        context: ctx,
+        builder: (_) => SuccessStatusDialog(
+          title: 'Berhasil Membuat',
+          message: 'No. Produksi ${created.noProduksi} berhasil dibuat.',
         ),
       );
     }
@@ -361,29 +266,24 @@ class _WashingProductionScreenState extends State<WashingProductionScreen> {
   //  DIALOG EDIT (kalau nanti sudah ada endpoint update)
   // =========================================================
   Future<void> _openEditDialog(
-    BuildContext context,
+    BuildContext ctx,
     WashingProduction row,
   ) async {
-    final vm = context.read<WashingProductionViewModel>();
-
-    // Open the form in EDIT mode by passing `header: row`
     final updated = await showDialog<WashingProduction>(
-      context: context,
+      context: ctx,
       barrierDismissible: false,
-      builder: (ctx) => WashingProductionFormDialog(
-        header: row, // ← send current values here
-      ),
+      builder: (_) => WashingProductionFormDialog(header: row),
     );
 
-    if (!mounted) return;
+    if (!mounted || !ctx.mounted) return;
 
     if (updated != null) {
-      // (Optional) Give feedback
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'No. Produksi ${updated.noProduksi} berhasil diperbarui',
-          ),
+      ctx.read<WashingProductionViewModel>().refreshPaged();
+      showDialog(
+        context: ctx,
+        builder: (_) => SuccessStatusDialog(
+          title: 'Berhasil Mengupdate',
+          message: 'No. Produksi ${updated.noProduksi} berhasil diperbarui.',
         ),
       );
     }

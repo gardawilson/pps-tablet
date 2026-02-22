@@ -1,28 +1,17 @@
-// lib/features/furniture_wip/widgets/reject_header_table.dart
-
 import 'package:flutter/material.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 
-import '../../../../common/widgets/horizontal_paged_table.dart';
-import '../../../../common/widgets/table_column_spec.dart';
-import '../model/furniture_wip_header_model.dart';
+import '../../../../common/widgets/atlas_data_table.dart';
+import '../../../../common/widgets/atlas_paged_data_table.dart';
 import '../../../../core/utils/date_formatter.dart';
+import '../model/furniture_wip_header_model.dart';
 
 class FurnitureWipHeaderTable extends StatelessWidget {
-  /// Paging controller (dipegang di ViewModel / Screen)
   final PagingController<int, FurnitureWipHeader> pagingController;
-
-  /// NoFurnitureWIP yang sedang selected (untuk highlight row)
   final String? selectedNoFurnitureWip;
-
-  /// Tap biasa pada row
   final ValueChanged<FurnitureWipHeader>? onItemTap;
-
-  /// Long-press (dengan posisi global) – untuk context menu / popover row
   final void Function(FurnitureWipHeader header, Offset globalPosition)?
   onItemLongPress;
-
-  /// Callback saat row partial diklik (tanpa posisi tap)
   final ValueChanged<FurnitureWipHeader>? onPartialTap;
 
   const FurnitureWipHeaderTable({
@@ -36,204 +25,150 @@ class FurnitureWipHeaderTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return HorizontalPagedTable<FurnitureWipHeader>(
+    return AtlasPagedDataTable<FurnitureWipHeader>(
       pagingController: pagingController,
-      widthMode: TableWidthMode.content, // atau fill/clamp sesuai selera
-      rowHeight: 52,
-      headerColor: const Color(0xFF1565C0),
-      horizontalPadding: 16,
+      columns: _buildColumns(),
       selectedPredicate: (row) => row.noFurnitureWip == selectedNoFurnitureWip,
       onRowTap: (row) {
-        // callback utama ke Screen
         onItemTap?.call(row);
-
-        // kalau partial dan punya handler khusus
         if (row.isPartialBool && onPartialTap != null) {
           onPartialTap!(row);
         }
       },
-      onRowLongPress: (row, pos) {
-        onItemLongPress?.call(row, pos);
-      },
-      columns: _buildColumns(),
+      onRowLongPress: (row, pos) => onItemLongPress?.call(row, pos),
     );
   }
 
-  List<TableColumnSpec<FurnitureWipHeader>> _buildColumns() {
+  List<AtlasTableColumn<FurnitureWipHeader>> _buildColumns() {
     return [
-      // =========================
-      // NO. FURNITURE WIP
-      // =========================
-      TableColumnSpec<FurnitureWipHeader>(
+      AtlasTableColumn<FurnitureWipHeader>(
         title: 'NO. LABEL',
         width: 170,
-        headerAlign: TextAlign.left,
-        cellAlign: TextAlign.left,
-        cellBuilder: (context, item) {
-          final isPartial = item.isPartialBool;
+        cellBuilder: (context, item, rowState) {
           return Row(
             children: [
               Expanded(
                 child: Text(
                   item.noFurnitureWip,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (isPartial) ...[
-                const SizedBox(width: 4),
-                Tooltip(
-                  message: 'Klik untuk lihat detail partial',
-                  child: Icon(
-                    Icons.info_outline,
-                    size: 16,
-                    color: Colors.orange.shade600,
+                  softWrap: true,
+                  style: TextStyle(
+                    fontWeight: rowState.isSelected
+                        ? FontWeight.w700
+                        : FontWeight.w600,
+                    color: rowState.isSelected
+                        ? const Color(0xFF0C66E4)
+                        : Colors.black87,
                   ),
                 ),
-              ],
+              ),
             ],
           );
         },
       ),
-
-      // =========================
-      // TANGGAL
-      // =========================
-      TableColumnSpec<FurnitureWipHeader>(
+      AtlasTableColumn<FurnitureWipHeader>(
         title: 'TANGGAL',
         width: 130,
-        headerAlign: TextAlign.left,
-        cellAlign: TextAlign.left,
-        cellBuilder: (context, item) {
+        cellBuilder: (context, item, rowState) {
           return Text(
             formatDateToShortId(item.dateCreate),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 14, color: rowState.textColor),
+            softWrap: true,
           );
         },
       ),
-
-      // =========================
-      // JENIS (NamaFurnitureWIP)
-      // =========================
-      TableColumnSpec<FurnitureWipHeader>(
+      AtlasTableColumn<FurnitureWipHeader>(
         title: 'JENIS',
         width: 350,
-        headerAlign: TextAlign.left,
-        cellAlign: TextAlign.left,
-        cellBuilder: (context, item) {
+        cellBuilder: (context, item, rowState) {
           return Text(
             item.namaFurnitureWip ?? '-',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 14, color: rowState.textColor),
+            softWrap: true,
           );
         },
       ),
-
-      // =========================
-      // OUTPUT (Kode + Nama Mesin/Pembeli/Bongkar)
-      // =========================
-      TableColumnSpec<FurnitureWipHeader>(
+      AtlasTableColumn<FurnitureWipHeader>(
         title: 'PROSES',
         width: 170,
-        headerAlign: TextAlign.left,
-        cellAlign: TextAlign.left,
-        cellBuilder: (context, item) {
+        cellBuilder: (context, item, rowState) {
           final code = item.outputCode ?? '-';
           final nama = (item.outputNamaMesin ?? '').trim();
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 code,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
+                  color: rowState.isSelected
+                      ? const Color(0xFF0C66E4)
+                      : Colors.black87,
                 ),
+                softWrap: true,
               ),
               if (nama.isNotEmpty) ...[
                 const SizedBox(height: 2),
                 Text(
                   nama,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Colors.black54,
-                    fontWeight: FontWeight.w400,
-                  ),
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                  softWrap: true,
                 ),
               ],
             ],
           );
         },
       ),
-
-      // =========================
-      // PCS (right-align)
-      // =========================
-      TableColumnSpec<FurnitureWipHeader>(
+      AtlasTableColumn<FurnitureWipHeader>(
         title: 'PCS',
         width: 80,
         headerAlign: TextAlign.right,
-        cellAlign: TextAlign.right,
-        cellBuilder: (context, item) {
-          final txt = _formatPcs(item.pcs);
+        cellAlignment: Alignment.centerRight,
+        cellBuilder: (context, item, rowState) {
           return Text(
-            txt,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            _formatPcs(item.pcs),
             style: TextStyle(
-              fontWeight:
-              item.isPartialBool ? FontWeight.bold : FontWeight.w500,
-              color: item.isPartialBool ? Colors.red : null,
+              fontSize: 14,
+              fontWeight: item.isPartialBool
+                  ? FontWeight.w700
+                  : FontWeight.w500,
+              color: item.isPartialBool ? Colors.red : rowState.textColor,
             ),
+            softWrap: true,
           );
         },
       ),
-
-      // =========================
-      // BERAT (right-align)
-      // =========================
-      TableColumnSpec<FurnitureWipHeader>(
+      AtlasTableColumn<FurnitureWipHeader>(
         title: 'BERAT',
         width: 100,
         headerAlign: TextAlign.right,
-        cellAlign: TextAlign.right,
-        cellBuilder: (context, item) {
-          final txt = _formatBerat(item.berat);
+        cellAlignment: Alignment.centerRight,
+        cellBuilder: (context, item, rowState) {
           return Text(
-            txt,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            _formatBerat(item.berat),
+            style: TextStyle(fontSize: 14, color: rowState.textColor),
+            softWrap: true,
           );
         },
       ),
-
-      // =========================
-      // LOKASI (center-align biar rapi)
-      // =========================
-      TableColumnSpec<FurnitureWipHeader>(
+      AtlasTableColumn<FurnitureWipHeader>(
         title: 'LOKASI',
         width: 110,
         headerAlign: TextAlign.center,
-        cellAlign: TextAlign.center,
-        cellBuilder: (context, item) {
-          final txt = _formatBlokLokasi(item.blok, item.idLokasi);
+        cellAlignment: Alignment.center,
+        showDivider: false,
+        cellBuilder: (context, item, rowState) {
           return Text(
-            txt,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            _formatBlokLokasi(item.blok, item.idLokasi),
+            style: TextStyle(fontSize: 14, color: rowState.textColor),
+            softWrap: true,
           );
         },
       ),
     ];
   }
-
-  // ==== Helpers ====
 
   String _formatPcs(double? v) {
     if (v == null) return '-';
@@ -250,8 +185,7 @@ class FurnitureWipHeaderTable extends StatelessWidget {
 
   String _formatBlokLokasi(String? blok, dynamic idLokasi) {
     final hasBlok = blok != null && blok.trim().isNotEmpty;
-    final hasLokasi =
-        idLokasi != null && idLokasi.toString().trim().isNotEmpty;
+    final hasLokasi = idLokasi != null && idLokasi.toString().trim().isNotEmpty;
 
     if (!hasBlok && !hasLokasi) {
       return '-';

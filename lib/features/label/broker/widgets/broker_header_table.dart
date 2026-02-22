@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../view_model/broker_view_model.dart';
-import '../model/broker_header_model.dart';
+
+import '../../../../common/widgets/atlas_data_table.dart';
 import '../../../../core/utils/date_formatter.dart';
+import '../model/broker_header_model.dart';
+import '../view_model/broker_view_model.dart';
 
 class BrokerHeaderTable extends StatelessWidget {
+  static const _colNoBrokerWidth = 128.0;
+  static const _colTanggalWidth = 108.0;
+  static const _colLokasiWidth = 96.0;
+
   final ScrollController scrollController;
   final ValueChanged<BrokerHeader> onItemTap;
 
@@ -21,232 +27,121 @@ class BrokerHeaderTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _buildTableHeader(),
-        Expanded(
-          child: Consumer<BrokerViewModel>(
-            builder: (context, vm, _) {
-              if (vm.isLoading && vm.items.isEmpty) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              if (vm.errorMessage.isNotEmpty && vm.items.isEmpty) {
-                return _buildErrorState(vm.errorMessage);
-              }
-
-              return ListView.builder(
-                controller: scrollController,
-                itemCount: vm.items.length + (vm.isFetchingMore ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (index == vm.items.length) {
-                    return const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  }
-
-                  final item = vm.items[index];
-                  final isSelected = vm.selectedNoBroker == item.noBroker;
-                  final isEven = index % 2 == 0;
-
-                  return _buildTableRow(
-                    context: context,
-                    item: item,
-                    isSelected: isSelected,
-                    isEven: isEven,
-                  );
-                },
-              );
-            },
-          ),
-        ),
-      ],
+    return Consumer<BrokerViewModel>(
+      builder: (context, vm, _) {
+        return AtlasDataTable<BrokerHeader>(
+          columns: _buildColumns(),
+          items: vm.items,
+          scrollController: scrollController,
+          isLoading: vm.isLoading,
+          isFetchingMore: vm.isFetchingMore,
+          errorMessage: vm.errorMessage,
+          errorBuilder: _buildErrorState,
+          selectedPredicate: (item) => vm.selectedNoBroker == item.noBroker,
+          highlightPredicate: _isQCCompleted,
+          onRowTap: onItemTap,
+          onRowLongPress: onItemLongPress,
+        );
+      },
     );
   }
 
-  Widget _buildTableHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1565C0),
-        border: Border(
-          bottom: BorderSide(color: Colors.grey.shade300, width: 2),
-        ),
+  List<AtlasTableColumn<BrokerHeader>> _buildColumns() {
+    return [
+      AtlasTableColumn<BrokerHeader>(
+        title: 'NO. BROKER',
+        width: _colNoBrokerWidth,
+        cellBuilder: (context, item, rowState) {
+          return Text(
+            item.noBroker,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: rowState.isSelected
+                  ? FontWeight.w700
+                  : FontWeight.w600,
+              color: rowState.isSelected
+                  ? const Color(0xFF0C66E4)
+                  : Colors.black87,
+            ),
+            softWrap: true,
+          );
+        },
       ),
-      child: Row(
-        children: const [
-          SizedBox(
-            width: 120,
-            child: Text(
-              'NO. BROKER',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-          SizedBox(
-            width: 130,
-            child: Text(
-              'TANGGAL',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              'JENIS',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              'PROSES',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-          SizedBox(
-            width: 120,
-            child: Text(
-              'LOKASI',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-          SizedBox(
-            width: 72,
-            child: Center(
-              child: Text(
-                'QC',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: Colors.white,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ),
-          ),
-        ],
+      AtlasTableColumn<BrokerHeader>(
+        title: 'TANGGAL',
+        width: _colTanggalWidth,
+        cellBuilder: (context, item, rowState) {
+          return Text(
+            formatDateToShortId(item.dateCreate),
+            style: TextStyle(fontSize: 14, color: rowState.textColor),
+            softWrap: true,
+          );
+        },
       ),
-    );
-  }
+      AtlasTableColumn<BrokerHeader>(
+        title: 'JENIS',
+        flex: 2,
+        horizontalPadding: 14,
+        cellBuilder: (context, item, rowState) {
+          return Text(
+            item.namaJenisPlastik,
+            style: TextStyle(fontSize: 14, color: rowState.textColor),
+            softWrap: true,
+          );
+        },
+      ),
+      AtlasTableColumn<BrokerHeader>(
+        title: 'PROSES',
+        flex: 2,
+        horizontalPadding: 14,
+        cellBuilder: (context, item, rowState) {
+          final code = (item.noProduksi ?? '').trim().isNotEmpty
+              ? item.noProduksi!.trim()
+              : ((item.noBongkarSusun ?? '').trim().isNotEmpty
+                    ? item.noBongkarSusun!.trim()
+                    : '-');
+          final nama = (item.namaMesin ?? '').trim();
 
-  Widget _buildTableRow({
-    required BuildContext context,
-    required BrokerHeader item,
-    required bool isSelected,
-    required bool isEven,
-  }) {
-    // Warna latar: selected > zebra
-    final bgColor = isSelected
-        ? Colors.blue.shade50
-        : (isEven ? Colors.white : Colors.grey.shade50);
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onLongPressStart: (details) =>
-          onItemLongPress(item, details.globalPosition),
-      onSecondaryTapDown: (details) =>
-          onItemLongPress(item, details.globalPosition),
-      child: InkWell(
-        onTap: () => onItemTap(item),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          curve: Curves.easeInOut,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          decoration: BoxDecoration(
-            color: bgColor,
-            border: Border(
-              left: BorderSide(
-                color: isSelected ? Colors.blue : Colors.transparent,
-                width: 4,
-              ),
-              bottom: BorderSide(color: Colors.grey.shade200),
-            ),
-          ),
-          child: Row(
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              SizedBox(
-                width: 120,
-                child: Text(
-                  item.noBroker,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                    color: isSelected ? Colors.blue.shade900 : Colors.black87,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+              Text(
+                code,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: rowState.isSelected
+                      ? const Color(0xFF0C66E4)
+                      : Colors.black87,
                 ),
+                softWrap: true,
               ),
-              SizedBox(
-                width: 130,
-                child: Text(
-                  formatDateToShortId(item.dateCreate),
-                  style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
-                  overflow: TextOverflow.ellipsis,
+              if (nama.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  nama,
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                  softWrap: true,
                 ),
-              ),
-              Expanded(
-                child: Text(
-                  item.namaJenisPlastik,
-                  style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Expanded(
-                child: Text(
-                  (item.namaMesin?.isNotEmpty == true)
-                      ? item.namaMesin!
-                      : (item.noBongkarSusun?.isNotEmpty == true
-                            ? item.noBongkarSusun!
-                            : '-'),
-                  style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              SizedBox(
-                width: 120,
-                child: Text(
-                  _formatBlokLokasi(item.blok, item.idLokasi),
-                  style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              SizedBox(
-                width: 72,
-                child: Center(
-                  child: _isQCCompleted(item)
-                      ? const _QcDoneLozenge()
-                      : const _QcOpenLozenge(),
-                ),
-              ),
+              ],
             ],
-          ),
-        ),
+          );
+        },
       ),
-    );
+      AtlasTableColumn<BrokerHeader>(
+        title: 'LOKASI',
+        width: _colLokasiWidth,
+        showDivider: false,
+        cellBuilder: (context, item, rowState) {
+          return Text(
+            _formatBlokLokasi(item.blok, item.idLokasi),
+            style: TextStyle(fontSize: 14, color: rowState.textColor),
+            softWrap: true,
+          );
+        },
+      ),
+    ];
   }
 
   String _formatBlokLokasi(String? blok, dynamic idLokasi) {
@@ -257,7 +152,6 @@ class BrokerHeaderTable extends StatelessWidget {
       return '-';
     }
 
-    // kalau keduanya ada → gabung tanpa spasi (contoh: A1)
     return '${blok ?? ''}${idLokasi ?? ''}';
   }
 
@@ -282,59 +176,6 @@ class BrokerHeaderTable extends StatelessWidget {
             style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _QcDoneLozenge extends StatelessWidget {
-  const _QcDoneLozenge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE3FCEF),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: const [
-          Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF216E4E)),
-          SizedBox(width: 4),
-          Text(
-            'Done',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF216E4E),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _QcOpenLozenge extends StatelessWidget {
-  const _QcOpenLozenge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFDFE1E6),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: const Text(
-        'Open',
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: Color(0xFF44546F),
-        ),
       ),
     );
   }

@@ -85,9 +85,12 @@ class _WashingActionBarState extends State<WashingActionBar> {
                             : Colors.grey.shade400,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 18, vertical: 14),
+                          horizontal: 18,
+                          vertical: 14,
+                        ),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         textStyle: const TextStyle(
                           fontWeight: FontWeight.w700,
                           letterSpacing: .2,
@@ -114,12 +117,12 @@ class _WashingActionBarState extends State<WashingActionBar> {
                         ),
                         boxShadow: _focused
                             ? [
-                          BoxShadow(
-                            color: cs.primary.withOpacity(.12),
-                            blurRadius: 14,
-                            offset: const Offset(0, 6),
-                          ),
-                        ]
+                                BoxShadow(
+                                  color: cs.primary.withOpacity(.12),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ]
                             : null,
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -140,13 +143,15 @@ class _WashingActionBarState extends State<WashingActionBar> {
                               textInputAction: TextInputAction.search,
                               decoration: InputDecoration(
                                 hintText:
-                                'Cari No Washing / Jenis / Warehouse…',
-                                hintStyle:
-                                TextStyle(color: Colors.grey.shade500),
+                                    'Cari No Washing / Jenis / Warehouse…',
+                                hintStyle: TextStyle(
+                                  color: Colors.grey.shade500,
+                                ),
                                 isCollapsed: true,
                                 border: InputBorder.none,
-                                contentPadding:
-                                const EdgeInsets.symmetric(vertical: 14),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                               ),
                             ),
                           ),
@@ -155,18 +160,19 @@ class _WashingActionBarState extends State<WashingActionBar> {
                             duration: const Duration(milliseconds: 140),
                             child: _hasText
                                 ? IconButton(
-                              key: const ValueKey('clear_on'),
-                              tooltip: 'Bersihkan',
-                              icon: const Icon(Icons.close_rounded),
-                              onPressed: () {
-                                widget.controller.clear();
-                                setState(() {});
-                                widget.onClear();
-                                _searchFocus.requestFocus();
-                              },
-                            )
+                                    key: const ValueKey('clear_on'),
+                                    tooltip: 'Bersihkan',
+                                    icon: const Icon(Icons.close_rounded),
+                                    onPressed: () {
+                                      widget.controller.clear();
+                                      setState(() {});
+                                      widget.onClear();
+                                      _searchFocus.requestFocus();
+                                    },
+                                  )
                                 : const SizedBox.shrink(
-                                key: ValueKey('clear_off')),
+                                    key: ValueKey('clear_off'),
+                                  ),
                           ),
                         ],
                       ),
@@ -187,7 +193,8 @@ class _WashingActionBarState extends State<WashingActionBar> {
                       },
                       style: IconButton.styleFrom(
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                     ),
                 ],

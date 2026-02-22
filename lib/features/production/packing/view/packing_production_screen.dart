@@ -6,18 +6,14 @@ import 'package:pps_tablet/features/production/packing/view/packing_production_i
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
-import '../../../../common/widgets/horizontal_paged_table.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
-import '../../../../common/widgets/table_column_spec.dart';
-import '../../../../core/utils/date_formatter.dart';
 
-// ✅ adjust these imports to your packing folder structure
 import '../model/packing_production_model.dart';
 import '../view_model/packing_production_view_model.dart';
-
 import '../widgets/packing_production_action_bar.dart';
 import '../widgets/packing_production_delete_dialog.dart';
 import '../widgets/packing_production_form_dialog.dart';
+import '../widgets/packing_production_header_table.dart';
 import '../widgets/packing_production_row_popover.dart';
 
 class PackingProductionScreen extends StatefulWidget {
@@ -32,24 +28,12 @@ class _PackingProductionScreenState extends State<PackingProductionScreen> {
   final TextEditingController _searchCtl = TextEditingController();
   String? _selectedNoPacking;
 
-  // ✅ Store VM instance as field
   late final PackingProductionViewModel _viewModel;
 
   @override
   void initState() {
     super.initState();
-
-    // ✅ Create VM once in initState
     _viewModel = PackingProductionViewModel();
-
-    debugPrint(
-      '🟩🟩🟩 [PACKING_SCREEN] initState: Created VM hash=${_viewModel.hashCode}',
-    );
-    debugPrint(
-      '🟩🟩🟩 [PACKING_SCREEN] initState: PagingController hash=${_viewModel.pagingController.hashCode}',
-    );
-
-    // Initialize first load
     _viewModel.refreshPaged();
   }
 
@@ -87,7 +71,6 @@ class _PackingProductionScreenState extends State<PackingProductionScreen> {
               child: PackingProductionRowPopover(
                 row: row,
                 onClose: () => Navigator.of(dialogCtx).pop(),
-
                 onInput: () {
                   Future.microtask(() {
                     Navigator.of(context).push(
@@ -101,11 +84,9 @@ class _PackingProductionScreenState extends State<PackingProductionScreen> {
                     );
                   });
                 },
-
                 onEdit: () async {
                   await _openEditDialog(context, row);
                 },
-
                 onDelete: () async {
                   await showDialog<void>(
                     context: context,
@@ -131,13 +112,13 @@ class _PackingProductionScreenState extends State<PackingProductionScreen> {
                               ),
                             );
                           } else {
-                            final rawMsg =
-                                _viewModel.saveError ?? 'Gagal menghapus data';
                             showDialog(
                               context: context,
                               builder: (_) => ErrorStatusDialog(
                                 title: 'Gagal Menghapus!',
-                                message: rawMsg,
+                                message:
+                                    _viewModel.saveError ??
+                                    'Gagal menghapus data',
                               ),
                             );
                           }
@@ -146,10 +127,7 @@ class _PackingProductionScreenState extends State<PackingProductionScreen> {
                     },
                   );
                 },
-
-                onPrint: () {
-                  // TODO: kalau nanti ada cetak / print packing
-                },
+                onPrint: () {},
                 onAuditHistory: () {
                   _navigateToAuditHistory(row);
                 },
@@ -170,106 +148,68 @@ class _PackingProductionScreenState extends State<PackingProductionScreen> {
     );
   }
 
+  Future<void> _openCreateDialog(BuildContext ctx) async {
+    final created = await showDialog<PackingProduction>(
+      context: ctx,
+      barrierDismissible: false,
+      builder: (_) => ChangeNotifierProvider<PackingProductionViewModel>.value(
+        value: _viewModel,
+        child: const PackingProductionFormDialog(),
+      ),
+    );
+    if (!mounted || !ctx.mounted) return;
+    if (created != null) {
+      _viewModel.refreshPaged();
+      setState(() => _selectedNoPacking = created.noPacking);
+      showDialog(
+        context: ctx,
+        builder: (_) => SuccessStatusDialog(
+          title: 'Berhasil Membuat',
+          message: 'No. Packing ${created.noPacking} berhasil dibuat.',
+        ),
+      );
+    }
+  }
+
+  Future<void> _openEditDialog(
+    BuildContext ctx,
+    PackingProduction row,
+  ) async {
+    final updated = await showDialog<PackingProduction>(
+      context: ctx,
+      barrierDismissible: false,
+      builder: (_) => ChangeNotifierProvider<PackingProductionViewModel>.value(
+        value: _viewModel,
+        child: PackingProductionFormDialog(header: row),
+      ),
+    );
+    if (!mounted || !ctx.mounted) return;
+    if (updated != null) {
+      _viewModel.refreshPaged();
+      showDialog(
+        context: ctx,
+        builder: (_) => SuccessStatusDialog(
+          title: 'Berhasil Mengupdate',
+          message: 'No. Packing ${updated.noPacking} berhasil diperbarui.',
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider<PackingProductionViewModel>.value(
       value: _viewModel,
       child: Consumer<PackingProductionViewModel>(
         builder: (context, vm, _) {
-          debugPrint(
-            '🟩 [PACKING_SCREEN] Consumer.builder() called, VM hash=${vm.hashCode}',
-          );
-          debugPrint(
-            '🟩 [PACKING_SCREEN] Consumer pagingController: hash=${vm.pagingController.hashCode}',
-          );
-
-          final columns = <TableColumnSpec<PackingProduction>>[
-            TableColumnSpec(
-              title: 'NO. PACKING',
-              width: 160,
-              headerAlign: TextAlign.left,
-              cellAlign: TextAlign.left,
-              cellBuilder: (_, r) => Text(
-                r.noPacking,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'TANGGAL',
-              width: 130,
-              headerAlign: TextAlign.left,
-              cellAlign: TextAlign.left,
-              cellBuilder: (_, r) => Text(formatDateToShortId(r.tglProduksi)),
-            ),
-            TableColumnSpec(
-              title: 'SHIFT',
-              width: 70,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) => Text('${r.shift}'),
-            ),
-            TableColumnSpec(
-              title: 'MESIN',
-              width: 180,
-              cellBuilder: (_, r) => Text(
-                r.namaMesin,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'OPERATOR',
-              width: 200,
-              cellBuilder: (_, r) => Text(
-                r.namaOperator,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'JAM KERJA',
-              width: 100,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) => Text(
-                '${r.jamKerja ?? 0} jam',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'JAM',
-              width: 140,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) => Text(
-                r.hourRangeText.isNotEmpty ? r.hourRangeText : '--:-- - --:--',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'HM',
-              width: 130,
-              headerAlign: TextAlign.right,
-              cellAlign: TextAlign.right,
-              cellBuilder: (_, r) => Text('${r.hourMeter ?? 0}'),
-            ),
-          ];
-
           return Scaffold(
             appBar: AppBar(
               title: const Text('Packing'),
               actions: [
                 IconButton(
                   icon: const Icon(Icons.refresh),
-                  onPressed: () {
-                    debugPrint(
-                      '🟩 [PACKING_SCREEN] Manual refresh pressed, VM hash=${vm.hashCode}',
-                    );
-                    vm.refreshPaged();
-                  },
+                  tooltip: 'Refresh',
+                  onPressed: vm.refreshPaged,
                 ),
               ],
             ),
@@ -282,14 +222,11 @@ class _PackingProductionScreenState extends State<PackingProductionScreen> {
                     _searchCtl.clear();
                     vm.clearFilters();
                   },
-                  onAddPressed: _openCreateDialog,
+                  onAddPressed: () => _openCreateDialog(context),
                 ),
                 Expanded(
-                  child: HorizontalPagedTable<PackingProduction>(
-                    pagingController: vm.pagingController,
-                    columns: columns,
-                    horizontalPadding: 16,
-                    selectedPredicate: (r) => r.noPacking == _selectedNoPacking,
+                  child: PackingProductionHeaderTable(
+                    selectedNoPacking: _selectedNoPacking,
                     onRowTap: (r) =>
                         setState(() => _selectedNoPacking = r.noPacking),
                     onRowLongPress: (r, globalPos) async {
@@ -307,76 +244,5 @@ class _PackingProductionScreenState extends State<PackingProductionScreen> {
         },
       ),
     );
-  }
-
-  Future<void> _openCreateDialog() async {
-    debugPrint('🟩 [PACKING_SCREEN] Opening create dialog...');
-    debugPrint('🟩 [PACKING_SCREEN] Using VM hash=${_viewModel.hashCode}');
-    debugPrint(
-      '🟩 [PACKING_SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
-    );
-
-    if (!mounted) return;
-
-    final created = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        debugPrint('🟩 [PACKING_SCREEN] Building create dialog...');
-
-        return ChangeNotifierProvider<PackingProductionViewModel>.value(
-          value: _viewModel,
-          child: const PackingProductionFormDialog(),
-        );
-      },
-    );
-
-    debugPrint('🟩 [PACKING_SCREEN] Dialog closed, result: $created');
-
-    if (!mounted) return;
-
-    if (created == true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Produksi packing berhasil dibuat')),
-      );
-    }
-  }
-
-  Future<void> _openEditDialog(
-    BuildContext context,
-    PackingProduction row,
-  ) async {
-    debugPrint('🟩 [PACKING_SCREEN] Opening edit dialog: ${row.noPacking}');
-    debugPrint('🟩 [PACKING_SCREEN] Using VM hash=${_viewModel.hashCode}');
-    debugPrint(
-      '🟩 [PACKING_SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
-    );
-
-    if (!mounted) return;
-
-    final updated = await showDialog<PackingProduction>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        debugPrint('🟩 [PACKING_SCREEN] Building edit dialog...');
-
-        return ChangeNotifierProvider<PackingProductionViewModel>.value(
-          value: _viewModel,
-          child: PackingProductionFormDialog(header: row),
-        );
-      },
-    );
-
-    debugPrint('🟩 [PACKING_SCREEN] Edit dialog closed: ${updated?.noPacking}');
-
-    if (!mounted) return;
-
-    if (updated != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('No. Packing ${updated.noPacking} berhasil diperbarui'),
-        ),
-      );
-    }
   }
 }

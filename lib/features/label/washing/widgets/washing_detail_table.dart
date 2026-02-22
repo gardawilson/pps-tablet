@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+import '../../../../common/widgets/atlas_data_table.dart';
 import '../../../../common/widgets/info_line.dart';
+import '../model/washing_detail_model.dart';
 import '../view_model/washing_view_model.dart';
 
 class WashingDetailTable extends StatelessWidget {
+  static const _colSakWidth = 50.0;
+
   final ScrollController scrollController;
 
-  const WashingDetailTable({
-    super.key,
-    required this.scrollController,
-  });
+  const WashingDetailTable({super.key, required this.scrollController});
 
   bool _isUsed(String? dateUsage) {
     final s = (dateUsage ?? '').trim();
@@ -35,7 +37,9 @@ class WashingDetailTable extends StatelessWidget {
       child: Consumer<WashingViewModel>(
         builder: (context, vm, _) {
           final totalSak = vm.details.length;
-          final usedDetails = vm.details.where((d) => _isUsed(d.dateUsage)).toList();
+          final usedDetails = vm.details
+              .where((d) => _isUsed(d.dateUsage))
+              .toList();
 
           final usedSak = usedDetails.length;
           final availSak = totalSak - usedSak;
@@ -56,11 +60,10 @@ class WashingDetailTable extends StatelessWidget {
               if (!vm.isDetailLoading && vm.details.isEmpty) _buildEmptyState(),
               if (!vm.isDetailLoading && vm.details.isNotEmpty)
                 Expanded(
-                  child: Column(
-                    children: [
-                      _buildTableHeader(),
-                      Expanded(child: _buildTableBody(vm)),
-                    ],
+                  child: AtlasDataTable<WashingDetail>(
+                    columns: _buildColumns(),
+                    items: vm.details,
+                    scrollController: scrollController,
                   ),
                 ),
             ],
@@ -68,6 +71,42 @@ class WashingDetailTable extends StatelessWidget {
         },
       ),
     );
+  }
+
+  List<AtlasTableColumn<WashingDetail>> _buildColumns() {
+    return [
+      AtlasTableColumn<WashingDetail>(
+        title: 'SAK',
+        width: _colSakWidth,
+        cellBuilder: (context, item, rowState) {
+          final used = _isUsed(item.dateUsage);
+          return Text(
+            item.noSak.toString(),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: used ? Colors.grey.shade600 : Colors.black87,
+            ),
+            softWrap: true,
+          );
+        },
+      ),
+      AtlasTableColumn<WashingDetail>(
+        title: 'BERAT (KG)',
+        showDivider: false,
+        cellBuilder: (context, item, rowState) {
+          final used = _isUsed(item.dateUsage);
+          return Text(
+            (item.berat ?? 0).toStringAsFixed(2),
+            style: TextStyle(
+              fontSize: 14,
+              color: used ? Colors.grey.shade500 : rowState.textColor,
+            ),
+            softWrap: true,
+          );
+        },
+      ),
+    ];
   }
 
   Widget _buildHeader({
@@ -94,7 +133,6 @@ class WashingDetailTable extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(12),
@@ -126,11 +164,8 @@ class WashingDetailTable extends StatelessWidget {
     );
   }
 
-
   Widget _buildLoadingState() {
-    return const Expanded(
-      child: Center(child: CircularProgressIndicator()),
-    );
+    return const Expanded(child: Center(child: CircularProgressIndicator()));
   }
 
   Widget _buildEmptyState() {
@@ -148,94 +183,6 @@ class WashingDetailTable extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildTableHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1565C0),
-        border: Border(bottom: BorderSide(color: Colors.grey.shade300, width: 2)),
-      ),
-      child: const Row(
-        children: [
-          SizedBox(
-            width: 80,
-            child: Text(
-              'SAK',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              'BERAT (KG)',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTableBody(WashingViewModel vm) {
-    return ListView.builder(
-      controller: scrollController,
-      itemCount: vm.details.length,
-      itemBuilder: (context, index) {
-        final d = vm.details[index];
-        final isEven = index % 2 == 0;
-        final used = _isUsed(d.dateUsage);
-
-        final bg = used
-            ? Colors.grey.shade100
-            : (isEven ? Colors.white : Colors.grey.shade50);
-
-        final textColor = used ? Colors.grey.shade500 : Colors.grey.shade800;
-        final sakColor = used ? Colors.grey.shade600 : Colors.black87;
-
-        return Opacity(
-          opacity: used ? 0.55 : 1,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: bg,
-              border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-            ),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 80,
-                  child: Text(
-                    d.noSak.toString(),
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: sakColor,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    (d.berat ?? 0).toStringAsFixed(2),
-                    style: TextStyle(fontSize: 15, color: textColor),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 }

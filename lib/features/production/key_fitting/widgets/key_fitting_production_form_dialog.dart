@@ -156,8 +156,6 @@ class _KeyFittingProductionFormDialogState
   }
 
   Future<void> _submit() async {
-    debugPrint('📝 [KEYFITTING_FORM] _submit() started');
-
     // cek overlap dulu
     final ovm = context.read<OverlapViewModel>();
     if (ovm.hasOverlap) {
@@ -267,7 +265,7 @@ class _KeyFittingProductionFormDialogState
         );
       }
     } catch (e) {
-      debugPrint('❌ [KEYFITTING_FORM] Exception during save: $e');
+      // error handled via prodVm.saveError
     } finally {
       if (mounted) Navigator.of(context).pop(); // close loading
     }
@@ -277,11 +275,7 @@ class _KeyFittingProductionFormDialogState
     if (result != null) {
       widget.onSave?.call(result);
 
-      if (isEdit) {
-        Navigator.of(context).pop(result);
-      } else {
-        Navigator.of(context).pop(true);
-      }
+      Navigator.of(context).pop(result);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

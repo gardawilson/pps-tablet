@@ -226,16 +226,18 @@ class _CrusherProductionFormDialogState extends State<CrusherProductionFormDialo
       }
     } finally {
       // pop loading
-      Navigator.of(context).pop();
+      if (mounted) Navigator.of(context).pop();
     }
 
     if (result != null) {
       widget.onSave?.call(result);
-      Navigator.of(context).pop(); // tutup dialog form
+      if (mounted) Navigator.of(context).pop(result); // tutup dialog form & kembalikan result
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(prodVm.saveError ?? 'Gagal menyimpan data')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(prodVm.saveError ?? 'Gagal menyimpan data')),
+        );
+      }
     }
   }
 

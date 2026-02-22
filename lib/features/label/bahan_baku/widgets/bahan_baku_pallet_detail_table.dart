@@ -1,21 +1,19 @@
-// lib/features/production/bahan_baku/widgets/bahan_baku_pallet_detail_table.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+import '../../../../common/widgets/atlas_data_table.dart';
 import '../../../../common/widgets/info_line.dart';
+import '../model/bahan_baku_pallet_detail.dart';
 import '../view_model/bahan_baku_view_model.dart';
 
-class BahanBakuPalletDetailTable extends StatefulWidget {
+class BahanBakuPalletDetailTable extends StatelessWidget {
+  static const _colSakWidth = 50.0;
+  static const _colKondisiWidth = 60.0;
+
   final ScrollController scrollController;
 
   const BahanBakuPalletDetailTable({super.key, required this.scrollController});
 
-  @override
-  State<BahanBakuPalletDetailTable> createState() =>
-      _BahanBakuPalletDetailTableState();
-}
-
-class _BahanBakuPalletDetailTableState
-    extends State<BahanBakuPalletDetailTable> {
   bool _isUsed(String? dateUsage) {
     final s = (dateUsage ?? '').trim();
     if (s.isEmpty) return false;
@@ -40,18 +38,14 @@ class _BahanBakuPalletDetailTableState
       child: Consumer<BahanBakuViewModel>(
         builder: (context, vm, _) {
           final totalSak = vm.details.length;
-
-          // ✅ available = DateUsage null
           final availableDetails = vm.details
               .where((d) => !_isUsed(d.dateUsage))
               .toList();
 
           final availableSak = availableDetails.length;
-
           final totalBerat = _sumBerat(vm.details);
           final availableBerat = _sumBerat(availableDetails);
 
-          // Count partial & lembab items
           final partialCount = vm.details.where((d) => d.isPartial == 1).length;
           final lembabCount = vm.details.where((d) => d.isLembab == 1).length;
 
@@ -69,16 +63,109 @@ class _BahanBakuPalletDetailTableState
               if (!vm.isDetailLoading && vm.details.isEmpty) _buildEmptyState(),
               if (!vm.isDetailLoading && vm.details.isNotEmpty)
                 Expanded(
-                  child: Column(
-                    children: [
-                      _buildTableHeader(),
-                      Expanded(child: _buildTableBody(vm)),
-                    ],
+                  child: AtlasDataTable<BahanBakuPalletDetail>(
+                    columns: _buildColumns(),
+                    items: vm.details,
+                    scrollController: scrollController,
                   ),
                 ),
             ],
           );
         },
+      ),
+    );
+  }
+
+  List<AtlasTableColumn<BahanBakuPalletDetail>> _buildColumns() {
+    return [
+      AtlasTableColumn<BahanBakuPalletDetail>(
+        title: 'SAK',
+        width: _colSakWidth,
+        cellBuilder: (context, item, rowState) {
+          final used = _isUsed(item.dateUsage);
+          return Text(
+            item.noSak,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: used ? Colors.grey.shade500 : Colors.black87,
+            ),
+            softWrap: true,
+          );
+        },
+      ),
+      AtlasTableColumn<BahanBakuPalletDetail>(
+        title: 'BERAT',
+        cellBuilder: (context, item, rowState) {
+          final partial = item.isPartial == 1;
+          final lembab = item.isLembab == 1;
+          final used = _isUsed(item.dateUsage);
+
+          final baseColor = partial
+              ? Colors.red
+              : (lembab ? Colors.blue.shade700 : rowState.textColor);
+
+          return Text(
+            _kg(item.berat),
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: partial || lembab ? FontWeight.w800 : FontWeight.w600,
+              color: used ? Colors.grey.shade500 : baseColor,
+            ),
+            softWrap: true,
+          );
+        },
+      ),
+      AtlasTableColumn<BahanBakuPalletDetail>(
+        title: 'KONDISI',
+        width: _colKondisiWidth,
+        headerAlign: TextAlign.center,
+        cellAlignment: Alignment.center,
+        showDivider: false,
+        cellBuilder: (context, item, rowState) {
+          final partial = item.isPartial == 1;
+          final lembab = item.isLembab == 1;
+          final used = _isUsed(item.dateUsage);
+
+          return Opacity(
+            opacity: used ? 0.55 : 1,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (partial) _conditionBadge('P', Colors.red),
+                if (partial && lembab) const SizedBox(width: 4),
+                if (lembab) _conditionBadge('L', Colors.blue),
+                if (!partial && !lembab)
+                  Text(
+                    '-',
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    ];
+  }
+
+  Widget _conditionBadge(String label, MaterialColor color) {
+    return Container(
+      width: 24,
+      height: 24,
+      decoration: BoxDecoration(
+        color: color.shade100,
+        shape: BoxShape.circle,
+        border: Border.all(color: color.shade300),
+      ),
+      child: Center(
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: color.shade800,
+          ),
+        ),
       ),
     );
   }
@@ -210,181 +297,6 @@ class _BahanBakuPalletDetailTableState
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildTableHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1565C0),
-        border: Border(
-          bottom: BorderSide(color: Colors.grey.shade300, width: 2),
-        ),
-      ),
-      child: const Row(
-        children: [
-          SizedBox(
-            width: 50, // ⬅️ dari 50 → 80 untuk NoSak yang lebih panjang
-            child: Text(
-              'SAK',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              'BERAT',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-          SizedBox(
-            width: 70, // ⬅️ kolom untuk badges
-            child: Text(
-              'KONDISI',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTableBody(BahanBakuViewModel vm) {
-    return ListView.builder(
-      controller: widget.scrollController,
-      itemCount: vm.details.length,
-      itemBuilder: (context, index) {
-        final d = vm.details[index];
-        final isEven = index % 2 == 0;
-
-        final partial = d.isPartial == 1;
-        final lembab = d.isLembab == 1;
-        final used = _isUsed(d.dateUsage);
-
-        final bg = used
-            ? Colors.grey.shade100
-            : (isEven ? Colors.white : Colors.grey.shade50);
-
-        final sakColor = used ? Colors.grey.shade600 : Colors.black87;
-
-        final beratColor = partial
-            ? Colors.red
-            : (lembab ? Colors.blue.shade700 : Colors.grey.shade800);
-        final beratTextColor = used ? Colors.grey.shade500 : beratColor;
-
-        return Opacity(
-          opacity: used ? 0.55 : 1,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            decoration: BoxDecoration(
-              color: bg,
-              border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 50,
-                  child: Text(
-                    d.noSak,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: sakColor,
-                    ),
-                    softWrap: true,
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    _kg(d.berat),
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: partial || lembab
-                          ? FontWeight.w800
-                          : FontWeight.w600,
-                      color: beratTextColor,
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  width: 70,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (partial)
-                        Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            color: Colors.red.shade100,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.red.shade300),
-                          ),
-                          child: Center(
-                            child: Text(
-                              'P',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.red.shade800,
-                              ),
-                            ),
-                          ),
-                        ),
-                      if (partial && lembab) const SizedBox(width: 4),
-                      if (lembab)
-                        Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            color: Colors.blue.shade100,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.blue.shade300),
-                          ),
-                          child: Center(
-                            child: Text(
-                              'L',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blue.shade800,
-                              ),
-                            ),
-                          ),
-                        ),
-                      if (!partial && !lembab)
-                        Text(
-                          '-',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey.shade400,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 }

@@ -4,19 +4,14 @@ import 'package:pps_tablet/features/production/sortir_reject/view/sortir_reject_
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
-import '../../../../common/widgets/horizontal_paged_table.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
-import '../../../../common/widgets/table_column_spec.dart';
-import '../../../../core/utils/date_formatter.dart';
 import '../model/sortir_reject_production_model.dart';
 import '../view_model/sortir_reject_production_view_model.dart';
 import '../widgets/sortir_reject_production_action_bar.dart';
 import '../widgets/sortir_reject_production_delete_dialog.dart';
 import '../widgets/sortir_reject_production_form_dialog.dart';
+import '../widgets/sortir_reject_production_header_table.dart';
 import '../widgets/sortir_reject_production_row_popover.dart';
-
-// TODO: ganti ke input screen sortir reject kamu
-// import 'sortir_reject_production_input_screen.dart';
 
 class SortirRejectProductionScreen extends StatefulWidget {
   const SortirRejectProductionScreen({super.key});
@@ -36,16 +31,7 @@ class _SortirRejectProductionScreenState
   @override
   void initState() {
     super.initState();
-
     _viewModel = SortirRejectProductionViewModel();
-
-    debugPrint(
-      '🟩🟩🟩 [SORTIR_REJECT_SCREEN] initState: Created VM hash=${_viewModel.hashCode}',
-    );
-    debugPrint(
-      '🟩🟩🟩 [SORTIR_REJECT_SCREEN] initState: PagingController hash=${_viewModel.pagingController.hashCode}',
-    );
-
     _viewModel.refreshPaged();
   }
 
@@ -83,9 +69,7 @@ class _SortirRejectProductionScreenState
               child: SortirRejectProductionRowPopover(
                 row: row,
                 onClose: () => Navigator.of(dialogCtx).pop(),
-
                 onInput: () {
-                  // TODO: arahkan ke input screen sortir reject kalau sudah ada
                   Future.microtask(() {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -98,11 +82,9 @@ class _SortirRejectProductionScreenState
                     );
                   });
                 },
-
                 onEdit: () async {
                   await _openEditDialog(context, row);
                 },
-
                 onDelete: () async {
                   await showDialog<void>(
                     context: context,
@@ -128,13 +110,13 @@ class _SortirRejectProductionScreenState
                               ),
                             );
                           } else {
-                            final rawMsg =
-                                _viewModel.saveError ?? 'Gagal menghapus data';
                             showDialog(
                               context: context,
                               builder: (_) => ErrorStatusDialog(
                                 title: 'Gagal Menghapus!',
-                                message: rawMsg,
+                                message:
+                                    _viewModel.saveError ??
+                                    'Gagal menghapus data',
                               ),
                             );
                           }
@@ -143,7 +125,6 @@ class _SortirRejectProductionScreenState
                     },
                   );
                 },
-
                 onAuditHistory: () {
                   _navigateToAuditHistory(row);
                 },
@@ -164,74 +145,71 @@ class _SortirRejectProductionScreenState
     );
   }
 
+  Future<void> _openCreateDialog(BuildContext ctx) async {
+    final created = await showDialog<SortirRejectProduction>(
+      context: ctx,
+      barrierDismissible: false,
+      builder: (_) =>
+          ChangeNotifierProvider<SortirRejectProductionViewModel>.value(
+            value: _viewModel,
+            child: const SortirRejectProductionFormDialog(),
+          ),
+    );
+    if (!mounted || !ctx.mounted) return;
+    if (created != null) {
+      _viewModel.refreshPaged();
+      setState(() => _selectedNoBJSortir = created.noBJSortir);
+      showDialog(
+        context: ctx,
+        builder: (_) => SuccessStatusDialog(
+          title: 'Berhasil Membuat',
+          message: 'No. BJ Sortir ${created.noBJSortir} berhasil dibuat.',
+        ),
+      );
+    }
+  }
+
+  Future<void> _openEditDialog(
+    BuildContext ctx,
+    SortirRejectProduction row,
+  ) async {
+    final updated = await showDialog<SortirRejectProduction>(
+      context: ctx,
+      barrierDismissible: false,
+      builder: (_) =>
+          ChangeNotifierProvider<SortirRejectProductionViewModel>.value(
+            value: _viewModel,
+            child: SortirRejectProductionFormDialog(header: row),
+          ),
+    );
+    if (!mounted || !ctx.mounted) return;
+    if (updated != null) {
+      _viewModel.refreshPaged();
+      showDialog(
+        context: ctx,
+        builder: (_) => SuccessStatusDialog(
+          title: 'Berhasil Mengupdate',
+          message:
+              'No. BJ Sortir ${updated.noBJSortir} berhasil diperbarui.',
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider<SortirRejectProductionViewModel>.value(
       value: _viewModel,
       child: Consumer<SortirRejectProductionViewModel>(
         builder: (context, vm, _) {
-          debugPrint(
-            '🟩 [SORTIR_REJECT_SCREEN] Consumer.builder() called, VM hash=${vm.hashCode}',
-          );
-          debugPrint(
-            '🟩 [SORTIR_REJECT_SCREEN] Consumer pagingController: hash=${vm.pagingController.hashCode}',
-          );
-
-          final columns = <TableColumnSpec<SortirRejectProduction>>[
-            TableColumnSpec(
-              title: 'NO. BJ SORTIR',
-              width: 170,
-              headerAlign: TextAlign.left,
-              cellAlign: TextAlign.left,
-              cellBuilder: (_, r) => Text(
-                r.noBJSortir,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'TANGGAL',
-              width: 130,
-              headerAlign: TextAlign.left,
-              cellAlign: TextAlign.left,
-              cellBuilder: (_, r) => Text(formatDateToShortId(r.tanggal)),
-            ),
-            TableColumnSpec(
-              title: 'WAREHOUSE',
-              width: 140,
-              headerAlign: TextAlign.left,
-              cellAlign: TextAlign.left,
-              cellBuilder: (_, r) => Text(
-                r.namaWarehouse ?? '-',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'USER',
-              width: 160,
-              headerAlign: TextAlign.left,
-              cellAlign: TextAlign.left,
-              cellBuilder: (_, r) => Text(
-                r.username.isNotEmpty ? r.username : '-',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ];
-
           return Scaffold(
             appBar: AppBar(
               title: const Text('Sortir Reject'),
               actions: [
                 IconButton(
                   icon: const Icon(Icons.refresh),
-                  onPressed: () {
-                    debugPrint(
-                      '🟩 [SORTIR_REJECT_SCREEN] Manual refresh pressed, VM hash=${vm.hashCode}',
-                    );
-                    vm.refreshPaged();
-                  },
+                  tooltip: 'Refresh',
+                  onPressed: vm.refreshPaged,
                 ),
               ],
             ),
@@ -244,15 +222,11 @@ class _SortirRejectProductionScreenState
                     _searchCtl.clear();
                     vm.clearFilters();
                   },
-                  onAddPressed: _openCreateDialog,
+                  onAddPressed: () => _openCreateDialog(context),
                 ),
                 Expanded(
-                  child: HorizontalPagedTable<SortirRejectProduction>(
-                    pagingController: vm.pagingController,
-                    columns: columns,
-                    horizontalPadding: 16,
-                    selectedPredicate: (r) =>
-                        r.noBJSortir == _selectedNoBJSortir,
+                  child: SortirRejectProductionHeaderTable(
+                    selectedNoBJSortir: _selectedNoBJSortir,
                     onRowTap: (r) =>
                         setState(() => _selectedNoBJSortir = r.noBJSortir),
                     onRowLongPress: (r, globalPos) async {
@@ -270,86 +244,5 @@ class _SortirRejectProductionScreenState
         },
       ),
     );
-  }
-
-  Future<void> _openCreateDialog() async {
-    debugPrint('🟩 [SORTIR_REJECT_SCREEN] Opening create dialog...');
-    debugPrint(
-      '🟩 [SORTIR_REJECT_SCREEN] Using VM hash=${_viewModel.hashCode}',
-    );
-    debugPrint(
-      '🟩 [SORTIR_REJECT_SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
-    );
-
-    if (!mounted) return;
-
-    final created = await showDialog<SortirRejectProduction>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        debugPrint('🟩 [SORTIR_REJECT_SCREEN] Building create dialog...');
-        return ChangeNotifierProvider<SortirRejectProductionViewModel>.value(
-          value: _viewModel,
-          child: const SortirRejectProductionFormDialog(),
-        );
-      },
-    );
-
-    debugPrint('🟩 [SORTIR_REJECT_SCREEN] Dialog closed, result: $created');
-
-    if (!mounted) return;
-
-    if (created != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Sortir Reject ${created.noBJSortir} berhasil dibuat'),
-        ),
-      );
-    }
-  }
-
-  Future<void> _openEditDialog(
-    BuildContext context,
-    SortirRejectProduction row,
-  ) async {
-    debugPrint(
-      '🟩 [SORTIR_REJECT_SCREEN] Opening edit dialog: ${row.noBJSortir}',
-    );
-    debugPrint(
-      '🟩 [SORTIR_REJECT_SCREEN] Using VM hash=${_viewModel.hashCode}',
-    );
-    debugPrint(
-      '🟩 [SORTIR_REJECT_SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
-    );
-
-    if (!mounted) return;
-
-    final updated = await showDialog<SortirRejectProduction>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        debugPrint('🟩 [SORTIR_REJECT_SCREEN] Building edit dialog...');
-        return ChangeNotifierProvider<SortirRejectProductionViewModel>.value(
-          value: _viewModel,
-          child: SortirRejectProductionFormDialog(header: row),
-        );
-      },
-    );
-
-    debugPrint(
-      '🟩 [SORTIR_REJECT_SCREEN] Edit dialog closed: ${updated?.noBJSortir}',
-    );
-
-    if (!mounted) return;
-
-    if (updated != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'No. BJ Sortir ${updated.noBJSortir} berhasil diperbarui',
-          ),
-        ),
-      );
-    }
   }
 }

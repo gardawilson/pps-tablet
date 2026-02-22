@@ -5,17 +5,14 @@ import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart'
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
-import '../../../../common/widgets/horizontal_paged_table.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
-import '../../../../common/widgets/table_column_spec.dart';
-import '../../../../core/utils/date_formatter.dart';
 
 import '../model/key_fitting_production_model.dart';
 import '../view_model/key_fitting_production_view_model.dart';
-
 import '../widgets/key_fitting_production_action_bar.dart';
 import '../widgets/key_fitting_production_delete_dialog.dart';
 import '../widgets/key_fitting_production_form_dialog.dart';
+import '../widgets/key_fitting_production_header_table.dart';
 import '../widgets/key_fitting_production_row_popover.dart';
 import 'key_fitting_production_input_screen.dart';
 
@@ -32,24 +29,12 @@ class _KeyFittingProductionScreenState
   final TextEditingController _searchCtl = TextEditingController();
   String? _selectedNoProduksi;
 
-  // ✅ Store VM instance as field
   late final KeyFittingProductionViewModel _viewModel;
 
   @override
   void initState() {
     super.initState();
-
-    // ✅ Create VM once in initState
     _viewModel = KeyFittingProductionViewModel();
-
-    debugPrint(
-      '🟦🟦🟦 [KEYFITTING_SCREEN] initState: Created VM hash=${_viewModel.hashCode}',
-    );
-    debugPrint(
-      '🟦🟦🟦 [KEYFITTING_SCREEN] initState: PagingController hash=${_viewModel.pagingController.hashCode}',
-    );
-
-    // Initialize first load
     _viewModel.refreshPaged();
   }
 
@@ -128,13 +113,13 @@ class _KeyFittingProductionScreenState
                               ),
                             );
                           } else {
-                            final rawMsg =
-                                _viewModel.saveError ?? 'Gagal menghapus data';
                             showDialog(
                               context: context,
                               builder: (_) => ErrorStatusDialog(
                                 title: 'Gagal Menghapus!',
-                                message: rawMsg,
+                                message:
+                                    _viewModel.saveError ??
+                                    'Gagal menghapus data',
                               ),
                             );
                           }
@@ -143,9 +128,7 @@ class _KeyFittingProductionScreenState
                     },
                   );
                 },
-                onPrint: () {
-                  // TODO: kalau nanti ada cetak label pasang kunci
-                },
+                onPrint: () {},
                 onAuditHistory: () {
                   _navigateToAuditHistory(row);
                 },
@@ -166,106 +149,68 @@ class _KeyFittingProductionScreenState
     );
   }
 
+  Future<void> _openCreateDialog(BuildContext ctx) async {
+    final created = await showDialog<KeyFittingProduction>(
+      context: ctx,
+      barrierDismissible: false,
+      builder: (_) => ChangeNotifierProvider<KeyFittingProductionViewModel>.value(
+        value: _viewModel,
+        child: const KeyFittingProductionFormDialog(),
+      ),
+    );
+    if (!mounted || !ctx.mounted) return;
+    if (created != null) {
+      _viewModel.refreshPaged();
+      setState(() => _selectedNoProduksi = created.noProduksi);
+      showDialog(
+        context: ctx,
+        builder: (_) => SuccessStatusDialog(
+          title: 'Berhasil Membuat',
+          message: 'No. Produksi ${created.noProduksi} berhasil dibuat.',
+        ),
+      );
+    }
+  }
+
+  Future<void> _openEditDialog(
+    BuildContext ctx,
+    KeyFittingProduction row,
+  ) async {
+    final updated = await showDialog<KeyFittingProduction>(
+      context: ctx,
+      barrierDismissible: false,
+      builder: (_) => ChangeNotifierProvider<KeyFittingProductionViewModel>.value(
+        value: _viewModel,
+        child: KeyFittingProductionFormDialog(header: row),
+      ),
+    );
+    if (!mounted || !ctx.mounted) return;
+    if (updated != null) {
+      _viewModel.refreshPaged();
+      showDialog(
+        context: ctx,
+        builder: (_) => SuccessStatusDialog(
+          title: 'Berhasil Mengupdate',
+          message: 'No. Produksi ${updated.noProduksi} berhasil diperbarui.',
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider<KeyFittingProductionViewModel>.value(
       value: _viewModel,
       child: Consumer<KeyFittingProductionViewModel>(
         builder: (context, vm, _) {
-          debugPrint(
-            '🟦 [KEYFITTING_SCREEN] Consumer.builder() called, VM hash=${vm.hashCode}',
-          );
-          debugPrint(
-            '🟦 [KEYFITTING_SCREEN] Consumer pagingController: hash=${vm.pagingController.hashCode}',
-          );
-
-          final columns = <TableColumnSpec<KeyFittingProduction>>[
-            TableColumnSpec(
-              title: 'NO. PRODUKSI',
-              width: 160,
-              headerAlign: TextAlign.left,
-              cellAlign: TextAlign.left,
-              cellBuilder: (_, r) => Text(
-                r.noProduksi,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'TANGGAL',
-              width: 130,
-              headerAlign: TextAlign.left,
-              cellAlign: TextAlign.left,
-              cellBuilder: (_, r) => Text(formatDateToShortId(r.tglProduksi)),
-            ),
-            TableColumnSpec(
-              title: 'SHIFT',
-              width: 70,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) => Text('${r.shift}'),
-            ),
-            TableColumnSpec(
-              title: 'MESIN',
-              width: 180,
-              cellBuilder: (_, r) => Text(
-                r.namaMesin,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'OPERATOR',
-              width: 200,
-              cellBuilder: (_, r) => Text(
-                r.namaOperator,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'JAM KERJA',
-              width: 100,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) => Text(
-                '${r.jamKerja ?? 0} jam',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'JAM',
-              width: 140,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) => Text(
-                r.hourRangeText.isNotEmpty ? r.hourRangeText : '--:-- - --:--',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'HM',
-              width: 130,
-              headerAlign: TextAlign.right,
-              cellAlign: TextAlign.right,
-              cellBuilder: (_, r) => Text('${r.hourMeter ?? 0}'),
-            ),
-          ];
-
           return Scaffold(
             appBar: AppBar(
               title: const Text('Pasang Kunci'),
               actions: [
                 IconButton(
                   icon: const Icon(Icons.refresh),
-                  onPressed: () {
-                    debugPrint(
-                      '🟦 [KEYFITTING_SCREEN] Manual refresh pressed, VM hash=${vm.hashCode}',
-                    );
-                    vm.refreshPaged();
-                  },
+                  tooltip: 'Refresh',
+                  onPressed: vm.refreshPaged,
                 ),
               ],
             ),
@@ -278,15 +223,11 @@ class _KeyFittingProductionScreenState
                     _searchCtl.clear();
                     vm.clearFilters();
                   },
-                  onAddPressed: _openCreateDialog,
+                  onAddPressed: () => _openCreateDialog(context),
                 ),
                 Expanded(
-                  child: HorizontalPagedTable<KeyFittingProduction>(
-                    pagingController: vm.pagingController,
-                    columns: columns,
-                    horizontalPadding: 16,
-                    selectedPredicate: (r) =>
-                        r.noProduksi == _selectedNoProduksi,
+                  child: KeyFittingProductionHeaderTable(
+                    selectedNoProduksi: _selectedNoProduksi,
                     onRowTap: (r) =>
                         setState(() => _selectedNoProduksi = r.noProduksi),
                     onRowLongPress: (r, globalPos) async {
@@ -304,80 +245,5 @@ class _KeyFittingProductionScreenState
         },
       ),
     );
-  }
-
-  Future<void> _openCreateDialog() async {
-    debugPrint('🟦 [KEYFITTING_SCREEN] Opening create dialog...');
-    debugPrint('🟦 [KEYFITTING_SCREEN] Using VM hash=${_viewModel.hashCode}');
-    debugPrint(
-      '🟦 [KEYFITTING_SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
-    );
-
-    if (!mounted) return;
-
-    final created = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        debugPrint('🟦 [KEYFITTING_SCREEN] Building create dialog...');
-
-        return ChangeNotifierProvider<KeyFittingProductionViewModel>.value(
-          value: _viewModel,
-          child: const KeyFittingProductionFormDialog(),
-        );
-      },
-    );
-
-    debugPrint('🟦 [KEYFITTING_SCREEN] Dialog closed, result: $created');
-
-    if (!mounted) return;
-
-    if (created == true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Produksi pasang kunci berhasil dibuat')),
-      );
-    }
-  }
-
-  Future<void> _openEditDialog(
-    BuildContext context,
-    KeyFittingProduction row,
-  ) async {
-    debugPrint('🟦 [KEYFITTING_SCREEN] Opening edit dialog: ${row.noProduksi}');
-    debugPrint('🟦 [KEYFITTING_SCREEN] Using VM hash=${_viewModel.hashCode}');
-    debugPrint(
-      '🟦 [KEYFITTING_SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
-    );
-
-    if (!mounted) return;
-
-    final updated = await showDialog<KeyFittingProduction>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        debugPrint('🟦 [KEYFITTING_SCREEN] Building edit dialog...');
-
-        return ChangeNotifierProvider<KeyFittingProductionViewModel>.value(
-          value: _viewModel,
-          child: KeyFittingProductionFormDialog(header: row),
-        );
-      },
-    );
-
-    debugPrint(
-      '🟦 [KEYFITTING_SCREEN] Edit dialog closed: ${updated?.noProduksi}',
-    );
-
-    if (!mounted) return;
-
-    if (updated != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'No. Produksi ${updated.noProduksi} berhasil diperbarui',
-          ),
-        ),
-      );
-    }
   }
 }

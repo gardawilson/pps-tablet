@@ -243,7 +243,9 @@ class _WashingProductionFormDialogState
     if (result != null) {
       widget.onSave?.call(result);
       if (mounted) {
-        Navigator.of(context).pop(); // tutup dialog form
+        Navigator.of(
+          context,
+        ).pop(result); // tutup dialog form & kembalikan result
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(

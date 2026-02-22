@@ -128,8 +128,6 @@ class _MixerProductionFormDialogState
   }
 
   Future<void> _submit() async {
-    debugPrint('📝 [MIXER_FORM] _submit() started');
-
     // cek overlap dulu
     final ovm = context.read<OverlapViewModel>();
     if (ovm.hasOverlap) {
@@ -216,15 +214,9 @@ class _MixerProductionFormDialogState
     final hadir = int.tryParse(hadirCtrl.text.trim());
     final hourMeter = double.tryParse(hourMeterCtrl.text.trim());
 
-    // ✅ Read VM from PARENT Screen context
     final prodVm = context.read<MixerProductionViewModel>();
-    debugPrint('📝 [MIXER_FORM] Got VM from context: VM hash=${prodVm.hashCode}');
-    debugPrint(
-      '📝 [MIXER_FORM] Got controller from VM: controller hash=${prodVm.pagingController.hashCode}',
-    );
 
     // show loading
-    debugPrint('📝 [MIXER_FORM] Showing loading dialog...');
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -235,13 +227,12 @@ class _MixerProductionFormDialogState
 
     try {
       if (isEdit) {
-        debugPrint('📝 [MIXER_FORM] Calling updateProduksi...');
         result = await prodVm.updateProduksi(
           noProduksi: widget.header!.noProduksi,
           tglProduksi: _selectedDate,
           idMesin: mesinId,
           idOperator: operatorId,
-          jam: jamKerja, // ✅ Send jam field
+          jam: jamKerja,
           shift: _selectedShift!,
           hourStart: hourStartSql,
           hourEnd: hourEndSql,
@@ -249,16 +240,12 @@ class _MixerProductionFormDialogState
           hadir: hadir,
           hourMeter: hourMeter,
         );
-        debugPrint(
-          '📝 [MIXER_FORM] updateProduksi returned: ${result?.noProduksi}',
-        );
       } else {
-        debugPrint('📝 [MIXER_FORM] Calling createProduksi...');
         result = await prodVm.createProduksi(
           tglProduksi: _selectedDate,
           idMesin: mesinId,
           idOperator: operatorId,
-          jam: jamKerja, // ✅ Send jam field
+          jam: jamKerja,
           shift: _selectedShift!,
           hourStart: hourStartSql,
           hourEnd: hourEndSql,
@@ -266,54 +253,21 @@ class _MixerProductionFormDialogState
           hadir: hadir,
           hourMeter: hourMeter,
         );
-        debugPrint(
-          '📝 [MIXER_FORM] createProduksi returned: ${result?.noProduksi}',
-        );
       }
-    } catch (e) {
-      debugPrint('❌ [MIXER_FORM] Exception during save: $e');
     } finally {
-      debugPrint('📝 [MIXER_FORM] Popping loading dialog...');
-      if (mounted) {
-        Navigator.of(context).pop();
-        debugPrint('📝 [MIXER_FORM] Loading dialog popped');
-      }
+      if (mounted) Navigator.of(context).pop();
     }
 
-    if (!mounted) {
-      debugPrint('📝 [MIXER_FORM] Widget not mounted after save, returning');
-      return;
-    }
-
-    debugPrint('📝 [MIXER_FORM] Checking result: ${result?.noProduksi}');
+    if (!mounted) return;
 
     if (result != null) {
-      debugPrint('📝 [MIXER_FORM] Success detected: ${result.noProduksi}');
-
       widget.onSave?.call(result);
-
-      if (isEdit) {
-        debugPrint('📝 [MIXER_FORM] Edit mode - closing with MixerProduction result');
-        Navigator.of(context).pop(result);
-        debugPrint('📝 [MIXER_FORM] Dialog popped with result');
-      } else {
-        debugPrint('📝 [MIXER_FORM] Create mode - closing with true');
-        Navigator.of(context).pop(true);
-        debugPrint('📝 [MIXER_FORM] Dialog popped with true');
-      }
+      Navigator.of(context).pop(result); // tutup dialog form & kembalikan result
     } else {
-      debugPrint('❌ [MIXER_FORM] Result is null, showing error');
-      debugPrint('❌ [MIXER_FORM] Error message: ${prodVm.saveError}');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(prodVm.saveError ?? 'Gagal menyimpan data'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text(prodVm.saveError ?? 'Gagal menyimpan data')),
       );
-      debugPrint('❌ [MIXER_FORM] SnackBar shown, keeping dialog open');
     }
-
-    debugPrint('📝 [MIXER_FORM] _submit() completed');
   }
 
   /// Panggil cek-overlap via ViewModel hanya jika input sudah lengkap
@@ -357,15 +311,6 @@ class _MixerProductionFormDialogState
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('📝 [MIXER_FORM] build() called');
-
-    // ✅ Verify we're using the correct VM
-    final vm = context.read<MixerProductionViewModel>();
-    debugPrint('📝 [MIXER_FORM] VM from context: hash=${vm.hashCode}');
-    debugPrint(
-      '📝 [MIXER_FORM] Controller from VM: hash=${vm.pagingController.hashCode}',
-    );
-
     return ChangeNotifierProvider(
       create: (_) => OverlapViewModel(repository: OverlapRepository()),
       child: Dialog(

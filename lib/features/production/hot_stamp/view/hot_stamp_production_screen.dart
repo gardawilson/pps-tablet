@@ -5,16 +5,14 @@ import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart'
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
-import '../../../../common/widgets/horizontal_paged_table.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
-import '../../../../common/widgets/table_column_spec.dart';
-import '../../../../core/utils/date_formatter.dart';
 
 import '../model/hot_stamp_production_model.dart';
 import '../view_model/hot_stamp_production_view_model.dart';
 import '../widgets/hot_stamp_production_action_bar.dart';
 import '../widgets/hot_stamp_production_delete_dialog.dart';
 import '../widgets/hot_stamp_production_form_dialog.dart';
+import '../widgets/hot_stamp_production_header_table.dart';
 import '../widgets/hot_stamp_production_row_popover.dart';
 import 'hot_stamp_production_input_screen.dart';
 
@@ -30,31 +28,19 @@ class _HotStampProductionScreenState extends State<HotStampProductionScreen> {
   final TextEditingController _searchCtl = TextEditingController();
   String? _selectedNoProduksi;
 
-  // ✅ Store VM instance as field
   late final HotStampProductionViewModel _viewModel;
 
   @override
   void initState() {
     super.initState();
-
-    // ✅ Create VM once in initState
     _viewModel = HotStampProductionViewModel();
-
-    debugPrint(
-      '🟦🟦🟦 [HOTSTAMP_SCREEN] initState: Created VM hash=${_viewModel.hashCode}',
-    );
-    debugPrint(
-      '🟦🟦🟦 [HOTSTAMP_SCREEN] initState: PagingController hash=${_viewModel.pagingController.hashCode}',
-    );
-
-    // Initialize first load
     _viewModel.refreshPaged();
   }
 
   @override
   void dispose() {
     _searchCtl.dispose();
-    _viewModel.dispose(); // ✅ Dispose VM
+    _viewModel.dispose();
     super.dispose();
   }
 
@@ -126,13 +112,13 @@ class _HotStampProductionScreenState extends State<HotStampProductionScreen> {
                               ),
                             );
                           } else {
-                            final rawMsg =
-                                _viewModel.saveError ?? 'Gagal menghapus data';
                             showDialog(
                               context: context,
                               builder: (_) => ErrorStatusDialog(
                                 title: 'Gagal Menghapus!',
-                                message: rawMsg,
+                                message:
+                                    _viewModel.saveError ??
+                                    'Gagal menghapus data',
                               ),
                             );
                           }
@@ -141,9 +127,7 @@ class _HotStampProductionScreenState extends State<HotStampProductionScreen> {
                     },
                   );
                 },
-                onPrint: () {
-                  // TODO: kalau nanti ada cetak label hot stamp
-                },
+                onPrint: () {},
                 onAuditHistory: () {
                   _navigateToAuditHistory(row);
                 },
@@ -164,107 +148,68 @@ class _HotStampProductionScreenState extends State<HotStampProductionScreen> {
     );
   }
 
+  Future<void> _openCreateDialog(BuildContext ctx) async {
+    final created = await showDialog<HotStampProduction>(
+      context: ctx,
+      barrierDismissible: false,
+      builder: (_) => ChangeNotifierProvider<HotStampProductionViewModel>.value(
+        value: _viewModel,
+        child: const HotStampProductionFormDialog(),
+      ),
+    );
+    if (!mounted || !ctx.mounted) return;
+    if (created != null) {
+      _viewModel.refreshPaged();
+      setState(() => _selectedNoProduksi = created.noProduksi);
+      showDialog(
+        context: ctx,
+        builder: (_) => SuccessStatusDialog(
+          title: 'Berhasil Membuat',
+          message: 'No. Produksi ${created.noProduksi} berhasil dibuat.',
+        ),
+      );
+    }
+  }
+
+  Future<void> _openEditDialog(
+    BuildContext ctx,
+    HotStampProduction row,
+  ) async {
+    final updated = await showDialog<HotStampProduction>(
+      context: ctx,
+      barrierDismissible: false,
+      builder: (_) => ChangeNotifierProvider<HotStampProductionViewModel>.value(
+        value: _viewModel,
+        child: HotStampProductionFormDialog(header: row),
+      ),
+    );
+    if (!mounted || !ctx.mounted) return;
+    if (updated != null) {
+      _viewModel.refreshPaged();
+      showDialog(
+        context: ctx,
+        builder: (_) => SuccessStatusDialog(
+          title: 'Berhasil Mengupdate',
+          message: 'No. Produksi ${updated.noProduksi} berhasil diperbarui.',
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // ✅ Use .value to provide existing VM instance
     return ChangeNotifierProvider<HotStampProductionViewModel>.value(
       value: _viewModel,
       child: Consumer<HotStampProductionViewModel>(
         builder: (context, vm, _) {
-          debugPrint(
-            '🟦 [HOTSTAMP_SCREEN] Consumer.builder() called, VM hash=${vm.hashCode}',
-          );
-          debugPrint(
-            '🟦 [HOTSTAMP_SCREEN] Consumer pagingController: hash=${vm.pagingController.hashCode}',
-          );
-
-          final columns = <TableColumnSpec<HotStampProduction>>[
-            TableColumnSpec(
-              title: 'NO. PRODUKSI',
-              width: 160,
-              headerAlign: TextAlign.left,
-              cellAlign: TextAlign.left,
-              cellBuilder: (_, r) => Text(
-                r.noProduksi,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'TANGGAL',
-              width: 130,
-              headerAlign: TextAlign.left,
-              cellAlign: TextAlign.left,
-              cellBuilder: (_, r) => Text(formatDateToShortId(r.tglProduksi)),
-            ),
-            TableColumnSpec(
-              title: 'SHIFT',
-              width: 70,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) => Text('${r.shift}'),
-            ),
-            TableColumnSpec(
-              title: 'MESIN',
-              width: 180,
-              cellBuilder: (_, r) => Text(
-                r.namaMesin,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'OPERATOR',
-              width: 200,
-              cellBuilder: (_, r) => Text(
-                r.namaOperator,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'JAM KERJA',
-              width: 100,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) => Text(
-                '${r.jamKerja ?? 0} jam',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'JAM',
-              width: 140,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) => Text(
-                r.hourRangeText.isNotEmpty ? r.hourRangeText : '--:-- - --:--',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'HM',
-              width: 130,
-              headerAlign: TextAlign.right,
-              cellAlign: TextAlign.right,
-              cellBuilder: (_, r) => Text('${r.hourMeter ?? 0}'),
-            ),
-          ];
-
           return Scaffold(
             appBar: AppBar(
               title: const Text('Hot Stamp Production'),
               actions: [
                 IconButton(
                   icon: const Icon(Icons.refresh),
-                  onPressed: () {
-                    debugPrint(
-                      '🟦 [HOTSTAMP_SCREEN] Manual refresh button pressed, VM hash=${vm.hashCode}',
-                    );
-                    vm.refreshPaged();
-                  },
+                  tooltip: 'Refresh',
+                  onPressed: vm.refreshPaged,
                 ),
               ],
             ),
@@ -277,15 +222,11 @@ class _HotStampProductionScreenState extends State<HotStampProductionScreen> {
                     _searchCtl.clear();
                     vm.clearFilters();
                   },
-                  onAddPressed: _openCreateDialog,
+                  onAddPressed: () => _openCreateDialog(context),
                 ),
                 Expanded(
-                  child: HorizontalPagedTable<HotStampProduction>(
-                    pagingController: vm.pagingController,
-                    columns: columns,
-                    horizontalPadding: 16,
-                    selectedPredicate: (r) =>
-                        r.noProduksi == _selectedNoProduksi,
+                  child: HotStampProductionHeaderTable(
+                    selectedNoProduksi: _selectedNoProduksi,
                     onRowTap: (r) =>
                         setState(() => _selectedNoProduksi = r.noProduksi),
                     onRowLongPress: (r, globalPos) async {
@@ -303,92 +244,5 @@ class _HotStampProductionScreenState extends State<HotStampProductionScreen> {
         },
       ),
     );
-  }
-
-  Future<void> _openCreateDialog() async {
-    debugPrint('🟦 [HOTSTAMP_SCREEN] Opening create dialog...');
-    debugPrint('🟦 [HOTSTAMP_SCREEN] Using VM hash=${_viewModel.hashCode}');
-    debugPrint(
-      '🟦 [HOTSTAMP_SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
-    );
-
-    if (!mounted) return;
-
-    final created = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        debugPrint('🟦 [HOTSTAMP_SCREEN] Building create dialog...');
-
-        // ✅ Share the SAME VM instance using .value
-        return ChangeNotifierProvider<HotStampProductionViewModel>.value(
-          value: _viewModel,
-          child: const HotStampProductionFormDialog(),
-        );
-      },
-    );
-
-    debugPrint('🟦 [HOTSTAMP_SCREEN] Dialog closed, result: $created');
-
-    if (!mounted) return;
-
-    if (created == true) {
-      debugPrint('🟦 [HOTSTAMP_SCREEN] Success detected (create).');
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Produksi hot stamp berhasil dibuat')),
-      );
-    } else {
-      debugPrint('🟦 [HOTSTAMP_SCREEN] Result was null or false: $created');
-    }
-  }
-
-  Future<void> _openEditDialog(
-    BuildContext context,
-    HotStampProduction row,
-  ) async {
-    debugPrint(
-      '🟦 [HOTSTAMP_SCREEN] Opening edit dialog for: ${row.noProduksi}',
-    );
-    debugPrint('🟦 [HOTSTAMP_SCREEN] Using VM hash=${_viewModel.hashCode}');
-    debugPrint(
-      '🟦 [HOTSTAMP_SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
-    );
-
-    if (!mounted) return;
-
-    final updated = await showDialog<HotStampProduction>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        debugPrint('🟦 [HOTSTAMP_SCREEN] Building edit dialog...');
-
-        // ✅ Share the SAME VM instance
-        return ChangeNotifierProvider<HotStampProductionViewModel>.value(
-          value: _viewModel,
-          child: HotStampProductionFormDialog(header: row),
-        );
-      },
-    );
-
-    debugPrint(
-      '🟦 [HOTSTAMP_SCREEN] Edit dialog closed, result: ${updated?.noProduksi}',
-    );
-
-    if (!mounted) return;
-
-    if (updated != null) {
-      debugPrint('🟦 [HOTSTAMP_SCREEN] Success detected (update).');
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'No. Produksi ${updated.noProduksi} berhasil diperbarui',
-          ),
-        ),
-      );
-    } else {
-      debugPrint('🟦 [HOTSTAMP_SCREEN] Result was null');
-    }
   }
 }

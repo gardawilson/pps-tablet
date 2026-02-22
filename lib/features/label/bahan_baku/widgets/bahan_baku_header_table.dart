@@ -1,15 +1,18 @@
-// lib/features/production/bahan_baku/widgets/bahan_baku_header_table.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+import '../../../../common/widgets/atlas_data_table.dart';
+import '../../../../core/utils/date_formatter.dart';
 import '../model/bahan_baku_header.dart';
 import '../view_model/bahan_baku_view_model.dart';
-import '../../../../core/utils/date_formatter.dart';
 
 class BahanBakuHeaderTable extends StatelessWidget {
+  static const _colNoBbWidth = 130.0;
+  static const _colTanggalWidth = 110.0;
+  static const _colNoPlatWidth = 100.0;
+
   final ScrollController scrollController;
   final ValueChanged<BahanBakuHeader> onItemTap;
-
-  /// Kirim header + posisi global saat long-press (untuk popover)
   final void Function(BahanBakuHeader header, Offset globalPosition)?
   onItemLongPress;
 
@@ -22,218 +25,82 @@ class BahanBakuHeaderTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _buildTableHeader(),
-        Expanded(
-          child: Consumer<BahanBakuViewModel>(
-            builder: (context, vm, _) {
-              if (vm.isLoading && vm.items.isEmpty) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              if (vm.errorMessage.isNotEmpty && vm.items.isEmpty) {
-                return _buildErrorState(vm.errorMessage);
-              }
-
-              return ListView.builder(
-                controller: scrollController,
-                itemCount: vm.items.length + (vm.isFetchingMore ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (index == vm.items.length) {
-                    return const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  }
-
-                  final item = vm.items[index];
-                  final isSelected = vm.selectedNoBahanBaku == item.noBahanBaku;
-                  final isEven = index % 2 == 0;
-
-                  return _buildTableRow(
-                    context: context,
-                    item: item,
-                    isSelected: isSelected,
-                    isEven: isEven,
-                  );
-                },
-              );
-            },
-          ),
-        ),
-      ],
+    return Consumer<BahanBakuViewModel>(
+      builder: (context, vm, _) {
+        return AtlasDataTable<BahanBakuHeader>(
+          columns: _buildColumns(),
+          items: vm.items,
+          scrollController: scrollController,
+          isLoading: vm.isLoading,
+          isFetchingMore: vm.isFetchingMore,
+          errorMessage: vm.errorMessage,
+          errorBuilder: _buildErrorState,
+          selectedPredicate: (item) =>
+              vm.selectedNoBahanBaku == item.noBahanBaku,
+          onRowTap: onItemTap,
+          onRowLongPress: onItemLongPress,
+        );
+      },
     );
   }
 
-  Widget _buildTableHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 12,
-      ), // ⬅️ padding dikurangi
-      decoration: BoxDecoration(
-        color: const Color(0xFF1565C0),
-        border: Border(
-          bottom: BorderSide(color: Colors.grey.shade300, width: 2),
-        ),
+  List<AtlasTableColumn<BahanBakuHeader>> _buildColumns() {
+    return [
+      AtlasTableColumn<BahanBakuHeader>(
+        title: 'NO. BB',
+        width: _colNoBbWidth,
+        cellBuilder: (context, item, rowState) {
+          return Text(
+            item.noBahanBaku,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: rowState.isSelected
+                  ? FontWeight.w700
+                  : FontWeight.w600,
+              color: rowState.isSelected
+                  ? const Color(0xFF0C66E4)
+                  : Colors.black87,
+            ),
+            softWrap: true,
+          );
+        },
       ),
-      child: Row(
-        children: const [
-          SizedBox(
-            width: 140, // ⬅️ dari 180 → 140
-            child: Text(
-              'NO. BB', // ⬅️ singkat dari "NO. BAHAN BAKU"
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 13, // ⬅️ dari 14 → 13
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-          SizedBox(
-            width: 90, // ⬅️ dari 130 → 90
-            child: Text(
-              'TANGGAL',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 2, // ⬅️ tambah flex
-            child: Text(
-              'SUPPLIER',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-          SizedBox(
-            width: 100, // ⬅️ dari 140 → 100
-            child: Text(
-              'NO. PLAT',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 1, // ⬅️ dari fixed 150 → Expanded
-            child: Text(
-              'DIBUAT',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-        ],
+      AtlasTableColumn<BahanBakuHeader>(
+        title: 'TANGGAL',
+        width: _colTanggalWidth,
+        cellBuilder: (context, item, rowState) {
+          return Text(
+            formatDateToShortId(item.dateCreate),
+            style: TextStyle(fontSize: 14, color: rowState.textColor),
+            softWrap: true,
+          );
+        },
       ),
-    );
-  }
-
-  Widget _buildTableRow({
-    required BuildContext context,
-    required BahanBakuHeader item,
-    required bool isSelected,
-    required bool isEven,
-  }) {
-    final bgColor = isSelected
-        ? Colors.blue.shade50
-        : (isEven ? Colors.white : Colors.grey.shade50);
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onLongPressStart: onItemLongPress != null
-          ? (details) => onItemLongPress!(item, details.globalPosition)
-          : null,
-      onSecondaryTapDown: onItemLongPress != null
-          ? (details) => onItemLongPress!(item, details.globalPosition)
-          : null,
-      child: InkWell(
-        onTap: () => onItemTap(item),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          curve: Curves.easeInOut,
-          padding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 14,
-          ), // ⬅️ padding dikurangi
-          decoration: BoxDecoration(
-            color: bgColor,
-            border: Border(
-              left: BorderSide(
-                color: isSelected ? Colors.blue : Colors.transparent,
-                width: 4,
-              ),
-              bottom: BorderSide(color: Colors.grey.shade200),
-            ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: 140, // ⬅️ sesuaikan dengan header
-                child: Text(
-                  item.noBahanBaku,
-                  style: TextStyle(
-                    fontSize: 14, // ⬅️ dari 15 → 14
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                    color: isSelected ? Colors.blue.shade900 : Colors.black87,
-                  ),
-                  softWrap: true,
-                ),
-              ),
-              SizedBox(
-                width: 90,
-                child: Text(
-                  formatDateToShortId(item.dateCreate),
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
-                  softWrap: true,
-                ),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text(
-                  item.namaSupplier,
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
-                  softWrap: true,
-                ),
-              ),
-              SizedBox(
-                width: 100,
-                child: Text(
-                  item.noPlat ?? '-',
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
-                  softWrap: true,
-                ),
-              ),
-              Expanded(
-                flex: 1,
-                child: Text(
-                  item.createBy ?? '-',
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
-                  softWrap: true,
-                ),
-              ),
-            ],
-          ),
-        ),
+      AtlasTableColumn<BahanBakuHeader>(
+        title: 'SUPPLIER',
+        flex: 2,
+        horizontalPadding: 14,
+        cellBuilder: (context, item, rowState) {
+          return Text(
+            item.namaSupplier,
+            style: TextStyle(fontSize: 14, color: rowState.textColor),
+            softWrap: true,
+          );
+        },
       ),
-    );
+      AtlasTableColumn<BahanBakuHeader>(
+        title: 'NO. PLAT',
+        width: _colNoPlatWidth,
+        showDivider: false,
+        cellBuilder: (context, item, rowState) {
+          return Text(
+            item.noPlat ?? '-',
+            style: TextStyle(fontSize: 14, color: rowState.textColor),
+            softWrap: true,
+          );
+        },
+      ),
+    ];
   }
 
   Widget _buildErrorState(String message) {

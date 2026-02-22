@@ -48,7 +48,7 @@ class _HotStampProductionFormDialogState
   late final TextEditingController dateCreatedCtrl;
   late final TextEditingController mesinCtrl;
   late final TextEditingController operatorCtrl;
-  late final TextEditingController jamCtrl; // ✅ Jam field
+  late final TextEditingController jamCtrl;
   late final TextEditingController hourMeterCtrl;
 
   // State
@@ -71,7 +71,7 @@ class _HotStampProductionFormDialogState
   bool get isEdit => widget.header != null;
 
   // kind untuk endpoint overlap (dialog ini HOT_STAMP)
-  static const String _kind = 'hotStamp'; // ✅ Updated kind
+  static const String _kind = 'hotStamp';
 
   @override
   void initState() {
@@ -91,7 +91,6 @@ class _HotStampProductionFormDialogState
     operatorCtrl =
         TextEditingController(text: widget.header?.namaOperator ?? '');
 
-    // ✅ Initialize jam field
     jamCtrl = TextEditingController(
       text: widget.header?.jamKerja?.toString() ?? '',
     );
@@ -118,8 +117,6 @@ class _HotStampProductionFormDialogState
   }
 
   Future<void> _submit() async {
-    debugPrint('📝 [HOTSTAMP_FORM] _submit() started');
-
     // cek overlap dulu
     final ovm = context.read<OverlapViewModel>();
     if (ovm.hasOverlap) {
@@ -159,7 +156,7 @@ class _HotStampProductionFormDialogState
       return;
     }
 
-    // ✅ Parse jam field (can be int or computed from time range)
+    // Parse jam field (can be int or computed from time range)
     int? jamKerja;
 
     // Try to get jam from direct input first
@@ -191,27 +188,21 @@ class _HotStampProductionFormDialogState
     }
 
     // helper HH:mm -> HH:mm:00
-    String _toSqlTime(String raw) {
+    String toSqlTime(String raw) {
       final t = raw.trim();
       if (t.isEmpty) return t;
       return t.length == 5 ? '$t:00' : t;
     }
 
-    final hourStartSql = _toSqlTime(hourStartCtrl.text);
-    final hourEndSql = _toSqlTime(hourEndCtrl.text);
+    final hourStartSql = toSqlTime(hourStartCtrl.text);
+    final hourEndSql = toSqlTime(hourEndCtrl.text);
 
     // parse angka
     final hourMeter = double.tryParse(hourMeterCtrl.text.trim());
 
-    // ✅ Read VM from PARENT Screen context
     final prodVm = context.read<HotStampProductionViewModel>();
-    debugPrint('📝 [HOTSTAMP_FORM] Got VM from context: VM hash=${prodVm.hashCode}');
-    debugPrint(
-      '📝 [HOTSTAMP_FORM] Got controller from VM: controller hash=${prodVm.pagingController.hashCode}',
-    );
 
     // show loading
-    debugPrint('📝 [HOTSTAMP_FORM] Showing loading dialog...');
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -222,81 +213,48 @@ class _HotStampProductionFormDialogState
 
     try {
       if (isEdit) {
-        debugPrint('📝 [HOTSTAMP_FORM] Calling updateProduksi...');
         result = await prodVm.updateProduksi(
           noProduksi: widget.header!.noProduksi,
           tglProduksi: _selectedDate,
           idMesin: mesinId,
           idOperator: operatorId,
-          jam: jamKerja, // ✅ Send jam field
+          jam: jamKerja,
           shift: _selectedShift!,
           hourStart: hourStartSql,
           hourEnd: hourEndSql,
           hourMeter: hourMeter,
         );
-        debugPrint(
-          '📝 [HOTSTAMP_FORM] updateProduksi returned: ${result?.noProduksi}',
-        );
       } else {
-        debugPrint('📝 [HOTSTAMP_FORM] Calling createProduksi...');
         result = await prodVm.createProduksi(
           tglProduksi: _selectedDate,
           idMesin: mesinId,
           idOperator: operatorId,
-          jam: jamKerja, // ✅ Send jam field
+          jam: jamKerja,
           shift: _selectedShift!,
           hourStart: hourStartSql,
           hourEnd: hourEndSql,
           hourMeter: hourMeter,
         );
-        debugPrint(
-          '📝 [HOTSTAMP_FORM] createProduksi returned: ${result?.noProduksi}',
-        );
       }
     } catch (e) {
-      debugPrint('❌ [HOTSTAMP_FORM] Exception during save: $e');
+      // error handled via prodVm.saveError
     } finally {
-      debugPrint('📝 [HOTSTAMP_FORM] Popping loading dialog...');
-      if (mounted) {
-        Navigator.of(context).pop();
-        debugPrint('📝 [HOTSTAMP_FORM] Loading dialog popped');
-      }
+      if (mounted) Navigator.of(context).pop();
     }
 
-    if (!mounted) {
-      debugPrint('📝 [HOTSTAMP_FORM] Widget not mounted after save, returning');
-      return;
-    }
-
-    debugPrint('📝 [HOTSTAMP_FORM] Checking result: ${result?.noProduksi}');
+    if (!mounted) return;
 
     if (result != null) {
-      debugPrint('📝 [HOTSTAMP_FORM] Success detected: ${result.noProduksi}');
-
       widget.onSave?.call(result);
-
-      if (isEdit) {
-        debugPrint('📝 [HOTSTAMP_FORM] Edit mode - closing with HotStampProduction result');
-        Navigator.of(context).pop(result);
-        debugPrint('📝 [HOTSTAMP_FORM] Dialog popped with result');
-      } else {
-        debugPrint('📝 [HOTSTAMP_FORM] Create mode - closing with true');
-        Navigator.of(context).pop(true);
-        debugPrint('📝 [HOTSTAMP_FORM] Dialog popped with true');
-      }
+      Navigator.of(context).pop(result);
     } else {
-      debugPrint('❌ [HOTSTAMP_FORM] Result is null, showing error');
-      debugPrint('❌ [HOTSTAMP_FORM] Error message: ${prodVm.saveError}');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(prodVm.saveError ?? 'Gagal menyimpan data'),
           backgroundColor: Colors.red,
         ),
       );
-      debugPrint('❌ [HOTSTAMP_FORM] SnackBar shown, keeping dialog open');
     }
-
-    debugPrint('📝 [HOTSTAMP_FORM] _submit() completed');
   }
 
   /// Panggil cek-overlap via ViewModel hanya jika input sudah lengkap
@@ -322,7 +280,7 @@ class _HotStampProductionFormDialogState
     );
   }
 
-  /// ✅ Auto-calculate jam from time range
+  /// Auto-calculate jam from time range
   void _updateJamFromTimeRange() {
     final start = hourStartCtrl.text.trim();
     final end = hourEndCtrl.text.trim();
@@ -340,15 +298,6 @@ class _HotStampProductionFormDialogState
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('📝 [HOTSTAMP_FORM] build() called');
-
-    // ✅ Verify we're using the correct VM
-    final vm = context.read<HotStampProductionViewModel>();
-    debugPrint('📝 [HOTSTAMP_FORM] VM from context: hash=${vm.hashCode}');
-    debugPrint(
-      '📝 [HOTSTAMP_FORM] Controller from VM: hash=${vm.pagingController.hashCode}',
-    );
-
     return ChangeNotifierProvider(
       create: (_) => OverlapViewModel(repository: OverlapRepository()),
       child: Dialog(
@@ -473,7 +422,7 @@ class _HotStampProductionFormDialogState
 
               // Jenis Mesin
               MesinDropdown(
-                idBagianMesin: 8, // ✅ TODO: sesuaikan ID bagian untuk HOT_STAMP
+                idBagianMesin: 8,
                 preselectId: widget.header?.idMesin,
                 label: 'Mesin',
                 hint: 'Pilih mesin',
@@ -526,7 +475,7 @@ class _HotStampProductionFormDialogState
                             _startTime = picked;
                             hourStartCtrl.text = formatHHmm(picked);
                           });
-                          _updateJamFromTimeRange(); // ✅ Auto-update jam
+                          _updateJamFromTimeRange();
                           await _checkOverlapIfReadyVM();
                         }
                       },
@@ -560,7 +509,7 @@ class _HotStampProductionFormDialogState
                             _endTime = picked;
                             hourEndCtrl.text = formatHHmm(picked);
                           });
-                          _updateJamFromTimeRange(); // ✅ Auto-update jam
+                          _updateJamFromTimeRange();
                           await _checkOverlapIfReadyVM();
                         }
                       },
@@ -636,7 +585,6 @@ class _HotStampProductionFormDialogState
     final ovm = context.watch<OverlapViewModel>();
     final hasOverlap = ovm.hasOverlap;
 
-    // ✅ Watch VM from PARENT Screen context for isSaving state
     final prodVm = context.watch<HotStampProductionViewModel>();
     final isSaving = prodVm.isSaving;
 

@@ -5,20 +5,14 @@ import 'package:pps_tablet/features/bongkar_susun/view/bongkar_susun_input_scree
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
-import '../../../../common/widgets/horizontal_paged_table.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
-import '../../../../common/widgets/table_column_spec.dart';
-import '../../../../core/utils/date_formatter.dart';
 
-import '../../production/broker/view/broker_production_input_screen.dart';
 import '../model/bongkar_susun_model.dart';
-import '../repository/bongkar_susun_repository.dart';
 import '../view_model/bongkar_susun_view_model.dart';
-
-// Action bar
 import '../widgets/bongkar_susun_action_bar.dart';
 import '../widgets/bongkar_susun_delete_dialog.dart';
 import '../widgets/bongkar_susun_form_dialog.dart';
+import '../widgets/bongkar_susun_header_table.dart';
 import '../widgets/bongkar_susun_row_popover.dart';
 
 class BongkarSusunScreen extends StatefulWidget {
@@ -32,31 +26,19 @@ class _BongkarSusunScreenState extends State<BongkarSusunScreen> {
   final TextEditingController _searchCtl = TextEditingController();
   String? _selectedNoBongkarSusun;
 
-  // ✅ Store VM instance as field
   late final BongkarSusunViewModel _viewModel;
 
   @override
   void initState() {
     super.initState();
-
-    // ✅ Screen hanya tahu tentang ViewModel, tidak peduli repository
-    _viewModel = BongkarSusunViewModel(); // ← Clean!
-
-    debugPrint(
-      '🟦🟦🟦 [SCREEN] initState: Created VM hash=${_viewModel.hashCode}',
-    );
-    debugPrint(
-      '🟦🟦🟦 [SCREEN] initState: PagingController hash=${_viewModel.pagingController.hashCode}',
-    );
-
-    // Initialize first load
+    _viewModel = BongkarSusunViewModel();
     _viewModel.refreshPaged();
   }
 
   @override
   void dispose() {
     _searchCtl.dispose();
-    _viewModel.dispose(); // ✅ Dispose VM
+    _viewModel.dispose();
     super.dispose();
   }
 
@@ -88,7 +70,6 @@ class _BongkarSusunScreenState extends State<BongkarSusunScreen> {
                 row: row,
                 onClose: () => Navigator.of(dialogCtx).pop(),
                 onInput: () {
-                  // popover sudah tertutup oleh _runAndClose di dalam popover
                   Future.microtask(() {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -101,7 +82,6 @@ class _BongkarSusunScreenState extends State<BongkarSusunScreen> {
                     );
                   });
                 },
-
                 onEdit: () async {
                   await _openEditDialog(context, row);
                 },
@@ -130,13 +110,13 @@ class _BongkarSusunScreenState extends State<BongkarSusunScreen> {
                               ),
                             );
                           } else {
-                            final rawMsg =
-                                _viewModel.saveError ?? 'Gagal menghapus data';
                             showDialog(
                               context: context,
                               builder: (_) => ErrorStatusDialog(
                                 title: 'Gagal Menghapus!',
-                                message: rawMsg,
+                                message:
+                                    _viewModel.saveError ??
+                                    'Gagal menghapus data',
                               ),
                             );
                           }
@@ -165,72 +145,70 @@ class _BongkarSusunScreenState extends State<BongkarSusunScreen> {
     );
   }
 
+  Future<void> _openCreateDialog(BuildContext ctx) async {
+    final created = await showDialog<BongkarSusun>(
+      context: ctx,
+      barrierDismissible: false,
+      builder: (_) => ChangeNotifierProvider<BongkarSusunViewModel>.value(
+        value: _viewModel,
+        child: const BongkarSusunFormDialog(),
+      ),
+    );
+    if (!mounted || !ctx.mounted) return;
+    if (created != null) {
+      _viewModel.refreshPaged();
+      setState(() => _selectedNoBongkarSusun = created.noBongkarSusun);
+      showDialog(
+        context: ctx,
+        builder: (_) => SuccessStatusDialog(
+          title: 'Berhasil Membuat',
+          message:
+              'No. Bongkar/Susun ${created.noBongkarSusun} berhasil dibuat.',
+        ),
+      );
+    }
+  }
+
+  Future<void> _openEditDialog(
+    BuildContext ctx,
+    BongkarSusun row,
+  ) async {
+    final updated = await showDialog<BongkarSusun>(
+      context: ctx,
+      barrierDismissible: false,
+      builder: (_) => ChangeNotifierProvider<BongkarSusunViewModel>.value(
+        value: _viewModel,
+        child: BongkarSusunFormDialog(header: row),
+      ),
+    );
+    if (!mounted || !ctx.mounted) return;
+    if (updated != null) {
+      _viewModel.refreshPaged();
+      showDialog(
+        context: ctx,
+        builder: (_) => SuccessStatusDialog(
+          title: 'Berhasil Mengupdate',
+          message:
+              'No. Bongkar/Susun ${updated.noBongkarSusun} berhasil diperbarui.',
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // ✅ Use .value to provide existing VM instance
     return ChangeNotifierProvider<BongkarSusunViewModel>.value(
       value: _viewModel,
       child: Consumer<BongkarSusunViewModel>(
         builder: (context, vm, _) {
-          debugPrint(
-            '🟦 [SCREEN] Consumer.builder() called, VM hash=${vm.hashCode}',
-          );
-          debugPrint(
-            '🟦 [SCREEN] Consumer pagingController: hash=${vm.pagingController.hashCode}',
-          );
-
-          final columns = <TableColumnSpec<BongkarSusun>>[
-            TableColumnSpec(
-              title: 'NO. BS',
-              width: 180,
-              headerAlign: TextAlign.left,
-              cellAlign: TextAlign.left,
-              cellBuilder: (_, r) => Text(
-                r.noBongkarSusun,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            TableColumnSpec(
-              title: 'TANGGAL',
-              width: 130,
-              headerAlign: TextAlign.left,
-              cellAlign: TextAlign.left,
-              cellBuilder: (_, r) => Text(formatDateToShortId(r.tanggal)),
-            ),
-            TableColumnSpec(
-              title: 'CREATED BY',
-              width: 130,
-              headerAlign: TextAlign.center,
-              cellAlign: TextAlign.center,
-              cellBuilder: (_, r) => Text('${r.username}'),
-            ),
-            TableColumnSpec(
-              title: 'CATATAN',
-              width: 300,
-              headerAlign: TextAlign.left,
-              cellAlign: TextAlign.left,
-              cellBuilder: (_, r) => Text(
-                r.note ?? '-',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.black87),
-              ),
-            ),
-          ];
-
           return Scaffold(
             appBar: AppBar(
               title: const Text('Bongkar Susun'),
               actions: [
                 IconButton(
                   icon: const Icon(Icons.refresh),
-                  onPressed: () {
-                    debugPrint(
-                      '🟦 [SCREEN] Manual refresh button pressed, VM hash=${vm.hashCode}',
-                    );
-                    vm.refreshPaged();
-                  },
+                  tooltip: 'Refresh',
+                  onPressed: vm.refreshPaged,
                 ),
               ],
             ),
@@ -243,15 +221,11 @@ class _BongkarSusunScreenState extends State<BongkarSusunScreen> {
                     _searchCtl.clear();
                     vm.clearFilters();
                   },
-                  onAddPressed: _openCreateDialog,
+                  onAddPressed: () => _openCreateDialog(context),
                 ),
                 Expanded(
-                  child: HorizontalPagedTable<BongkarSusun>(
-                    pagingController: vm.pagingController,
-                    columns: columns,
-                    horizontalPadding: 16,
-                    selectedPredicate: (r) =>
-                        r.noBongkarSusun == _selectedNoBongkarSusun,
+                  child: BongkarSusunHeaderTable(
+                    selectedNoBongkarSusun: _selectedNoBongkarSusun,
                     onRowTap: (r) => setState(
                       () => _selectedNoBongkarSusun = r.noBongkarSusun,
                     ),
@@ -270,87 +244,5 @@ class _BongkarSusunScreenState extends State<BongkarSusunScreen> {
         },
       ),
     );
-  }
-
-  Future<void> _openCreateDialog() async {
-    debugPrint('🟦 [SCREEN] Opening create dialog...');
-    debugPrint('🟦 [SCREEN] Using VM hash=${_viewModel.hashCode}');
-    debugPrint(
-      '🟦 [SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
-    );
-
-    if (!mounted) return;
-
-    final created = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        debugPrint('🟦 [SCREEN] Building create dialog...');
-
-        // ✅ Share the SAME VM instance using .value
-        return ChangeNotifierProvider<BongkarSusunViewModel>.value(
-          value: _viewModel,
-          child: const BongkarSusunFormDialog(),
-        );
-      },
-    );
-
-    debugPrint('🟦 [SCREEN] Dialog closed, result: $created');
-
-    if (!mounted) return;
-
-    if (created == true) {
-      debugPrint('🟦 [SCREEN] Success detected (create).');
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Bongkar/Susun berhasil dibuat')),
-      );
-    } else {
-      debugPrint('🟦 [SCREEN] Result was null or false: $created');
-    }
-  }
-
-  Future<void> _openEditDialog(BuildContext context, BongkarSusun row) async {
-    debugPrint('🟦 [SCREEN] Opening edit dialog for: ${row.noBongkarSusun}');
-    debugPrint('🟦 [SCREEN] Using VM hash=${_viewModel.hashCode}');
-    debugPrint(
-      '🟦 [SCREEN] Using controller hash=${_viewModel.pagingController.hashCode}',
-    );
-
-    if (!mounted) return;
-
-    final updated = await showDialog<BongkarSusun>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        debugPrint('🟦 [SCREEN] Building edit dialog...');
-
-        // ✅ Share the SAME VM instance
-        return ChangeNotifierProvider<BongkarSusunViewModel>.value(
-          value: _viewModel,
-          child: BongkarSusunFormDialog(header: row),
-        );
-      },
-    );
-
-    debugPrint(
-      '🟦 [SCREEN] Edit dialog closed, result: ${updated?.noBongkarSusun}',
-    );
-
-    if (!mounted) return;
-
-    if (updated != null) {
-      debugPrint('🟦 [SCREEN] Success detected (update).');
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'No. Bongkar/Susun ${updated.noBongkarSusun} berhasil diperbarui',
-          ),
-        ),
-      );
-    } else {
-      debugPrint('🟦 [SCREEN] Result was null');
-    }
   }
 }

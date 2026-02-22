@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../view_model/gilingan_view_model.dart';
-import '../model/gilingan_header_model.dart';
+import '../../../../common/widgets/atlas_data_table.dart';
 import '../../../../core/utils/date_formatter.dart';
+import '../model/gilingan_header_model.dart';
+import '../view_model/gilingan_view_model.dart';
 
 class GilinganHeaderTable extends StatelessWidget {
+  static const _colNoGilinganWidth = 150.0;
+  static const _colTanggalWidth = 108.0;
+  static const _colBeratWidth = 92.0;
+  static const _colLokasiWidth = 96.0;
+
   final ScrollController scrollController;
   final ValueChanged<GilinganHeader> onItemTap;
 
@@ -13,7 +19,7 @@ class GilinganHeaderTable extends StatelessWidget {
   final void Function(GilinganHeader header, Offset globalPosition)
   onItemLongPress;
 
-  /// NEW: callback ketika row partial di-tap
+  /// callback ketika row partial di-tap
   final void Function(GilinganHeader header, Offset globalPosition)?
   onPartialTap;
 
@@ -27,286 +33,158 @@ class GilinganHeaderTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _buildTableHeader(),
-        Expanded(
-          child: Consumer<GilinganViewModel>(
-            builder: (context, vm, _) {
-              if (vm.isLoading && vm.items.isEmpty) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              if (vm.errorMessage.isNotEmpty && vm.items.isEmpty) {
-                return _buildErrorState(vm.errorMessage);
-              }
-
-              return ListView.builder(
-                controller: scrollController,
-                itemCount: vm.items.length + (vm.isFetchingMore ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (index == vm.items.length) {
-                    return const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  }
-
-                  final item = vm.items[index];
-                  final isSelected = vm.selectedNoGilingan == item.noGilingan;
-                  final isEven = index % 2 == 0;
-
-                  return _buildTableRow(
-                    context: context,
-                    vm: vm,
-                    item: item,
-                    isSelected: isSelected,
-                    isEven: isEven,
-                  );
-                },
-              );
-            },
-          ),
-        ),
-      ],
+    return Consumer<GilinganViewModel>(
+      builder: (context, vm, _) {
+        return AtlasDataTable<GilinganHeader>(
+          columns: _buildColumns(),
+          items: vm.items,
+          scrollController: scrollController,
+          isLoading: vm.isLoading,
+          isFetchingMore: vm.isFetchingMore,
+          errorMessage: vm.errorMessage,
+          errorBuilder: _buildErrorState,
+          selectedPredicate: (item) => vm.selectedNoGilingan == item.noGilingan,
+          onRowTapWithPosition: (item, globalPosition) {
+            onItemTap(item);
+            if (item.isPartialBool && onPartialTap != null) {
+              onPartialTap!(item, globalPosition);
+            }
+          },
+          onRowLongPress: onItemLongPress,
+        );
+      },
     );
   }
 
-  Widget _buildTableHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1565C0),
-        border: Border(
-          bottom: BorderSide(color: Colors.grey.shade300, width: 2),
-        ),
-      ),
-      child: const Row(
-        children: [
-          SizedBox(
-            width: 150,
-            child: Text(
-              'NO. GILINGAN',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-          SizedBox(
-            width: 130,
-            child: Text(
-              'TANGGAL',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              'JENIS',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-          SizedBox(
-            width: 100,
-            child: Text(
-              'BERAT',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              'PROSES',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-          SizedBox(
-            width: 100,
-            child: Text(
-              'LOKASI',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTableRow({
-    required BuildContext context,
-    required GilinganViewModel vm,
-    required GilinganHeader item,
-    required bool isSelected,
-    required bool isEven,
-  }) {
-    final bgColor = isSelected
-        ? Colors.blue.shade50
-        : (isEven ? Colors.white : Colors.grey.shade50);
-
-    String _formatBerat(double? v) {
-      if (v == null) return '-';
-      return v.toStringAsFixed(2);
-    }
-
-    // Callback lokal
-    final partialTapCallback = onPartialTap;
-
-    // Posisi tap terakhir (global)
-    Offset? tapDownPosition;
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (details) {
-        tapDownPosition = details.globalPosition;
-      },
-      onTap: () {
-        // Selalu jalankan handler tap utama
-        onItemTap(item);
-
-        // Kalau partial, panggil callback partial ke Screen
-        if (item.isPartialBool &&
-            partialTapCallback != null &&
-            tapDownPosition != null) {
-          partialTapCallback(item, tapDownPosition!);
-        }
-      },
-      onLongPressStart: (details) =>
-          onItemLongPress(item, details.globalPosition),
-      onSecondaryTapDown: (details) =>
-          onItemLongPress(item, details.globalPosition),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        curve: Curves.easeInOut,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        decoration: BoxDecoration(
-          color: bgColor,
-          border: Border(
-            left: BorderSide(
-              color: isSelected ? Colors.blue : Colors.transparent,
-              width: 4,
-            ),
-            bottom: BorderSide(color: Colors.grey.shade200),
-          ),
-        ),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 150,
-              child: Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      item.noGilingan,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight:
-                        isSelected ? FontWeight.bold : FontWeight.w500,
-                        color:
-                        isSelected ? Colors.blue.shade900 : Colors.black87,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
+  List<AtlasTableColumn<GilinganHeader>> _buildColumns() {
+    return [
+      AtlasTableColumn<GilinganHeader>(
+        title: 'NO. GILINGAN',
+        width: _colNoGilinganWidth,
+        cellBuilder: (context, item, rowState) {
+          return Row(
+            children: [
+              Expanded(
+                child: Text(
+                  item.noGilingan,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: rowState.isSelected
+                        ? FontWeight.w700
+                        : FontWeight.w600,
+                    color: rowState.isSelected
+                        ? const Color(0xFF0C66E4)
+                        : Colors.black87,
                   ),
-                  if (item.isPartialBool) ...[
-                    const SizedBox(width: 6),
-                    Tooltip(
-                      message: 'Klik untuk lihat detail partial',
-                      child: Icon(
-                        Icons.info_outline,
-                        size: 16,
-                        color: Colors.orange.shade600,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            SizedBox(
-              width: 130,
-              child: Text(
-                formatDateToShortId(item.dateCreate),
-                style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            Expanded(
-              child: Text(
-                item.namaGilingan ?? '-',
-                style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            SizedBox(
-              width: 100,
-              child: Text(
-                _formatBerat(item.berat),
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight:
-                  item.isPartialBool ? FontWeight.bold : FontWeight.w400,
-                  color: item.isPartialBool
-                      ? Colors.red
-                      : Colors.grey.shade800,
+                  softWrap: true,
                 ),
-                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            Expanded(
-              child: Text(
-                displayMesinOrBongkar(item),
-                style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            SizedBox(
-              width: 100,
-              child: Text(
-                _formatBlokLokasi(item.blok, item.idLokasi),
-                style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
+            ],
+          );
+        },
       ),
-    );
+      AtlasTableColumn<GilinganHeader>(
+        title: 'TANGGAL',
+        width: _colTanggalWidth,
+        cellBuilder: (context, item, rowState) {
+          return Text(
+            formatDateToShortId(item.dateCreate),
+            style: TextStyle(fontSize: 14, color: rowState.textColor),
+            softWrap: true,
+          );
+        },
+      ),
+      AtlasTableColumn<GilinganHeader>(
+        title: 'JENIS',
+        flex: 2,
+        horizontalPadding: 14,
+        cellBuilder: (context, item, rowState) {
+          return Text(
+            item.namaGilingan ?? '-',
+            style: TextStyle(fontSize: 14, color: rowState.textColor),
+            softWrap: true,
+          );
+        },
+      ),
+      AtlasTableColumn<GilinganHeader>(
+        title: 'BERAT',
+        width: _colBeratWidth,
+        cellBuilder: (context, item, rowState) {
+          return Text(
+            _formatBerat(item.berat),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: item.isPartialBool
+                  ? FontWeight.w700
+                  : FontWeight.w400,
+              color: item.isPartialBool ? Colors.red : rowState.textColor,
+            ),
+            softWrap: true,
+          );
+        },
+      ),
+      AtlasTableColumn<GilinganHeader>(
+        title: 'PROSES',
+        flex: 2,
+        horizontalPadding: 14,
+        cellBuilder: (context, item, rowState) {
+          final code = (item.refNoProduksi ?? '').trim().isNotEmpty
+              ? item.refNoProduksi!.trim()
+              : ((item.noBongkarSusun ?? '').trim().isNotEmpty
+                    ? item.noBongkarSusun!.trim()
+                    : '-');
+          final nama = (item.refNamaMesin ?? '').trim();
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                code,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: rowState.isSelected
+                      ? const Color(0xFF0C66E4)
+                      : Colors.black87,
+                ),
+                softWrap: true,
+              ),
+              if (nama.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  nama,
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                  softWrap: true,
+                ),
+              ],
+            ],
+          );
+        },
+      ),
+      AtlasTableColumn<GilinganHeader>(
+        title: 'LOKASI',
+        width: _colLokasiWidth,
+        showDivider: false,
+        cellBuilder: (context, item, rowState) {
+          return Text(
+            _formatBlokLokasi(item.blok, item.idLokasi),
+            style: TextStyle(fontSize: 14, color: rowState.textColor),
+            softWrap: true,
+          );
+        },
+      ),
+    ];
   }
 
-  String displayMesinOrBongkar(GilinganHeader i) {
-    String? pick(String? s) => (s == null || s.trim().isEmpty) ? null : s.trim();
-    return pick(i.gilinganNamaMesin) ?? pick(i.noBongkarSusun) ?? '-';
+  String _formatBerat(double? v) {
+    if (v == null) return '-';
+    return v.toStringAsFixed(2);
   }
 
   String _formatBlokLokasi(String? blok, dynamic idLokasi) {
     final hasBlok = blok != null && blok.trim().isNotEmpty;
-    final hasLokasi =
-        idLokasi != null && idLokasi.toString().trim().isNotEmpty;
+    final hasLokasi = idLokasi != null && idLokasi.toString().trim().isNotEmpty;
 
     if (!hasBlok && !hasLokasi) {
       return '-';

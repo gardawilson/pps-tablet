@@ -50,9 +50,7 @@ class PackingRepository {
 
       final List<dynamic> raw = body['data'] ?? [];
       final items = raw
-          .map(
-            (e) => PackingHeader.fromJson(e as Map<String, dynamic>),
-      )
+          .map((e) => PackingHeader.fromJson(e as Map<String, dynamic>))
           .toList();
 
       final meta = (body['meta'] as Map<String, dynamic>?) ?? const {};
@@ -64,10 +62,7 @@ class PackingRepository {
         'totalPages': meta['totalPages'] ?? 1,
       };
     } on ApiException catch (e) {
-      throw Exception(_friendlyError(
-        e,
-        'Gagal fetch Packing (Barang Jadi)',
-      ));
+      throw Exception(_friendlyError(e, 'Gagal fetch Packing (Barang Jadi)'));
     }
   }
 
@@ -90,9 +85,7 @@ class PackingRepository {
   //   "outputCode": "BD.0000..." / "S.0000..." / "BG.0000..." / "L.0000..."
   // }
   // =======================================================================
-  Future<Map<String, dynamic>> createPacking(
-      Map<String, dynamic> body,
-      ) async {
+  Future<Map<String, dynamic>> createPacking(Map<String, dynamic> body) async {
     // Guard: outputCode wajib
     final oc = (body['outputCode'] ?? '').toString().trim();
     if (oc.isEmpty) {
@@ -100,16 +93,10 @@ class PackingRepository {
     }
 
     try {
-      final res = await api.postJson(
-        '/api/labels/packing',
-        body: body,
-      );
+      final res = await api.postJson('/api/labels/packing', body: body);
       return res;
     } on ApiException catch (e) {
-      throw Exception(_friendlyError(
-        e,
-        'Gagal membuat Packing (Barang Jadi)',
-      ));
+      throw Exception(_friendlyError(e, 'Gagal membuat Packing (Barang Jadi)'));
     }
   }
 
@@ -117,9 +104,9 @@ class PackingRepository {
   // PUT /api/labels/packing/:noBJ
   // =======================================================================
   Future<Map<String, dynamic>> updatePacking(
-      String noBJ,
-      Map<String, dynamic> body,
-      ) async {
+    String noBJ,
+    Map<String, dynamic> body,
+  ) async {
     if (body.isEmpty) {
       throw Exception('Tidak ada field yang diubah.');
     }
@@ -131,38 +118,110 @@ class PackingRepository {
       );
       return res;
     } on ApiException catch (e) {
-      throw Exception(_friendlyError(
-        e,
-        'Gagal update Packing (Barang Jadi)',
-      ));
+      throw Exception(_friendlyError(e, 'Gagal update Packing (Barang Jadi)'));
     }
   }
 
   // =======================================================================
   // DELETE /api/labels/packing/:noBJ
   // =======================================================================
-  Future<Map<String, dynamic>> deletePacking(
-      String noBJ,
-      ) async {
+  Future<Map<String, dynamic>> deletePacking(String noBJ) async {
     try {
       final res = await api.deleteJson(
         '/api/labels/packing/${Uri.encodeComponent(noBJ)}',
       );
       return res;
     } on ApiException catch (e) {
-      throw Exception(_friendlyError(
-        e,
-        'Gagal menghapus Packing',
-      ));
+      throw Exception(_friendlyError(e, 'Gagal menghapus Packing'));
+    }
+  }
+
+  // =======================================================================
+  // Fetch output items
+  // =======================================================================
+
+  Future<List<PackingOutputItem>> fetchOutputsByInjectNoProduksi(
+    String noProduksi,
+  ) async {
+    try {
+      final body = await api.getJson(
+        '/api/production/inject/$noProduksi/outputs/barang-jadi',
+      );
+      final List<dynamic> data = body['data'] ?? [];
+      return data
+          .map((e) => PackingOutputItem.fromJson(e as Map<String, dynamic>))
+          .where((o) => o.noBJ.isNotEmpty)
+          .toList();
+    } on ApiException catch (e) {
+      throw Exception(_friendlyError(e, 'Gagal fetch inject outputs packing'));
+    }
+  }
+
+  Future<List<PackingOutputItem>> fetchOutputsByPackingNoPacking(
+    String noPacking,
+  ) async {
+    try {
+      final body = await api.getJson(
+        '/api/production/packing/$noPacking/outputs',
+      );
+      final List<dynamic> data = body['data'] ?? [];
+      return data
+          .map((e) => PackingOutputItem.fromJson(e as Map<String, dynamic>))
+          .where((o) => o.noBJ.isNotEmpty)
+          .toList();
+    } on ApiException catch (e) {
+      throw Exception(_friendlyError(e, 'Gagal fetch packing outputs'));
+    }
+  }
+
+  Future<List<PackingOutputItem>> fetchOutputsByNoBongkarSusun(
+    String noBongkarSusun,
+  ) async {
+    try {
+      final body = await api.getJson(
+        '/api/bongkar-susun/$noBongkarSusun/outputs/barang-jadi',
+      );
+      final List<dynamic> data = body['data'] ?? [];
+      return data
+          .map((e) => PackingOutputItem.fromJson(e as Map<String, dynamic>))
+          .where((o) => o.noBJ.isNotEmpty)
+          .toList();
+    } on ApiException catch (e) {
+      throw Exception(
+        _friendlyError(e, 'Gagal fetch bongkar susun outputs packing'),
+      );
+    }
+  }
+
+  Future<List<PackingOutputItem>> fetchOutputsByNoRetur(String noRetur) async {
+    try {
+      final body = await api.getJson(
+        '/api/production/return/$noRetur/outputs/barang-jadi',
+      );
+      final List<dynamic> data = body['data'] ?? [];
+      return data
+          .map((e) => PackingOutputItem.fromJson(e as Map<String, dynamic>))
+          .where((o) => o.noBJ.isNotEmpty)
+          .toList();
+    } on ApiException catch (e) {
+      throw Exception(_friendlyError(e, 'Gagal fetch retur outputs packing'));
+    }
+  }
+
+  Future<void> markAsPrinted(String noBJ) async {
+    try {
+      await api.patchJson(
+        '/api/labels/packing/${Uri.encodeComponent(noBJ)}/print',
+      );
+    } on ApiException catch (e) {
+      throw Exception(_friendlyError(e, 'Gagal mark as printed packing'));
     }
   }
 
   // =======================================================================
   // GET /api/labels/packing/partials/:noBJ
   // =======================================================================
-  Future<PackingPartialInfo> fetchPartialInfo({
-    required String noBJ,
-  }) async {
+  Future<PackingPartialInfo> fetchPartialInfo({required String noBJ}) async {
     try {
       final body = await api.getJson(
         '/api/labels/packing/partials/${Uri.encodeComponent(noBJ)}',
@@ -170,10 +229,9 @@ class PackingRepository {
 
       return PackingPartialInfo.fromEnvelope(body);
     } on ApiException catch (e) {
-      throw Exception(_friendlyError(
-        e,
-        'Failed to fetch packing partial info',
-      ));
+      throw Exception(
+        _friendlyError(e, 'Failed to fetch packing partial info'),
+      );
     }
   }
 }

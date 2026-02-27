@@ -1,5 +1,23 @@
 // lib/features/reject/model/reject_header_model.dart
 
+class RejectOutputItem {
+  final String noReject;
+  final int hasBeenPrinted;
+
+  const RejectOutputItem({
+    required this.noReject,
+    required this.hasBeenPrinted,
+  });
+
+  bool get isPrinted => hasBeenPrinted > 0;
+
+  factory RejectOutputItem.fromJson(Map<String, dynamic> json) =>
+      RejectOutputItem(
+        noReject: (json['NoReject'] ?? '').toString(),
+        hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
+      );
+}
+
 class RejectHeader {
   // Core
   final String noReject;     // NoReject
@@ -22,6 +40,10 @@ class RejectHeader {
   final String? outputCode;       // NoProduksi / NoBJSortir
   final String? outputNamaMesin;  // NamaMesin / 'BJ Sortir'
 
+  final int hasBeenPrinted;
+
+  bool get isPrinted => hasBeenPrinted > 0;
+
   const RejectHeader({
     required this.noReject,
     required this.dateCreate,
@@ -35,6 +57,7 @@ class RejectHeader {
     this.outputType,
     this.outputCode,
     this.outputNamaMesin,
+    this.hasBeenPrinted = 0,
   });
 
   // ---------------------------------------------------------------------------
@@ -104,6 +127,7 @@ class RejectHeader {
       outputType: json['OutputType']?.toString(),
       outputCode: json['OutputCode']?.toString(),
       outputNamaMesin: json['OutputNamaMesin']?.toString(),
+      hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -120,6 +144,7 @@ class RejectHeader {
     'OutputType': outputType,
     'OutputCode': outputCode,
     'OutputNamaMesin': outputNamaMesin,
+    'HasBeenPrinted': hasBeenPrinted,
   };
 
   RejectHeader copyWith({
@@ -135,6 +160,7 @@ class RejectHeader {
     String? outputType,
     String? outputCode,
     String? outputNamaMesin,
+    int? hasBeenPrinted,
   }) {
     return RejectHeader(
       noReject: noReject ?? this.noReject,
@@ -149,6 +175,7 @@ class RejectHeader {
       outputType: outputType ?? this.outputType,
       outputCode: outputCode ?? this.outputCode,
       outputNamaMesin: outputNamaMesin ?? this.outputNamaMesin,
+      hasBeenPrinted: hasBeenPrinted ?? this.hasBeenPrinted,
     );
   }
 }

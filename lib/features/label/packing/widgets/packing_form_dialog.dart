@@ -26,7 +26,10 @@ import '../../../production/inject/widgets/packing_by_inject_section.dart';
 import '../../../production/return/model/return_production_model.dart';
 import '../../../production/return/widgets/return_production_dropdown.dart';
 
+import '../../../../common/widgets/label_output_panel.dart';
+import '../../../../core/network/api_client.dart';
 import '../model/packing_header_model.dart';
+import '../repository/packing_repository.dart';
 import '../view_model/packing_view_model.dart';
 import 'packing_text_field.dart';
 
@@ -107,6 +110,10 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
   String? _bongkarError;
   String? _returError;
 
+  // Output panel
+  List<PackingOutputItem> _packingOutputs = [];
+  bool _loadingOutputs = false;
+
   // ✅ simpan payload terakhir untuk "buat label baru (isi sama)"
   _PackingCreateDraft? _lastDraft;
 
@@ -123,6 +130,11 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
         if (_selectedMode == PackingInputMode.inject &&
             _preInjectNoProduksi != null) {
           _reloadInjectPackingAndRecalc();
+        }
+        // Auto-fetch outputs untuk edit mode
+        final code = (widget.header!.outputCode ?? '').trim();
+        if (code.isNotEmpty) {
+          _fetchOutputs(code);
         }
       } else {
         context.read<InjectProductionViewModel>().clearPacking();
@@ -245,6 +257,7 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
   void _selectMode(PackingInputMode m) {
     setState(() {
       _selectedMode = m;
+      _packingOutputs = [];
 
       if (!isEdit && m == PackingInputMode.inject) {
         _selectedType = null;
@@ -257,6 +270,36 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
     });
 
     _onPcsChanged();
+  }
+
+  Future<void> _fetchOutputs(String code) async {
+    if (!mounted || code.isEmpty) return;
+    setState(() => _loadingOutputs = true);
+    try {
+      final repo = PackingRepository(api: ApiClient());
+      List<PackingOutputItem> outputs;
+      switch (_selectedMode) {
+        case PackingInputMode.inject:
+          outputs = await repo.fetchOutputsByInjectNoProduksi(code);
+          break;
+        case PackingInputMode.packing:
+          outputs = await repo.fetchOutputsByPackingNoPacking(code);
+          break;
+        case PackingInputMode.bongkarSusun:
+          outputs = await repo.fetchOutputsByNoBongkarSusun(code);
+          break;
+        case PackingInputMode.retur:
+          outputs = await repo.fetchOutputsByNoRetur(code);
+          break;
+        case null:
+          outputs = [];
+      }
+      if (mounted) setState(() => _packingOutputs = outputs);
+    } catch (_) {
+      if (mounted) setState(() => _packingOutputs = []);
+    } finally {
+      if (mounted) setState(() => _loadingOutputs = false);
+    }
   }
 
   Future<void> _submit() async {
@@ -599,7 +642,7 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 750),
+        constraints: const BoxConstraints(maxWidth: 900, maxHeight: 750),
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -609,7 +652,13 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
             Expanded(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [Expanded(flex: 4, child: _buildLeftColumn())],
+                children: [
+                  Expanded(flex: 5, child: _buildLeftColumn()),
+                  const SizedBox(width: 24),
+                  Container(width: 1, color: Colors.grey.shade300),
+                  const SizedBox(width: 24),
+                  Expanded(flex: 2, child: _buildOutputPanel()),
+                ],
               ),
             ),
             const SizedBox(height: 16),
@@ -797,6 +846,7 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
                                         _injectError = null;
                                       });
                                       _reloadInjectPackingAndRecalc();
+                                      _fetchOutputs(ip?.noProduksi ?? '');
                                     }
                                   : null,
                             ),
@@ -847,6 +897,7 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
                                         _selectedPacking = pp;
                                         _packingError = null;
                                       });
+                                      _fetchOutputs(pp?.noPacking ?? '');
                                     }
                                   : null,
                             ),
@@ -899,6 +950,7 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
                                         _selectedBongkar = bs;
                                         _bongkarError = null;
                                       });
+                                      _fetchOutputs(bs?.noBongkarSusun ?? '');
                                     }
                                   : null,
                             ),
@@ -949,6 +1001,7 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
                                         _selectedRetur = ret;
                                         _returError = null;
                                       });
+                                      _fetchOutputs(ret?.noRetur ?? '');
                                     }
                                   : null,
                             ),
@@ -1074,6 +1127,44 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildOutputPanel() {
+    String noSourceMessage;
+    String sourceCode;
+
+    switch (_selectedMode) {
+      case PackingInputMode.inject:
+        noSourceMessage = 'Pilih No Inject\nuntuk melihat output';
+        sourceCode = _selectedInject?.noProduksi ?? _preInjectNoProduksi ?? '';
+        break;
+      case PackingInputMode.packing:
+        noSourceMessage = 'Pilih No Packing\nuntuk melihat output';
+        sourceCode = _selectedPacking?.noPacking ?? _prePackingNoPacking ?? '';
+        break;
+      case PackingInputMode.bongkarSusun:
+        noSourceMessage = 'Pilih No Bongkar Susun\nuntuk melihat output';
+        sourceCode =
+            _selectedBongkar?.noBongkarSusun ?? _preBongkarNoBongkarSusun ?? '';
+        break;
+      case PackingInputMode.retur:
+        noSourceMessage = 'Pilih No Retur\nuntuk melihat output';
+        sourceCode = _selectedRetur?.noRetur ?? _preReturNoRetur ?? '';
+        break;
+      case null:
+        noSourceMessage = 'Pilih sumber proses\nuntuk melihat output';
+        sourceCode = '';
+    }
+
+    return LabelOutputPanel(
+      title: 'Output Barang Jadi',
+      items: _packingOutputs
+          .map((o) => LabelOutputItem(code: o.noBJ, isPrinted: o.isPrinted))
+          .toList(),
+      isLoading: _loadingOutputs,
+      hasSource: sourceCode.isNotEmpty,
+      noSourceMessage: noSourceMessage,
     );
   }
 

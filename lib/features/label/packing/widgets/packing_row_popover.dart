@@ -6,8 +6,10 @@ import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/label_popover_widgets.dart';
 import '../../../../core/utils/pdf_print_service.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../model/packing_header_model.dart';
+import '../repository/packing_repository.dart';
 
 class PackingRowPopover extends StatefulWidget {
   final PackingHeader header;
@@ -205,15 +207,20 @@ class _PackingRowPopoverState extends State<PackingRowPopover> {
                   ).context;
 
                   final pdfService = PdfPrintService(
-                    baseUrl: 'http://192.168.10.100:3000',
                     defaultSystem: 'pps',
                   );
 
-                  await pdfService.printReport80mm(
+                  final success = await pdfService.directPrintReport80mm(
                     context: rootCtx,
                     reportName: 'CrLabelBarangJadi',
                     query: {'NoBJ': widget.header.noBJ},
                   );
+
+                  if (success) {
+                    await PackingRepository(api: ApiClient()).markAsPrinted(
+                      widget.header.noBJ,
+                    );
+                  }
                 }),
               ),
               divider,

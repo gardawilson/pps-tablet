@@ -8,6 +8,7 @@ import '../../../../common/widgets/label_popover_widgets.dart';
 import '../../../../core/utils/pdf_print_service.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../model/gilingan_header_model.dart';
+import '../repository/gilingan_repository.dart';
 
 class GilinganRowPopover extends StatefulWidget {
   final GilinganHeader header;
@@ -205,15 +206,20 @@ class _GilinganRowPopoverState extends State<GilinganRowPopover> {
                   ).context;
 
                   final pdfService = PdfPrintService(
-                    baseUrl: 'http://192.168.10.100:3000',
                     defaultSystem: 'pps',
                   );
 
-                  await pdfService.printReport80mm(
+                  final success = await pdfService.directPrintReport80mm(
                     context: rootCtx,
                     reportName: 'CrLabelGilingan',
                     query: {'NoGilingan': widget.header.noGilingan},
                   );
+
+                  if (success) {
+                    await GilinganRepository().markAsPrinted(
+                      widget.header.noGilingan,
+                    );
+                  }
                 }),
               ),
               divider,

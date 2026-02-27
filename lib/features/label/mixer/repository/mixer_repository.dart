@@ -317,6 +317,104 @@ class MixerRepository {
     throw Exception(msg);
   }
 
+  /// Fetch list NoMixer for a NoProduksi (production/mixer process)
+  Future<List<MixerOutputItem>> fetchOutputsByNoProduksiMixer(
+    String noProduksi,
+  ) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse(
+      "${ApiConstants.baseUrl}/api/production/mixer/$noProduksi/outputs",
+    );
+    final response = await http.get(
+      url,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    if (response.statusCode == 200) {
+      final body = json.decode(response.body);
+      final List<dynamic> data = body['data'] ?? [];
+      return data
+          .map((e) => MixerOutputItem.fromJson(e as Map<String, dynamic>))
+          .where((o) => o.noMixer.isNotEmpty)
+          .toList();
+    }
+    throw Exception(
+      'Failed to fetch mixer outputs by NoProduksi (status: ${response.statusCode})',
+    );
+  }
+
+  /// Fetch list NoMixer for a NoProduksi (inject process)
+  Future<List<MixerOutputItem>> fetchOutputsByNoProduksiInject(
+    String noProduksi,
+  ) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse(
+      "${ApiConstants.baseUrl}/api/production/inject/$noProduksi/outputs",
+    );
+    final response = await http.get(
+      url,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    if (response.statusCode == 200) {
+      final body = json.decode(response.body);
+      final List<dynamic> data = body['data'] ?? [];
+      return data
+          .map((e) => MixerOutputItem.fromJson(e as Map<String, dynamic>))
+          .where((o) => o.noMixer.isNotEmpty)
+          .toList();
+    }
+    throw Exception(
+      'Failed to fetch inject outputs for mixer (status: ${response.statusCode})',
+    );
+  }
+
+  /// Fetch list NoMixer for a NoBongkarSusun
+  Future<List<MixerOutputItem>> fetchOutputsByNoBongkarSusun(
+    String noBongkarSusun,
+  ) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse(
+      "${ApiConstants.baseUrl}/api/bongkar-susun/$noBongkarSusun/outputs/mixer",
+    );
+    final response = await http.get(
+      url,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    if (response.statusCode == 200) {
+      final body = json.decode(response.body);
+      final List<dynamic> data = body['data'] ?? [];
+      return data
+          .map((e) => MixerOutputItem.fromJson(e as Map<String, dynamic>))
+          .where((o) => o.noMixer.isNotEmpty)
+          .toList();
+    }
+    throw Exception(
+      'Failed to fetch bongkar outputs for mixer (status: ${response.statusCode})',
+    );
+  }
+
+  /// Tandai mixer sudah dicetak
+  Future<void> markAsPrinted(String noMixer) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse(
+      "${ApiConstants.baseUrl}/api/labels/mixer/$noMixer/print",
+    );
+    final resp = await http.patch(
+      url,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+    print("🖨️ PATCH Mark As Printed: $url");
+    print("⬅️ Response [${resp.statusCode}]: ${resp.body}");
+    if (resp.statusCode != 200 && resp.statusCode != 204) {
+      final msg = resp.body.isNotEmpty
+          ? resp.body
+          : 'Gagal mark as printed (status: ${resp.statusCode})';
+      throw Exception(msg);
+    }
+  }
+
   /// Fetch partial info for Mixer NoMixer + NoSak
   Future<MixerPartialInfo> fetchPartialInfo({
     required String noMixer,

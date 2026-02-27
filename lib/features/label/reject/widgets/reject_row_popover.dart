@@ -5,9 +5,11 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/label_popover_widgets.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/pdf_print_service.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../model/reject_header_model.dart';
+import '../repository/reject_repository.dart';
 
 class RejectRowPopover extends StatefulWidget {
   final RejectHeader header;
@@ -202,16 +204,19 @@ class _RejectRowPopoverState extends State<RejectRowPopover> {
                     rootNavigator: true,
                   ).context;
 
-                  final pdfService = PdfPrintService(
-                    baseUrl: 'http://192.168.10.100:3000',
-                    defaultSystem: 'pps',
-                  );
+                  final pdfService = PdfPrintService(defaultSystem: 'pps');
 
-                  await pdfService.printReport80mm(
+                  final success = await pdfService.directPrintReport80mm(
                     context: rootCtx,
                     reportName: 'CrLabelRejectV2',
                     query: {'NoReject': widget.header.noReject},
                   );
+
+                  if (success) {
+                    await RejectRepository(
+                      api: ApiClient(),
+                    ).markAsPrinted(widget.header.noReject);
+                  }
                 }),
               ),
               divider,

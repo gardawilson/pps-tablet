@@ -253,6 +253,178 @@ class FurnitureWipRepository {
     throw Exception('$msg (status: ${resp.statusCode})');
   }
 
+  /// Fetch furniture wip outputs dari NoProduksi Inject
+  Future<List<FurnitureWipOutputItem>> fetchOutputsByInjectNoProduksi(
+    String noProduksi,
+  ) async {
+    final token = await TokenStorage.getToken();
+    final uri = Uri.parse(
+      "${ApiConstants.baseUrl}/api/production/inject/$noProduksi/outputs/furniture-wip",
+    );
+    final resp = await http
+        .get(uri, headers: {'Authorization': 'Bearer $token'})
+        .timeout(_timeout);
+    if (resp.statusCode == 200) {
+      final body = json.decode(resp.body);
+      final List<dynamic> data = body['data'] ?? [];
+      return data
+          .map((e) => FurnitureWipOutputItem.fromJson(e as Map<String, dynamic>))
+          .where((o) => o.noFurnitureWip.isNotEmpty)
+          .toList();
+    }
+    throw Exception(
+      'Failed to fetch furniture wip outputs by inject (status: ${resp.statusCode})',
+    );
+  }
+
+  /// Fetch furniture wip outputs dari NoProduksi Hot Stamp
+  Future<List<FurnitureWipOutputItem>> fetchOutputsByHotStampNoProduksi(
+    String noProduksi,
+  ) async {
+    final token = await TokenStorage.getToken();
+    final uri = Uri.parse(
+      "${ApiConstants.baseUrl}/api/production/hot-stamp/$noProduksi/outputs/furniture-wip",
+    );
+    final resp = await http
+        .get(uri, headers: {'Authorization': 'Bearer $token'})
+        .timeout(_timeout);
+    if (resp.statusCode == 200) {
+      final body = json.decode(resp.body);
+      final List<dynamic> data = body['data'] ?? [];
+      return data
+          .map((e) => FurnitureWipOutputItem.fromJson(e as Map<String, dynamic>))
+          .where((o) => o.noFurnitureWip.isNotEmpty)
+          .toList();
+    }
+    throw Exception(
+      'Failed to fetch furniture wip outputs by hot stamp (status: ${resp.statusCode})',
+    );
+  }
+
+  /// Fetch furniture wip outputs dari NoProduksi Key Fitting
+  Future<List<FurnitureWipOutputItem>> fetchOutputsByKeyFittingNoProduksi(
+    String noProduksi,
+  ) async {
+    final token = await TokenStorage.getToken();
+    final uri = Uri.parse(
+      "${ApiConstants.baseUrl}/api/production/key-fitting/$noProduksi/outputs/furniture-wip",
+    );
+    final resp = await http
+        .get(uri, headers: {'Authorization': 'Bearer $token'})
+        .timeout(_timeout);
+    if (resp.statusCode == 200) {
+      final body = json.decode(resp.body);
+      final List<dynamic> data = body['data'] ?? [];
+      return data
+          .map((e) => FurnitureWipOutputItem.fromJson(e as Map<String, dynamic>))
+          .where((o) => o.noFurnitureWip.isNotEmpty)
+          .toList();
+    }
+    throw Exception(
+      'Failed to fetch furniture wip outputs by key fitting (status: ${resp.statusCode})',
+    );
+  }
+
+  /// Fetch furniture wip outputs dari NoProduksi Spanner
+  Future<List<FurnitureWipOutputItem>> fetchOutputsBySpannerNoProduksi(
+    String noProduksi,
+  ) async {
+    final token = await TokenStorage.getToken();
+    final uri = Uri.parse(
+      "${ApiConstants.baseUrl}/api/production/spanner/$noProduksi/outputs/furniture-wip",
+    );
+    final resp = await http
+        .get(uri, headers: {'Authorization': 'Bearer $token'})
+        .timeout(_timeout);
+    if (resp.statusCode == 200) {
+      final body = json.decode(resp.body);
+      final List<dynamic> data = body['data'] ?? [];
+      return data
+          .map((e) => FurnitureWipOutputItem.fromJson(e as Map<String, dynamic>))
+          .where((o) => o.noFurnitureWip.isNotEmpty)
+          .toList();
+    }
+    throw Exception(
+      'Failed to fetch furniture wip outputs by spanner (status: ${resp.statusCode})',
+    );
+  }
+
+  /// Fetch furniture wip outputs dari NoBongkarSusun
+  Future<List<FurnitureWipOutputItem>> fetchOutputsByNoBongkarSusun(
+    String noBongkarSusun,
+  ) async {
+    final token = await TokenStorage.getToken();
+    final uri = Uri.parse(
+      "${ApiConstants.baseUrl}/api/bongkar-susun/$noBongkarSusun/outputs/furniture-wip",
+    );
+    final resp = await http
+        .get(uri, headers: {'Authorization': 'Bearer $token'})
+        .timeout(_timeout);
+    if (resp.statusCode == 200) {
+      final body = json.decode(resp.body);
+      final List<dynamic> data = body['data'] ?? [];
+      return data
+          .map((e) => FurnitureWipOutputItem.fromJson(e as Map<String, dynamic>))
+          .where((o) => o.noFurnitureWip.isNotEmpty)
+          .toList();
+    }
+    throw Exception(
+      'Failed to fetch furniture wip outputs by bongkar susun (status: ${resp.statusCode})',
+    );
+  }
+
+  /// Fetch furniture wip outputs dari NoRetur
+  Future<List<FurnitureWipOutputItem>> fetchOutputsByNoRetur(
+    String noRetur,
+  ) async {
+    final token = await TokenStorage.getToken();
+    final uri = Uri.parse(
+      "${ApiConstants.baseUrl}/api/production/return/$noRetur/outputs/furniture-wip",
+    );
+    final resp = await http
+        .get(uri, headers: {'Authorization': 'Bearer $token'})
+        .timeout(_timeout);
+    if (resp.statusCode == 200) {
+      final body = json.decode(resp.body);
+      final List<dynamic> data = body['data'] ?? [];
+      return data
+          .map((e) => FurnitureWipOutputItem.fromJson(e as Map<String, dynamic>))
+          .where((o) => o.noFurnitureWip.isNotEmpty)
+          .toList();
+    }
+    throw Exception(
+      'Failed to fetch furniture wip outputs by retur (status: ${resp.statusCode})',
+    );
+  }
+
+  /// Tandai furniture wip sudah dicetak
+  Future<void> markAsPrinted(String noFurnitureWip) async {
+    final token = await TokenStorage.getToken();
+    final uri = Uri.parse(
+      "${ApiConstants.baseUrl}/api/labels/furniture-wip/${Uri.encodeComponent(noFurnitureWip)}/print",
+    );
+    final resp = await http
+        .patch(
+          uri,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        )
+        .timeout(_timeout);
+    print("🖨️ PATCH Mark As Printed Furniture WIP: $uri");
+    print("⬅️ Response [${resp.statusCode}]: ${resp.body}");
+    if (resp.statusCode != 200 && resp.statusCode != 204) {
+      final Map<String, dynamic> parsed =
+          resp.body.isNotEmpty ? json.decode(resp.body) : {};
+      final msg = (parsed['message'] ??
+              parsed['error'] ??
+              'Gagal mark as printed furniture wip (status: ${resp.statusCode})')
+          .toString();
+      throw Exception(msg);
+    }
+  }
+
   /// GET /api/labels/furniture-wip/partials/:nofurniturewip
   ///
   /// Mengambil info partial untuk 1 NoFurnitureWIP

@@ -11,6 +11,7 @@ import 'bahan_baku_pallet_popover.dart';
 class BahanBakuPalletTable extends StatefulWidget {
   static const _colPalletWidth = 70.0;
   static const _colLokasiWidth = 60.0;
+  static const _colPrintWidth = 72.0;
 
   final ScrollController scrollController;
   final ValueChanged<BahanBakuPallet> onPalletTap;
@@ -65,7 +66,12 @@ class _BahanBakuPalletTableState extends State<BahanBakuPalletTable> {
         pallet: pallet,
         onClose: () => _popover.hide(),
         onInputQc: () => widget.onInputQcTap(pallet),
-        apiBaseUrl: 'http://192.168.10.100:3000',
+        onAfterPrint: () {
+          context.read<BahanBakuViewModel>().markAsPalletPrinted(
+            noBahanBaku: pallet.noBahanBaku,
+            noPallet: pallet.noPallet,
+          );
+        },
       ),
       preferAbove: true,
       verticalGap: 8,
@@ -207,7 +213,6 @@ class _BahanBakuPalletTableState extends State<BahanBakuPalletTable> {
         width: BahanBakuPalletTable._colLokasiWidth,
         headerAlign: TextAlign.center,
         cellAlignment: Alignment.center,
-        showDivider: false,
         cellBuilder: (context, pallet, rowState) {
           final isDisabled = pallet.isEmpty;
           return Text(
@@ -218,6 +223,49 @@ class _BahanBakuPalletTableState extends State<BahanBakuPalletTable> {
               color: isDisabled ? Colors.grey.shade500 : rowState.textColor,
             ),
             softWrap: true,
+          );
+        },
+      ),
+      AtlasTableColumn<BahanBakuPallet>(
+        title: 'PRINT',
+        width: BahanBakuPalletTable._colPrintWidth,
+        showDivider: false,
+        cellBuilder: (context, pallet, rowState) {
+          final count = pallet.hasBeenPrinted;
+          if (count == 0) {
+            return Text(
+              '—',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade400),
+            );
+          }
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0C66E4).withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFF0C66E4).withValues(alpha: 0.30),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.print_rounded,
+                  size: 12,
+                  color: Color(0xFF0C66E4),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '${count}x',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0C66E4),
+                  ),
+                ),
+              ],
+            ),
           );
         },
       ),

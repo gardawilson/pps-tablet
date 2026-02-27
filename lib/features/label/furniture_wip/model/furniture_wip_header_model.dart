@@ -1,5 +1,24 @@
 // lib/features/furniture_wip/model/reject_header_model.dart
 
+class FurnitureWipOutputItem {
+  final String noFurnitureWip;
+  final int hasBeenPrinted;
+
+  const FurnitureWipOutputItem({
+    required this.noFurnitureWip,
+    required this.hasBeenPrinted,
+  });
+
+  bool get isPrinted => hasBeenPrinted > 0;
+
+  factory FurnitureWipOutputItem.fromJson(Map<String, dynamic> json) {
+    return FurnitureWipOutputItem(
+      noFurnitureWip: (json['NoFurnitureWIP'] ?? '').toString(),
+      hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 class FurnitureWipHeader {
   // Core
   final String noFurnitureWip;    // NoFurnitureWIP
@@ -24,6 +43,10 @@ class FurnitureWipHeader {
   final String? outputCode;       // BH./BI./BG./L./BJ./S.******
   final String? outputNamaMesin;  // NamaMesin / 'Bongkar Susun' / NamaPembeli
 
+  final int hasBeenPrinted;
+
+  bool get isPrinted => hasBeenPrinted > 0;
+
   const FurnitureWipHeader({
     required this.noFurnitureWip,
     required this.dateCreate,
@@ -38,6 +61,7 @@ class FurnitureWipHeader {
     this.outputType,
     this.outputCode,
     this.outputNamaMesin,
+    this.hasBeenPrinted = 0,
   });
 
   // Convenience getters buat UI
@@ -101,6 +125,7 @@ class FurnitureWipHeader {
       outputType: json['OutputType']?.toString(),
       outputCode: json['OutputCode']?.toString(),
       outputNamaMesin: json['OutputNamaMesin']?.toString(),
+      hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -119,6 +144,7 @@ class FurnitureWipHeader {
     'OutputType': outputType,
     'OutputCode': outputCode,
     'OutputNamaMesin': outputNamaMesin,
+    'HasBeenPrinted': hasBeenPrinted,
   };
 
   FurnitureWipHeader copyWith({
@@ -135,6 +161,7 @@ class FurnitureWipHeader {
     String? outputType,
     String? outputCode,
     String? outputNamaMesin,
+    int? hasBeenPrinted,
   }) {
     return FurnitureWipHeader(
       noFurnitureWip: noFurnitureWip ?? this.noFurnitureWip,
@@ -150,6 +177,7 @@ class FurnitureWipHeader {
       outputType: outputType ?? this.outputType,
       outputCode: outputCode ?? this.outputCode,
       outputNamaMesin: outputNamaMesin ?? this.outputNamaMesin,
+      hasBeenPrinted: hasBeenPrinted ?? this.hasBeenPrinted,
     );
   }
 }

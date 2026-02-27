@@ -33,6 +33,10 @@ class BahanBakuPallet {
   final String? blok;
   final int? idLokasi;
 
+  final int hasBeenPrinted;
+
+  bool get isPrinted => hasBeenPrinted > 0;
+
   const BahanBakuPallet({
     required this.noBahanBaku,
     required this.noPallet,
@@ -60,6 +64,7 @@ class BahanBakuPallet {
     this.density3,
     this.blok,
     this.idLokasi,
+    this.hasBeenPrinted = 0,
   });
 
   static int _toInt(dynamic v) {
@@ -126,6 +131,7 @@ class BahanBakuPallet {
 
       blok: json['Blok']?.toString(),
       idLokasi: json['IdLokasi'] != null ? _toInt(json['IdLokasi']) : null,
+      hasBeenPrinted: _toInt(json['HasBeenPrinted']),
     );
   }
 
@@ -157,6 +163,7 @@ class BahanBakuPallet {
     'Density3': density3,
     'Blok': blok,
     'IdLokasi': idLokasi,
+    'HasBeenPrinted': hasBeenPrinted,
   };
 
   BahanBakuPallet copyWith({
@@ -186,6 +193,7 @@ class BahanBakuPallet {
     double? density3,
     String? blok,
     int? idLokasi,
+    int? hasBeenPrinted,
   }) {
     return BahanBakuPallet(
       noBahanBaku: noBahanBaku ?? this.noBahanBaku,
@@ -214,6 +222,7 @@ class BahanBakuPallet {
       density3: density3 ?? this.density3,
       blok: blok ?? this.blok,
       idLokasi: idLokasi ?? this.idLokasi,
+      hasBeenPrinted: hasBeenPrinted ?? this.hasBeenPrinted,
     );
   }
 }

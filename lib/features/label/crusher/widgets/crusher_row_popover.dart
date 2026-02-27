@@ -8,6 +8,7 @@ import '../../../../common/widgets/label_popover_widgets.dart';
 import '../../../../core/utils/pdf_print_service.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../model/crusher_header_model.dart';
+import '../repository/crusher_repository.dart';
 
 class CrusherRowPopover extends StatefulWidget {
   final CrusherHeader header;
@@ -207,15 +208,20 @@ class _CrusherRowPopoverState extends State<CrusherRowPopover> {
                   ).context;
 
                   final pdfService = PdfPrintService(
-                    baseUrl: 'http://192.168.10.100:3000',
                     defaultSystem: 'pps',
                   );
 
-                  await pdfService.printReport80mm(
+                  final success = await pdfService.directPrintReport80mm(
                     context: rootCtx,
                     reportName: 'CrLabelCrusher',
                     query: {'NoCrusher': widget.header.noCrusher},
                   );
+
+                  if (success) {
+                    await CrusherRepository().markAsPrinted(
+                      widget.header.noCrusher,
+                    );
+                  }
                 }),
               ),
               divider,

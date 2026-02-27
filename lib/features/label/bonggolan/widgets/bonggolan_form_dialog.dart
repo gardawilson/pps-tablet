@@ -17,18 +17,16 @@ import 'package:pps_tablet/features/jenis_bonggolan/widgets/jenis_bonggolan_drop
 import '../../../production/broker/widgets/broker_production_dropdown.dart';
 import 'package:pps_tablet/features/production/inject/widgets/inject_production_dropdown.dart';
 
+import '../../../../common/widgets/label_output_panel.dart';
 import '../model/bonggolan_header_model.dart';
+import '../repository/bonggolan_repository.dart';
 import '../view_model/bonggolan_view_model.dart';
 
 class BonggolanFormDialog extends StatefulWidget {
   final BonggolanHeader? header;
   final Function(BonggolanHeader)? onSave;
 
-  const BonggolanFormDialog({
-    super.key,
-    this.header,
-    this.onSave,
-  });
+  const BonggolanFormDialog({super.key, this.header, this.onSave});
 
   @override
   State<BonggolanFormDialog> createState() => _BonggolanFormDialogState();
@@ -57,10 +55,16 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
   String? _injectError;
   String? _bongkarError;
 
+  // Output panel
+  List<BonggolanOutputItem> _bonggolanOutputs = [];
+  bool _loadingOutputs = false;
+
   @override
   void initState() {
     super.initState();
-    noBonggolanCtrl = TextEditingController(text: widget.header?.noBonggolan ?? '');
+    noBonggolanCtrl = TextEditingController(
+      text: widget.header?.noBonggolan ?? '',
+    );
 
     final DateTime seededDate = widget.header != null
         ? (parseAnyToDateTime(widget.header!.dateCreate) ?? DateTime.now())
@@ -72,16 +76,25 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
     );
 
     jenisCtrl = TextEditingController(text: widget.header?.namaBonggolan ?? '');
-    warehouseCtrl = TextEditingController(text: widget.header?.namaWarehouse ?? '');
+    warehouseCtrl = TextEditingController(
+      text: widget.header?.namaWarehouse ?? '',
+    );
 
-    noBrokerProduksiCtrl = TextEditingController(text: widget.header?.brokerNoProduksi ?? '');
-    noInjectProduksiCtrl = TextEditingController(text: widget.header?.injectNoProduksi ?? '');
-    noBongkarSusunCtrl = TextEditingController(text: widget.header?.noBongkarSusun ?? '');
+    noBrokerProduksiCtrl = TextEditingController(
+      text: widget.header?.brokerNoProduksi ?? '',
+    );
+    noInjectProduksiCtrl = TextEditingController(
+      text: widget.header?.injectNoProduksi ?? '',
+    );
+    noBongkarSusunCtrl = TextEditingController(
+      text: widget.header?.noBongkarSusun ?? '',
+    );
 
     beratCtrl = TextEditingController(
       text: (widget.header?.berat != null)
           ? widget.header!.berat!.toStringAsFixed(
-          widget.header!.berat! % 1 == 0 ? 0 : 3)
+              widget.header!.berat! % 1 == 0 ? 0 : 3,
+            )
           : '',
     );
 
@@ -104,8 +117,21 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
       if (_injectError != null && mounted) setState(() => _injectError = null);
     });
     noBongkarSusunCtrl.addListener(() {
-      if (_bongkarError != null && mounted) setState(() => _bongkarError = null);
+      if (_bongkarError != null && mounted)
+        setState(() => _bongkarError = null);
     });
+
+    // Auto-fetch outputs on edit mode
+    if (widget.header != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final code = _selectedMode == InputMode.brokerProduction
+            ? noBrokerProduksiCtrl.text
+            : _selectedMode == InputMode.injectProduction
+            ? noInjectProduksiCtrl.text
+            : noBongkarSusunCtrl.text;
+        if (code.trim().isNotEmpty) _fetchOutputs(code.trim());
+      });
+    }
   }
 
   @override
@@ -123,13 +149,37 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
 
   bool get isEdit => widget.header != null;
 
+  Future<void> _fetchOutputs(String code) async {
+    if (code.trim().isEmpty) {
+      setState(() => _bonggolanOutputs = []);
+      return;
+    }
+    setState(() => _loadingOutputs = true);
+    try {
+      final repo = BonggolanRepository();
+      List<BonggolanOutputItem> outputs;
+      if (_selectedMode == InputMode.brokerProduction) {
+        outputs = await repo.fetchOutputsByBrokerNoProduksi(code.trim());
+      } else if (_selectedMode == InputMode.injectProduction) {
+        outputs = await repo.fetchOutputsByInjectNoProduksi(code.trim());
+      } else {
+        outputs = await repo.fetchOutputsByNoBongkarSusun(code.trim());
+      }
+      if (mounted) setState(() => _bonggolanOutputs = outputs);
+    } catch (_) {
+      if (mounted) setState(() => _bonggolanOutputs = []);
+    } finally {
+      if (mounted) setState(() => _loadingOutputs = false);
+    }
+  }
+
   void _selectMode(InputMode m) {
     setState(() {
       _selectedMode = m;
-      // Keep previous values; just clear error messages for clean UX.
       _brokerError = null;
       _injectError = null;
       _bongkarError = null;
+      _bonggolanOutputs = [];
     });
   }
 
@@ -141,7 +191,8 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
     if (!isEdit && _selectedMode == null) {
       await DialogService.instance.showError(
         title: 'PILIH PROSES',
-        message: 'Pilih salah satu dari Proses Broker, Inject, atau Bongkar Susun',
+        message:
+            'Pilih salah satu dari Proses Broker, Inject, atau Bongkar Susun',
       );
       return;
     }
@@ -189,10 +240,11 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
         await vm.updateFromForm(
           noBonggolan: widget.header!.noBonggolan,
           // Send only what user can edit in this form:
-          dateCreate: _selectedDate,                 // DateTime?
-          idBonggolan: _selectedJenis?.idBonggolan,  // int? (null = keep)
-          idWarehouse: widget.header?.idWarehouse,   // you can wire a real picker later
-          berat: beratVal,                           // double?
+          dateCreate: _selectedDate, // DateTime?
+          idBonggolan: _selectedJenis?.idBonggolan, // int? (null = keep)
+          idWarehouse:
+              widget.header?.idWarehouse, // you can wire a real picker later
+          berat: beratVal, // double?
           // Optional status/location if you later add fields:
           // idStatus: ...,
           // blok: ...,
@@ -213,7 +265,8 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
         final res = await vm.createFromForm(
           idBonggolan: _selectedJenis?.idBonggolan,
           dateCreate: _selectedDate,
-          idWarehouse: widget.header?.idWarehouse ?? 5, // TODO: ganti jika punya picker
+          idWarehouse:
+              widget.header?.idWarehouse ?? 5, // TODO: ganti jika punya picker
           berat: beratVal,
           mode: _selectedMode,
           brokerNoProduksi: noBrokerProduksiCtrl.text.trim().isEmpty
@@ -240,10 +293,16 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const SizedBox(height: 6),
-              const Text('Nomor Bonggolan:', style: TextStyle(color: Colors.black54)),
+              const Text(
+                'Nomor Bonggolan:',
+                style: TextStyle(color: Colors.black54),
+              ),
               const SizedBox(height: 6),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.green.withOpacity(.08),
                   borderRadius: BorderRadius.circular(8),
@@ -266,17 +325,19 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
       }
     } catch (e) {
       DialogService.instance.hideLoading();
-      await DialogService.instance.showError(title: 'Error', message: e.toString());
+      await DialogService.instance.showError(
+        title: 'Error',
+        message: e.toString(),
+      );
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
+        constraints: const BoxConstraints(maxWidth: 900, maxHeight: 700),
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -287,7 +348,11 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(flex: 4, child: _buildLeftColumn()),
+                  Expanded(flex: 5, child: _buildLeftColumn()),
+                  const SizedBox(width: 24),
+                  Container(width: 1, color: Colors.grey.shade300),
+                  const SizedBox(width: 24),
+                  Expanded(flex: 2, child: _buildOutputPanel()),
                 ],
               ),
             ),
@@ -324,11 +389,16 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
   }
 
   Widget _buildLeftColumn() {
-    final bool isBrokerProductionEnabled = !isEdit && _selectedMode == InputMode.brokerProduction;
-    final bool isInjectProductionEnabled = !isEdit && _selectedMode == InputMode.injectProduction;
+    final bool isBrokerProductionEnabled =
+        !isEdit && _selectedMode == InputMode.brokerProduction;
+    final bool isInjectProductionEnabled =
+        !isEdit && _selectedMode == InputMode.injectProduction;
     final bool isBongkarEnabled = !isEdit && _selectedMode == InputMode.bongkar;
 
-    final errorStyle = TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12);
+    final errorStyle = TextStyle(
+      color: Theme.of(context).colorScheme.error,
+      fontSize: 12,
+    );
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -339,239 +409,312 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
       child: Form(
         key: _formKey,
         child: SingleChildScrollView(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(
-              children: [
-                Icon(Icons.description, color: Colors.blue.shade700, size: 20),
-                const SizedBox(width: 8),
-                const Text('Header', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            BonggolanTextField(
-              controller: noBonggolanCtrl,
-              label: 'No Bonggolan',
-              icon: Icons.label,
-              asText: true, // readonly text
-            ),
-
-            const SizedBox(height: 16),
-
-            AppDateField(
-              controller: dateCreatedCtrl,
-              label: 'Date Created',
-              format: DateFormat('EEEE, dd MMM yyyy', 'id_ID'),
-              initialDate: _selectedDate,
-              // Date picker is always valid here; you can add extra rules if needed.
-              onChanged: (d) {
-                if (d != null) {
-                  setState(() {
-                    _selectedDate = d;
-                    dateCreatedCtrl.text = DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(d);
-                  });
-                }
-              },
-            ),
-
-            const SizedBox(height: 16),
-
-            // Jenis Bonggolan (Required)
-            JenisBonggolanDropdown(
-              preselectId: widget.header?.idBonggolan,
-              hintText: 'Pilih jenis bonggolan',
-              validator: (v) => v == null ? 'Wajib pilih jenis bonggolan' : null,
-              autovalidateMode: AutovalidateMode.onUserInteraction,
-              onChanged: (jp) {
-                _selectedJenis = jp;
-                jenisCtrl.text = jp?.namaBonggolan ?? '';
-              },
-            ),
-
-            const SizedBox(height: 16),
-
-            // Berat (Required, numeric > 0)
-            SizedBox(
-              width: 300,
-              child: TextFormField(
-                controller: beratCtrl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d*([.,]\d{0,3})?$')),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.description,
+                    color: Colors.blue.shade700,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Header',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                 ],
-                decoration: InputDecoration(
-                  labelText: 'Berat (kg)',
-                  hintText: '0',
-                  prefixIcon: const Icon(Icons.monitor_weight_outlined),
-                  suffixText: 'kg',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  isDense: true,
-                ),
-                validator: (val) {
-                  final raw = (val ?? '').trim();
-                  if (raw.isEmpty) return 'Berat wajib diisi.';
-                  final s = raw.replaceAll(',', '.');
-                  final d = double.tryParse(s);
-                  if (d == null) return 'Format berat tidak valid.';
-                  if (d <= 0) return 'Berat harus > 0.';
-                  return null;
-                },
-                onEditingComplete: () {
-                  final s = beratCtrl.text.trim().replaceAll(',', '.');
-                  beratCtrl.text = s;
-                  FocusScope.of(context).unfocus();
+              ),
+              const SizedBox(height: 16),
+
+              BonggolanTextField(
+                controller: noBonggolanCtrl,
+                label: 'No Bonggolan',
+                icon: Icons.label,
+                asText: true, // readonly text
+              ),
+
+              const SizedBox(height: 16),
+
+              AppDateField(
+                controller: dateCreatedCtrl,
+                label: 'Date Created',
+                format: DateFormat('EEEE, dd MMM yyyy', 'id_ID'),
+                initialDate: _selectedDate,
+                // Date picker is always valid here; you can add extra rules if needed.
+                onChanged: (d) {
+                  if (d != null) {
+                    setState(() {
+                      _selectedDate = d;
+                      dateCreatedCtrl.text = DateFormat(
+                        'EEEE, dd MMM yyyy',
+                        'id_ID',
+                      ).format(d);
+                    });
+                  }
                 },
               ),
-            ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // ===== BROKER =====
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Radio<InputMode>(
-                  value: InputMode.brokerProduction,
-                  groupValue: _selectedMode,
-                  onChanged: isEdit ? null : (val) => _selectMode(val!),
+              // Jenis Bonggolan (Required)
+              JenisBonggolanDropdown(
+                preselectId: widget.header?.idBonggolan,
+                hintText: 'Pilih jenis bonggolan',
+                validator: (v) =>
+                    v == null ? 'Wajib pilih jenis bonggolan' : null,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                onChanged: (jp) {
+                  _selectedJenis = jp;
+                  jenisCtrl.text = jp?.namaBonggolan ?? '';
+                },
+              ),
+
+              const SizedBox(height: 16),
+
+              // Berat (Required, numeric > 0)
+              SizedBox(
+                width: 300,
+                child: TextFormField(
+                  controller: beratCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'^\d*([.,]\d{0,3})?$'),
+                    ),
+                  ],
+                  decoration: InputDecoration(
+                    labelText: 'Berat (kg)',
+                    hintText: '0',
+                    prefixIcon: const Icon(Icons.monitor_weight_outlined),
+                    suffixText: 'kg',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    isDense: true,
+                  ),
+                  validator: (val) {
+                    final raw = (val ?? '').trim();
+                    if (raw.isEmpty) return 'Berat wajib diisi.';
+                    final s = raw.replaceAll(',', '.');
+                    final d = double.tryParse(s);
+                    if (d == null) return 'Format berat tidak valid.';
+                    if (d <= 0) return 'Berat harus > 0.';
+                    return null;
+                  },
+                  onEditingComplete: () {
+                    final s = beratCtrl.text.trim().replaceAll(',', '.');
+                    beratCtrl.text = s;
+                    FocusScope.of(context).unfocus();
+                  },
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: IgnorePointer(
-                    ignoring: !isBrokerProductionEnabled,
-                    child: Opacity(
-                      opacity: isBrokerProductionEnabled ? 1 : 0.6,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          BrokerProductionDropdown(
-                            preselectNoProduksi: widget.header?.brokerNoProduksi,
-                            preselectNamaMesin: widget.header?.brokerNamaMesin,
-                            date: _selectedDate,
-                            enabled: isBrokerProductionEnabled,
-                            onChanged: isBrokerProductionEnabled
-                                ? (bp) {
-                              if (_selectedMode != InputMode.brokerProduction) {
-                                _selectMode(InputMode.brokerProduction);
-                              }
-                              setState(() {
-                                noBrokerProduksiCtrl.text = bp?.noProduksi ?? '';
-                                _brokerError = null;
-                              });
-                            }
-                                : null,
-                          ),
-                          if (_brokerError != null) ...[
-                            const SizedBox(height: 6),
-                            Text(_brokerError!, style: errorStyle),
+              ),
+
+              const SizedBox(height: 16),
+
+              // ===== BROKER =====
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Radio<InputMode>(
+                    value: InputMode.brokerProduction,
+                    groupValue: _selectedMode,
+                    onChanged: isEdit ? null : (val) => _selectMode(val!),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: IgnorePointer(
+                      ignoring: !isBrokerProductionEnabled,
+                      child: Opacity(
+                        opacity: isBrokerProductionEnabled ? 1 : 0.6,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            BrokerProductionDropdown(
+                              preselectNoProduksi:
+                                  widget.header?.brokerNoProduksi,
+                              preselectNamaMesin:
+                                  widget.header?.brokerNamaMesin,
+                              date: _selectedDate,
+                              enabled: isBrokerProductionEnabled,
+                              onChanged: isBrokerProductionEnabled
+                                  ? (bp) {
+                                      if (_selectedMode !=
+                                          InputMode.brokerProduction) {
+                                        _selectMode(InputMode.brokerProduction);
+                                      }
+                                      final code = bp?.noProduksi ?? '';
+                                      setState(() {
+                                        noBrokerProduksiCtrl.text = code;
+                                        _brokerError = null;
+                                        _bonggolanOutputs = [];
+                                      });
+                                      if (code.isNotEmpty) _fetchOutputs(code);
+                                    }
+                                  : null,
+                            ),
+                            if (_brokerError != null) ...[
+                              const SizedBox(height: 6),
+                              Text(_brokerError!, style: errorStyle),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // ===== INJECT =====
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Radio<InputMode>(
-                  value: InputMode.injectProduction,
-                  groupValue: _selectedMode,
-                  onChanged: isEdit ? null : (val) => _selectMode(val!),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: IgnorePointer(
-                    ignoring: !isInjectProductionEnabled,
-                    child: Opacity(
-                      opacity: isInjectProductionEnabled ? 1 : 0.6,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          InjectProductionDropdown(
-                            preselectNoProduksi: widget.header?.injectNoProduksi,
-                            preselectNamaMesin: widget.header?.injectNamaMesin,
-                            date: _selectedDate,
-                            enabled: isInjectProductionEnabled,
-                            onChanged: isInjectProductionEnabled
-                                ? (ip) {
-                              if (_selectedMode != InputMode.injectProduction) {
-                                _selectMode(InputMode.injectProduction);
-                              }
-                              setState(() {
-                                noInjectProduksiCtrl.text = ip?.noProduksi ?? '';
-                                _injectError = null;
-                              });
-                            }
-                                : null,
-                          ),
-                          if (_injectError != null) ...[
-                            const SizedBox(height: 6),
-                            Text(_injectError!, style: errorStyle),
+              // ===== INJECT =====
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Radio<InputMode>(
+                    value: InputMode.injectProduction,
+                    groupValue: _selectedMode,
+                    onChanged: isEdit ? null : (val) => _selectMode(val!),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: IgnorePointer(
+                      ignoring: !isInjectProductionEnabled,
+                      child: Opacity(
+                        opacity: isInjectProductionEnabled ? 1 : 0.6,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            InjectProductionDropdown(
+                              preselectNoProduksi:
+                                  widget.header?.injectNoProduksi,
+                              preselectNamaMesin:
+                                  widget.header?.injectNamaMesin,
+                              date: _selectedDate,
+                              enabled: isInjectProductionEnabled,
+                              onChanged: isInjectProductionEnabled
+                                  ? (ip) {
+                                      if (_selectedMode !=
+                                          InputMode.injectProduction) {
+                                        _selectMode(InputMode.injectProduction);
+                                      }
+                                      final code = ip?.noProduksi ?? '';
+                                      setState(() {
+                                        noInjectProduksiCtrl.text = code;
+                                        _injectError = null;
+                                        _bonggolanOutputs = [];
+                                      });
+                                      if (code.isNotEmpty) _fetchOutputs(code);
+                                    }
+                                  : null,
+                            ),
+                            if (_injectError != null) ...[
+                              const SizedBox(height: 6),
+                              Text(_injectError!, style: errorStyle),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // ===== BONGKAR =====
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Radio<InputMode>(
-                  value: InputMode.bongkar,
-                  groupValue: _selectedMode,
-                  onChanged: isEdit ? null : (val) => _selectMode(val!),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: IgnorePointer(
-                    ignoring: !isBongkarEnabled,
-                    child: Opacity(
-                      opacity: isBongkarEnabled ? 1 : 0.6,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          BongkarSusunDropdown(
-                            preselectNoBongkarSusun: widget.header?.noBongkarSusun,
-                            date: _selectedDate,
-                            enabled: isBongkarEnabled,
-                            onChanged: isBongkarEnabled
-                                ? (bs) {
-                              if (_selectedMode != InputMode.bongkar) {
-                                _selectMode(InputMode.bongkar);
-                              }
-                              setState(() {
-                                noBongkarSusunCtrl.text = bs?.noBongkarSusun ?? '';
-                                _bongkarError = null;
-                              });
-                            }
-                                : null,
-                          ),
-                          if (_bongkarError != null) ...[
-                            const SizedBox(height: 6),
-                            Text(_bongkarError!, style: errorStyle),
+              // ===== BONGKAR =====
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Radio<InputMode>(
+                    value: InputMode.bongkar,
+                    groupValue: _selectedMode,
+                    onChanged: isEdit ? null : (val) => _selectMode(val!),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: IgnorePointer(
+                      ignoring: !isBongkarEnabled,
+                      child: Opacity(
+                        opacity: isBongkarEnabled ? 1 : 0.6,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            BongkarSusunDropdown(
+                              preselectNoBongkarSusun:
+                                  widget.header?.noBongkarSusun,
+                              date: _selectedDate,
+                              enabled: isBongkarEnabled,
+                              onChanged: isBongkarEnabled
+                                  ? (bs) {
+                                      if (_selectedMode != InputMode.bongkar) {
+                                        _selectMode(InputMode.bongkar);
+                                      }
+                                      final code = bs?.noBongkarSusun ?? '';
+                                      setState(() {
+                                        noBongkarSusunCtrl.text = code;
+                                        _bongkarError = null;
+                                        _bonggolanOutputs = [];
+                                      });
+                                      if (code.isNotEmpty) _fetchOutputs(code);
+                                    }
+                                  : null,
+                            ),
+                            if (_bongkarError != null) ...[
+                              const SizedBox(height: 6),
+                              Text(_bongkarError!, style: errorStyle),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ]),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  // ===== RIGHT COLUMN: OUTPUT PANEL =====
+  Widget _buildOutputPanel() {
+    final String noSourceMessage;
+    final String sourceCode;
+
+    switch (_selectedMode) {
+      case InputMode.brokerProduction:
+        noSourceMessage = 'Pilih No Produksi Broker\nuntuk melihat output';
+        sourceCode = noBrokerProduksiCtrl.text.trim();
+        break;
+      case InputMode.injectProduction:
+        noSourceMessage = 'Pilih No Produksi Inject\nuntuk melihat output';
+        sourceCode = noInjectProduksiCtrl.text.trim();
+        break;
+      case InputMode.bongkar:
+        noSourceMessage = 'Pilih No Bongkar Susun\nuntuk melihat output';
+        sourceCode = noBongkarSusunCtrl.text.trim();
+        break;
+      default:
+        noSourceMessage = 'Pilih sumber\nuntuk melihat output';
+        sourceCode = '';
+    }
+
+    return LabelOutputPanel(
+      title: 'Output Bonggolan',
+      items: _bonggolanOutputs
+          .map((o) => LabelOutputItem(
+                code: o.noBonggolan,
+                isPrinted: o.isPrinted,
+              ))
+          .toList(),
+      isLoading: _loadingOutputs,
+      hasSource: sourceCode.isNotEmpty,
+      noSourceMessage: noSourceMessage,
     );
   }
 
@@ -591,11 +734,16 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
         ElevatedButton(
           onPressed: _submit,
           style: ElevatedButton.styleFrom(
-            backgroundColor: isEdit ? const Color(0xFFF57C00) : const Color(0xFF00897B),
+            backgroundColor: isEdit
+                ? const Color(0xFFF57C00)
+                : const Color(0xFF00897B),
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
           ),
-          child: const Text('SIMPAN', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+          child: const Text(
+            'SIMPAN',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+          ),
         ),
       ],
     );

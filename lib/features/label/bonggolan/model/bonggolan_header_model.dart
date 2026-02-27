@@ -1,4 +1,24 @@
 // lib/features/bonggolan/model/reject_header_model.dart
+
+class BonggolanOutputItem {
+  final String noBonggolan;
+  final int hasBeenPrinted;
+
+  const BonggolanOutputItem({
+    required this.noBonggolan,
+    required this.hasBeenPrinted,
+  });
+
+  bool get isPrinted => hasBeenPrinted > 0;
+
+  factory BonggolanOutputItem.fromJson(Map<String, dynamic> json) {
+    return BonggolanOutputItem(
+      noBonggolan: (json['NoBonggolan'] ?? '').toString(),
+      hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 class BonggolanHeader {
   // Core
   final String noBonggolan; // NoBonggolan
@@ -23,6 +43,10 @@ class BonggolanHeader {
   // Bongkar Susun
   final String? noBongkarSusun; // NoBongkarSusun
 
+  final int hasBeenPrinted;
+
+  bool get isPrinted => hasBeenPrinted > 0;
+
   const BonggolanHeader({
     required this.noBonggolan,
     required this.dateCreate,
@@ -39,6 +63,7 @@ class BonggolanHeader {
     this.injectNoProduksi,
     this.injectNamaMesin,
     this.noBongkarSusun,
+    this.hasBeenPrinted = 0,
   });
 
   // Convenience: prefer Inject* then fallback to Broker*
@@ -87,6 +112,7 @@ class BonggolanHeader {
       injectNoProduksi: json['InjectNoProduksi'],
       injectNamaMesin: json['InjectNamaMesin'],
       noBongkarSusun: json['NoBongkarSusun'],
+      hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -106,6 +132,7 @@ class BonggolanHeader {
     'InjectNoProduksi': injectNoProduksi,
     'InjectNamaMesin': injectNamaMesin,
     'NoBongkarSusun': noBongkarSusun,
+    'HasBeenPrinted': hasBeenPrinted,
   };
 
   BonggolanHeader copyWith({
@@ -124,6 +151,7 @@ class BonggolanHeader {
     String? injectNoProduksi,
     String? injectNamaMesin,
     String? noBongkarSusun,
+    int? hasBeenPrinted,
   }) {
     return BonggolanHeader(
       noBonggolan: noBonggolan ?? this.noBonggolan,
@@ -141,6 +169,7 @@ class BonggolanHeader {
       injectNoProduksi: injectNoProduksi ?? this.injectNoProduksi,
       injectNamaMesin: injectNamaMesin ?? this.injectNamaMesin,
       noBongkarSusun: noBongkarSusun ?? this.noBongkarSusun,
+      hasBeenPrinted: hasBeenPrinted ?? this.hasBeenPrinted,
     );
   }
 }

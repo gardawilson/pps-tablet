@@ -13,6 +13,7 @@ import '../../../bongkar_susun/widgets/bongkar_susun_dropdown.dart';
 import '../../../production/washing/widgets/washing_production_dropdown.dart';
 import '../model/washing_header_model.dart';
 import '../model/washing_detail_model.dart';
+import '../repository/washing_repository.dart';
 import 'washing_text_field.dart';
 import 'package:provider/provider.dart';
 import '../view_model/washing_view_model.dart';
@@ -48,6 +49,14 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
   InputMode? _selectedMode; // menyimpan pilihan radio user
 
   DateTime _selectedDate = DateTime.now(); // <-- sumber kebenaran untuk tanggal
+
+  // 🔹 Outputs: NoWashing yang sudah dibuat untuk NoProduksi terpilih
+  List<WashingOutputItem> _washingOutputs = [];
+  bool _loadingOutputs = false;
+
+  // 🔹 Outputs: NoWashing terkait NoBongkarSusun
+  List<WashingOutputItem> _bongkarOutputs = [];
+  bool _loadingBongkarOutputs = false;
 
   @override
   void initState() {
@@ -86,6 +95,22 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
     } else {
       _selectedMode = InputMode.production; // default
     }
+
+    // 🔹 Fetch outputs jika ada NoProduksi (edit mode atau preselect)
+    final preNoProduksi = widget.header?.noProduksi ?? '';
+    if (preNoProduksi.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _fetchOutputs(preNoProduksi),
+      );
+    }
+
+    // 🔹 Fetch outputs jika ada NoBongkarSusun (edit mode)
+    final preNoBongkar = widget.header?.noBongkarSusun ?? '';
+    if (preNoBongkar.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _fetchBongkarOutputs(preNoBongkar),
+      );
+    }
   }
 
   @override
@@ -101,12 +126,48 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
 
   bool get isEdit => widget.header != null;
 
+  Future<void> _fetchOutputs(String noProduksi) async {
+    if (noProduksi.trim().isEmpty) {
+      setState(() => _washingOutputs = []);
+      return;
+    }
+    setState(() => _loadingOutputs = true);
+    try {
+      final outputs = await WashingRepository().fetchOutputsByNoProduksi(
+        noProduksi.trim(),
+      );
+      if (mounted) setState(() => _washingOutputs = outputs);
+    } catch (_) {
+      if (mounted) setState(() => _washingOutputs = []);
+    } finally {
+      if (mounted) setState(() => _loadingOutputs = false);
+    }
+  }
+
+  Future<void> _fetchBongkarOutputs(String noBongkarSusun) async {
+    if (noBongkarSusun.trim().isEmpty) {
+      setState(() => _bongkarOutputs = []);
+      return;
+    }
+    setState(() => _loadingBongkarOutputs = true);
+    try {
+      final outputs = await WashingRepository().fetchOutputsByNoBongkarSusun(
+        noBongkarSusun.trim(),
+      );
+      if (mounted) setState(() => _bongkarOutputs = outputs);
+    } catch (_) {
+      if (mounted) setState(() => _bongkarOutputs = []);
+    } finally {
+      if (mounted) setState(() => _loadingBongkarOutputs = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 1000, maxHeight: 700),
+        constraints: const BoxConstraints(maxWidth: 900, maxHeight: 700),
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -117,18 +178,15 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // KOLOM KIRI: Form Header
-                  Expanded(flex: 4, child: _buildLeftColumn()),
+                  // KOLOM KIRI: Form Header + Detail
+                  Expanded(flex: 5, child: _buildLeftColumn()),
 
                   const SizedBox(width: 24),
-
-                  // Divider Vertical
                   Container(width: 1, color: Colors.grey.shade300),
-
                   const SizedBox(width: 24),
 
-                  // KOLOM KANAN: Detail List
-                  Expanded(flex: 2, child: _buildRightColumn()),
+                  // KOLOM KANAN: Output Panel (full tinggi)
+                  Expanded(flex: 2, child: _buildOutputPanel()),
                 ],
               ),
             ),
@@ -164,471 +222,640 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
     );
   }
 
-  // KOLOM KIRI: Form Header
+  // KOLOM KIRI: Form Header + Detail — satu scroll tunggal
   Widget _buildLeftColumn() {
     final bool isProductionEnabled =
         !isEdit && _selectedMode == InputMode.production;
     final bool isBongkarEnabled = !isEdit && _selectedMode == InputMode.bongkar;
+    final totalSak = detailList.length;
+    final totalBerat = detailList.fold<double>(0, (a, b) => a + (b.berat ?? 0));
+
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Bagian Form Header ──
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.description,
+                      color: Colors.blue.shade700,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      "Header",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                WashingTextField(
+                  controller: noWashingCtrl,
+                  label: 'No Washing',
+                  icon: Icons.label,
+                  asText: true,
+                ),
+                const SizedBox(height: 12),
+                AppDateField(
+                  controller: dateCreatedCtrl,
+                  label: 'Date Created',
+                  format: DateFormat('EEEE, dd MMM yyyy', 'id_ID'),
+                  initialDate: _selectedDate,
+                  onChanged: (d) {
+                    if (d != null) {
+                      setState(() {
+                        _selectedDate = d;
+                        dateCreatedCtrl.text = DateFormat(
+                          'EEEE, dd MMM yyyy',
+                          'id_ID',
+                        ).format(d);
+                        // Tanggal berubah → referensi & output tidak valid lagi
+                        noProduksiCtrl.clear();
+                        noBongkarSusunCtrl.clear();
+                        _washingOutputs = [];
+                        _bongkarOutputs = [];
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+                JenisPlastikDropdown(
+                  preselectId: widget.header?.idJenisPlastik,
+                  hintText: 'Pilih jenis plastik',
+                  validator: (v) =>
+                      v == null ? 'Wajib pilih jenis plastik' : null,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                  onChanged: (jp) {
+                    _selectedJenis = jp;
+                    jenisCtrl.text = jp?.jenis ?? '';
+                  },
+                ),
+                const SizedBox(height: 12),
+
+                // 🔹 No Produksi
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Radio<InputMode>(
+                      value: InputMode.production,
+                      groupValue: _selectedMode,
+                      onChanged: isEdit
+                          ? null
+                          : (val) => setState(() => _selectedMode = val!),
+                    ),
+                    Expanded(
+                      child: IgnorePointer(
+                        ignoring: !isProductionEnabled,
+                        child: Opacity(
+                          opacity: isProductionEnabled ? 1 : 0.6,
+                          child: WashingProductionDropdown(
+                            preselectNoProduksi: widget.header?.noProduksi,
+                            preselectNamaMesin: widget.header?.namaMesin,
+                            date: _selectedDate,
+                            enabled: isProductionEnabled,
+                            onChanged: isProductionEnabled
+                                ? (wp) {
+                                    final no = wp?.noProduksi ?? '';
+                                    setState(() {
+                                      noProduksiCtrl.text = no;
+                                      _washingOutputs = [];
+                                    });
+                                    _fetchOutputs(no);
+                                  }
+                                : null,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
+                // 🔹 No Bongkar Susun
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Radio<InputMode>(
+                      value: InputMode.bongkar,
+                      groupValue: _selectedMode,
+                      onChanged: isEdit
+                          ? null
+                          : (val) => setState(() => _selectedMode = val!),
+                    ),
+                    Expanded(
+                      child: IgnorePointer(
+                        ignoring: !isBongkarEnabled,
+                        child: Opacity(
+                          opacity: isBongkarEnabled ? 1 : 0.6,
+                          child: BongkarSusunDropdown(
+                            preselectNoBongkarSusun:
+                                widget.header?.noBongkarSusun,
+                            date: _selectedDate,
+                            enabled: isBongkarEnabled,
+                            onChanged: isBongkarEnabled
+                                ? (bs) {
+                                    final no = bs?.noBongkarSusun ?? '';
+                                    setState(() {
+                                      noBongkarSusunCtrl.text = no;
+                                      _bongkarOutputs = [];
+                                    });
+                                    _fetchBongkarOutputs(no);
+                                  }
+                                : null,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 12),
+          Divider(height: 1, thickness: 1, color: Colors.grey.shade300),
+          const SizedBox(height: 12),
+
+          // ── Bagian Detail ──
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header bar: judul + tombol Tambah
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      "Detail",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => _addNewDetail(idBagian: 7),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Tambah'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 10),
+
+                // Total bar
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.inventory_2,
+                            size: 20,
+                            color: Colors.blue.shade700,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '$totalSak',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        height: 30,
+                        width: 1,
+                        color: Colors.grey.shade300,
+                      ),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.scale,
+                            size: 20,
+                            color: Colors.blue.shade700,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${totalBerat.toStringAsFixed(2)} kg',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                // Tabel detail (shrinkWrap — parent SingleChildScrollView yang scroll)
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    children: [
+                      // Header tabel
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(8),
+                            topRight: Radius.circular(8),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 1,
+                              child: Text(
+                                'Sak',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              flex: 2,
+                              child: Text(
+                                'Berat (kg)',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(
+                              width: 100,
+                              child: Text(
+                                'Aksi',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: Colors.grey.shade300,
+                      ),
+
+                      // Rows — shrinkWrap karena scroll dikelola oleh SingleChildScrollView di atas
+                      if (detailList.isEmpty)
+                        _buildEmptyDetailState()
+                      else
+                        ListView.separated(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: detailList.length,
+                          separatorBuilder: (_, __) => Divider(
+                            height: 1,
+                            thickness: 1,
+                            color: Colors.grey.shade200,
+                          ),
+                          itemBuilder: (context, index) {
+                            final d = detailList[index];
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 0,
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    flex: 1,
+                                    child: Text(
+                                      '${d.noSak}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 2,
+                                    child: Text(
+                                      (d.berat ?? 0).toStringAsFixed(2),
+                                      style: const TextStyle(fontSize: 14),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: 100,
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        IconButton(
+                                          icon: Icon(
+                                            Icons.edit,
+                                            color: Colors.blue.shade600,
+                                            size: 20,
+                                          ),
+                                          onPressed: () =>
+                                              _editDetail(d, index),
+                                          constraints: const BoxConstraints(),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        IconButton(
+                                          icon: Icon(
+                                            Icons.delete,
+                                            color: Colors.red.shade600,
+                                            size: 20,
+                                          ),
+                                          onPressed: () => _deleteDetail(index),
+                                          constraints: const BoxConstraints(),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+              ], // tutup children Column (white Container)
+            ), // tutup Column
+          ), // tutup Container (white)
+
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  // KOLOM KANAN: Output Panel (production = NoWashing list, bongkar = grouped categories)
+  Widget _buildOutputPanel() {
+    final bool isProductionMode = _selectedMode == InputMode.production;
+    final bool isBongkarMode = _selectedMode == InputMode.bongkar;
+    final bool hasNoProduksi = noProduksiCtrl.text.trim().isNotEmpty;
+    final bool hasNoBongkar = noBongkarSusunCtrl.text.trim().isNotEmpty;
+
+    final bool isLoading = isProductionMode
+        ? _loadingOutputs
+        : _loadingBongkarOutputs;
+
+    // Badge count
+    final int count = isProductionMode
+        ? _washingOutputs.length
+        : _bongkarOutputs.length;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(8),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
       ),
-      child: SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Header ──
+          Row(
+            children: [
+              Icon(
+                isProductionMode ? Icons.label_outline : Icons.output_outlined,
+                size: 18,
+                color: Colors.blue.shade700,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  "Label Output",
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+              if (count > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '$count',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue.shade800,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+
+          const SizedBox(height: 10),
+          Divider(height: 1, color: Colors.grey.shade200),
+          const SizedBox(height: 10),
+
+          // ── Body ──
+          if (isLoading)
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.blue.shade400,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Memuat...',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          // ── Production mode ──
+          else if (isProductionMode) ...[
+            if (!hasNoProduksi)
+              _buildOutputEmptyState(
+                icon: Icons.touch_app_outlined,
+                message: 'Pilih No Produksi\nuntuk melihat label terkait',
+              )
+            else if (_washingOutputs.isEmpty)
+              _buildOutputEmptyState(
+                icon: Icons.inbox_outlined,
+                message: 'Belum ada label washing\nuntuk produksi ini',
+              )
+            else
+              Expanded(
+                child: ListView.separated(
+                  padding: EdgeInsets.zero,
+                  itemCount: _washingOutputs.length,
+                  separatorBuilder: (_, __) =>
+                      Divider(height: 1, color: Colors.grey.shade100),
+                  itemBuilder: (_, index) {
+                    final item = _washingOutputs[index];
+                    return _buildOutputItem(item);
+                  },
+                ),
+              ),
+          ]
+          // ── Bongkar mode ──
+          else if (isBongkarMode) ...[
+            if (!hasNoBongkar)
+              _buildOutputEmptyState(
+                icon: Icons.touch_app_outlined,
+                message: 'Pilih No Bongkar Susun\nuntuk melihat label terkait',
+              )
+            else if (_bongkarOutputs.isEmpty)
+              _buildOutputEmptyState(
+                icon: Icons.inbox_outlined,
+                message: 'Belum ada label output\nuntuk bongkar susun ini',
+              )
+            else
+              Expanded(
+                child: ListView.separated(
+                  padding: EdgeInsets.zero,
+                  itemCount: _bongkarOutputs.length,
+                  separatorBuilder: (_, __) =>
+                      Divider(height: 1, color: Colors.grey.shade100),
+                  itemBuilder: (_, index) {
+                    final item = _bongkarOutputs[index];
+                    return _buildOutputItem(item);
+                  },
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOutputEmptyState({
+    required IconData icon,
+    required String message,
+  }) {
+    return Expanded(
+      child: Center(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              children: [
-                Icon(Icons.description, color: Colors.blue.shade700, size: 20),
-                const SizedBox(width: 8),
-                const Text(
-                  "Header",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ],
+            Icon(icon, size: 40, color: Colors.grey.shade300),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade500,
+                height: 1.5,
+              ),
             ),
-            const SizedBox(height: 16),
-            WashingTextField(
-              controller: noWashingCtrl,
-              label: 'No Washing',
-              icon: Icons.label,
-              asText: true, // 🔑 tampil readonly (hanya text)
-            ),
-
-            const SizedBox(height: 16),
-
-            AppDateField(
-              controller: dateCreatedCtrl,
-              label: 'Date Created',
-              format: DateFormat('EEEE, dd MMM yyyy', 'id_ID'),
-              initialDate: _selectedDate,
-              onChanged: (d) {
-                if (d != null) {
-                  setState(() {
-                    _selectedDate = d;
-                    dateCreatedCtrl.text = DateFormat(
-                      'EEEE, dd MMM yyyy',
-                      'id_ID',
-                    ).format(d);
-                  });
-                }
-              },
-            ),
-
-            const SizedBox(height: 16),
-
-            JenisPlastikDropdown(
-              preselectId:
-                  widget.header?.idJenisPlastik, // preselect by ID dari header
-              hintText: 'Pilih jenis plastik',
-              validator: (v) => v == null ? 'Wajib pilih jenis plastik' : null,
-              autovalidateMode: AutovalidateMode.onUserInteraction,
-              onChanged: (jp) {
-                _selectedJenis = jp;
-                jenisCtrl.text =
-                    jp?.jenis ?? ''; // tetap sinkron untuk tampilan teks
-                // (opsional) kalau kamu masih ingin menyimpan di WashingViewModel:
-                // context.read<WashingViewModel>().selectedJenisPlastik = jp;
-              },
-            ),
-
-            const SizedBox(height: 16),
-
-            // 🔹 No Produksi (Washing)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Radio<InputMode>(
-                  value: InputMode.production,
-                  groupValue: _selectedMode,
-                  onChanged: isEdit
-                      ? null
-                      : (val) => setState(() => _selectedMode = val!),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: IgnorePointer(
-                    // benar-benar disable gesture saat tidak enabled
-                    ignoring: !isProductionEnabled,
-                    child: Opacity(
-                      opacity: isProductionEnabled ? 1 : 0.6, // feedback visual
-                      child: WashingProductionDropdown(
-                        preselectNoProduksi: widget.header?.noProduksi,
-                        preselectNamaMesin: widget.header?.namaMesin,
-                        date: _selectedDate,
-                        enabled: isProductionEnabled, // tetap teruskan ke child
-                        onChanged: isProductionEnabled
-                            ? (wp) {
-                                setState(() {
-                                  noProduksiCtrl.text = wp?.noProduksi ?? '';
-                                });
-                              }
-                            : null, // null-kan saat disabled
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-
-            // 🔹 No Bongkar Susun
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Radio<InputMode>(
-                  value: InputMode.bongkar,
-                  groupValue: _selectedMode,
-                  onChanged: isEdit
-                      ? null
-                      : (val) => setState(() => _selectedMode = val!),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: IgnorePointer(
-                    ignoring: !isBongkarEnabled,
-                    child: Opacity(
-                      opacity: isBongkarEnabled ? 1 : 0.6,
-                      child: BongkarSusunDropdown(
-                        preselectNoBongkarSusun: widget.header?.noBongkarSusun,
-                        date: _selectedDate,
-                        enabled: isBongkarEnabled,
-                        onChanged: isBongkarEnabled
-                            ? (bs) {
-                                setState(() {
-                                  noBongkarSusunCtrl.text =
-                                      bs?.noBongkarSusun ?? '';
-                                });
-                              }
-                            : null,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            // const SizedBox(height: 16),
-            // WashingTextField(
-            //   controller: warehouseCtrl,
-            //   label: 'Warehouse',
-            //   icon: Icons.warehouse,
-            // ),
           ],
         ),
       ),
     );
   }
 
-  // KOLOM KANAN: Detail List
-  Widget _buildRightColumn() {
-    final totalSak = detailList.length;
-    final totalBerat = detailList.fold<double>(0, (a, b) => a + (b.berat ?? 0));
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: CustomScrollView(
-        // satu-satunya scroll di kolom kanan
-        slivers: [
-          // Header simpel
-          SliverToBoxAdapter(
+  Widget _buildOutputItem(WashingOutputItem item) {
+    final printed = item.isPrinted;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              item.noWashing,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: printed ? Colors.green.shade50 : Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: printed ? Colors.green.shade300 : Colors.grey.shade300,
+              ),
+            ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  "Detail",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
+                Icon(
+                  printed ? Icons.print : Icons.print_outlined,
+                  size: 12,
+                  color: printed ? Colors.green.shade700 : Colors.grey.shade500,
                 ),
-                ElevatedButton.icon(
-                  onPressed: () => _addNewDetail(idBagian: 7),
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Tambah'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                const SizedBox(width: 4),
+                Text(
+                  printed ? 'Printed' : 'Belum',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: printed
+                        ? Colors.green.shade700
+                        : Colors.grey.shade500,
                   ),
                 ),
               ],
             ),
           ),
-
-          const SliverToBoxAdapter(child: SizedBox(height: 10)),
-
-          // Total bar
-          SliverToBoxAdapter(
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.inventory_2,
-                        size: 20,
-                        color: Colors.blue.shade700,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '$totalSak',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Container(height: 30, width: 1, color: Colors.grey.shade300),
-                  Row(
-                    children: [
-                      Icon(Icons.scale, size: 20, color: Colors.blue.shade700),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${totalBerat.toStringAsFixed(2)} kg',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SliverToBoxAdapter(child: SizedBox(height: 8)),
-
-          // Tabel (header + list) dibungkus container, tanpa Expanded di dalamnya
-          SliverToBoxAdapter(
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                children: [
-                  // Header tabel
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(8),
-                        topRight: Radius.circular(8),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: 1,
-                          child: Text(
-                            'Sak',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: Text(
-                            'Berat (kg)',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(
-                          width: 100,
-                          child: Text(
-                            'Aksi',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Divider(height: 1, thickness: 1, color: Colors.grey.shade300),
-
-                  // List detail — outer scroll yg handle, jadi list ini shrinkWrap + no scroll
-                  if (detailList.isEmpty)
-                    _buildEmptyDetailState()
-                  else
-                    ListView.separated(
-                      padding: EdgeInsets.zero,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: detailList.length,
-                      separatorBuilder: (_, __) => Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: Colors.grey.shade200,
-                      ),
-                      itemBuilder: (context, index) {
-                        final d = detailList[index];
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 0,
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                flex: 1,
-                                child: Text(
-                                  '${d.noSak}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                flex: 2,
-                                child: Text(
-                                  (d.berat ?? 0).toStringAsFixed(2),
-                                  style: const TextStyle(fontSize: 14),
-                                ),
-                              ),
-                              SizedBox(
-                                width: 100,
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    IconButton(
-                                      icon: Icon(
-                                        Icons.edit,
-                                        color: Colors.blue.shade600,
-                                        size: 20,
-                                      ),
-                                      onPressed: () => _editDetail(d, index),
-                                      constraints: const BoxConstraints(),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    IconButton(
-                                      icon: Icon(
-                                        Icons.delete,
-                                        color: Colors.red.shade600,
-                                        size: 20,
-                                      ),
-                                      onPressed: () => _deleteDetail(index),
-                                      constraints: const BoxConstraints(),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                ],
-              ),
-            ),
-          ),
-          // sedikit ruang bawah agar nyaman saat dekat tepi/keyboard
-          const SliverToBoxAdapter(child: SizedBox(height: 8)),
         ],
       ),
-    );
-  }
-
-  Widget _buildSimpleDetailList() {
-    return ListView.separated(
-      itemCount: detailList.length,
-      separatorBuilder: (_, __) =>
-          Divider(height: 1, thickness: 1, color: Colors.grey.shade200),
-      itemBuilder: (context, index) {
-        final d = detailList[index];
-
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-          child: Row(
-            children: [
-              // No. SAK
-              Expanded(
-                flex: 1,
-                child: Text(
-                  '${d.noSak}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-
-              // Berat
-              Expanded(
-                flex: 2,
-                child: Text(
-                  (d.berat ?? 0).toStringAsFixed(2),
-                  style: const TextStyle(fontSize: 14),
-                ),
-              ),
-
-              // Aksi
-              SizedBox(
-                width: 100,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    IconButton(
-                      icon: Icon(
-                        Icons.edit,
-                        color: Colors.blue.shade600,
-                        size: 20,
-                      ),
-                      onPressed: () => _editDetail(d, index),
-                      constraints: const BoxConstraints(),
-                    ),
-                    const SizedBox(width: 4),
-                    IconButton(
-                      icon: Icon(
-                        Icons.delete,
-                        color: Colors.red.shade600,
-                        size: 20,
-                      ),
-                      onPressed: () => _deleteDetail(index),
-                      constraints: const BoxConstraints(),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 

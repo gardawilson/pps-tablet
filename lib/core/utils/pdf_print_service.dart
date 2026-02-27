@@ -10,8 +10,11 @@ import 'dart:async';
 import '../../common/widgets/loading_dialog.dart';
 
 class PdfPrintService {
+  /// URL default Crystal Report server. Ganti di sini jika server pindah.
+  static const String defaultBaseUrl = 'http://192.168.11.153:44381';
+
   PdfPrintService({
-    required this.baseUrl,
+    this.baseUrl = PdfPrintService.defaultBaseUrl,
     this.defaultSystem = 'pps',
     this.httpClient,
     this.getAuthHeader,
@@ -31,11 +34,10 @@ class PdfPrintService {
     required Map<String, String> query,
     String? system,
   }) {
-    final u = Uri.parse('$baseUrl/api/crystalreport/${system ?? defaultSystem}/export-pdf');
-    return u.replace(queryParameters: {
-      'reportName': reportName,
-      ...query,
-    });
+    final u = Uri.parse(
+      '$baseUrl/api/crystalreport/${system ?? defaultSystem}/export-pdf',
+    );
+    return u.replace(queryParameters: {'reportName': reportName, ...query});
   }
 
   // =============== PUBLIC API (PREVIEW MODE) ===============
@@ -71,14 +73,25 @@ class PdfPrintService {
   }) async {
     Future<void> core() async {
       final bytes = await _download(url);
-      final filename = _filenameFromHeaders(bytes.response, saveNameHint ?? 'Label.pdf');
+      final filename = _filenameFromHeaders(
+        bytes.response,
+        saveNameHint ?? 'Label.pdf',
+      );
       await _saveOriginalTemp(bytes.body, filename); // optional debug
       final rebuilt = await _remapPdfTo80mm(bytes.body);
-      await _openNativePrintPreview(fileName: '80mm_$filename', pdfBytes: rebuilt);
+      await _openNativePrintPreview(
+        fileName: '80mm_$filename',
+        pdfBytes: rebuilt,
+      );
     }
 
     if (showLoading) {
-      await _withLoading(context: context, enabled: true, message: loadingMessage, run: core);
+      await _withLoading(
+        context: context,
+        enabled: true,
+        message: loadingMessage,
+        run: core,
+      );
     } else {
       try {
         await core();
@@ -101,8 +114,10 @@ class PdfPrintService {
     bool showLoading = false,
     String loadingMessage = 'Mencetak label…',
     Function(String)? onError,
+    Uri? afterPrintPatchUrl,
   }) async {
     final url = buildUri(reportName: reportName, query: query, system: system);
+    debugPrint('🖨️ directPrintReport80mm → $url');
 
     return await directPrintFromUrl(
       context: context,
@@ -111,6 +126,7 @@ class PdfPrintService {
       showLoading: showLoading,
       loadingMessage: loadingMessage,
       onError: onError,
+      afterPrintPatchUrl: afterPrintPatchUrl,
     );
   }
 
@@ -123,6 +139,7 @@ class PdfPrintService {
     bool showLoading = false,
     String loadingMessage = 'Mencetak…',
     Function(String)? onError,
+    Uri? afterPrintPatchUrl,
   }) async {
     Future<bool> core() async {
       try {
@@ -137,6 +154,11 @@ class PdfPrintService {
           pdfBytes: pdfBytes,
           autoSelectPrinter: autoSelectPrinter,
         );
+
+        // 4. Hit PATCH endpoint hanya jika print berhasil
+        if (success && afterPrintPatchUrl != null) {
+          await _patchAfterPrint(afterPrintPatchUrl);
+        }
 
         return success;
       } catch (e) {
@@ -220,7 +242,7 @@ class PdfPrintService {
 
         for (final keyword in keywords) {
           final found = printers.firstWhere(
-                (p) => p.name.toLowerCase().contains(keyword),
+            (p) => p.name.toLowerCase().contains(keyword),
             orElse: () => Printer(url: ''),
           );
 
@@ -273,7 +295,9 @@ class PdfPrintService {
                   title: Text(
                     p.name,
                     style: TextStyle(
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                     ),
                   ),
                   subtitle: Text(p.url),
@@ -317,9 +341,34 @@ class PdfPrintService {
   bool get hasPrinterSelected => _selectedPrinter != null;
 
   // =============== INTERNALS ===============
+
+  Future<void> _patchAfterPrint(Uri url) async {
+    try {
+      final client = httpClient ?? http.Client();
+      final headers = <String, String>{'Content-Type': 'application/json'};
+      if (getAuthHeader != null) headers.addAll(getAuthHeader!());
+      final resp = await client
+          .patch(url, headers: headers)
+          .timeout(const Duration(seconds: 10));
+      debugPrint('✅ PATCH after print: ${resp.statusCode} ${url.path}');
+    } catch (e) {
+      debugPrint('⚠️ PATCH after print failed (ignored): $e');
+    }
+  }
+
   String _inferName(String reportName, Map<String, String> query) {
-    final keysPref = const ['NoBroker', 'NoWashing', 'NoProduksi', 'NoTrans', 'Nomor', 'NoBJ'];
-    final key = keysPref.firstWhere((k) => query[k]?.isNotEmpty == true, orElse: () => '');
+    final keysPref = const [
+      'NoBroker',
+      'NoWashing',
+      'NoProduksi',
+      'NoTrans',
+      'Nomor',
+      'NoBJ',
+    ];
+    final key = keysPref.firstWhere(
+      (k) => query[k]?.isNotEmpty == true,
+      orElse: () => '',
+    );
     final val = key.isEmpty ? '' : query[key]!;
     final safe = val.replaceAll(RegExp(r'[^\w\-.]+'), '_');
     return '${reportName}_${safe.isEmpty ? DateTime.now().millisecondsSinceEpoch : safe}.pdf';
@@ -330,7 +379,9 @@ class PdfPrintService {
     final headers = <String, String>{};
     if (getAuthHeader != null) headers.addAll(getAuthHeader!());
 
-    final resp = await client.get(url, headers: headers).timeout(const Duration(seconds: 30));
+    final resp = await client
+        .get(url, headers: headers)
+        .timeout(const Duration(seconds: 30));
     if (resp.statusCode != 200 || resp.bodyBytes.isEmpty) {
       throw Exception('HTTP ${resp.statusCode} — tidak ada data.');
     }
@@ -345,7 +396,10 @@ class PdfPrintService {
 
   String _filenameFromHeaders(http.Response resp, String fallback) {
     final cd = resp.headers['content-disposition'] ?? '';
-    final m = RegExp(r'filename\*?=([^;]+)', caseSensitive: false).firstMatch(cd);
+    final m = RegExp(
+      r'filename\*?=([^;]+)',
+      caseSensitive: false,
+    ).firstMatch(cd);
     if (m != null) {
       var v = m.group(1)!.trim();
       v = v.replaceAll(RegExp(r"^UTF-8''"), '');
@@ -367,7 +421,9 @@ class PdfPrintService {
         pw.Page(
           pageFormat: PdfPageFormat(pageWidthPt, pageHeightPt),
           margin: pw.EdgeInsets.zero,
-          build: (_) => pw.Center(child: pw.Image(pw.MemoryImage(png), fit: pw.BoxFit.contain)),
+          build: (_) => pw.Center(
+            child: pw.Image(pw.MemoryImage(png), fit: pw.BoxFit.contain),
+          ),
         ),
       );
     }

@@ -219,6 +219,27 @@ class BahanBakuViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> markAsPalletPrinted({
+    required String noBahanBaku,
+    required String noPallet,
+  }) async {
+    try {
+      await repository.markAsPrinted(
+        noBahanBaku: noBahanBaku,
+        noPallet: noPallet,
+      );
+      final idx = pallets.indexWhere((p) => p.noPallet == noPallet);
+      if (idx != -1) {
+        pallets[idx] = pallets[idx].copyWith(
+          hasBeenPrinted: pallets[idx].hasBeenPrinted + 1,
+        );
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('❌ Error markAsPalletPrinted($noBahanBaku/$noPallet): $e');
+    }
+  }
+
   /// Reset state saat masuk/keluar screen
   void resetForScreen() {
     selectedNoBahanBaku = null;

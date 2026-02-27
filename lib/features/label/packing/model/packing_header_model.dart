@@ -1,5 +1,21 @@
 // lib/features/packing/model/reject_header_model.dart
 
+class PackingOutputItem {
+  final String noBJ;
+  final int hasBeenPrinted;
+
+  const PackingOutputItem({required this.noBJ, required this.hasBeenPrinted});
+
+  bool get isPrinted => hasBeenPrinted > 0;
+
+  factory PackingOutputItem.fromJson(Map<String, dynamic> json) {
+    return PackingOutputItem(
+      noBJ: (json['NoBJ'] ?? '').toString(),
+      hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 class PackingHeader {
   // Core
   final String noBJ;        // NoBJ
@@ -30,6 +46,10 @@ class PackingHeader {
   /// NamaMesin / 'Bongkar Susun' / NamaPembeli
   final String? outputNamaMesin;
 
+  final int hasBeenPrinted;
+
+  bool get isPrinted => hasBeenPrinted > 0;
+
   const PackingHeader({
     required this.noBJ,
     required this.dateCreate,
@@ -44,6 +64,7 @@ class PackingHeader {
     this.outputType,
     this.outputCode,
     this.outputNamaMesin,
+    this.hasBeenPrinted = 0,
   });
 
   // ---------------------------------------------------------------------------
@@ -111,6 +132,7 @@ class PackingHeader {
       outputType: json['OutputType']?.toString(),
       outputCode: json['OutputCode']?.toString(),
       outputNamaMesin: json['OutputNamaMesin']?.toString(),
+      hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -128,6 +150,7 @@ class PackingHeader {
     'OutputType': outputType,
     'OutputCode': outputCode,
     'OutputNamaMesin': outputNamaMesin,
+    'HasBeenPrinted': hasBeenPrinted,
   };
 
   PackingHeader copyWith({
@@ -144,6 +167,7 @@ class PackingHeader {
     String? outputType,
     String? outputCode,
     String? outputNamaMesin,
+    int? hasBeenPrinted,
   }) {
     return PackingHeader(
       noBJ: noBJ ?? this.noBJ,
@@ -159,6 +183,7 @@ class PackingHeader {
       outputType: outputType ?? this.outputType,
       outputCode: outputCode ?? this.outputCode,
       outputNamaMesin: outputNamaMesin ?? this.outputNamaMesin,
+      hasBeenPrinted: hasBeenPrinted ?? this.hasBeenPrinted,
     );
   }
 }

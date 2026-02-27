@@ -8,6 +8,7 @@ import '../../../../common/widgets/label_popover_widgets.dart';
 import '../../../../core/utils/pdf_print_service.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../model/washing_header_model.dart';
+import '../repository/washing_repository.dart';
 
 class WashingRowPopover extends StatefulWidget {
   final WashingHeader header;
@@ -211,15 +212,20 @@ class _WashingRowPopoverState extends State<WashingRowPopover> {
                   ).context;
 
                   final pdfService = PdfPrintService(
-                    baseUrl: 'http://192.168.10.100:3000',
                     defaultSystem: 'pps',
                   );
 
-                  await pdfService.printReport80mm(
+                  final success = await pdfService.directPrintReport80mm(
                     context: rootCtx,
                     reportName: 'CrLabelPalletWashing',
                     query: {'NoWashing': widget.header.noWashing},
                   );
+
+                  if (success) {
+                    await WashingRepository().markAsPrinted(
+                      widget.header.noWashing,
+                    );
+                  }
                 }),
               ),
               divider,

@@ -5,9 +5,12 @@ import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../common/widgets/label_output_panel.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/services/dialog_service.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../common/widgets/app_date_field.dart';
+import '../repository/reject_repository.dart';
 
 import '../../../production/hot_stamp/widgets/hot_stamp_production_dropdown.dart';
 import '../../../production/inject/widgets/inject_production_dropdown.dart';
@@ -24,10 +27,7 @@ import 'reject_text_field.dart';
 class RejectFormDialog extends StatefulWidget {
   final RejectHeader? header;
 
-  const RejectFormDialog({
-    super.key,
-    this.header,
-  });
+  const RejectFormDialog({super.key, this.header});
 
   @override
   State<RejectFormDialog> createState() => _RejectFormDialogState();
@@ -45,6 +45,10 @@ class _RejectFormDialogState extends State<RejectFormDialog> {
   DateTime _selectedDate = DateTime.now();
   RejectInputMode? _selectedMode;
   RejectType? _selectedType;
+
+  // Output panel state
+  List<RejectOutputItem> _rejectOutputs = [];
+  bool _loadingOutputs = false;
 
   // Controllers untuk masing-masing proses (menyimpan kode yang dipilih)
   late final TextEditingController injectCodeCtrl;
@@ -80,8 +84,8 @@ class _RejectFormDialogState extends State<RejectFormDialog> {
     beratCtrl = TextEditingController(
       text: (widget.header?.berat != null)
           ? widget.header!.berat!.toStringAsFixed(
-        widget.header!.berat! % 1 == 0 ? 0 : 3,
-      )
+              widget.header!.berat! % 1 == 0 ? 0 : 3,
+            )
           : '',
     );
 
@@ -114,6 +118,16 @@ class _RejectFormDialogState extends State<RejectFormDialog> {
           _selectedMode = RejectInputMode.bjSortir;
           sortirCodeCtrl.text = code;
         }
+      }
+    }
+
+    // Auto-fetch outputs on edit mode
+    if (isEdit && _selectedMode != null) {
+      final code = (widget.header!.outputCode ?? '').trim();
+      if (code.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _fetchOutputs(code);
+        });
       }
     }
 
@@ -161,6 +175,7 @@ class _RejectFormDialogState extends State<RejectFormDialog> {
   void _selectMode(RejectInputMode m) {
     setState(() {
       _selectedMode = m;
+      _rejectOutputs = [];
       // Clear semua error untuk clean UX
       _injectError = null;
       _hotStampError = null;
@@ -168,6 +183,37 @@ class _RejectFormDialogState extends State<RejectFormDialog> {
       _spannerError = null;
       _sortirError = null;
     });
+  }
+
+  Future<void> _fetchOutputs(String code) async {
+    if (code.isEmpty || _selectedMode == null) return;
+    setState(() => _loadingOutputs = true);
+    try {
+      final repo = RejectRepository(api: ApiClient());
+      List<RejectOutputItem> results;
+      switch (_selectedMode!) {
+        case RejectInputMode.inject:
+          results = await repo.fetchOutputsByInjectNoProduksi(code);
+          break;
+        case RejectInputMode.hotStamping:
+          results = await repo.fetchOutputsByHotStampNoProduksi(code);
+          break;
+        case RejectInputMode.pasangKunci:
+          results = await repo.fetchOutputsByKeyFittingNoProduksi(code);
+          break;
+        case RejectInputMode.spanner:
+          results = await repo.fetchOutputsBySpannerNoProduksi(code);
+          break;
+        case RejectInputMode.bjSortir:
+          results = await repo.fetchOutputsBySortirRejectNoBJSortir(code);
+          break;
+      }
+      if (mounted) setState(() => _rejectOutputs = results);
+    } catch (_) {
+      if (mounted) setState(() => _rejectOutputs = []);
+    } finally {
+      if (mounted) setState(() => _loadingOutputs = false);
+    }
   }
 
   Future<void> _submit() async {
@@ -178,7 +224,8 @@ class _RejectFormDialogState extends State<RejectFormDialog> {
     if (!isEdit && _selectedMode == null) {
       await DialogService.instance.showError(
         title: 'PILIH PROSES',
-        message: 'Pilih salah satu proses sumber (Inject / Hot Stamping / Pasang Kunci / Spanner / BJ Sortir)',
+        message:
+            'Pilih salah satu proses sumber (Inject / Hot Stamping / Pasang Kunci / Spanner / BJ Sortir)',
       );
       return;
     }
@@ -324,10 +371,16 @@ class _RejectFormDialogState extends State<RejectFormDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const SizedBox(height: 6),
-              const Text('Nomor Reject:', style: TextStyle(color: Colors.black54)),
+              const Text(
+                'Nomor Reject:',
+                style: TextStyle(color: Colors.black54),
+              ),
               const SizedBox(height: 6),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.green.withOpacity(.08),
                   borderRadius: BorderRadius.circular(8),
@@ -356,7 +409,10 @@ class _RejectFormDialogState extends State<RejectFormDialog> {
               ),
               const SizedBox(height: 6),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.green.withOpacity(.08),
                   borderRadius: BorderRadius.circular(8),
@@ -396,7 +452,10 @@ class _RejectFormDialogState extends State<RejectFormDialog> {
       }
     } catch (e) {
       DialogService.instance.hideLoading();
-      await DialogService.instance.showError(title: 'Error', message: e.toString());
+      await DialogService.instance.showError(
+        title: 'Error',
+        message: e.toString(),
+      );
     }
   }
 
@@ -405,7 +464,7 @@ class _RejectFormDialogState extends State<RejectFormDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
+        constraints: const BoxConstraints(maxWidth: 900, maxHeight: 700),
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -416,7 +475,11 @@ class _RejectFormDialogState extends State<RejectFormDialog> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(flex: 4, child: _buildLeftColumn()),
+                  Expanded(flex: 5, child: _buildLeftColumn()),
+                  const SizedBox(width: 24),
+                  Container(width: 1, color: const Color(0xFFDCDFE4)),
+                  const SizedBox(width: 24),
+                  Expanded(flex: 2, child: _buildOutputPanel()),
                 ],
               ),
             ),
@@ -453,13 +516,21 @@ class _RejectFormDialogState extends State<RejectFormDialog> {
   }
 
   Widget _buildLeftColumn() {
-    final bool isInjectEnabled = !isEdit && _selectedMode == RejectInputMode.inject;
-    final bool isHotStampEnabled = !isEdit && _selectedMode == RejectInputMode.hotStamping;
-    final bool isKeyFittingEnabled = !isEdit && _selectedMode == RejectInputMode.pasangKunci;
-    final bool isSpannerEnabled = !isEdit && _selectedMode == RejectInputMode.spanner;
-    final bool isSortirEnabled = !isEdit && _selectedMode == RejectInputMode.bjSortir;
+    final bool isInjectEnabled =
+        !isEdit && _selectedMode == RejectInputMode.inject;
+    final bool isHotStampEnabled =
+        !isEdit && _selectedMode == RejectInputMode.hotStamping;
+    final bool isKeyFittingEnabled =
+        !isEdit && _selectedMode == RejectInputMode.pasangKunci;
+    final bool isSpannerEnabled =
+        !isEdit && _selectedMode == RejectInputMode.spanner;
+    final bool isSortirEnabled =
+        !isEdit && _selectedMode == RejectInputMode.bjSortir;
 
-    final errorStyle = TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12);
+    final errorStyle = TextStyle(
+      color: Theme.of(context).colorScheme.error,
+      fontSize: 12,
+    );
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -470,343 +541,466 @@ class _RejectFormDialogState extends State<RejectFormDialog> {
       child: Form(
         key: _formKey,
         child: SingleChildScrollView(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(
-              children: [
-                Icon(Icons.description, color: Colors.blue.shade700, size: 20),
-                const SizedBox(width: 8),
-                const Text('Header', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // No Reject (readonly text)
-            RejectTextField(
-              controller: noRejectCtrl,
-              label: 'No. Reject',
-              icon: Icons.label_important_outline,
-              asText: true,
-            ),
-
-            const SizedBox(height: 16),
-
-            // Date Created
-            AppDateField(
-              controller: dateCreatedCtrl,
-              label: 'Date Created',
-              format: DateFormat('EEEE, dd MMM yyyy', 'id_ID'),
-              initialDate: _selectedDate,
-              onChanged: (d) {
-                if (d != null) {
-                  setState(() {
-                    _selectedDate = d;
-                    dateCreatedCtrl.text = DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(d);
-                  });
-                }
-              },
-            ),
-
-            const SizedBox(height: 16),
-
-            // Jenis Reject (Required)
-            RejectTypeDropdown(
-              preselectId: widget.header?.idReject,
-              hintText: 'Pilih jenis Reject',
-              validator: (v) => v == null ? 'Wajib pilih jenis Reject' : null,
-              autovalidateMode: AutovalidateMode.onUserInteraction,
-              onChanged: (rt) {
-                _selectedType = rt;
-              },
-            ),
-
-            const SizedBox(height: 16),
-
-            // Berat (Optional)
-            SizedBox(
-              width: 300,
-              child: TextFormField(
-                controller: beratCtrl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d*([.,]\d{0,3})?$')),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.description,
+                    color: Colors.blue.shade700,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Header',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                 ],
-                decoration: InputDecoration(
-                  labelText: 'Berat (kg)',
-                  hintText: '0',
-                  prefixIcon: const Icon(Icons.monitor_weight_outlined),
-                  suffixText: 'kg',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  isDense: true,
-                ),
-                validator: (val) {
-                  final raw = (val ?? '').trim();
-                  if (raw.isEmpty) return null; // optional
-                  final s = raw.replaceAll(',', '.');
-                  final d = double.tryParse(s);
-                  if (d == null) return 'Format berat tidak valid.';
-                  if (d <= 0) return 'Berat harus > 0.';
-                  return null;
-                },
-                onEditingComplete: () {
-                  final s = beratCtrl.text.trim().replaceAll(',', '.');
-                  beratCtrl.text = s;
-                  FocusScope.of(context).unfocus();
+              ),
+              const SizedBox(height: 16),
+
+              // No Reject (readonly text)
+              RejectTextField(
+                controller: noRejectCtrl,
+                label: 'No. Reject',
+                icon: Icons.label_important_outline,
+                asText: true,
+              ),
+
+              const SizedBox(height: 16),
+
+              // Date Created
+              AppDateField(
+                controller: dateCreatedCtrl,
+                label: 'Date Created',
+                format: DateFormat('EEEE, dd MMM yyyy', 'id_ID'),
+                initialDate: _selectedDate,
+                onChanged: (d) {
+                  if (d != null) {
+                    setState(() {
+                      _selectedDate = d;
+                      dateCreatedCtrl.text = DateFormat(
+                        'EEEE, dd MMM yyyy',
+                        'id_ID',
+                      ).format(d);
+                    });
+                  }
                 },
               ),
-            ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // ===== INJECT (S.*****) =====
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Radio<RejectInputMode>(
-                  value: RejectInputMode.inject,
-                  groupValue: _selectedMode,
-                  onChanged: isEdit ? null : (val) => _selectMode(val!),
+              // Jenis Reject (Required)
+              RejectTypeDropdown(
+                preselectId: widget.header?.idReject,
+                hintText: 'Pilih jenis Reject',
+                validator: (v) => v == null ? 'Wajib pilih jenis Reject' : null,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                onChanged: (rt) {
+                  _selectedType = rt;
+                },
+              ),
+
+              const SizedBox(height: 16),
+
+              // Berat (Optional)
+              SizedBox(
+                width: 300,
+                child: TextFormField(
+                  controller: beratCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'^\d*([.,]\d{0,3})?$'),
+                    ),
+                  ],
+                  decoration: InputDecoration(
+                    labelText: 'Berat (kg)',
+                    hintText: '0',
+                    prefixIcon: const Icon(Icons.monitor_weight_outlined),
+                    suffixText: 'kg',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    isDense: true,
+                  ),
+                  validator: (val) {
+                    final raw = (val ?? '').trim();
+                    if (raw.isEmpty) return null; // optional
+                    final s = raw.replaceAll(',', '.');
+                    final d = double.tryParse(s);
+                    if (d == null) return 'Format berat tidak valid.';
+                    if (d <= 0) return 'Berat harus > 0.';
+                    return null;
+                  },
+                  onEditingComplete: () {
+                    final s = beratCtrl.text.trim().replaceAll(',', '.');
+                    beratCtrl.text = s;
+                    FocusScope.of(context).unfocus();
+                  },
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: IgnorePointer(
-                    ignoring: !isInjectEnabled,
-                    child: Opacity(
-                      opacity: isInjectEnabled ? 1 : 0.6,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          InjectProductionDropdown(
-                            preselectNoProduksi: widget.header?.outputCode?.startsWith('S.') == true
-                                ? widget.header!.outputCode
-                                : null,
-                            date: _selectedDate,
-                            enabled: isInjectEnabled,
-                            onChanged: isInjectEnabled
-                                ? (ip) {
-                              if (_selectedMode != RejectInputMode.inject) {
-                                _selectMode(RejectInputMode.inject);
-                              }
-                              setState(() {
-                                injectCodeCtrl.text = ip?.noProduksi ?? '';
-                                _injectError = null;
-                              });
-                            }
-                                : null,
-                          ),
-                          if (_injectError != null) ...[
-                            const SizedBox(height: 6),
-                            Text(_injectError!, style: errorStyle),
+              ),
+
+              const SizedBox(height: 16),
+
+              // ===== INJECT (S.*****) =====
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Radio<RejectInputMode>(
+                    value: RejectInputMode.inject,
+                    groupValue: _selectedMode,
+                    onChanged: isEdit ? null : (val) => _selectMode(val!),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: IgnorePointer(
+                      ignoring: !isInjectEnabled,
+                      child: Opacity(
+                        opacity: isInjectEnabled ? 1 : 0.6,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            InjectProductionDropdown(
+                              preselectNoProduksi:
+                                  widget.header?.outputCode?.startsWith('S.') ==
+                                      true
+                                  ? widget.header!.outputCode
+                                  : null,
+                              date: _selectedDate,
+                              enabled: isInjectEnabled,
+                              onChanged: isInjectEnabled
+                                  ? (ip) {
+                                      if (_selectedMode !=
+                                          RejectInputMode.inject) {
+                                        _selectMode(RejectInputMode.inject);
+                                      }
+                                      setState(() {
+                                        injectCodeCtrl.text =
+                                            ip?.noProduksi ?? '';
+                                        _injectError = null;
+                                      });
+                                      if ((ip?.noProduksi ?? '').isNotEmpty) {
+                                        _fetchOutputs(ip!.noProduksi);
+                                      }
+                                    }
+                                  : null,
+                            ),
+                            if (_injectError != null) ...[
+                              const SizedBox(height: 6),
+                              Text(_injectError!, style: errorStyle),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // ===== HOT STAMPING (BH.*****) =====
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Radio<RejectInputMode>(
-                  value: RejectInputMode.hotStamping,
-                  groupValue: _selectedMode,
-                  onChanged: isEdit ? null : (val) => _selectMode(val!),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: IgnorePointer(
-                    ignoring: !isHotStampEnabled,
-                    child: Opacity(
-                      opacity: isHotStampEnabled ? 1 : 0.6,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          HotStampProductionDropdown(
-                            preselectNoProduksi: widget.header?.outputCode?.startsWith('BH.') == true
-                                ? widget.header!.outputCode
-                                : null,
-                            date: _selectedDate,
-                            enabled: isHotStampEnabled,
-                            onChanged: isHotStampEnabled
-                                ? (hs) {
-                              if (_selectedMode != RejectInputMode.hotStamping) {
-                                _selectMode(RejectInputMode.hotStamping);
-                              }
-                              setState(() {
-                                hotStampCodeCtrl.text = hs?.noProduksi ?? '';
-                                _hotStampError = null;
-                              });
-                            }
-                                : null,
-                          ),
-                          if (_hotStampError != null) ...[
-                            const SizedBox(height: 6),
-                            Text(_hotStampError!, style: errorStyle),
+              // ===== HOT STAMPING (BH.*****) =====
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Radio<RejectInputMode>(
+                    value: RejectInputMode.hotStamping,
+                    groupValue: _selectedMode,
+                    onChanged: isEdit ? null : (val) => _selectMode(val!),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: IgnorePointer(
+                      ignoring: !isHotStampEnabled,
+                      child: Opacity(
+                        opacity: isHotStampEnabled ? 1 : 0.6,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            HotStampProductionDropdown(
+                              preselectNoProduksi:
+                                  widget.header?.outputCode?.startsWith(
+                                        'BH.',
+                                      ) ==
+                                      true
+                                  ? widget.header!.outputCode
+                                  : null,
+                              date: _selectedDate,
+                              enabled: isHotStampEnabled,
+                              onChanged: isHotStampEnabled
+                                  ? (hs) {
+                                      if (_selectedMode !=
+                                          RejectInputMode.hotStamping) {
+                                        _selectMode(
+                                          RejectInputMode.hotStamping,
+                                        );
+                                      }
+                                      setState(() {
+                                        hotStampCodeCtrl.text =
+                                            hs?.noProduksi ?? '';
+                                        _hotStampError = null;
+                                      });
+                                      if ((hs?.noProduksi ?? '').isNotEmpty) {
+                                        _fetchOutputs(hs!.noProduksi);
+                                      }
+                                    }
+                                  : null,
+                            ),
+                            if (_hotStampError != null) ...[
+                              const SizedBox(height: 6),
+                              Text(_hotStampError!, style: errorStyle),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // ===== PASANG KUNCI (BI.*****) =====
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Radio<RejectInputMode>(
-                  value: RejectInputMode.pasangKunci,
-                  groupValue: _selectedMode,
-                  onChanged: isEdit ? null : (val) => _selectMode(val!),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: IgnorePointer(
-                    ignoring: !isKeyFittingEnabled,
-                    child: Opacity(
-                      opacity: isKeyFittingEnabled ? 1 : 0.6,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          KeyFittingProductionDropdown(
-                            preselectNoProduksi: widget.header?.outputCode?.startsWith('BI.') == true
-                                ? widget.header!.outputCode
-                                : null,
-                            date: _selectedDate,
-                            enabled: isKeyFittingEnabled,
-                            onChanged: isKeyFittingEnabled
-                                ? (kf) {
-                              if (_selectedMode != RejectInputMode.pasangKunci) {
-                                _selectMode(RejectInputMode.pasangKunci);
-                              }
-                              setState(() {
-                                keyFittingCodeCtrl.text = kf?.noProduksi ?? '';
-                                _keyFittingError = null;
-                              });
-                            }
-                                : null,
-                          ),
-                          if (_keyFittingError != null) ...[
-                            const SizedBox(height: 6),
-                            Text(_keyFittingError!, style: errorStyle),
+              // ===== PASANG KUNCI (BI.*****) =====
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Radio<RejectInputMode>(
+                    value: RejectInputMode.pasangKunci,
+                    groupValue: _selectedMode,
+                    onChanged: isEdit ? null : (val) => _selectMode(val!),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: IgnorePointer(
+                      ignoring: !isKeyFittingEnabled,
+                      child: Opacity(
+                        opacity: isKeyFittingEnabled ? 1 : 0.6,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            KeyFittingProductionDropdown(
+                              preselectNoProduksi:
+                                  widget.header?.outputCode?.startsWith(
+                                        'BI.',
+                                      ) ==
+                                      true
+                                  ? widget.header!.outputCode
+                                  : null,
+                              date: _selectedDate,
+                              enabled: isKeyFittingEnabled,
+                              onChanged: isKeyFittingEnabled
+                                  ? (kf) {
+                                      if (_selectedMode !=
+                                          RejectInputMode.pasangKunci) {
+                                        _selectMode(
+                                          RejectInputMode.pasangKunci,
+                                        );
+                                      }
+                                      setState(() {
+                                        keyFittingCodeCtrl.text =
+                                            kf?.noProduksi ?? '';
+                                        _keyFittingError = null;
+                                      });
+                                      if ((kf?.noProduksi ?? '').isNotEmpty) {
+                                        _fetchOutputs(kf!.noProduksi);
+                                      }
+                                    }
+                                  : null,
+                            ),
+                            if (_keyFittingError != null) ...[
+                              const SizedBox(height: 6),
+                              Text(_keyFittingError!, style: errorStyle),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // ===== SPANNER (BJ.*****) =====
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Radio<RejectInputMode>(
-                  value: RejectInputMode.spanner,
-                  groupValue: _selectedMode,
-                  onChanged: isEdit ? null : (val) => _selectMode(val!),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: IgnorePointer(
-                    ignoring: !isSpannerEnabled,
-                    child: Opacity(
-                      opacity: isSpannerEnabled ? 1 : 0.6,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SpannerProductionDropdown(
-                            preselectNoProduksi: widget.header?.outputCode?.startsWith('BJ.') == true
-                                ? widget.header!.outputCode
-                                : null,
-                            date: _selectedDate,
-                            enabled: isSpannerEnabled,
-                            onChanged: isSpannerEnabled
-                                ? (sp) {
-                              if (_selectedMode != RejectInputMode.spanner) {
-                                _selectMode(RejectInputMode.spanner);
-                              }
-                              setState(() {
-                                spannerCodeCtrl.text = sp?.noProduksi ?? '';
-                                _spannerError = null;
-                              });
-                            }
-                                : null,
-                          ),
-                          if (_spannerError != null) ...[
-                            const SizedBox(height: 6),
-                            Text(_spannerError!, style: errorStyle),
+              // ===== SPANNER (BJ.*****) =====
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Radio<RejectInputMode>(
+                    value: RejectInputMode.spanner,
+                    groupValue: _selectedMode,
+                    onChanged: isEdit ? null : (val) => _selectMode(val!),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: IgnorePointer(
+                      ignoring: !isSpannerEnabled,
+                      child: Opacity(
+                        opacity: isSpannerEnabled ? 1 : 0.6,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SpannerProductionDropdown(
+                              preselectNoProduksi:
+                                  widget.header?.outputCode?.startsWith(
+                                        'BJ.',
+                                      ) ==
+                                      true
+                                  ? widget.header!.outputCode
+                                  : null,
+                              date: _selectedDate,
+                              enabled: isSpannerEnabled,
+                              onChanged: isSpannerEnabled
+                                  ? (sp) {
+                                      if (_selectedMode !=
+                                          RejectInputMode.spanner) {
+                                        _selectMode(RejectInputMode.spanner);
+                                      }
+                                      setState(() {
+                                        spannerCodeCtrl.text =
+                                            sp?.noProduksi ?? '';
+                                        _spannerError = null;
+                                      });
+                                      if ((sp?.noProduksi ?? '').isNotEmpty) {
+                                        _fetchOutputs(sp!.noProduksi);
+                                      }
+                                    }
+                                  : null,
+                            ),
+                            if (_spannerError != null) ...[
+                              const SizedBox(height: 6),
+                              Text(_spannerError!, style: errorStyle),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // ===== BJ SORTIR (J.*****) =====
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Radio<RejectInputMode>(
-                  value: RejectInputMode.bjSortir,
-                  groupValue: _selectedMode,
-                  onChanged: isEdit ? null : (val) => _selectMode(val!),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: IgnorePointer(
-                    ignoring: !isSortirEnabled,
-                    child: Opacity(
-                      opacity: isSortirEnabled ? 1 : 0.6,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SortirRejectProductionDropdown(
-                            preselectNoBJSortir: widget.header?.outputCode?.startsWith('J.') == true
-                                ? widget.header!.outputCode
-                                : null,
-                            date: _selectedDate,
-                            enabled: isSortirEnabled,
-                            onChanged: isSortirEnabled
-                                ? (sr) {
-                              if (_selectedMode != RejectInputMode.bjSortir) {
-                                _selectMode(RejectInputMode.bjSortir);
-                              }
-                              setState(() {
-                                sortirCodeCtrl.text = sr?.noBJSortir ?? '';
-                                _sortirError = null;
-                              });
-                            }
-                                : null,
-                          ),
-                          if (_sortirError != null) ...[
-                            const SizedBox(height: 6),
-                            Text(_sortirError!, style: errorStyle),
+              // ===== BJ SORTIR (J.*****) =====
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Radio<RejectInputMode>(
+                    value: RejectInputMode.bjSortir,
+                    groupValue: _selectedMode,
+                    onChanged: isEdit ? null : (val) => _selectMode(val!),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: IgnorePointer(
+                      ignoring: !isSortirEnabled,
+                      child: Opacity(
+                        opacity: isSortirEnabled ? 1 : 0.6,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SortirRejectProductionDropdown(
+                              preselectNoBJSortir:
+                                  widget.header?.outputCode?.startsWith('J.') ==
+                                      true
+                                  ? widget.header!.outputCode
+                                  : null,
+                              date: _selectedDate,
+                              enabled: isSortirEnabled,
+                              onChanged: isSortirEnabled
+                                  ? (sr) {
+                                      if (_selectedMode !=
+                                          RejectInputMode.bjSortir) {
+                                        _selectMode(RejectInputMode.bjSortir);
+                                      }
+                                      setState(() {
+                                        sortirCodeCtrl.text =
+                                            sr?.noBJSortir ?? '';
+                                        _sortirError = null;
+                                      });
+                                      if ((sr?.noBJSortir ?? '').isNotEmpty) {
+                                        _fetchOutputs(sr!.noBJSortir);
+                                      }
+                                    }
+                                  : null,
+                            ),
+                            if (_sortirError != null) ...[
+                              const SizedBox(height: 6),
+                              Text(_sortirError!, style: errorStyle),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ]),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildOutputPanel() {
+    String title;
+    String? sourceCode;
+    String noSourceMessage;
+
+    switch (_selectedMode) {
+      case RejectInputMode.inject:
+        title = 'Output Reject';
+        sourceCode = injectCodeCtrl.text.trim().isEmpty
+            ? null
+            : injectCodeCtrl.text.trim();
+        noSourceMessage = 'Pilih Nomor Inject terlebih dahulu';
+        break;
+      case RejectInputMode.hotStamping:
+        title = 'Output Reject';
+        sourceCode = hotStampCodeCtrl.text.trim().isEmpty
+            ? null
+            : hotStampCodeCtrl.text.trim();
+        noSourceMessage = 'Pilih Nomor Hot Stamping terlebih dahulu';
+        break;
+      case RejectInputMode.pasangKunci:
+        title = 'Output Reject';
+        sourceCode = keyFittingCodeCtrl.text.trim().isEmpty
+            ? null
+            : keyFittingCodeCtrl.text.trim();
+        noSourceMessage = 'Pilih Nomor Pasang Kunci terlebih dahulu';
+        break;
+      case RejectInputMode.spanner:
+        title = 'Output Reject';
+        sourceCode = spannerCodeCtrl.text.trim().isEmpty
+            ? null
+            : spannerCodeCtrl.text.trim();
+        noSourceMessage = 'Pilih Nomor Spanner terlebih dahulu';
+        break;
+      case RejectInputMode.bjSortir:
+        title = 'Output Reject';
+        sourceCode = sortirCodeCtrl.text.trim().isEmpty
+            ? null
+            : sortirCodeCtrl.text.trim();
+        noSourceMessage = 'Pilih Nomor BJ Sortir terlebih dahulu';
+        break;
+      case null:
+        title = 'Output Reject';
+        sourceCode = null;
+        noSourceMessage = 'Pilih proses sumber terlebih dahulu';
+        break;
+    }
+
+    return LabelOutputPanel(
+      title: title,
+      isLoading: _loadingOutputs,
+      hasSource: sourceCode != null,
+      noSourceMessage: noSourceMessage,
+      items: _rejectOutputs
+          .map((o) => LabelOutputItem(code: o.noReject, isPrinted: o.isPrinted))
+          .toList(),
     );
   }
 
@@ -826,11 +1020,16 @@ class _RejectFormDialogState extends State<RejectFormDialog> {
         ElevatedButton(
           onPressed: _submit,
           style: ElevatedButton.styleFrom(
-            backgroundColor: isEdit ? const Color(0xFFF57C00) : const Color(0xFF00897B),
+            backgroundColor: isEdit
+                ? const Color(0xFFF57C00)
+                : const Color(0xFF00897B),
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
           ),
-          child: const Text('SIMPAN', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+          child: const Text(
+            'SIMPAN',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+          ),
         ),
       ],
     );

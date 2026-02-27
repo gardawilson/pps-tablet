@@ -1,3 +1,22 @@
+class WashingOutputItem {
+  final String noWashing;
+  final int hasBeenPrinted;
+
+  const WashingOutputItem({
+    required this.noWashing,
+    required this.hasBeenPrinted,
+  });
+
+  bool get isPrinted => hasBeenPrinted > 0;
+
+  factory WashingOutputItem.fromJson(Map<String, dynamic> json) {
+    return WashingOutputItem(
+      noWashing: (json['NoWashing'] ?? '').toString(),
+      hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 class WashingHeader {
   final String noWashing;
   final int idJenisPlastik;
@@ -25,6 +44,10 @@ class WashingHeader {
   final String? blok;
   final int? idLokasi;
 
+  final int hasBeenPrinted;
+
+  bool get isPrinted => hasBeenPrinted > 0;
+
   const WashingHeader({
     required this.noWashing,
     required this.idJenisPlastik,
@@ -47,6 +70,7 @@ class WashingHeader {
     this.noBongkarSusun,
     this.blok,
     this.idLokasi,
+    this.hasBeenPrinted = 0,
   });
 
   // Converter boolean yang robust
@@ -88,6 +112,7 @@ class WashingHeader {
       noBongkarSusun: json['NoBongkarSusun'],
       blok: json['Blok'],
       idLokasi: (json['IdLokasi'] as num?)?.toInt(),
+      hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -113,6 +138,7 @@ class WashingHeader {
     'NoBongkarSusun': noBongkarSusun,
     'Blok': blok,
     'IdLokasi': idLokasi,
+    'HasBeenPrinted': hasBeenPrinted,
   };
 
   WashingHeader copyWith({
@@ -137,6 +163,7 @@ class WashingHeader {
     String? noBongkarSusun,
     String? blok,
     int? idLokasi,
+    int? hasBeenPrinted,
   }) {
     return WashingHeader(
       noWashing: noWashing ?? this.noWashing,
@@ -160,6 +187,7 @@ class WashingHeader {
       noBongkarSusun: noBongkarSusun ?? this.noBongkarSusun,
       blok: blok ?? this.blok,
       idLokasi: idLokasi ?? this.idLokasi,
+      hasBeenPrinted: hasBeenPrinted ?? this.hasBeenPrinted,
     );
   }
 }

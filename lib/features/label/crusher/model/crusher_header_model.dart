@@ -1,21 +1,47 @@
 // lib/features/crusher/model/reject_header_model.dart
+
+class CrusherOutputItem {
+  final String noCrusher;
+  final int hasBeenPrinted;
+
+  const CrusherOutputItem({
+    required this.noCrusher,
+    required this.hasBeenPrinted,
+  });
+
+  bool get isPrinted => hasBeenPrinted > 0;
+
+  factory CrusherOutputItem.fromJson(Map<String, dynamic> json) {
+    return CrusherOutputItem(
+      noCrusher: (json['NoCrusher'] ?? '').toString(),
+      hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 class CrusherHeader {
   // Core
-  final String noCrusher;        // NoCrusher
-  final String dateCreate;       // DateCreate (ISO/string from API)
-  final int idCrusher;           // IdCrusher
-  final String? namaCrusher;     // NamaCrusher (join MstCrusher)
-  final int idWarehouse;         // IdWarehouse
-  final String? namaWarehouse;   // NamaWarehouse (join)
-  final String? blok;            // Blok
-  final String? idLokasi;        // IdLokasi (stringified)
-  final double? berat;           // Berat
-  final String statusText;       // PASS/HOLD
+  final String noCrusher; // NoCrusher
+  final String dateCreate; // DateCreate (ISO/string from API)
+  final int idCrusher; // IdCrusher
+  final String? namaCrusher; // NamaCrusher (join MstCrusher)
+  final int idWarehouse; // IdWarehouse
+  final String? namaWarehouse; // NamaWarehouse (join)
+  final String? blok; // Blok
+  final String? idLokasi; // IdLokasi (stringified)
+  final double? berat; // Berat
+  final String statusText; // PASS/HOLD
 
   // New joins
-  final String? crusherNoProduksi; // from CrusherProduksiOutput.NoCrusherProduksi
-  final String? crusherNamaMesin;  // from MstMesin.NamaMesin via CrusherProduksi_h
-  final String? noBongkarSusun;    // from BongkarSusunOutputCrusher.NoBongkarSusun
+  final String?
+  crusherNoProduksi; // from CrusherProduksiOutput.NoCrusherProduksi
+  final String?
+  crusherNamaMesin; // from MstMesin.NamaMesin via CrusherProduksi_h
+  final String? noBongkarSusun; // from BongkarSusunOutputCrusher.NoBongkarSusun
+
+  final int hasBeenPrinted;
+
+  bool get isPrinted => hasBeenPrinted > 0;
 
   const CrusherHeader({
     required this.noCrusher,
@@ -31,11 +57,12 @@ class CrusherHeader {
     this.crusherNoProduksi,
     this.crusherNamaMesin,
     this.noBongkarSusun,
+    this.hasBeenPrinted = 0,
   });
 
   // Optional convenience (e.g., for a unified “ref” display)
   String? get refNoProduksi => crusherNoProduksi;
-  String? get refNamaMesin  => crusherNamaMesin;
+  String? get refNamaMesin => crusherNamaMesin;
 
   factory CrusherHeader.fromJson(Map<String, dynamic> json) {
     double? _toDouble(dynamic v) {
@@ -68,6 +95,7 @@ class CrusherHeader {
       crusherNoProduksi: json['CrusherNoProduksi'],
       crusherNamaMesin: json['CrusherNamaMesin'],
       noBongkarSusun: json['NoBongkarSusun'],
+      hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -87,6 +115,7 @@ class CrusherHeader {
     'CrusherNoProduksi': crusherNoProduksi,
     'CrusherNamaMesin': crusherNamaMesin,
     'NoBongkarSusun': noBongkarSusun,
+    'HasBeenPrinted': hasBeenPrinted,
   };
 
   CrusherHeader copyWith({
@@ -103,6 +132,7 @@ class CrusherHeader {
     String? crusherNoProduksi,
     String? crusherNamaMesin,
     String? noBongkarSusun,
+    int? hasBeenPrinted,
   }) {
     return CrusherHeader(
       noCrusher: noCrusher ?? this.noCrusher,
@@ -118,6 +148,7 @@ class CrusherHeader {
       crusherNoProduksi: crusherNoProduksi ?? this.crusherNoProduksi,
       crusherNamaMesin: crusherNamaMesin ?? this.crusherNamaMesin,
       noBongkarSusun: noBongkarSusun ?? this.noBongkarSusun,
+      hasBeenPrinted: hasBeenPrinted ?? this.hasBeenPrinted,
     );
   }
 }

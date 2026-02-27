@@ -212,6 +212,84 @@ class GilinganRepository {
   }
 
 
+  /// Fetch gilingan outputs dari NoProduksi Gilingan
+  Future<List<GilinganOutputItem>> fetchOutputsByNoProduksi(
+    String noProduksi,
+  ) async {
+    final token = await TokenStorage.getToken();
+    final uri = Uri.parse(
+      "${ApiConstants.baseUrl}/api/production/gilingan/$noProduksi/outputs",
+    );
+    final resp = await http
+        .get(uri, headers: {'Authorization': 'Bearer $token'})
+        .timeout(_timeout);
+    if (resp.statusCode == 200) {
+      final body = json.decode(resp.body);
+      final List<dynamic> data = body['data'] ?? [];
+      return data
+          .map((e) => GilinganOutputItem.fromJson(e as Map<String, dynamic>))
+          .where((o) => o.noGilingan.isNotEmpty)
+          .toList();
+    }
+    throw Exception(
+      'Failed to fetch gilingan outputs (status: ${resp.statusCode})',
+    );
+  }
+
+  /// Fetch gilingan outputs dari NoBongkarSusun
+  Future<List<GilinganOutputItem>> fetchOutputsByNoBongkarSusun(
+    String noBongkarSusun,
+  ) async {
+    final token = await TokenStorage.getToken();
+    final uri = Uri.parse(
+      "${ApiConstants.baseUrl}/api/bongkar-susun/$noBongkarSusun/outputs/gilingan",
+    );
+    final resp = await http
+        .get(uri, headers: {'Authorization': 'Bearer $token'})
+        .timeout(_timeout);
+    if (resp.statusCode == 200) {
+      final body = json.decode(resp.body);
+      final List<dynamic> data = body['data'] ?? [];
+      return data
+          .map((e) => GilinganOutputItem.fromJson(e as Map<String, dynamic>))
+          .where((o) => o.noGilingan.isNotEmpty)
+          .toList();
+    }
+    throw Exception(
+      'Failed to fetch gilingan outputs by bongkar susun (status: ${resp.statusCode})',
+    );
+  }
+
+  /// Tandai gilingan sudah dicetak
+  Future<void> markAsPrinted(String noGilingan) async {
+    final token = await TokenStorage.getToken();
+    final uri = Uri.parse(
+      "${ApiConstants.baseUrl}/api/labels/gilingan/${Uri.encodeComponent(noGilingan)}/print",
+    );
+    final resp = await http
+        .patch(
+          uri,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        )
+        .timeout(_timeout);
+    print("🖨️ PATCH Mark As Printed Gilingan: $uri");
+    print("⬅️ Response [${resp.statusCode}]: ${resp.body}");
+    if (resp.statusCode != 200 && resp.statusCode != 204) {
+      final Map<String, dynamic> parsed = resp.body.isNotEmpty
+          ? json.decode(resp.body)
+          : {};
+      final msg =
+          (parsed['message'] ??
+                  parsed['error'] ??
+                  'Gagal mark as printed gilingan (status: ${resp.statusCode})')
+              .toString();
+      throw Exception(msg);
+    }
+  }
+
   /// Fetch partial info for one Gilingan (per NoGilingan)
   Future<GilinganPartialInfo> fetchPartialInfo({
     required String noGilingan,

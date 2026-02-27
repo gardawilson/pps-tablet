@@ -14,24 +14,16 @@ import '../../../../core/services/dialog_service.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../common/widgets/app_date_field.dart';
 
-import '../../../jenis_bonggolan/model/jenis_bonggolan_model.dart';
-import 'package:pps_tablet/features/jenis_bonggolan/widgets/jenis_bonggolan_dropdown.dart';
-
-import '../../../production/broker/widgets/broker_production_dropdown.dart';
-import 'package:pps_tablet/features/production/inject/widgets/inject_production_dropdown.dart';
-
+import '../../../../common/widgets/label_output_panel.dart';
 import '../model/crusher_header_model.dart';
+import '../repository/crusher_repository.dart';
 import '../view_model/crusher_view_model.dart';
 
 class CrusherFormDialog extends StatefulWidget {
   final CrusherHeader? header;
   final Function(CrusherHeader)? onSave;
 
-  const CrusherFormDialog({
-    super.key,
-    this.header,
-    this.onSave,
-  });
+  const CrusherFormDialog({super.key, this.header, this.onSave});
 
   @override
   State<CrusherFormDialog> createState() => _CrusherFormDialogState();
@@ -54,6 +46,10 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
   InputMode? _selectedMode;
   DateTime _selectedDate = DateTime.now();
 
+  // Output panel
+  List<CrusherOutputItem> _crusherOutputs = [];
+  bool _loadingOutputs = false;
+
   // Inline error text under process dropdowns
   String? _crusherProductionError;
   String? _bongkarSusunError;
@@ -73,15 +69,22 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
     );
 
     jenisCtrl = TextEditingController(text: widget.header?.namaCrusher ?? '');
-    warehouseCtrl = TextEditingController(text: widget.header?.namaWarehouse ?? '');
+    warehouseCtrl = TextEditingController(
+      text: widget.header?.namaWarehouse ?? '',
+    );
 
-    noCrusherProduksiCtrl = TextEditingController(text: widget.header?.crusherNoProduksi ?? '');
-    noBongkarSusunCtrl = TextEditingController(text: widget.header?.noBongkarSusun ?? '');
+    noCrusherProduksiCtrl = TextEditingController(
+      text: widget.header?.crusherNoProduksi ?? '',
+    );
+    noBongkarSusunCtrl = TextEditingController(
+      text: widget.header?.noBongkarSusun ?? '',
+    );
 
     beratCtrl = TextEditingController(
       text: (widget.header?.berat != null)
           ? widget.header!.berat!.toStringAsFixed(
-          widget.header!.berat! % 1 == 0 ? 0 : 3)
+              widget.header!.berat! % 1 == 0 ? 0 : 3,
+            )
           : '',
     );
 
@@ -94,12 +97,27 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
       _selectedMode = null;
     }
 
+    // Auto-fetch outputs on edit mode
+    if (isEdit) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_selectedMode == InputMode.crusherProduction &&
+            noCrusherProduksiCtrl.text.trim().isNotEmpty) {
+          _fetchOutputs(noCrusherProduksiCtrl.text.trim());
+        } else if (_selectedMode == InputMode.bongkarSusun &&
+            noBongkarSusunCtrl.text.trim().isNotEmpty) {
+          _fetchOutputs(noBongkarSusunCtrl.text.trim());
+        }
+      });
+    }
+
     // Clear inline error when user types
     noCrusherProduksiCtrl.addListener(() {
-      if (_crusherProductionError != null && mounted) setState(() => _crusherProductionError = null);
+      if (_crusherProductionError != null && mounted)
+        setState(() => _crusherProductionError = null);
     });
     noBongkarSusunCtrl.addListener(() {
-      if (_bongkarSusunError != null && mounted) setState(() => _bongkarSusunError = null);
+      if (_bongkarSusunError != null && mounted)
+        setState(() => _bongkarSusunError = null);
     });
   }
 
@@ -120,10 +138,32 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
   void _selectMode(InputMode m) {
     setState(() {
       _selectedMode = m;
-      // Keep previous values; just clear error messages for clean UX.
+      _crusherOutputs = [];
       _crusherProductionError = null;
       _bongkarSusunError = null;
     });
+  }
+
+  Future<void> _fetchOutputs(String code) async {
+    if (code.trim().isEmpty || _selectedMode == null) return;
+    setState(() => _loadingOutputs = true);
+    try {
+      final repo = CrusherRepository();
+      List<CrusherOutputItem> results;
+      switch (_selectedMode!) {
+        case InputMode.crusherProduction:
+          results = await repo.fetchOutputsByCrusherNoProduksi(code.trim());
+          break;
+        case InputMode.bongkarSusun:
+          results = await repo.fetchOutputsByNoBongkarSusun(code.trim());
+          break;
+      }
+      if (mounted) setState(() => _crusherOutputs = results);
+    } catch (_) {
+      if (mounted) setState(() => _crusherOutputs = []);
+    } finally {
+      if (mounted) setState(() => _loadingOutputs = false);
+    }
   }
 
   Future<void> _submit() async {
@@ -145,7 +185,9 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
       switch (_selectedMode!) {
         case InputMode.crusherProduction:
           if (noCrusherProduksiCtrl.text.trim().isEmpty) {
-            setState(() => _crusherProductionError = 'Pilih Nomor Proses Crusher');
+            setState(
+              () => _crusherProductionError = 'Pilih Nomor Proses Crusher',
+            );
             hasProcessError = true;
           }
           break;
@@ -175,10 +217,10 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
 
         await vm.updateFromForm(
           noCrusher: widget.header!.noCrusher,
-          dateCreate: _selectedDate,                 // DateTime?
-          idCrusher: _selectedJenis?.idCrusher,      // int? (null = keep)
-          idWarehouse: widget.header?.idWarehouse,   // hook up real picker later
-          berat: beratVal,                           // double?
+          dateCreate: _selectedDate, // DateTime?
+          idCrusher: _selectedJenis?.idCrusher, // int? (null = keep)
+          idWarehouse: widget.header?.idWarehouse, // hook up real picker later
+          berat: beratVal, // double?
           // Optional future fields:
           // idStatus: ...,
           // blok: ...,
@@ -199,22 +241,25 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
         final res = await vm.createFromForm(
           idCrusher: _selectedJenis?.idCrusher,
           dateCreate: _selectedDate,
-          idWarehouse: widget.header?.idWarehouse ?? 5, // TODO: ganti jika punya picker
+          idWarehouse:
+              widget.header?.idWarehouse ?? 5, // TODO: ganti jika punya picker
           berat: beratVal,
           mode: _selectedMode,
           // processed codes:
           noCrusherProduksi: noCrusherProduksiCtrl.text.trim().isEmpty
               ? null
-              : noCrusherProduksiCtrl.text.trim(),    // must start with "G."
+              : noCrusherProduksiCtrl.text.trim(), // must start with "G."
           noBongkarSusun: noBongkarSusunCtrl.text.trim().isEmpty
               ? null
-              : noBongkarSusunCtrl.text.trim(),       // must start with "BG."
+              : noBongkarSusunCtrl.text.trim(), // must start with "BG."
           toDbDateString: toDbDateString,
         );
 
         DialogService.instance.hideLoading();
 
-        final createdNo = res['data']?['header']?['NoCrusher']?.toString() ?? '-'; // ← PascalCase
+        final createdNo =
+            res['data']?['header']?['NoCrusher']?.toString() ??
+            '-'; // ← PascalCase
 
         await DialogService.instance.showSuccess(
           title: 'Berhasil',
@@ -223,10 +268,16 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const SizedBox(height: 6),
-              const Text('Nomor Crusher:', style: TextStyle(color: Colors.black54)),
+              const Text(
+                'Nomor Crusher:',
+                style: TextStyle(color: Colors.black54),
+              ),
               const SizedBox(height: 6),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.green.withOpacity(.08),
                   borderRadius: BorderRadius.circular(8),
@@ -249,17 +300,19 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
       }
     } catch (e) {
       DialogService.instance.hideLoading();
-      await DialogService.instance.showError(title: 'Error', message: e.toString());
+      await DialogService.instance.showError(
+        title: 'Error',
+        message: e.toString(),
+      );
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
+        constraints: const BoxConstraints(maxWidth: 900, maxHeight: 700),
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -270,7 +323,11 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(flex: 4, child: _buildLeftColumn()),
+                  Expanded(flex: 5, child: _buildLeftColumn()),
+                  const SizedBox(width: 12),
+                  const VerticalDivider(width: 1),
+                  const SizedBox(width: 12),
+                  Expanded(flex: 2, child: _buildOutputPanel()),
                 ],
               ),
             ),
@@ -307,10 +364,15 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
   }
 
   Widget _buildLeftColumn() {
-    final bool isCrusherProductionEnabled = !isEdit && _selectedMode == InputMode.crusherProduction;
-    final bool isBongkarEnabled = !isEdit && _selectedMode == InputMode.bongkarSusun;
+    final bool isCrusherProductionEnabled =
+        !isEdit && _selectedMode == InputMode.crusherProduction;
+    final bool isBongkarEnabled =
+        !isEdit && _selectedMode == InputMode.bongkarSusun;
 
-    final errorStyle = TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12);
+    final errorStyle = TextStyle(
+      color: Theme.of(context).colorScheme.error,
+      fontSize: 12,
+    );
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -321,204 +383,260 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
       child: Form(
         key: _formKey,
         child: SingleChildScrollView(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(
-              children: [
-                Icon(Icons.description, color: Colors.blue.shade700, size: 20),
-                const SizedBox(width: 8),
-                const Text('Header', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            CrusherTextField(
-              controller: noCrusherCtrl,
-              label: 'No Crusher',
-              icon: Icons.label,
-              asText: true, // readonly text
-            ),
-
-            const SizedBox(height: 16),
-
-            AppDateField(
-              controller: dateCreatedCtrl,
-              label: 'Date Created',
-              format: DateFormat('EEEE, dd MMM yyyy', 'id_ID'),
-              initialDate: _selectedDate,
-              // Date picker is always valid here; you can add extra rules if needed.
-              onChanged: (d) {
-                if (d != null) {
-                  setState(() {
-                    _selectedDate = d;
-                    dateCreatedCtrl.text = DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(d);
-                  });
-                }
-              },
-            ),
-
-            const SizedBox(height: 16),
-
-            // Jenis Crusher (Required)
-            CrusherTypeDropdown(
-              preselectId: widget.header?.idCrusher,
-              hintText: 'Pilih jenis crusher',                     // ← was bonggolan
-              validator: (v) => v == null ? 'Wajib pilih jenis crusher' : null, // ← wording
-              autovalidateMode: AutovalidateMode.onUserInteraction,
-              onChanged: (ct) {
-                _selectedJenis = ct;
-                jenisCtrl.text = ct?.namaCrusher ?? '';
-              },
-            ),
-
-            const SizedBox(height: 16),
-
-            // Berat (Required, numeric > 0)
-            SizedBox(
-              width: 300,
-              child: TextFormField(
-                controller: beratCtrl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d*([.,]\d{0,3})?$')),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.description,
+                    color: Colors.blue.shade700,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Header',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                 ],
-                decoration: InputDecoration(
-                  labelText: 'Berat (kg)',
-                  hintText: '0',
-                  prefixIcon: const Icon(Icons.monitor_weight_outlined),
-                  suffixText: 'kg',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  isDense: true,
-                ),
-                validator: (val) {
-                  final raw = (val ?? '').trim();
-                  if (raw.isEmpty) return 'Berat wajib diisi.';
-                  final s = raw.replaceAll(',', '.');
-                  final d = double.tryParse(s);
-                  if (d == null) return 'Format berat tidak valid.';
-                  if (d <= 0) return 'Berat harus > 0.';
-                  return null;
-                },
-                onEditingComplete: () {
-                  final s = beratCtrl.text.trim().replaceAll(',', '.');
-                  beratCtrl.text = s;
-                  FocusScope.of(context).unfocus();
+              ),
+              const SizedBox(height: 16),
+
+              CrusherTextField(
+                controller: noCrusherCtrl,
+                label: 'No Crusher',
+                icon: Icons.label,
+                asText: true, // readonly text
+              ),
+
+              const SizedBox(height: 16),
+
+              AppDateField(
+                controller: dateCreatedCtrl,
+                label: 'Date Created',
+                format: DateFormat('EEEE, dd MMM yyyy', 'id_ID'),
+                initialDate: _selectedDate,
+                // Date picker is always valid here; you can add extra rules if needed.
+                onChanged: (d) {
+                  if (d != null) {
+                    setState(() {
+                      _selectedDate = d;
+                      dateCreatedCtrl.text = DateFormat(
+                        'EEEE, dd MMM yyyy',
+                        'id_ID',
+                      ).format(d);
+                    });
+                  }
                 },
               ),
-            ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // ===== CRUSHER =====
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Radio<InputMode>(
-                  value: InputMode.crusherProduction,
-                  groupValue: _selectedMode,
-                  onChanged: isEdit ? null : (val) => _selectMode(val!),
+              // Jenis Crusher (Required)
+              CrusherTypeDropdown(
+                preselectId: widget.header?.idCrusher,
+                hintText: 'Pilih jenis crusher', // ← was bonggolan
+                validator: (v) =>
+                    v == null ? 'Wajib pilih jenis crusher' : null, // ← wording
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                onChanged: (ct) {
+                  _selectedJenis = ct;
+                  jenisCtrl.text = ct?.namaCrusher ?? '';
+                },
+              ),
+
+              const SizedBox(height: 16),
+
+              // Berat (Required, numeric > 0)
+              SizedBox(
+                width: 300,
+                child: TextFormField(
+                  controller: beratCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'^\d*([.,]\d{0,3})?$'),
+                    ),
+                  ],
+                  decoration: InputDecoration(
+                    labelText: 'Berat (kg)',
+                    hintText: '0',
+                    prefixIcon: const Icon(Icons.monitor_weight_outlined),
+                    suffixText: 'kg',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    isDense: true,
+                  ),
+                  validator: (val) {
+                    final raw = (val ?? '').trim();
+                    if (raw.isEmpty) return 'Berat wajib diisi.';
+                    final s = raw.replaceAll(',', '.');
+                    final d = double.tryParse(s);
+                    if (d == null) return 'Format berat tidak valid.';
+                    if (d <= 0) return 'Berat harus > 0.';
+                    return null;
+                  },
+                  onEditingComplete: () {
+                    final s = beratCtrl.text.trim().replaceAll(',', '.');
+                    beratCtrl.text = s;
+                    FocusScope.of(context).unfocus();
+                  },
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: IgnorePointer(
-                    ignoring: !isCrusherProductionEnabled,
-                    child: Opacity(
-                      opacity: isCrusherProductionEnabled ? 1 : 0.6,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          CrusherProductionDropdown(
-                            // ✅ use Crusher preselect props
-                            preselectNoCrusherProduksi: widget.header?.crusherNoProduksi,
-                            preselectNamaMesin: widget.header?.crusherNamaMesin,
+              ),
 
-                            // fetch mode needs a date
-                            date: _selectedDate,
+              const SizedBox(height: 16),
 
-                            // optional extra filters if you have them:
-                            // idMesinFilter: selectedIdMesin,
-                            // shiftFilter: selectedShiftString,
+              // ===== CRUSHER =====
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Radio<InputMode>(
+                    value: InputMode.crusherProduction,
+                    groupValue: _selectedMode,
+                    onChanged: isEdit ? null : (val) => _selectMode(val!),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: IgnorePointer(
+                      ignoring: !isCrusherProductionEnabled,
+                      child: Opacity(
+                        opacity: isCrusherProductionEnabled ? 1 : 0.6,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            CrusherProductionDropdown(
+                              // ✅ use Crusher preselect props
+                              preselectNoCrusherProduksi:
+                                  widget.header?.crusherNoProduksi,
+                              preselectNamaMesin:
+                                  widget.header?.crusherNamaMesin,
 
-                            enabled: isCrusherProductionEnabled,
-                            onChanged: isCrusherProductionEnabled
-                                ? (cp) {
-                              if (_selectedMode != InputMode.crusherProduction) {
-                                _selectMode(InputMode.crusherProduction);
-                              }
-                              setState(() {
-                                // ✅ set controller with the Crusher produksi number
-                                noCrusherProduksiCtrl.text = cp?.noCrusherProduksi ?? '';
+                              // fetch mode needs a date
+                              date: _selectedDate,
 
-                                // You can also capture outputs if needed:
-                                // final outputs = cp?.outputNoCrusherList ?? [];
+                              // optional extra filters if you have them:
+                              // idMesinFilter: selectedIdMesin,
+                              // shiftFilter: selectedShiftString,
+                              enabled: isCrusherProductionEnabled,
+                              onChanged: isCrusherProductionEnabled
+                                  ? (cp) {
+                                      if (_selectedMode !=
+                                          InputMode.crusherProduction) {
+                                        _selectMode(
+                                          InputMode.crusherProduction,
+                                        );
+                                      }
+                                      setState(() {
+                                        noCrusherProduksiCtrl.text =
+                                            cp?.noCrusherProduksi ?? '';
+                                        _crusherOutputs = [];
+                                        _crusherProductionError = null;
+                                      });
+                                      if ((cp?.noCrusherProduksi ?? '').isNotEmpty) {
+                                        _fetchOutputs(cp!.noCrusherProduksi);
+                                      }
+                                    }
+                                  : null,
+                            ),
 
-                                _crusherProductionError = null;
-                              });
-                            }
-                                : null,
-                          ),
-
-                          if (_crusherProductionError != null) ...[
-                            const SizedBox(height: 6),
-                            Text(_crusherProductionError!, style: errorStyle),
+                            if (_crusherProductionError != null) ...[
+                              const SizedBox(height: 6),
+                              Text(_crusherProductionError!, style: errorStyle),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // ===== BONGKAR =====
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Radio<InputMode>(
-                  value: InputMode.bongkarSusun,
-                  groupValue: _selectedMode,
-                  onChanged: isEdit ? null : (val) => _selectMode(val!),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: IgnorePointer(
-                    ignoring: !isBongkarEnabled,
-                    child: Opacity(
-                      opacity: isBongkarEnabled ? 1 : 0.6,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          BongkarSusunDropdown(
-                            preselectNoBongkarSusun: widget.header?.noBongkarSusun,
-                            date: _selectedDate,
-                            enabled: isBongkarEnabled,
-                            onChanged: isBongkarEnabled
-                                ? (bs) {
-                              if (_selectedMode != InputMode.bongkarSusun) {
-                                _selectMode(InputMode.bongkarSusun);
-                              }
-                              setState(() {
-                                noBongkarSusunCtrl.text = bs?.noBongkarSusun ?? '';
-                                _bongkarSusunError = null;
-                              });
-                            }
-                                : null,
-                          ),
-                          if (_bongkarSusunError != null) ...[
-                            const SizedBox(height: 6),
-                            Text(_bongkarSusunError!, style: errorStyle),
+              // ===== BONGKAR =====
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Radio<InputMode>(
+                    value: InputMode.bongkarSusun,
+                    groupValue: _selectedMode,
+                    onChanged: isEdit ? null : (val) => _selectMode(val!),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: IgnorePointer(
+                      ignoring: !isBongkarEnabled,
+                      child: Opacity(
+                        opacity: isBongkarEnabled ? 1 : 0.6,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            BongkarSusunDropdown(
+                              preselectNoBongkarSusun:
+                                  widget.header?.noBongkarSusun,
+                              date: _selectedDate,
+                              enabled: isBongkarEnabled,
+                              onChanged: isBongkarEnabled
+                                  ? (bs) {
+                                      if (_selectedMode !=
+                                          InputMode.bongkarSusun) {
+                                        _selectMode(InputMode.bongkarSusun);
+                                      }
+                                      setState(() {
+                                        noBongkarSusunCtrl.text =
+                                            bs?.noBongkarSusun ?? '';
+                                        _crusherOutputs = [];
+                                        _bongkarSusunError = null;
+                                      });
+                                      if ((bs?.noBongkarSusun ?? '').isNotEmpty) {
+                                        _fetchOutputs(bs!.noBongkarSusun);
+                                      }
+                                    }
+                                  : null,
+                            ),
+                            if (_bongkarSusunError != null) ...[
+                              const SizedBox(height: 6),
+                              Text(_bongkarSusunError!, style: errorStyle),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ]),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildOutputPanel() {
+    final sourceCode = _selectedMode == InputMode.crusherProduction
+        ? noCrusherProduksiCtrl.text.trim()
+        : noBongkarSusunCtrl.text.trim();
+
+    final noSourceMessage = _selectedMode == InputMode.crusherProduction
+        ? 'Pilih No Proses Crusher\nuntuk melihat output'
+        : _selectedMode == InputMode.bongkarSusun
+        ? 'Pilih No Bongkar Susun\nuntuk melihat output'
+        : 'Pilih sumber\nuntuk melihat output';
+
+    return LabelOutputPanel(
+      title: 'Output Crusher',
+      items: _crusherOutputs
+          .map((o) => LabelOutputItem(
+                code: o.noCrusher,
+                isPrinted: o.isPrinted,
+              ))
+          .toList(),
+      isLoading: _loadingOutputs,
+      hasSource: sourceCode.isNotEmpty,
+      noSourceMessage: noSourceMessage,
     );
   }
 
@@ -538,11 +656,16 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
         ElevatedButton(
           onPressed: _submit,
           style: ElevatedButton.styleFrom(
-            backgroundColor: isEdit ? const Color(0xFFF57C00) : const Color(0xFF00897B),
+            backgroundColor: isEdit
+                ? const Color(0xFFF57C00)
+                : const Color(0xFF00897B),
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
           ),
-          child: const Text('SIMPAN', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+          child: const Text(
+            'SIMPAN',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+          ),
         ),
       ],
     );

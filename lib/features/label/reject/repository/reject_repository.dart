@@ -6,6 +6,8 @@ import '../../../../core/network/api_client.dart';
 import '../model/reject_header_model.dart';
 import '../model/reject_partial_model.dart';
 
+// ignore_for_file: avoid_print
+
 class RejectRepository {
   final ApiClient api;
 
@@ -175,6 +177,118 @@ class RejectRepository {
       throw Exception(
         _friendlyError(e, 'Gagal menghapus Reject'),
       );
+    }
+  }
+
+  // =======================================================================
+  // GET outputs/reject by various production sources
+  // =======================================================================
+
+  Future<List<RejectOutputItem>> fetchOutputsByInjectNoProduksi(
+    String noProduksi,
+  ) async {
+    try {
+      final body = await api.getJson(
+        '/api/production/inject/$noProduksi/outputs/reject',
+      );
+      final List<dynamic> data = body['data'] ?? [];
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map((e) => RejectOutputItem.fromJson(e))
+          .where((o) => o.noReject.isNotEmpty)
+          .toList();
+    } on ApiException catch (e) {
+      throw Exception(_friendlyError(e, 'Gagal fetch output reject inject'));
+    }
+  }
+
+  Future<List<RejectOutputItem>> fetchOutputsByHotStampNoProduksi(
+    String noProduksi,
+  ) async {
+    try {
+      final body = await api.getJson(
+        '/api/production/hot-stamp/$noProduksi/outputs/reject',
+      );
+      final List<dynamic> data = body['data'] ?? [];
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map((e) => RejectOutputItem.fromJson(e))
+          .where((o) => o.noReject.isNotEmpty)
+          .toList();
+    } on ApiException catch (e) {
+      throw Exception(_friendlyError(e, 'Gagal fetch output reject hot stamp'));
+    }
+  }
+
+  Future<List<RejectOutputItem>> fetchOutputsByKeyFittingNoProduksi(
+    String noProduksi,
+  ) async {
+    try {
+      final body = await api.getJson(
+        '/api/production/key-fitting/$noProduksi/outputs/reject',
+      );
+      final List<dynamic> data = body['data'] ?? [];
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map((e) => RejectOutputItem.fromJson(e))
+          .where((o) => o.noReject.isNotEmpty)
+          .toList();
+    } on ApiException catch (e) {
+      throw Exception(
+        _friendlyError(e, 'Gagal fetch output reject pasang kunci'),
+      );
+    }
+  }
+
+  Future<List<RejectOutputItem>> fetchOutputsBySpannerNoProduksi(
+    String noProduksi,
+  ) async {
+    try {
+      final body = await api.getJson(
+        '/api/production/spanner/$noProduksi/outputs/reject',
+      );
+      final List<dynamic> data = body['data'] ?? [];
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map((e) => RejectOutputItem.fromJson(e))
+          .where((o) => o.noReject.isNotEmpty)
+          .toList();
+    } on ApiException catch (e) {
+      throw Exception(_friendlyError(e, 'Gagal fetch output reject spanner'));
+    }
+  }
+
+  Future<List<RejectOutputItem>> fetchOutputsBySortirRejectNoBJSortir(
+    String noBJSortir,
+  ) async {
+    try {
+      final body = await api.getJson(
+        '/api/production/sortir-reject/$noBJSortir/outputs/reject',
+      );
+      final List<dynamic> data = body['data'] ?? [];
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map((e) => RejectOutputItem.fromJson(e))
+          .where((o) => o.noReject.isNotEmpty)
+          .toList();
+    } on ApiException catch (e) {
+      throw Exception(
+        _friendlyError(e, 'Gagal fetch output reject sortir reject'),
+      );
+    }
+  }
+
+  // =======================================================================
+  // PATCH /api/labels/reject/:noReject/print
+  // =======================================================================
+  Future<void> markAsPrinted(String noReject) async {
+    try {
+      await api.patchJson(
+        '/api/labels/reject/${Uri.encodeComponent(noReject)}/print',
+      );
+      print('🖨️ PATCH Mark As Printed Reject: $noReject');
+    } on ApiException catch (e) {
+      throw Exception(_friendlyError(e, 'Gagal mark as printed reject'));
     }
   }
 

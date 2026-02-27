@@ -39,8 +39,10 @@ bool? asBool(dynamic v) {
   if (v == null) return null;
   if (v is bool) return v;
   final s = v.toString().toLowerCase().trim();
-  if (s == '1' || s == 'true' || s == 't' || s == 'yes' || s == 'y') return true;
-  if (s == '0' || s == 'false' || s == 'f' || s == 'no' || s == 'n') return false;
+  if (s == '1' || s == 'true' || s == 't' || s == 'yes' || s == 'y')
+    return true;
+  if (s == '0' || s == 'false' || s == 'f' || s == 'no' || s == 'n')
+    return false;
   return null;
 }
 
@@ -106,7 +108,9 @@ DateTime? pickDT(Map<String, dynamic> j, List<String> keys) {
     if (maybeNum != null) {
       final n = maybeNum.toInt();
       return DateTime.fromMillisecondsSinceEpoch(
-          n >= 1000000000000 ? n : n * 1000, isUtc: true);
+        n >= 1000000000000 ? n : n * 1000,
+        isUtc: true,
+      );
     }
     return null;
   }
@@ -114,7 +118,9 @@ DateTime? pickDT(Map<String, dynamic> j, List<String> keys) {
   if (v is num) {
     final n = v.toInt();
     return DateTime.fromMillisecondsSinceEpoch(
-        n >= 1000000000000 ? n : n * 1000, isUtc: true);
+      n >= 1000000000000 ? n : n * 1000,
+      isUtc: true,
+    );
   }
 
   return null;

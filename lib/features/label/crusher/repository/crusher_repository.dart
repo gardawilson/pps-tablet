@@ -150,6 +150,84 @@ class CrusherRepository {
     throw Exception('$msg (status: ${res.statusCode})');
   }
 
+  /// Fetch crusher outputs dari CrusherProduksi NoCrusherProduksi
+  Future<List<CrusherOutputItem>> fetchOutputsByCrusherNoProduksi(
+    String noCrusherProduksi,
+  ) async {
+    final token = await TokenStorage.getToken();
+    final uri = Uri.parse(
+      "${ApiConstants.baseUrl}/api/production/crusher/$noCrusherProduksi/outputs",
+    );
+    final resp = await http
+        .get(uri, headers: {'Authorization': 'Bearer $token'})
+        .timeout(_timeout);
+    if (resp.statusCode == 200) {
+      final body = json.decode(resp.body);
+      final List<dynamic> data = body['data'] ?? [];
+      return data
+          .map((e) => CrusherOutputItem.fromJson(e as Map<String, dynamic>))
+          .where((o) => o.noCrusher.isNotEmpty)
+          .toList();
+    }
+    throw Exception(
+      'Failed to fetch crusher outputs (status: ${resp.statusCode})',
+    );
+  }
+
+  /// Fetch crusher outputs dari NoBongkarSusun
+  Future<List<CrusherOutputItem>> fetchOutputsByNoBongkarSusun(
+    String noBongkarSusun,
+  ) async {
+    final token = await TokenStorage.getToken();
+    final uri = Uri.parse(
+      "${ApiConstants.baseUrl}/api/bongkar-susun/$noBongkarSusun/outputs/crusher",
+    );
+    final resp = await http
+        .get(uri, headers: {'Authorization': 'Bearer $token'})
+        .timeout(_timeout);
+    if (resp.statusCode == 200) {
+      final body = json.decode(resp.body);
+      final List<dynamic> data = body['data'] ?? [];
+      return data
+          .map((e) => CrusherOutputItem.fromJson(e as Map<String, dynamic>))
+          .where((o) => o.noCrusher.isNotEmpty)
+          .toList();
+    }
+    throw Exception(
+      'Failed to fetch crusher outputs by bongkar susun (status: ${resp.statusCode})',
+    );
+  }
+
+  /// Tandai crusher sudah dicetak
+  Future<void> markAsPrinted(String noCrusher) async {
+    final token = await TokenStorage.getToken();
+    final uri = Uri.parse(
+      "${ApiConstants.baseUrl}/api/labels/crusher/${Uri.encodeComponent(noCrusher)}/print",
+    );
+    final resp = await http
+        .patch(
+          uri,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        )
+        .timeout(_timeout);
+    print("🖨️ PATCH Mark As Printed Crusher: $uri");
+    print("⬅️ Response [${resp.statusCode}]: ${resp.body}");
+    if (resp.statusCode != 200 && resp.statusCode != 204) {
+      final Map<String, dynamic> parsed = resp.body.isNotEmpty
+          ? json.decode(resp.body)
+          : {};
+      final msg =
+          (parsed['message'] ??
+                  parsed['error'] ??
+                  'Gagal mark as printed crusher (status: ${resp.statusCode})')
+              .toString();
+      throw Exception(msg);
+    }
+  }
+
   // DELETE Crusher
   Future<Map<String, dynamic>> deleteCrusher(String noCrusher) async {
     final token = await TokenStorage.getToken();

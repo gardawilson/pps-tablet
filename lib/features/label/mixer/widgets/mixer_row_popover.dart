@@ -8,6 +8,7 @@ import '../../../../common/widgets/label_popover_widgets.dart';
 import '../../../../core/utils/pdf_print_service.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../model/mixer_header_model.dart';
+import '../repository/mixer_repository.dart';
 
 class MixerRowPopover extends StatefulWidget {
   final MixerHeader header;
@@ -82,6 +83,17 @@ class _MixerRowPopoverState extends State<MixerRowPopover> {
     final canEdit = perm.can('label_mixer:update');
     final canDelete = perm.can('label_mixer:delete');
 
+    final statusText = widget.header.statusText.trim().isEmpty
+        ? '-'
+        : widget.header.statusText.trim().toUpperCase();
+    final isPass = statusText == 'PASS';
+    final statusColor = isPass
+        ? const Color(0xFF1F845A)
+        : const Color(0xFFC9372C);
+    final blokText = (widget.header.blok ?? '').trim().isEmpty
+        ? null
+        : widget.header.blok!.trim();
+
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 240, maxWidth: 320),
       child: Material(
@@ -94,6 +106,7 @@ class _MixerRowPopoverState extends State<MixerRowPopover> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // ── Header ──
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -168,6 +181,16 @@ class _MixerRowPopoverState extends State<MixerRowPopover> {
                   ],
                 ),
               ),
+              // ── Status + QC panel ──
+              Container(
+                width: double.infinity,
+                color: atlasSurface,
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [_buildQCDataCard()],
+                ),
+              ),
               divider,
               LabelPopoverMenuTile(
                 icon: Icons.history_rounded,
@@ -203,15 +226,20 @@ class _MixerRowPopoverState extends State<MixerRowPopover> {
                   ).context;
 
                   final pdfService = PdfPrintService(
-                    baseUrl: 'http://192.168.10.100:3000',
                     defaultSystem: 'pps',
                   );
 
-                  await pdfService.printReport80mm(
+                  final success = await pdfService.directPrintReport80mm(
                     context: rootCtx,
                     reportName: 'CrLabelPalletMixer',
                     query: {'noMixer': widget.header.noMixer},
                   );
+
+                  if (success) {
+                    await MixerRepository().markAsPrinted(
+                      widget.header.noMixer,
+                    );
+                  }
                 }),
               ),
               divider,
@@ -229,6 +257,89 @@ class _MixerRowPopoverState extends State<MixerRowPopover> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQCDataCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFDCDFE4)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Quality Control',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF44546F),
+              letterSpacing: 0.2,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _buildQcDataItem('Moist 1', widget.header.moisture),
+              const SizedBox(width: 8),
+              _buildQcDataItem('Moist 2', widget.header.moisture2),
+              const SizedBox(width: 8),
+              _buildQcDataItem('Moist 3', widget.header.moisture3),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              _buildQcDataItem('Max Melt', widget.header.maxMeltTemp),
+              const SizedBox(width: 8),
+              _buildQcDataItem('Min Melt', widget.header.minMeltTemp),
+              const SizedBox(width: 8),
+              _buildQcDataItem('MFI', widget.header.mfi),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQcDataItem(String label, double? value) {
+    final displayValue = value != null ? value.toStringAsFixed(2) : '-';
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF7F8F9),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFEBECF0)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF6B778C),
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              displayValue,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF172B4D),
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ),
       ),
     );

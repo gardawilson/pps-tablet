@@ -23,6 +23,7 @@ import '../model/mixer_detail_model.dart';
 import '../model/mixer_header_model.dart';
 import 'mixer_text_field.dart';
 import '../view_model/mixer_view_model.dart';
+import '../repository/mixer_repository.dart';
 import '../../../shared/max_sak/max_sak_service.dart';
 
 class MixerFormDialog extends StatefulWidget {
@@ -57,6 +58,9 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
   /// - "S.XXXX"  → dari InjectProduksiOutputMixer
   /// - "BG.XXXX" → dari BongkarSusunOutputMixer
   String? _selectedOutputCode;
+
+  List<MixerOutputItem> _mixerOutputs = [];
+  bool _loadingOutputs = false;
 
   String _initialProductionLikeCode() {
     final output = (widget.header?.outputCode ?? '').trim();
@@ -122,6 +126,16 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
 
     // Saat EDIT, kita biarkan _selectedOutputCode = null
     // supaya update tidak menyentuh mapping outputCode di BE.
+
+    // Auto-fetch outputs on edit mode
+    if (widget.header != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final code = _selectedMode == InputMode.bongkar
+            ? _initialBongkarCode()
+            : _initialProductionLikeCode();
+        if (code.isNotEmpty) _fetchOutputs(code);
+      });
+    }
   }
 
   @override
@@ -134,6 +148,30 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
     super.dispose();
   }
 
+  Future<void> _fetchOutputs(String code) async {
+    if (code.trim().isEmpty) {
+      setState(() => _mixerOutputs = []);
+      return;
+    }
+    setState(() => _loadingOutputs = true);
+    try {
+      final repo = MixerRepository();
+      List<MixerOutputItem> outputs;
+      if (_selectedMode == InputMode.production) {
+        outputs = await repo.fetchOutputsByNoProduksiMixer(code.trim());
+      } else if (_selectedMode == InputMode.inject) {
+        outputs = await repo.fetchOutputsByNoProduksiInject(code.trim());
+      } else {
+        outputs = await repo.fetchOutputsByNoBongkarSusun(code.trim());
+      }
+      if (mounted) setState(() => _mixerOutputs = outputs);
+    } catch (_) {
+      if (mounted) setState(() => _mixerOutputs = []);
+    } finally {
+      if (mounted) setState(() => _loadingOutputs = false);
+    }
+  }
+
   bool get isEdit => widget.header != null;
 
   @override
@@ -141,7 +179,7 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 1000, maxHeight: 700),
+        constraints: const BoxConstraints(maxWidth: 900, maxHeight: 700),
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -152,13 +190,13 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // LEFT: Header form
-                  Expanded(flex: 4, child: _buildLeftColumn()),
+                  // LEFT: form + detail
+                  Expanded(flex: 5, child: _buildLeftColumn()),
                   const SizedBox(width: 24),
                   Container(width: 1, color: Colors.grey.shade300),
                   const SizedBox(width: 24),
-                  // RIGHT: Detail list
-                  Expanded(flex: 2, child: _buildRightColumn()),
+                  // RIGHT: output panel
+                  Expanded(flex: 2, child: _buildOutputPanel()),
                 ],
               ),
             ),
@@ -195,481 +233,687 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
     );
   }
 
-  // ===== LEFT COLUMN: HEADER FORM =====
+  // ===== LEFT COLUMN: HEADER FORM + DETAIL =====
   Widget _buildLeftColumn() {
     final bool isProductionEnabled =
         !isEdit && _selectedMode == InputMode.production;
     final bool isInjectEnabled = !isEdit && _selectedMode == InputMode.inject;
     final bool isBongkarEnabled = !isEdit && _selectedMode == InputMode.bongkar;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.description, color: Colors.blue.shade700, size: 20),
-                const SizedBox(width: 8),
-                const Text(
-                  "Header",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // No Mixer (readonly display)
-            MixerTextField(
-              controller: noMixerCtrl,
-              label: 'No Mixer',
-              icon: Icons.label,
-              asText: true,
-            ),
-            const SizedBox(height: 16),
-
-            // Date
-            AppDateField(
-              controller: dateCreatedCtrl,
-              label: 'Date Created',
-              format: DateFormat('EEEE, dd MMM yyyy', 'id_ID'),
-              initialDate: _selectedDate,
-              onChanged: (d) {
-                if (d != null) {
-                  setState(() {
-                    _selectedDate = d;
-                    dateCreatedCtrl.text = DateFormat(
-                      'EEEE, dd MMM yyyy',
-                      'id_ID',
-                    ).format(d);
-                  });
-                }
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Mixer type
-            MixerTypeDropdown(
-              preselectId: widget.header?.idMixer,
-              hintText: 'Pilih jenis mixer',
-              validator: (v) => v == null ? 'Wajib pilih jenis mixer' : null,
-              autovalidateMode: AutovalidateMode.onUserInteraction,
-              onChanged: (jp) {
-                _selectedType = jp;
-                jenisCtrl.text = jp?.jenis ?? '';
-              },
-            ),
-
-            const SizedBox(height: 16),
-
-            // ================== OUTPUT CODE SOURCE ==================
-            // Mode: Production (I.* → MixerProduksiOutput)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Radio<InputMode>(
-                  value: InputMode.production,
-                  groupValue: _selectedMode,
-                  onChanged: isEdit
-                      ? null
-                      : (val) {
-                          setState(() {
-                            _selectedMode = val!;
-                            // ganti mode → clear output code & bongkar
-                            _selectedOutputCode = null;
-                            noProduksiCtrl.clear();
-                            noBongkarSusunCtrl.clear();
-                          });
-                        },
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: IgnorePointer(
-                    ignoring: !isProductionEnabled,
-                    child: Opacity(
-                      opacity: isProductionEnabled ? 1 : 0.6,
-                      child: MixerProductionDropdown(
-                        preselectNoProduksi: isEdit
-                            ? (() {
-                                final code = _initialProductionLikeCode();
-                                return code.toUpperCase().startsWith('I.')
-                                    ? code
-                                    : null;
-                              })()
-                            : null,
-                        preselectNamaMesin: widget.header?.namaMesin,
-                        date: _selectedDate,
-                        enabled: isProductionEnabled,
-                        onChanged: isProductionEnabled
-                            ? (wp) {
-                                setState(() {
-                                  final code = (wp?.noProduksi ?? '').trim();
-                                  noProduksiCtrl.text = code;
-                                  // ASUMSI: wp.noProduksi sudah termasuk prefix "I."
-                                  _selectedOutputCode = code.isEmpty
-                                      ? null
-                                      : code;
-                                });
-                              }
-                            : null,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Mode: Inject (S.* → InjectProduksiOutputMixer)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Radio<InputMode>(
-                  value: InputMode.inject,
-                  groupValue: _selectedMode,
-                  onChanged: isEdit
-                      ? null
-                      : (val) {
-                          setState(() {
-                            _selectedMode = val!;
-                            _selectedOutputCode = null;
-                            noProduksiCtrl.clear();
-                            noBongkarSusunCtrl.clear();
-                          });
-                        },
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: IgnorePointer(
-                    ignoring: !isInjectEnabled,
-                    child: Opacity(
-                      opacity: isInjectEnabled ? 1 : 0.6,
-                      child: InjectProductionDropdown(
-                        preselectNoProduksi: isEdit
-                            ? (() {
-                                final code = _initialProductionLikeCode();
-                                return code.toUpperCase().startsWith('S.')
-                                    ? code
-                                    : null;
-                              })()
-                            : null,
-                        preselectNamaMesin: widget.header?.namaMesin,
-                        date: _selectedDate,
-                        enabled: isInjectEnabled,
-                        onChanged: isInjectEnabled
-                            ? (ip) {
-                                setState(() {
-                                  final code = (ip?.noProduksi ?? '').trim();
-                                  noProduksiCtrl.text = code;
-                                  // ASUMSI: ip.noProduksi sudah "S.000000..."
-                                  _selectedOutputCode = code.isEmpty
-                                      ? null
-                                      : code;
-                                });
-                              }
-                            : null,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Mode: Bongkar Susun (BG.* → BongkarSusunOutputMixer)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Radio<InputMode>(
-                  value: InputMode.bongkar,
-                  groupValue: _selectedMode,
-                  onChanged: isEdit
-                      ? null
-                      : (val) {
-                          setState(() {
-                            _selectedMode = val!;
-                            // ganti mode → clear output code & produksi/inject
-                            _selectedOutputCode = null;
-                            noProduksiCtrl.clear();
-                            noBongkarSusunCtrl.clear();
-                          });
-                        },
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: IgnorePointer(
-                    ignoring: !isBongkarEnabled,
-                    child: Opacity(
-                      opacity: isBongkarEnabled ? 1 : 0.6,
-                      child: BongkarSusunDropdown(
-                        preselectNoBongkarSusun: isEdit
-                            ? _initialBongkarCode()
-                            : null,
-                        date: _selectedDate,
-                        enabled: isBongkarEnabled,
-                        onChanged: isBongkarEnabled
-                            ? (bs) {
-                                setState(() {
-                                  final code = (bs?.noBongkarSusun ?? '')
-                                      .trim();
-                                  noBongkarSusunCtrl.text = code;
-
-                                  // ASUMSI: bs.noBongkarSusun sudah "BG.0000000X"
-                                  _selectedOutputCode = code.isEmpty
-                                      ? null
-                                      : code;
-                                });
-                              }
-                            : null,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ===== RIGHT COLUMN: DETAIL LIST =====
-  Widget _buildRightColumn() {
     final totalSak = detailList.length;
     final totalBerat = detailList.fold<double>(
       0,
       (a, b) => a + (b.berat ?? 0.0),
     );
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: CustomScrollView(
-        slivers: [
-          // Header
-          SliverToBoxAdapter(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ---- FORM (grey) ----
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  "Detail",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                Row(
+                  children: [
+                    Icon(
+                      Icons.description,
+                      color: Colors.blue.shade700,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      "Header",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // No Mixer (readonly display)
+                MixerTextField(
+                  controller: noMixerCtrl,
+                  label: 'No Mixer',
+                  icon: Icons.label,
+                  asText: true,
+                ),
+                const SizedBox(height: 16),
+
+                // Date
+                AppDateField(
+                  controller: dateCreatedCtrl,
+                  label: 'Date Created',
+                  format: DateFormat('EEEE, dd MMM yyyy', 'id_ID'),
+                  initialDate: _selectedDate,
+                  onChanged: (d) {
+                    if (d != null) {
+                      setState(() {
+                        _selectedDate = d;
+                        dateCreatedCtrl.text = DateFormat(
+                          'EEEE, dd MMM yyyy',
+                          'id_ID',
+                        ).format(d);
+                        noProduksiCtrl.clear();
+                        noBongkarSusunCtrl.clear();
+                        _mixerOutputs = [];
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Mixer type
+                MixerTypeDropdown(
+                  preselectId: widget.header?.idMixer,
+                  hintText: 'Pilih jenis mixer',
+                  validator: (v) =>
+                      v == null ? 'Wajib pilih jenis mixer' : null,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                  onChanged: (jp) {
+                    _selectedType = jp;
+                    jenisCtrl.text = jp?.jenis ?? '';
+                  },
+                ),
+
+                const SizedBox(height: 16),
+
+                // ================== OUTPUT CODE SOURCE ==================
+                // Mode: Production (I.* → MixerProduksiOutput)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Radio<InputMode>(
+                      value: InputMode.production,
+                      groupValue: _selectedMode,
+                      onChanged: isEdit
+                          ? null
+                          : (val) {
+                              setState(() {
+                                _selectedMode = val!;
+                                _selectedOutputCode = null;
+                                noProduksiCtrl.clear();
+                                noBongkarSusunCtrl.clear();
+                                _mixerOutputs = [];
+                              });
+                            },
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: IgnorePointer(
+                        ignoring: !isProductionEnabled,
+                        child: Opacity(
+                          opacity: isProductionEnabled ? 1 : 0.6,
+                          child: MixerProductionDropdown(
+                            preselectNoProduksi: isEdit
+                                ? (() {
+                                    final code = _initialProductionLikeCode();
+                                    return code.toUpperCase().startsWith('I.')
+                                        ? code
+                                        : null;
+                                  })()
+                                : null,
+                            preselectNamaMesin: widget.header?.namaMesin,
+                            date: _selectedDate,
+                            enabled: isProductionEnabled,
+                            onChanged: isProductionEnabled
+                                ? (wp) {
+                                    final code = (wp?.noProduksi ?? '').trim();
+                                    setState(() {
+                                      noProduksiCtrl.text = code;
+                                      _selectedOutputCode = code.isEmpty
+                                          ? null
+                                          : code;
+                                      _mixerOutputs = [];
+                                    });
+                                    if (code.isNotEmpty) _fetchOutputs(code);
+                                  }
+                                : null,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Mode: Inject (S.* → InjectProduksiOutputMixer)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Radio<InputMode>(
+                      value: InputMode.inject,
+                      groupValue: _selectedMode,
+                      onChanged: isEdit
+                          ? null
+                          : (val) {
+                              setState(() {
+                                _selectedMode = val!;
+                                _selectedOutputCode = null;
+                                noProduksiCtrl.clear();
+                                noBongkarSusunCtrl.clear();
+                                _mixerOutputs = [];
+                              });
+                            },
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: IgnorePointer(
+                        ignoring: !isInjectEnabled,
+                        child: Opacity(
+                          opacity: isInjectEnabled ? 1 : 0.6,
+                          child: InjectProductionDropdown(
+                            preselectNoProduksi: isEdit
+                                ? (() {
+                                    final code = _initialProductionLikeCode();
+                                    return code.toUpperCase().startsWith('S.')
+                                        ? code
+                                        : null;
+                                  })()
+                                : null,
+                            preselectNamaMesin: widget.header?.namaMesin,
+                            date: _selectedDate,
+                            enabled: isInjectEnabled,
+                            onChanged: isInjectEnabled
+                                ? (ip) {
+                                    final code = (ip?.noProduksi ?? '').trim();
+                                    setState(() {
+                                      noProduksiCtrl.text = code;
+                                      _selectedOutputCode = code.isEmpty
+                                          ? null
+                                          : code;
+                                      _mixerOutputs = [];
+                                    });
+                                    if (code.isNotEmpty) _fetchOutputs(code);
+                                  }
+                                : null,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Mode: Bongkar Susun (BG.* → BongkarSusunOutputMixer)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Radio<InputMode>(
+                      value: InputMode.bongkar,
+                      groupValue: _selectedMode,
+                      onChanged: isEdit
+                          ? null
+                          : (val) {
+                              setState(() {
+                                _selectedMode = val!;
+                                _selectedOutputCode = null;
+                                noProduksiCtrl.clear();
+                                noBongkarSusunCtrl.clear();
+                                _mixerOutputs = [];
+                              });
+                            },
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: IgnorePointer(
+                        ignoring: !isBongkarEnabled,
+                        child: Opacity(
+                          opacity: isBongkarEnabled ? 1 : 0.6,
+                          child: BongkarSusunDropdown(
+                            preselectNoBongkarSusun: isEdit
+                                ? _initialBongkarCode()
+                                : null,
+                            date: _selectedDate,
+                            enabled: isBongkarEnabled,
+                            onChanged: isBongkarEnabled
+                                ? (bs) {
+                                    final code = (bs?.noBongkarSusun ?? '')
+                                        .trim();
+                                    setState(() {
+                                      noBongkarSusunCtrl.text = code;
+                                      _selectedOutputCode = code.isEmpty
+                                          ? null
+                                          : code;
+                                      _mixerOutputs = [];
+                                    });
+                                    if (code.isNotEmpty) _fetchOutputs(code);
+                                  }
+                                : null,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const Divider(height: 24, thickness: 1),
+
+          // ---- DETAIL (white) ----
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title + Tambah button
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.list_alt,
+                          color: Colors.blue.shade700,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          "Detail",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => _addNewDetail(idBagian: 2),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Tambah'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                // Total bar
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.inventory_2,
+                            size: 20,
+                            color: Colors.blue.shade700,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '$totalSak',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        height: 30,
+                        width: 1,
+                        color: Colors.grey.shade300,
+                      ),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.scale,
+                            size: 20,
+                            color: Colors.blue.shade700,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${totalBerat.toStringAsFixed(2)} kg',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                ElevatedButton.icon(
-                  onPressed: () => _addNewDetail(idBagian: 2),
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Tambah'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                const SizedBox(height: 8),
+
+                // Table
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    children: [
+                      // Header table
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(8),
+                            topRight: Radius.circular(8),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 1,
+                              child: Text(
+                                'Sak',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              flex: 2,
+                              child: Text(
+                                'Berat (kg)',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(
+                              width: 100,
+                              child: Text(
+                                'Aksi',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: Colors.grey.shade300,
+                      ),
+                      if (detailList.isEmpty)
+                        _buildEmptyDetailState()
+                      else
+                        ListView.separated(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: detailList.length,
+                          separatorBuilder: (_, __) => Divider(
+                            height: 1,
+                            thickness: 1,
+                            color: Colors.grey.shade200,
+                          ),
+                          itemBuilder: (context, index) {
+                            final d = detailList[index];
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 0,
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    flex: 1,
+                                    child: Text(
+                                      '${d.noSak}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 2,
+                                    child: Text(
+                                      (d.berat ?? 0).toStringAsFixed(2),
+                                      style: const TextStyle(fontSize: 14),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: 100,
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        IconButton(
+                                          icon: Icon(
+                                            Icons.edit,
+                                            color: Colors.blue.shade600,
+                                            size: 20,
+                                          ),
+                                          onPressed: () =>
+                                              _editDetail(d, index),
+                                          constraints: const BoxConstraints(),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        IconButton(
+                                          icon: Icon(
+                                            Icons.delete,
+                                            color: Colors.red.shade600,
+                                            size: 20,
+                                          ),
+                                          onPressed: () => _deleteDetail(index),
+                                          constraints: const BoxConstraints(),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-          const SliverToBoxAdapter(child: SizedBox(height: 10)),
+        ],
+      ),
+    );
+  }
 
-          // Total bar
-          SliverToBoxAdapter(
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.inventory_2,
-                        size: 20,
-                        color: Colors.blue.shade700,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '$totalSak',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Container(height: 30, width: 1, color: Colors.grey.shade300),
-                  Row(
-                    children: [
-                      Icon(Icons.scale, size: 20, color: Colors.blue.shade700),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${totalBerat.toStringAsFixed(2)} kg',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+  // ===== RIGHT COLUMN: OUTPUT PANEL =====
+  Widget _buildOutputPanel() {
+    String emptyMessage;
+    String sourceCode;
+
+    switch (_selectedMode) {
+      case InputMode.production:
+        emptyMessage = 'Pilih No Produksi\nuntuk melihat output';
+        sourceCode = noProduksiCtrl.text.trim();
+        break;
+      case InputMode.inject:
+        emptyMessage = 'Pilih No Inject\nuntuk melihat output';
+        sourceCode = noProduksiCtrl.text.trim();
+        break;
+      case InputMode.bongkar:
+        emptyMessage = 'Pilih No Bongkar Susun\nuntuk melihat output';
+        sourceCode = noBongkarSusunCtrl.text.trim();
+        break;
+      default:
+        emptyMessage = 'Pilih sumber\nuntuk melihat output';
+        sourceCode = '';
+    }
+
+    final hasSource = sourceCode.isNotEmpty;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Panel header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
             ),
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: 8)),
-
-          // Table
-          SliverToBoxAdapter(
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                children: [
-                  // Header table
+            child: Row(
+              children: [
+                Icon(Icons.output, size: 18, color: Colors.indigo.shade400),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Output Mixer',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                if (hasSource)
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
+                      horizontal: 8,
+                      vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(8),
-                        topRight: Radius.circular(8),
-                      ),
+                      color: Colors.indigo.shade50,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: 1,
-                          child: Text(
-                            'Sak',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: Text(
-                            'Berat (kg)',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(
-                          width: 100,
-                          child: Text(
-                            'Aksi',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      '${_mixerOutputs.length}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.indigo.shade600,
+                      ),
                     ),
                   ),
-                  Divider(height: 1, thickness: 1, color: Colors.grey.shade300),
-                  if (detailList.isEmpty)
-                    _buildEmptyDetailState()
-                  else
-                    ListView.separated(
-                      padding: EdgeInsets.zero,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: detailList.length,
-                      separatorBuilder: (_, __) => Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: Colors.grey.shade200,
-                      ),
-                      itemBuilder: (context, index) {
-                        final d = detailList[index];
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 0,
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                flex: 1,
-                                child: Text(
-                                  '${d.noSak}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                flex: 2,
-                                child: Text(
-                                  (d.berat ?? 0).toStringAsFixed(2),
-                                  style: const TextStyle(fontSize: 14),
-                                ),
-                              ),
-                              SizedBox(
-                                width: 100,
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    IconButton(
-                                      icon: Icon(
-                                        Icons.edit,
-                                        color: Colors.blue.shade600,
-                                        size: 20,
-                                      ),
-                                      onPressed: () => _editDetail(d, index),
-                                      constraints: const BoxConstraints(),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    IconButton(
-                                      icon: Icon(
-                                        Icons.delete,
-                                        color: Colors.red.shade600,
-                                        size: 20,
-                                      ),
-                                      onPressed: () => _deleteDetail(index),
-                                      constraints: const BoxConstraints(),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                ],
-              ),
+              ],
             ),
           ),
-          const SliverToBoxAdapter(child: SizedBox(height: 8)),
+
+          // Content
+          Expanded(
+            child: _loadingOutputs
+                ? const Center(child: CircularProgressIndicator())
+                : !hasSource
+                ? _buildOutputEmptyState(
+                    icon: Icons.link_off,
+                    message: emptyMessage,
+                  )
+                : _mixerOutputs.isEmpty
+                ? _buildOutputEmptyState(
+                    icon: Icons.inbox_outlined,
+                    message: 'Belum ada\nlabel output',
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    itemCount: _mixerOutputs.length,
+                    separatorBuilder: (_, __) =>
+                        Divider(height: 1, color: Colors.grey.shade100),
+                    itemBuilder: (context, index) =>
+                        _buildOutputItem(_mixerOutputs[index]),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOutputItem(MixerOutputItem item) {
+    final printed = item.isPrinted;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              item.noMixer,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: printed ? Colors.green.shade50 : Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: printed ? Colors.green.shade300 : Colors.grey.shade300,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  printed ? Icons.print : Icons.print_outlined,
+                  size: 12,
+                  color: printed ? Colors.green.shade700 : Colors.grey.shade500,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  printed ? 'Printed' : 'Belum',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: printed
+                        ? Colors.green.shade700
+                        : Colors.grey.shade500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOutputEmptyState({
+    required IconData icon,
+    required String message,
+  }) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 40, color: Colors.grey.shade300),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+          ),
         ],
       ),
     );
@@ -739,7 +983,7 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
     String? beratError;
     String? jumlahSakError;
 
-    void _setJumlah(StateSetter setDialogState, int v) {
+    void setJumlah(StateSetter setDialogState, int v) {
       final clamped = v.clamp(1, remaining);
       setDialogState(() {
         jumlahSakCtrl.text = clamped.toString();
@@ -861,7 +1105,7 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                                   previewJumlah = 0;
                                 });
                               } else if (v > remaining) {
-                                _setJumlah(setDialogState, remaining);
+                                setJumlah(setDialogState, remaining);
                                 setDialogState(() {
                                   jumlahSakError =
                                       'Mencapai batas ($remaining sak)';
@@ -944,7 +1188,7 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                       hasError = true;
                     } else if (jumlahBaru > remaining) {
                       jumlahSakError = 'Tidak boleh > $remaining';
-                      _setJumlah(setDialogState, remaining);
+                      setJumlah(setDialogState, remaining);
                       hasError = true;
                     }
                   });

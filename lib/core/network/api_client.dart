@@ -178,6 +178,38 @@ class ApiClient {
     return _decodeJsonBody(resp);
   }
 
+  Future<Map<String, dynamic>> patchJson(
+    String path, {
+    Map<String, dynamic>? query,
+    Object? body,
+  }) async {
+    final url = _buildUri(path, query);
+    final headers = await _headers();
+
+    print('➡️ [PATCH] $url');
+    if (body != null) print('📦 Body: $body');
+
+    final resp = await _client
+        .patch(url, headers: headers, body: body != null ? json.encode(body) : null)
+        .timeout(_timeout);
+
+    print('⬅️ [${resp.statusCode}]');
+
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      throw ApiException(
+        resp.statusCode,
+        'PATCH $path failed',
+        responseBody: resp.body,
+      );
+    }
+
+    if (resp.statusCode == 204 || resp.body.isEmpty) {
+      return <String, dynamic>{};
+    }
+
+    return _decodeJsonBody(resp);
+  }
+
   /// Delete yang mungkin mengembalikan body (200) atau tidak (204).
   Future<Map<String, dynamic>> deleteJson(
     String path, {

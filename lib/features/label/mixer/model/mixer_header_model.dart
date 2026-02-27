@@ -1,3 +1,22 @@
+class MixerOutputItem {
+  final String noMixer;
+  final int hasBeenPrinted;
+
+  const MixerOutputItem({
+    required this.noMixer,
+    required this.hasBeenPrinted,
+  });
+
+  bool get isPrinted => hasBeenPrinted > 0;
+
+  factory MixerOutputItem.fromJson(Map<String, dynamic> json) {
+    return MixerOutputItem(
+      noMixer: (json['NoMixer'] ?? '').toString(),
+      hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 class MixerHeader {
   final String noMixer; // NoMixer
   final int idMixer; // IdMixer
@@ -45,6 +64,10 @@ class MixerHeader {
   final String? createBy; // CreateBy
   final String? dateTimeCreate; // DateTimeCreate
 
+  final int hasBeenPrinted;
+
+  bool get isPrinted => hasBeenPrinted > 0;
+
   const MixerHeader({
     required this.noMixer,
     required this.idMixer,
@@ -68,6 +91,7 @@ class MixerHeader {
     this.namaMesin,
     this.createBy,
     this.dateTimeCreate,
+    this.hasBeenPrinted = 0,
   });
 
   // ---- helpers ----
@@ -170,6 +194,7 @@ class MixerHeader {
 
       createBy: json['CreateBy']?.toString(),
       dateTimeCreate: json['DateTimeCreate']?.toString(),
+      hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -203,6 +228,7 @@ class MixerHeader {
 
     'CreateBy': createBy,
     'DateTimeCreate': dateTimeCreate,
+    'HasBeenPrinted': hasBeenPrinted,
   };
 
   MixerHeader copyWith({
@@ -228,6 +254,7 @@ class MixerHeader {
     String? namaMesin,
     String? createBy,
     String? dateTimeCreate,
+    int? hasBeenPrinted,
   }) {
     return MixerHeader(
       noMixer: noMixer ?? this.noMixer,
@@ -252,6 +279,7 @@ class MixerHeader {
       namaMesin: namaMesin ?? this.namaMesin,
       createBy: createBy ?? this.createBy,
       dateTimeCreate: dateTimeCreate ?? this.dateTimeCreate,
+      hasBeenPrinted: hasBeenPrinted ?? this.hasBeenPrinted,
     );
   }
 }

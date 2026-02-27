@@ -1,3 +1,22 @@
+class BrokerOutputItem {
+  final String noBroker;
+  final int hasBeenPrinted;
+
+  const BrokerOutputItem({
+    required this.noBroker,
+    required this.hasBeenPrinted,
+  });
+
+  bool get isPrinted => hasBeenPrinted > 0;
+
+  factory BrokerOutputItem.fromJson(Map<String, dynamic> json) {
+    return BrokerOutputItem(
+      noBroker: (json['NoBroker'] ?? '').toString(),
+      hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 class BrokerHeader {
   final String noBroker; // NoBroker
   final int idJenisPlastik; // IdJenisPlastik
@@ -37,6 +56,10 @@ class BrokerHeader {
   final String? createBy;
   final String? dateTimeCreate;
 
+  final int hasBeenPrinted;
+
+  bool get isPrinted => hasBeenPrinted > 0;
+
   const BrokerHeader({
     required this.noBroker,
     required this.idJenisPlastik,
@@ -63,6 +86,7 @@ class BrokerHeader {
     this.noBongkarSusun,
     this.createBy,
     this.dateTimeCreate,
+    this.hasBeenPrinted = 0,
   });
 
   static bool? _statusToBool(String? s) {
@@ -120,6 +144,7 @@ class BrokerHeader {
 
       createBy: json['CreateBy']?.toString(),
       dateTimeCreate: json['DateTimeCreate']?.toString(),
+      hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -154,6 +179,7 @@ class BrokerHeader {
 
     'CreateBy': createBy,
     'DateTimeCreate': dateTimeCreate,
+    'HasBeenPrinted': hasBeenPrinted,
   };
 
   BrokerHeader copyWith({
@@ -182,6 +208,7 @@ class BrokerHeader {
     String? noBongkarSusun,
     String? createBy,
     String? dateTimeCreate,
+    int? hasBeenPrinted,
   }) {
     return BrokerHeader(
       noBroker: noBroker ?? this.noBroker,
@@ -209,6 +236,7 @@ class BrokerHeader {
       noBongkarSusun: noBongkarSusun ?? this.noBongkarSusun,
       createBy: createBy ?? this.createBy,
       dateTimeCreate: dateTimeCreate ?? this.dateTimeCreate,
+      hasBeenPrinted: hasBeenPrinted ?? this.hasBeenPrinted,
     );
   }
 }

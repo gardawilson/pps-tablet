@@ -265,6 +265,94 @@ class WashingRepository {
     throw Exception('Gagal update QC washing (status: ${resp.statusCode})');
   }
 
+  /// Ambil list NoWashing yang sudah dibuat untuk suatu NoBongkarSusun
+  Future<List<WashingOutputItem>> fetchOutputsByNoBongkarSusun(
+    String noBongkarSusun,
+  ) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse(
+      "${ApiConstants.baseUrl}/api/bongkar-susun/$noBongkarSusun/outputs/washing",
+    );
+
+    print("➡️ Fetching Washing Outputs for NoBongkarSusun: $url");
+
+    final response = await http.get(
+      url,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    print("⬅️ Response [${response.statusCode}]: ${response.body}");
+
+    if (response.statusCode == 200) {
+      final body = json.decode(response.body);
+      final List<dynamic> data = body['data'] ?? [];
+      return data
+          .map((e) => WashingOutputItem.fromJson(e as Map<String, dynamic>))
+          .where((o) => o.noWashing.isNotEmpty)
+          .toList();
+    }
+    throw Exception(
+      'Gagal fetch outputs washing by NoBongkarSusun (status: ${response.statusCode})',
+    );
+  }
+
+  /// Ambil list NoWashing yang sudah dibuat untuk suatu NoProduksi
+  Future<List<WashingOutputItem>> fetchOutputsByNoProduksi(
+    String noProduksi,
+  ) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse(
+      "${ApiConstants.baseUrl}/api/production/washing/$noProduksi/outputs",
+    );
+
+    print("➡️ Fetching Washing Outputs for NoProduksi: $url");
+
+    final response = await http.get(
+      url,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    print("⬅️ Response [${response.statusCode}]: ${response.body}");
+
+    if (response.statusCode == 200) {
+      final body = json.decode(response.body);
+      final List<dynamic> data = body['data'] ?? [];
+      return data
+          .map((e) => WashingOutputItem.fromJson(e as Map<String, dynamic>))
+          .where((o) => o.noWashing.isNotEmpty)
+          .toList();
+    }
+    throw Exception(
+      'Gagal fetch outputs washing (status: ${response.statusCode})',
+    );
+  }
+
+  /// Tandai washing sudah dicetak
+  Future<void> markAsPrinted(String noWashing) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse(
+      "${ApiConstants.baseUrl}/api/labels/washing/$noWashing/print",
+    );
+
+    final resp = await http.patch(
+      url,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    print("🖨️ PATCH Mark As Printed: $url");
+    print("⬅️ Response [${resp.statusCode}]: ${resp.body}");
+
+    if (resp.statusCode != 200 && resp.statusCode != 204) {
+      final msg = (resp.body.isNotEmpty)
+          ? resp.body
+          : 'Gagal mark as printed (status: ${resp.statusCode})';
+      throw Exception(msg);
+    }
+  }
+
   /// Delete washing by NoWashing
   Future<void> deleteWashing(String noWashing) async {
     final token = await TokenStorage.getToken();

@@ -42,8 +42,8 @@ class FurnitureWipHeaderTable extends StatelessWidget {
   List<AtlasTableColumn<FurnitureWipHeader>> _buildColumns() {
     return [
       AtlasTableColumn<FurnitureWipHeader>(
-        title: 'NO. LABEL',
-        width: 170,
+        title: 'NO. FWIP',
+        width: 150,
         cellBuilder: (context, item, rowState) {
           return Row(
             children: [
@@ -78,7 +78,7 @@ class FurnitureWipHeaderTable extends StatelessWidget {
       ),
       AtlasTableColumn<FurnitureWipHeader>(
         title: 'JENIS',
-        width: 350,
+        width: 300,
         cellBuilder: (context, item, rowState) {
           return Text(
             item.namaFurnitureWip ?? '-',
@@ -158,12 +158,54 @@ class FurnitureWipHeaderTable extends StatelessWidget {
         width: 110,
         headerAlign: TextAlign.center,
         cellAlignment: Alignment.center,
-        showDivider: false,
         cellBuilder: (context, item, rowState) {
           return Text(
             _formatBlokLokasi(item.blok, item.idLokasi),
             style: TextStyle(fontSize: 14, color: rowState.textColor),
             softWrap: true,
+          );
+        },
+      ),
+      AtlasTableColumn<FurnitureWipHeader>(
+        title: 'PRINT',
+        width: 72,
+        showDivider: false,
+        cellBuilder: (context, item, rowState) {
+          final count = item.hasBeenPrinted;
+          if (count == 0) {
+            return Text(
+              '—',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade400),
+            );
+          }
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0C66E4).withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFF0C66E4).withValues(alpha: 0.30),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.print_rounded,
+                  size: 12,
+                  color: Color(0xFF0C66E4),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '${count}x',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0C66E4),
+                  ),
+                ),
+              ],
+            ),
           );
         },
       ),

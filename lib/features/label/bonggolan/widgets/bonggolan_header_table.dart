@@ -11,6 +11,7 @@ class BonggolanHeaderTable extends StatelessWidget {
   static const _colTanggalWidth = 108.0;
   static const _colBeratWidth = 92.0;
   static const _colLokasiWidth = 96.0;
+  static const _colPrintWidth = 72.0;
 
   final ScrollController scrollController;
   final ValueChanged<BonggolanHeader> onItemTap;
@@ -144,12 +145,54 @@ class BonggolanHeaderTable extends StatelessWidget {
       AtlasTableColumn<BonggolanHeader>(
         title: 'LOKASI',
         width: _colLokasiWidth,
-        showDivider: false,
         cellBuilder: (context, item, rowState) {
           return Text(
             _formatBlokLokasi(item.blok, item.idLokasi),
             style: TextStyle(fontSize: 14, color: rowState.textColor),
             softWrap: true,
+          );
+        },
+      ),
+      AtlasTableColumn<BonggolanHeader>(
+        title: 'PRINT',
+        width: _colPrintWidth,
+        showDivider: false,
+        cellBuilder: (context, item, rowState) {
+          final count = item.hasBeenPrinted;
+          if (count == 0) {
+            return Text(
+              '—',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade400),
+            );
+          }
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0C66E4).withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFF0C66E4).withValues(alpha: 0.30),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.print_rounded,
+                  size: 12,
+                  color: Color(0xFF0C66E4),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '${count}x',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0C66E4),
+                  ),
+                ),
+              ],
+            ),
           );
         },
       ),

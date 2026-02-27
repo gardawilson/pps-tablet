@@ -7,9 +7,11 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/label_popover_widgets.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/pdf_print_service.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../model/broker_header_model.dart';
+import '../repository/broker_repository.dart';
 
 class BrokerRowPopover extends StatefulWidget {
   final BrokerHeader header;
@@ -82,17 +84,6 @@ class _BrokerRowPopoverState extends State<BrokerRowPopover> {
     final perm = context.watch<PermissionViewModel>();
     final canEdit = perm.can('label_broker:update');
     final canDelete = perm.can('label_broker:delete');
-
-    final statusText = widget.header.statusText.trim().isEmpty
-        ? '-'
-        : widget.header.statusText.trim().toUpperCase();
-    final isPass = statusText == 'PASS';
-    final statusColor = isPass
-        ? const Color(0xFF1F845A)
-        : const Color(0xFFC9372C);
-    final warehouseText = (widget.header.namaWarehouse ?? '').trim().isEmpty
-        ? 'Warehouse -'
-        : widget.header.namaWarehouse!.trim();
 
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 240, maxWidth: 320),
@@ -186,28 +177,7 @@ class _BrokerRowPopoverState extends State<BrokerRowPopover> {
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        LabelPopoverStatusLozenge(
-                          label: statusText,
-                          color: statusColor,
-                          icon: isPass
-                              ? Icons.check_circle
-                              : Icons.pause_circle,
-                        ),
-                        LabelPopoverStatusLozenge(
-                          label: warehouseText,
-                          color: const Color(0xFF4B5563),
-                          icon: Icons.warehouse_outlined,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    _buildQCDataCard(),
-                  ],
+                  children: [_buildQCDataCard()],
                 ),
               ),
               divider,
@@ -245,15 +215,20 @@ class _BrokerRowPopoverState extends State<BrokerRowPopover> {
                   ).context;
 
                   final pdfService = PdfPrintService(
-                    baseUrl: 'http://192.168.10.100:3000',
                     defaultSystem: 'pps',
                   );
 
-                  await pdfService.printReport80mm(
+                  final success = await pdfService.directPrintReport80mm(
                     context: rootCtx,
                     reportName: 'CrLabelPalletBroker',
                     query: {'NoBroker': widget.header.noBroker},
                   );
+
+                  if (success) {
+                    await BrokerRepository(
+                      api: ApiClient(),
+                    ).markAsPrinted(widget.header.noBroker);
+                  }
                 }),
               ),
               divider,

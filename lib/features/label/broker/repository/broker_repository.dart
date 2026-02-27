@@ -169,6 +169,39 @@ class BrokerRepository {
     await api.deleteJson('/api/labels/broker/$noBroker');
   }
 
+  /// Ambil list NoBroker yang sudah dibuat untuk suatu NoBongkarSusun
+  Future<List<BrokerOutputItem>> fetchOutputsByNoBongkarSusun(
+    String noBongkarSusun,
+  ) async {
+    final body = await api.getJson(
+      '/api/bongkar-susun/$noBongkarSusun/outputs/broker',
+    );
+    final List<dynamic> data = body['data'] ?? [];
+    return data
+        .map((e) => BrokerOutputItem.fromJson(e as Map<String, dynamic>))
+        .where((o) => o.noBroker.isNotEmpty)
+        .toList();
+  }
+
+  /// Ambil list NoBroker yang sudah dibuat untuk suatu NoProduksi
+  Future<List<BrokerOutputItem>> fetchOutputsByNoProduksi(
+    String noProduksi,
+  ) async {
+    final body = await api.getJson(
+      '/api/production/broker/$noProduksi/outputs',
+    );
+    final List<dynamic> data = body['data'] ?? [];
+    return data
+        .map((e) => BrokerOutputItem.fromJson(e as Map<String, dynamic>))
+        .where((o) => o.noBroker.isNotEmpty)
+        .toList();
+  }
+
+  /// Tandai broker sudah dicetak
+  Future<void> markAsPrinted(String noBroker) async {
+    await api.patchJson('/api/labels/broker/$noBroker/print');
+  }
+
   Future<BrokerPartialInfo> fetchPartialInfo({
     required String noBroker,
     required int noSak,

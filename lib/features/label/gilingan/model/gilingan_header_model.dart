@@ -1,5 +1,24 @@
 // lib/features/gilingan/model/reject_header_model.dart
 
+class GilinganOutputItem {
+  final String noGilingan;
+  final int hasBeenPrinted;
+
+  const GilinganOutputItem({
+    required this.noGilingan,
+    required this.hasBeenPrinted,
+  });
+
+  bool get isPrinted => hasBeenPrinted > 0;
+
+  factory GilinganOutputItem.fromJson(Map<String, dynamic> json) {
+    return GilinganOutputItem(
+      noGilingan: (json['NoGilingan'] ?? '').toString(),
+      hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 class GilinganHeader {
   // Core
   final String noGilingan;     // NoGilingan
@@ -18,6 +37,10 @@ class GilinganHeader {
   final String? gilinganNamaMesin;  // dari MstMesin.NamaMesin via GilinganProduksi_h
   final String? noBongkarSusun;     // dari BongkarSusunOutputGilingan.NoBongkarSusun
 
+  final int hasBeenPrinted;
+
+  bool get isPrinted => hasBeenPrinted > 0;
+
   const GilinganHeader({
     required this.noGilingan,
     required this.dateCreate,
@@ -32,6 +55,7 @@ class GilinganHeader {
     this.gilinganNoProduksi,
     this.gilinganNamaMesin,
     this.noBongkarSusun,
+    this.hasBeenPrinted = 0,
   });
 
   // Convenience getters (optional, buat dipakai UI)
@@ -84,6 +108,7 @@ class GilinganHeader {
       gilinganNoProduksi: json['GilinganNoProduksi'],
       gilinganNamaMesin: json['GilinganNamaMesin'],
       noBongkarSusun: json['NoBongkarSusun'],
+      hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -101,6 +126,7 @@ class GilinganHeader {
     'GilinganNoProduksi': gilinganNoProduksi,
     'GilinganNamaMesin': gilinganNamaMesin,
     'NoBongkarSusun': noBongkarSusun,
+    'HasBeenPrinted': hasBeenPrinted,
   };
 
   GilinganHeader copyWith({
@@ -117,6 +143,7 @@ class GilinganHeader {
     String? gilinganNoProduksi,
     String? gilinganNamaMesin,
     String? noBongkarSusun,
+    int? hasBeenPrinted,
   }) {
     return GilinganHeader(
       noGilingan: noGilingan ?? this.noGilingan,
@@ -134,6 +161,7 @@ class GilinganHeader {
       gilinganNamaMesin:
       gilinganNamaMesin ?? this.gilinganNamaMesin,
       noBongkarSusun: noBongkarSusun ?? this.noBongkarSusun,
+      hasBeenPrinted: hasBeenPrinted ?? this.hasBeenPrinted,
     );
   }
 }

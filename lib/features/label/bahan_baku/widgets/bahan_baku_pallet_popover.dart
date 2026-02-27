@@ -12,19 +12,14 @@ class BahanBakuPalletPopover extends StatefulWidget {
   final BahanBakuPallet pallet;
   final VoidCallback onClose;
   final VoidCallback onInputQc;
-
-  final VoidCallback? onPrint;
-  final String apiBaseUrl;
-  final String? username;
+  final VoidCallback? onAfterPrint;
 
   const BahanBakuPalletPopover({
     super.key,
     required this.pallet,
     required this.onClose,
     required this.onInputQc,
-    this.onPrint,
-    this.apiBaseUrl = 'https://192.168.10.100:3000',
-    this.username,
+    this.onAfterPrint,
   });
 
   @override
@@ -52,48 +47,6 @@ class _BahanBakuPalletPopoverState extends State<BahanBakuPalletPopover> {
         setState(() => _copied = false);
       }
     });
-  }
-
-  Future<String?> _resolveUsername() async {
-    if (widget.username != null && widget.username!.trim().isNotEmpty) {
-      return widget.username!.trim();
-    }
-    return null;
-  }
-
-  Future<void> _defaultPrint(BuildContext context) async {
-    final rootCtx = Navigator.of(context, rootNavigator: true).context;
-    final u = await _resolveUsername();
-
-    final query = <String, String>{
-      'reportName': 'LabelPalletBB',
-      'NoBahanBaku': widget.pallet.noBahanBaku,
-      'NoPallet': widget.pallet.noPallet,
-      if (u != null) 'Username': u,
-    };
-
-    final base = widget.apiBaseUrl.replaceAll(RegExp(r'\/+$'), '');
-    final qs = query.entries
-        .map(
-          (e) =>
-              '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value)}',
-        )
-        .join('&');
-
-    final urlToLog = '$base/api/crystalreport/pps/export-pdf?$qs';
-    debugPrint('[BB-PRINT] $urlToLog');
-    debugPrint('[BB-PRINT] query=$query');
-
-    final pdfService = PdfPrintService(baseUrl: base, defaultSystem: 'pps');
-    await pdfService.printReport80mm(
-      context: rootCtx,
-      reportName: 'LabelPalletBB',
-      query: {
-        'NoBahanBaku': widget.pallet.noBahanBaku,
-        'NoPallet': widget.pallet.noPallet,
-        if (u != null) 'Username': u,
-      },
-    );
   }
 
   @override
@@ -224,10 +177,21 @@ class _BahanBakuPalletPopoverState extends State<BahanBakuPalletPopover> {
                 label: 'Print',
                 enabled: true,
                 onTap: () => _runAndClose(() async {
-                  if (widget.onPrint != null) {
-                    widget.onPrint!();
-                  } else {
-                    await _defaultPrint(context);
+                  final rootCtx = Navigator.of(
+                    context,
+                    rootNavigator: true,
+                  ).context;
+                  final pdfService = PdfPrintService(defaultSystem: 'pps');
+                  final success = await pdfService.directPrintReport80mm(
+                    context: rootCtx,
+                    reportName: 'LabelPalletBB',
+                    query: {
+                      'NoBahanBaku': widget.pallet.noBahanBaku,
+                      'NoPallet': widget.pallet.noPallet,
+                    },
+                  );
+                  if (success) {
+                    widget.onAfterPrint?.call();
                   }
                 }),
               ),

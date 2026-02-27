@@ -8,6 +8,7 @@ import '../../../../common/widgets/label_popover_widgets.dart';
 import '../../../../core/utils/pdf_print_service.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../model/bonggolan_header_model.dart';
+import '../repository/bonggolan_repository.dart';
 
 class BonggolanRowPopover extends StatefulWidget {
   final BonggolanHeader header;
@@ -205,15 +206,20 @@ class _BonggolanRowPopoverState extends State<BonggolanRowPopover> {
                   ).context;
 
                   final pdfService = PdfPrintService(
-                    baseUrl: 'http://192.168.10.100:3000',
                     defaultSystem: 'pps',
                   );
 
-                  await pdfService.printReport80mm(
+                  final success = await pdfService.directPrintReport80mm(
                     context: rootCtx,
                     reportName: 'CrLabelPalletBonggolan',
                     query: {'NoBonggolan': widget.header.noBonggolan},
                   );
+
+                  if (success) {
+                    await BonggolanRepository().markAsPrinted(
+                      widget.header.noBonggolan,
+                    );
+                  }
                 }),
               ),
               divider,

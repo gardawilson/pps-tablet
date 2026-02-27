@@ -26,8 +26,9 @@ import '../../../production/return/widgets/return_production_dropdown.dart';
 
 import '../../../production/spanner/widgets/spanner_production_dropdown.dart';
 
-
+import '../../../../common/widgets/label_output_panel.dart';
 import '../model/furniture_wip_header_model.dart';
+import '../repository/furniture_wip_repository.dart';
 import '../view_model/furniture_wip_view_model.dart';
 import 'furniture_wip_text_field.dart';
 
@@ -38,14 +39,10 @@ import '../../../furniture_wip_type/widgets/furniture_wip_type_dropdown.dart';
 class FurnitureWipFormDialog extends StatefulWidget {
   final FurnitureWipHeader? header;
 
-  const FurnitureWipFormDialog({
-    super.key,
-    this.header,
-  });
+  const FurnitureWipFormDialog({super.key, this.header});
 
   @override
-  State<FurnitureWipFormDialog> createState() =>
-      _FurnitureWipFormDialogState();
+  State<FurnitureWipFormDialog> createState() => _FurnitureWipFormDialogState();
 }
 
 class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
@@ -100,6 +97,10 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
   String? _spannerError;
   String? _injectError;
 
+  // Output panel
+  List<FurnitureWipOutputItem> _furnitureWipOutputs = [];
+  bool _loadingOutputs = false;
+
   bool get isEdit => widget.header != null;
 
   @override
@@ -112,8 +113,14 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
 
       if (isEdit) {
         // 🔹 EDIT mode inject: load data inject untuk auto-calc
-        if (_selectedMode == FurnitureWipInputMode.inject && _preInjectNoProduksi != null) {
+        if (_selectedMode == FurnitureWipInputMode.inject &&
+            _preInjectNoProduksi != null) {
           _reloadInjectFurnitureWipAndRecalc();
+        }
+        // 🔹 Auto-fetch outputs untuk edit mode
+        final code = (widget.header!.outputCode ?? '').trim();
+        if (code.isNotEmpty) {
+          _fetchOutputs(code);
         }
       } else {
         // 🔹 CREATE mode: reset cache
@@ -137,16 +144,16 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
     pcsCtrl = TextEditingController(
       text: (widget.header?.pcs != null)
           ? widget.header!.pcs!.toStringAsFixed(
-        widget.header!.pcs! % 1 == 0 ? 0 : 3,
-      )
+              widget.header!.pcs! % 1 == 0 ? 0 : 3,
+            )
           : '',
     );
 
     beratCtrl = TextEditingController(
       text: (widget.header?.berat != null)
           ? widget.header!.berat!.toStringAsFixed(
-        widget.header!.berat! % 1 == 0 ? 0 : 3,
-      )
+              widget.header!.berat! % 1 == 0 ? 0 : 3,
+            )
           : '',
     );
 
@@ -258,6 +265,7 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
   void _selectMode(FurnitureWipInputMode m) {
     setState(() {
       _selectedMode = m;
+      _furnitureWipOutputs = [];
 
       // Kalau pindah ke mode Inject di CREATE, kosongkan jenis dropdown
       if (!isEdit && m == FurnitureWipInputMode.inject) {
@@ -277,6 +285,42 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
     _onPcsChanged();
   }
 
+  Future<void> _fetchOutputs(String code) async {
+    if (!mounted || code.isEmpty) return;
+    setState(() => _loadingOutputs = true);
+    try {
+      final repo = FurnitureWipRepository();
+      List<FurnitureWipOutputItem> outputs;
+      switch (_selectedMode) {
+        case FurnitureWipInputMode.inject:
+          outputs = await repo.fetchOutputsByInjectNoProduksi(code);
+          break;
+        case FurnitureWipInputMode.hotStamping:
+          outputs = await repo.fetchOutputsByHotStampNoProduksi(code);
+          break;
+        case FurnitureWipInputMode.pasangKunci:
+          outputs = await repo.fetchOutputsByKeyFittingNoProduksi(code);
+          break;
+        case FurnitureWipInputMode.spanner:
+          outputs = await repo.fetchOutputsBySpannerNoProduksi(code);
+          break;
+        case FurnitureWipInputMode.bongkarSusun:
+          outputs = await repo.fetchOutputsByNoBongkarSusun(code);
+          break;
+        case FurnitureWipInputMode.retur:
+          outputs = await repo.fetchOutputsByNoRetur(code);
+          break;
+        case null:
+          outputs = [];
+      }
+      if (mounted) setState(() => _furnitureWipOutputs = outputs);
+    } catch (_) {
+      if (mounted) setState(() => _furnitureWipOutputs = []);
+    } finally {
+      if (mounted) setState(() => _loadingOutputs = false);
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -288,8 +332,7 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
 
     // Ambil ID jenis dari dropdown
     // Untuk INJECT create → selalu null (biar backend auto-mapping multi-label)
-    int? idFurnitureVal =
-    isInjectCreate ? null : _selectedType?.idCabinetWip;
+    int? idFurnitureVal = isInjectCreate ? null : _selectedType?.idCabinetWip;
 
     // EDIT → kalau user tidak ubah dropdown, biarkan null (service keep existing)
     if (isEdit && idFurnitureVal == null) {
@@ -334,7 +377,7 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
         await DialogService.instance.showSuccess(
           title: 'Tersimpan',
           message:
-          'Label ${widget.header!.noFurnitureWip} berhasil diperbarui.',
+              'Label ${widget.header!.noFurnitureWip} berhasil diperbarui.',
         );
         if (mounted) Navigator.pop(context);
       } else {
@@ -347,7 +390,7 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
           await DialogService.instance.showError(
             title: 'PILIH PROSES',
             message:
-            'Pilih sumber proses (Hot Stamping / Pasang Kunci / Bongkar Susun / Retur / Spanner / Inject).',
+                'Pilih sumber proses (Hot Stamping / Pasang Kunci / Bongkar Susun / Retur / Spanner / Inject).',
           );
           return;
         }
@@ -386,8 +429,7 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
           case FurnitureWipInputMode.pasangKunci:
             if (_selectedKeyFitting == null) {
               setState(() {
-                _keyFittingError =
-                'Pilih nomor produksi Key Fitting (BI.).';
+                _keyFittingError = 'Pilih nomor produksi Key Fitting (BI.).';
               });
               hasProcessError = true;
             } else {
@@ -420,8 +462,7 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
           case FurnitureWipInputMode.spanner:
             if (_selectedSpanner == null) {
               setState(() {
-                _spannerError =
-                'Pilih nomor BJ Sortir (Spanner / BJ.).';
+                _spannerError = 'Pilih nomor BJ Sortir (Spanner / BJ.).';
               });
               hasProcessError = true;
             } else {
@@ -445,14 +486,14 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
           // Inline error sudah muncul di bawah dropdown yang bermasalah
           await DialogService.instance.showError(
             title: 'NOMOR LABEL SUMBER',
-            message:
-            'Lengkapi pilihan nomor sumber untuk proses yang dipilih.',
+            message: 'Lengkapi pilihan nomor sumber untuk proses yang dipilih.',
           );
           return;
         }
 
         // 🔹 VALIDASI untuk mode INJECT (CREATE & EDIT)
-        if (isInjectCreate || (isEdit && _selectedMode == FurnitureWipInputMode.inject)) {
+        if (isInjectCreate ||
+            (isEdit && _selectedMode == FurnitureWipInputMode.inject)) {
           final injectVm = context.read<InjectProductionViewModel>();
           final totalBerat = injectVm.furnitureWipBeratProdukHasilTimbang;
 
@@ -460,7 +501,7 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
             DialogService.instance.showError(
               title: 'DATA INJECT TIDAK LENGKAP',
               message:
-              'Berat produk hasil timbang dari Inject belum tersedia atau 0.\n'
+                  'Berat produk hasil timbang dari Inject belum tersedia atau 0.\n'
                   'Pastikan data Inject sudah lengkap sebelum menyimpan Furniture WIP.',
             );
             return;
@@ -470,7 +511,7 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
             DialogService.instance.showError(
               title: 'PCS TIDAK VALID',
               message:
-              'PCS wajib diisi dan harus lebih besar dari 0 untuk perhitungan berat otomatis.',
+                  'PCS wajib diisi dan harus lebih besar dari 0 untuk perhitungan berat otomatis.',
             );
             return;
           }
@@ -509,16 +550,14 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
         final data = res['data'] as Map<String, dynamic>? ?? {};
         final List headers = data['headers'] as List? ?? [];
         final output = data['output'] as Map<String, dynamic>? ?? {};
-        final int count =
-            (output['count'] as int?) ?? headers.length;
+        final int count = (output['count'] as int?) ?? headers.length;
 
         Widget extraWidget;
 
         if (headers.isEmpty) {
           extraWidget = const SizedBox.shrink();
         } else if (headers.length == 1) {
-          final no =
-              headers.first['NoFurnitureWIP']?.toString() ?? '-';
+          final no = headers.first['NoFurnitureWIP']?.toString() ?? '-';
           extraWidget = Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -530,13 +569,13 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
               const SizedBox(height: 6),
               Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 8),
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.green.withOpacity(.08),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: Colors.green.withOpacity(.35),
-                  ),
+                  border: Border.all(color: Colors.green.withOpacity(.35)),
                 ),
                 child: Text(
                   no,
@@ -563,22 +602,20 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
               const SizedBox(height: 6),
               Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 8),
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.green.withOpacity(.08),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: Colors.green.withOpacity(.35),
-                  ),
+                  border: Border.all(color: Colors.green.withOpacity(.35)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: headers.map((h) {
-                    final no =
-                        h['NoFurnitureWIP']?.toString() ?? '-';
+                    final no = h['NoFurnitureWIP']?.toString() ?? '-';
                     return Padding(
-                      padding:
-                      const EdgeInsets.symmetric(vertical: 2),
+                      padding: const EdgeInsets.symmetric(vertical: 2),
                       child: Text(
                         '• $no',
                         style: const TextStyle(
@@ -607,8 +644,10 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
       }
     } catch (e) {
       DialogService.instance.hideLoading();
-      await DialogService.instance
-          .showError(title: 'Error', message: e.toString());
+      await DialogService.instance.showError(
+        title: 'Error',
+        message: e.toString(),
+      );
     }
   }
 
@@ -617,7 +656,7 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
+        constraints: const BoxConstraints(maxWidth: 900, maxHeight: 700),
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -628,7 +667,11 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(flex: 4, child: _buildLeftColumn()),
+                  Expanded(flex: 5, child: _buildLeftColumn()),
+                  const SizedBox(width: 24),
+                  Container(width: 1, color: Colors.grey.shade300),
+                  const SizedBox(width: 24),
+                  Expanded(flex: 2, child: _buildOutputPanel()),
                 ],
               ),
             ),
@@ -706,13 +749,15 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.description,
-                      color: Colors.blue.shade700, size: 20),
+                  Icon(
+                    Icons.description,
+                    color: Colors.blue.shade700,
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   const Text(
                     'Header',
-                    style:
-                    TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
@@ -739,8 +784,9 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
                     setState(() {
                       _selectedDate = d;
                       dateCreatedCtrl.text = DateFormat(
-                          'EEEE, dd MMM yyyy', 'id_ID')
-                          .format(d);
+                        'EEEE, dd MMM yyyy',
+                        'id_ID',
+                      ).format(d);
                     });
                   }
                 },
@@ -753,10 +799,7 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
               // ==========================
               const Text(
                 'Proses',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
 
@@ -785,18 +828,20 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
                               enabled: isInjectEnabled,
                               onChanged: isInjectEnabled
                                   ? (ip) {
-                                if (_selectedMode !=
-                                    FurnitureWipInputMode.inject) {
-                                  _selectMode(
-                                      FurnitureWipInputMode.inject);
-                                }
-                                setState(() {
-                                  _selectedInject = ip;
-                                  _injectError = null;
-                                });
-                                // 🔹 Fetch furniture wip baru untuk Inject terpilih + recalc berat
-                                _reloadInjectFurnitureWipAndRecalc();
-                              }
+                                      if (_selectedMode !=
+                                          FurnitureWipInputMode.inject) {
+                                        _selectMode(
+                                          FurnitureWipInputMode.inject,
+                                        );
+                                      }
+                                      setState(() {
+                                        _selectedInject = ip;
+                                        _injectError = null;
+                                      });
+                                      // 🔹 Fetch furniture wip baru untuk Inject terpilih + recalc berat
+                                      _reloadInjectFurnitureWipAndRecalc();
+                                      _fetchOutputs(ip?.noProduksi ?? '');
+                                    }
                                   : null,
                             ),
                             if (_injectError != null) ...[
@@ -838,17 +883,18 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
                               enabled: isHotStampEnabled,
                               onChanged: isHotStampEnabled
                                   ? (hs) {
-                                if (_selectedMode !=
-                                    FurnitureWipInputMode
-                                        .hotStamping) {
-                                  _selectMode(FurnitureWipInputMode
-                                      .hotStamping);
-                                }
-                                setState(() {
-                                  _selectedHotStamp = hs;
-                                  _hotStampError = null;
-                                });
-                              }
+                                      if (_selectedMode !=
+                                          FurnitureWipInputMode.hotStamping) {
+                                        _selectMode(
+                                          FurnitureWipInputMode.hotStamping,
+                                        );
+                                      }
+                                      setState(() {
+                                        _selectedHotStamp = hs;
+                                        _hotStampError = null;
+                                      });
+                                      _fetchOutputs(hs?.noProduksi ?? '');
+                                    }
                                   : null,
                             ),
                             if (_hotStampError != null) ...[
@@ -884,25 +930,24 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             KeyFittingProductionDropdown(
-                              preselectNoProduksi:
-                              _preKeyFittingNoProduksi,
-                              preselectNamaMesin:
-                              _preKeyFittingNamaMesin,
+                              preselectNoProduksi: _preKeyFittingNoProduksi,
+                              preselectNamaMesin: _preKeyFittingNamaMesin,
                               date: _selectedDate,
                               enabled: isKeyFittingEnabled,
                               onChanged: isKeyFittingEnabled
                                   ? (kf) {
-                                if (_selectedMode !=
-                                    FurnitureWipInputMode
-                                        .pasangKunci) {
-                                  _selectMode(FurnitureWipInputMode
-                                      .pasangKunci);
-                                }
-                                setState(() {
-                                  _selectedKeyFitting = kf;
-                                  _keyFittingError = null;
-                                });
-                              }
+                                      if (_selectedMode !=
+                                          FurnitureWipInputMode.pasangKunci) {
+                                        _selectMode(
+                                          FurnitureWipInputMode.pasangKunci,
+                                        );
+                                      }
+                                      setState(() {
+                                        _selectedKeyFitting = kf;
+                                        _keyFittingError = null;
+                                      });
+                                      _fetchOutputs(kf?.noProduksi ?? '');
+                                    }
                                   : null,
                             ),
                             if (_keyFittingError != null) ...[
@@ -944,16 +989,18 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
                               enabled: isSpannerEnabled,
                               onChanged: isSpannerEnabled
                                   ? (sp) {
-                                if (_selectedMode !=
-                                    FurnitureWipInputMode.spanner) {
-                                  _selectMode(
-                                      FurnitureWipInputMode.spanner);
-                                }
-                                setState(() {
-                                  _selectedSpanner = sp;
-                                  _spannerError = null;
-                                });
-                              }
+                                      if (_selectedMode !=
+                                          FurnitureWipInputMode.spanner) {
+                                        _selectMode(
+                                          FurnitureWipInputMode.spanner,
+                                        );
+                                      }
+                                      setState(() {
+                                        _selectedSpanner = sp;
+                                        _spannerError = null;
+                                      });
+                                      _fetchOutputs(sp?.noProduksi ?? '');
+                                    }
                                   : null,
                             ),
                             if (_spannerError != null) ...[
@@ -990,22 +1037,23 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
                           children: [
                             BongkarSusunDropdown(
                               preselectNoBongkarSusun:
-                              _preBongkarNoBongkarSusun,
+                                  _preBongkarNoBongkarSusun,
                               date: _selectedDate,
                               enabled: isBongkarEnabled,
                               onChanged: isBongkarEnabled
                                   ? (bs) {
-                                if (_selectedMode !=
-                                    FurnitureWipInputMode
-                                        .bongkarSusun) {
-                                  _selectMode(FurnitureWipInputMode
-                                      .bongkarSusun);
-                                }
-                                setState(() {
-                                  _selectedBongkar = bs;
-                                  _bongkarError = null;
-                                });
-                              }
+                                      if (_selectedMode !=
+                                          FurnitureWipInputMode.bongkarSusun) {
+                                        _selectMode(
+                                          FurnitureWipInputMode.bongkarSusun,
+                                        );
+                                      }
+                                      setState(() {
+                                        _selectedBongkar = bs;
+                                        _bongkarError = null;
+                                      });
+                                      _fetchOutputs(bs?.noBongkarSusun ?? '');
+                                    }
                                   : null,
                             ),
                             if (_bongkarError != null) ...[
@@ -1047,16 +1095,18 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
                               enabled: isReturEnabled,
                               onChanged: isReturEnabled
                                   ? (ret) {
-                                if (_selectedMode !=
-                                    FurnitureWipInputMode.retur) {
-                                  _selectMode(
-                                      FurnitureWipInputMode.retur);
-                                }
-                                setState(() {
-                                  _selectedReturBj = ret;
-                                  _returError = null;
-                                });
-                              }
+                                      if (_selectedMode !=
+                                          FurnitureWipInputMode.retur) {
+                                        _selectMode(
+                                          FurnitureWipInputMode.retur,
+                                        );
+                                      }
+                                      setState(() {
+                                        _selectedReturBj = ret;
+                                        _returError = null;
+                                      });
+                                      _fetchOutputs(ret?.noRetur ?? '');
+                                    }
                                   : null,
                             ),
                             if (_returError != null) ...[
@@ -1076,12 +1126,11 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
               // ==========================
               // Jenis Furniture WIP
               // ==========================
-
               if (isCreateInjectMode) ...[
                 // CREATE + mode INJECT → tampilkan section display dari Inject
                 FurnitureWipByInjectSection(
                   noProduksi:
-                  _selectedInject?.noProduksi ?? _preInjectNoProduksi,
+                      _selectedInject?.noProduksi ?? _preInjectNoProduksi,
                   title: 'Jenis Furniture WIP',
                   icon: Icons.category_outlined,
                 ),
@@ -1097,9 +1146,7 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
                     if (_selectedMode == FurnitureWipInputMode.inject) {
                       return null;
                     }
-                    return v == null
-                        ? 'Wajib pilih jenis Furniture WIP'
-                        : null;
+                    return v == null ? 'Wajib pilih jenis Furniture WIP' : null;
                   },
                   autovalidateMode: AutovalidateMode.onUserInteraction,
                   onChanged: (fw) {
@@ -1118,8 +1165,9 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
                     child: SizedBox(
                       child: TextFormField(
                         controller: pcsCtrl,
-                        keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(
                             RegExp(r'^\d*([.,]\d{0,3})?$'),
@@ -1128,8 +1176,7 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
                         decoration: InputDecoration(
                           labelText: 'PCS',
                           hintText: '0',
-                          prefixIcon:
-                          const Icon(Icons.filter_1_outlined),
+                          prefixIcon: const Icon(Icons.filter_1_outlined),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -1156,8 +1203,9 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
                       child: TextFormField(
                         controller: beratCtrl,
                         enabled: !isBeratAuto, // 🔹 disable saat mode INJECT
-                        keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(
                             RegExp(r'^\d*([.,]\d{0,3})?$'),
@@ -1165,9 +1213,10 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
                         ],
                         decoration: InputDecoration(
                           labelText: 'Berat (kg)',
-                          hintText: isBeratAuto ? 'Auto dari PCS & Inject' : '0',
-                          prefixIcon:
-                          const Icon(Icons.monitor_weight_outlined),
+                          hintText: isBeratAuto
+                              ? 'Auto dari PCS & Inject'
+                              : '0',
+                          prefixIcon: const Icon(Icons.monitor_weight_outlined),
                           suffixText: 'kg',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
@@ -1201,6 +1250,58 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
     );
   }
 
+  Widget _buildOutputPanel() {
+    String noSourceMessage;
+    String sourceCode;
+
+    switch (_selectedMode) {
+      case FurnitureWipInputMode.inject:
+        noSourceMessage = 'Pilih No Inject\nuntuk melihat output';
+        sourceCode = _selectedInject?.noProduksi ?? _preInjectNoProduksi ?? '';
+        break;
+      case FurnitureWipInputMode.hotStamping:
+        noSourceMessage = 'Pilih No Hot Stamping\nuntuk melihat output';
+        sourceCode =
+            _selectedHotStamp?.noProduksi ?? _preHotStampNoProduksi ?? '';
+        break;
+      case FurnitureWipInputMode.pasangKunci:
+        noSourceMessage = 'Pilih No Pasang Kunci\nuntuk melihat output';
+        sourceCode =
+            _selectedKeyFitting?.noProduksi ?? _preKeyFittingNoProduksi ?? '';
+        break;
+      case FurnitureWipInputMode.spanner:
+        noSourceMessage = 'Pilih No Spanner\nuntuk melihat output';
+        sourceCode =
+            _selectedSpanner?.noProduksi ?? _preSpannerNoProduksi ?? '';
+        break;
+      case FurnitureWipInputMode.bongkarSusun:
+        noSourceMessage = 'Pilih No Bongkar Susun\nuntuk melihat output';
+        sourceCode =
+            _selectedBongkar?.noBongkarSusun ?? _preBongkarNoBongkarSusun ?? '';
+        break;
+      case FurnitureWipInputMode.retur:
+        noSourceMessage = 'Pilih No Retur\nuntuk melihat output';
+        sourceCode = _selectedReturBj?.noRetur ?? _preReturNoRetur ?? '';
+        break;
+      case null:
+        noSourceMessage = 'Pilih sumber proses\nuntuk melihat output';
+        sourceCode = '';
+    }
+
+    return LabelOutputPanel(
+      title: 'Output Furniture WIP',
+      items: _furnitureWipOutputs
+          .map(
+            (o) =>
+                LabelOutputItem(code: o.noFurnitureWip, isPrinted: o.isPrinted),
+          )
+          .toList(),
+      isLoading: _loadingOutputs,
+      hasSource: sourceCode.isNotEmpty,
+      noSourceMessage: noSourceMessage,
+    );
+  }
+
   Widget _buildActions() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
@@ -1208,8 +1309,7 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
         OutlinedButton(
           onPressed: () => Navigator.pop(context),
           style: OutlinedButton.styleFrom(
-            padding:
-            const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
             side: BorderSide(color: Colors.grey.shade400),
           ),
           child: const Text('BATAL', style: TextStyle(fontSize: 15)),
@@ -1218,13 +1318,11 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
         ElevatedButton(
           onPressed: _submit,
           style: ElevatedButton.styleFrom(
-            backgroundColor:
-            isEdit ? const Color(0xFFF57C00) : const Color(0xFF00897B),
+            backgroundColor: isEdit
+                ? const Color(0xFFF57C00)
+                : const Color(0xFF00897B),
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(
-              horizontal: 28,
-              vertical: 14,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
           ),
           child: const Text(
             'SIMPAN',

@@ -74,6 +74,17 @@ class BahanBakuRepository {
         .toList();
   }
 
+  Future<void> markAsPrinted({
+    required String noBahanBaku,
+    required String noPallet,
+  }) async {
+    final encodedNoBahanBaku = Uri.encodeComponent(noBahanBaku);
+    final encodedNoPallet = Uri.encodeComponent(noPallet);
+    await api.patchJson(
+      '/api/labels/bahan-baku/$encodedNoBahanBaku/pallet/$encodedNoPallet/print',
+    );
+  }
+
   Future<Map<String, dynamic>> updatePalletQc({
     required String noBahanBaku,
     required BahanBakuPallet pallet,

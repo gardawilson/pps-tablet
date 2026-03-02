@@ -80,12 +80,12 @@ class _BahanBakuActionBarState extends State<BahanBakuActionBar> {
                         ),
                         boxShadow: _focused
                             ? [
-                          BoxShadow(
-                            color: cs.primary.withOpacity(.12),
-                            blurRadius: 14,
-                            offset: const Offset(0, 6),
-                          ),
-                        ]
+                                BoxShadow(
+                                  color: cs.primary.withOpacity(.12),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ]
                             : null,
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -106,13 +106,15 @@ class _BahanBakuActionBarState extends State<BahanBakuActionBar> {
                               textInputAction: TextInputAction.search,
                               decoration: InputDecoration(
                                 hintText:
-                                'Cari No Bahan Baku / Supplier / No Plat…',
-                                hintStyle:
-                                TextStyle(color: Colors.grey.shade500),
+                                    'Cari No Bahan Baku / Supplier / No Plat…',
+                                hintStyle: TextStyle(
+                                  color: Colors.grey.shade500,
+                                ),
                                 isCollapsed: true,
                                 border: InputBorder.none,
-                                contentPadding:
-                                const EdgeInsets.symmetric(vertical: 14),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                               ),
                             ),
                           ),
@@ -121,18 +123,19 @@ class _BahanBakuActionBarState extends State<BahanBakuActionBar> {
                             duration: const Duration(milliseconds: 140),
                             child: _hasText
                                 ? IconButton(
-                              key: const ValueKey('clear_on'),
-                              tooltip: 'Bersihkan',
-                              icon: const Icon(Icons.close_rounded),
-                              onPressed: () {
-                                widget.controller.clear();
-                                setState(() {});
-                                widget.onClear();
-                                _searchFocus.requestFocus();
-                              },
-                            )
+                                    key: const ValueKey('clear_on'),
+                                    tooltip: 'Bersihkan',
+                                    icon: const Icon(Icons.close_rounded),
+                                    onPressed: () {
+                                      widget.controller.clear();
+                                      setState(() {});
+                                      widget.onClear();
+                                      _searchFocus.requestFocus();
+                                    },
+                                  )
                                 : const SizedBox.shrink(
-                                key: ValueKey('clear_off')),
+                                    key: ValueKey('clear_off'),
+                                  ),
                           ),
                         ],
                       ),
@@ -153,7 +156,8 @@ class _BahanBakuActionBarState extends State<BahanBakuActionBar> {
                       },
                       style: IconButton.styleFrom(
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                     ),
                 ],

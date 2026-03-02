@@ -10,17 +10,22 @@ class LabelSelectionScreen extends StatelessWidget {
     final perm = context.watch<PermissionViewModel>();
 
     // ===== permissions per menu =====
-    final canReadBahanBaku = perm.can('penerimaanbahanbaku:read'); // Label Bahan Baku
+    final canReadBahanBaku = perm.can(
+      'penerimaanbahanbaku:read',
+    ); // Label Bahan Baku
     final canReadWashing = perm.can('label_washing:read');
     final canReadBroker = perm.can('label_broker:read');
     final canReadBonggolan = perm.can('label_bonggolan:read');
-    final canReadCrusher = perm.can('label_crusher:read'); // <-- kalau crusher belum ada permission khusus
+    final canReadCrusher = perm.can(
+      'label_crusher:read',
+    ); // <-- kalau crusher belum ada permission khusus
     final canReadGilingan = perm.can('label_gilingan:read');
     final canReadMixer = perm.can('label_mixer:read');
     final canReadFurnitureWip = perm.can('label_furniturewip:read');
-    final canReadPacking = perm.can('label_barangjadi:read'); // <-- kamu punya packing:read (bukan label_packing)
+    final canReadPacking = perm.can(
+      'label_barangjadi:read',
+    ); // <-- kamu punya packing:read (bukan label_packing)
     final canReadReject = perm.can('label_reject:read');
-
 
     return Scaffold(
       appBar: AppBar(
@@ -126,8 +131,8 @@ class LabelSelectionScreen extends StatelessWidget {
 
           _buildLabelCard(
             context,
-            title: 'Label Packing',
-            subtitle: 'Buat label untuk proses Packing',
+            title: 'Label Barang Jadi',
+            subtitle: 'Buat label untuk proses Barang Jadi',
             icon: Icons.label,
             enabled: canReadPacking,
             onTap: canReadPacking
@@ -152,13 +157,13 @@ class LabelSelectionScreen extends StatelessWidget {
 
   // 🔹 Reusable builder untuk setiap kartu label
   Widget _buildLabelCard(
-      BuildContext context, {
-        required String title,
-        required String subtitle,
-        required IconData icon,
-        required VoidCallback? onTap,
-        bool enabled = true,
-      }) {
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required VoidCallback? onTap,
+    bool enabled = true,
+  }) {
     final Color baseColor = enabled ? Colors.blue : Colors.grey;
 
     return Opacity(
@@ -166,9 +171,7 @@ class LabelSelectionScreen extends StatelessWidget {
       child: Card(
         elevation: 4,
         shadowColor: Colors.black12,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: ListTile(
           onTap: enabled ? onTap : null,
           contentPadding: const EdgeInsets.all(20),
@@ -195,11 +198,7 @@ class LabelSelectionScreen extends StatelessWidget {
               color: enabled ? Colors.grey.shade600 : Colors.grey.shade400,
             ),
           ),
-          trailing: Icon(
-            Icons.arrow_forward_ios,
-            size: 16,
-            color: baseColor,
-          ),
+          trailing: Icon(Icons.arrow_forward_ios, size: 16, color: baseColor),
         ),
       ),
     );

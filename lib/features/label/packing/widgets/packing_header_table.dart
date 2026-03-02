@@ -43,7 +43,7 @@ class PackingHeaderTable extends StatelessWidget {
     return [
       AtlasTableColumn<PackingHeader>(
         title: 'NO. LABEL',
-        width: 170,
+        width: 150,
         cellBuilder: (context, item, rowState) {
           return Row(
             children: [
@@ -78,7 +78,7 @@ class PackingHeaderTable extends StatelessWidget {
       ),
       AtlasTableColumn<PackingHeader>(
         title: 'JENIS',
-        width: 350,
+        width: 300,
         cellBuilder: (context, item, rowState) {
           return Text(
             item.namaBJ ?? '-',

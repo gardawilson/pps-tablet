@@ -206,9 +206,7 @@ class _PackingRowPopoverState extends State<PackingRowPopover> {
                     rootNavigator: true,
                   ).context;
 
-                  final pdfService = PdfPrintService(
-                    defaultSystem: 'pps',
-                  );
+                  final pdfService = PdfPrintService(defaultSystem: 'pps');
 
                   final success = await pdfService.directPrintReport80mm(
                     context: rootCtx,
@@ -217,9 +215,9 @@ class _PackingRowPopoverState extends State<PackingRowPopover> {
                   );
 
                   if (success) {
-                    await PackingRepository(api: ApiClient()).markAsPrinted(
-                      widget.header.noBJ,
-                    );
+                    await PackingRepository(
+                      api: ApiClient(),
+                    ).markAsPrinted(widget.header.noBJ);
                   }
                 }),
               ),

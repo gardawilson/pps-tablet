@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
-import 'package:pps_tablet/features/label/packing/widgets/rawbt_auto_print_dialog.dart';
+import 'package:pps_tablet/features/label/packing/widgets/bt_auto_print_dialog.dart';
+import 'package:pps_tablet/features/label/packing/widgets/packing_auto_repeat_dialog.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/services/dialog_service.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../common/widgets/app_date_field.dart';
-
-import '../../../../core/utils/rawbt_print_service.dart'; // ← RAWBT
 
 import '../../../bongkar_susun/widgets/bongkar_susun_dropdown.dart';
 import '../../../bongkar_susun/model/bongkar_susun_model.dart';
@@ -32,6 +31,8 @@ import '../model/packing_header_model.dart';
 import '../repository/packing_repository.dart';
 import '../view_model/packing_view_model.dart';
 import 'packing_text_field.dart';
+
+enum _PrintMode { singleCreate, autoPrintManual, autoRepeat }
 
 /// ✅ Draft untuk "Generate label baru dengan isi sama" (Auto mode)
 class _PackingCreateDraft {
@@ -80,8 +81,13 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
   // State
   DateTime _selectedDate = DateTime.now();
 
-  // Mode cetak otomatis
-  bool _isAutoPrintMode = false;
+  // Mode cetak
+  _PrintMode _printMode = _PrintMode.singleCreate;
+
+  // Jumlah pengulangan (hanya aktif saat mode autoRepeat)
+  late final TextEditingController _repeatCountCtrl;
+  int get _repeatCount =>
+      (int.tryParse(_repeatCountCtrl.text.trim()) ?? 1).clamp(1, 99);
 
   // Mode proses (BD / S / BG / L)
   PackingInputMode? _selectedMode;
@@ -141,6 +147,7 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
       }
     });
 
+    _repeatCountCtrl = TextEditingController(text: '1');
     noBJCtrl = TextEditingController(text: widget.header?.noBJ ?? '');
 
     final DateTime seededDate = widget.header != null
@@ -199,6 +206,7 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
   @override
   void dispose() {
     pcsCtrl.removeListener(_onPcsChanged);
+    _repeatCountCtrl.dispose();
     noBJCtrl.dispose();
     dateCreatedCtrl.dispose();
     pcsCtrl.dispose();
@@ -490,8 +498,16 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
         final output = data['output'] as Map<String, dynamic>? ?? {};
         final int count = (output['count'] as int?) ?? headers.length;
 
-        // 🟢 CEK MODE: AUTO PRINT atau NORMAL
-        if (_isAutoPrintMode && headers.isNotEmpty) {
+        // 🟢 CEK MODE: singleCreate / autoPrintManual / autoRepeat
+        if (_printMode == _PrintMode.autoRepeat && headers.isNotEmpty) {
+          if (mounted) {
+            final firstNoBJ = headers.first['NoBJ']?.toString() ?? '';
+            if (firstNoBJ.isNotEmpty) {
+              await _showAutoRepeatDialog(firstNoBJ);
+            }
+          }
+        } else if (_printMode == _PrintMode.autoPrintManual &&
+            headers.isNotEmpty) {
           if (mounted) {
             await _showAutoPrintDialog(headers, count);
           }
@@ -603,7 +619,7 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
     return showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => RawBTAutoPrintDialog(
+      builder: (ctx) => BtAutoPrintDialog(
         headers: headers,
         count: count,
         reportName: 'CrLabelBarangJadi',
@@ -637,6 +653,94 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
     );
   }
 
+  /// Buka dialog auto-repeat: create+print sebanyak [_repeatCount] kali.
+  /// [firstNoBJ] adalah label yang sudah dibuat oleh form submit (round 1).
+  Future<void> _showAutoRepeatDialog(String firstNoBJ) async {
+    final draft = _lastDraft;
+    if (draft == null) return;
+
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PackingAutoRepeatDialog(
+        totalRounds: _repeatCount,
+        firstNoBJ: firstNoBJ,
+        reportName: 'CrLabelBarangJadi',
+        baseUrl: 'http://192.168.10.100:3000',
+        onCreate: () async {
+          final vm = context.read<PackingViewModel>();
+          final res = await vm.createFromForm(
+            idBJ: draft.idBJ,
+            dateCreate: draft.dateCreate,
+            pcs: draft.pcs,
+            berat: draft.berat,
+            isPartial: false,
+            idWarehouse: null,
+            blok: null,
+            idLokasi: null,
+            mode: draft.mode,
+            packingCode: draft.packingCode,
+            injectCode: draft.injectCode,
+            bongkarSusunCode: draft.bongkarSusunCode,
+            returCode: draft.returCode,
+            toDbDateString: toDbDateString,
+          );
+          final data = res['data'] as Map<String, dynamic>? ?? {};
+          final headers = (data['headers'] as List?)?.cast<dynamic>() ?? [];
+          if (headers.isEmpty) return null;
+          return headers.first['NoBJ']?.toString();
+        },
+      ),
+    );
+  }
+
+  Widget _buildModeChip({
+    required String label,
+    required _PrintMode mode,
+    required IconData icon,
+  }) {
+    final selected = _printMode == mode;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() {
+          _printMode = mode;
+          if (mode != _PrintMode.autoRepeat) _repeatCountCtrl.text = '1';
+        }),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          decoration: BoxDecoration(
+            color: selected ? Colors.blue.shade700 : Colors.white,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: selected ? Colors.blue.shade700 : Colors.blue.shade300,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: selected ? Colors.white : Colors.blue.shade600,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? Colors.white : Colors.blue.shade800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -661,6 +765,7 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
                 ],
               ),
             ),
+            if (!isEdit) ...[const SizedBox(height: 12), _buildModeCetak()],
             const SizedBox(height: 16),
             _buildActions(),
           ],
@@ -670,64 +775,126 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
   }
 
   Widget _buildHeader() {
-    return Column(
+    return Row(
       children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: isEdit ? Colors.orange.shade100 : Colors.green.shade100,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                isEdit ? Icons.edit : Icons.add,
-                color: isEdit ? Colors.orange.shade700 : Colors.green.shade700,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              isEdit ? 'Edit Label Barang Jadi' : 'Buat Label Barang Jadi',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-          ],
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: isEdit ? Colors.orange.shade100 : Colors.green.shade100,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            isEdit ? Icons.edit : Icons.add,
+            color: isEdit ? Colors.orange.shade700 : Colors.green.shade700,
+            size: 24,
+          ),
         ),
+        const SizedBox(width: 12),
+        Text(
+          isEdit ? 'Edit Label Barang Jadi' : 'Buat Label Barang Jadi',
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+      ],
+    );
+  }
 
-        // 🟢 Toggle Mode Cetak Otomatis
-        if (!isEdit) ...[
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.blue.shade200),
-            ),
-            child: Row(
+  Widget _buildModeCetak() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.print, size: 18, color: Colors.blue.shade700),
+              const SizedBox(width: 6),
+              Text(
+                'Mode Cetak',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.blue.shade900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _buildModeChip(
+                label: 'Single',
+                mode: _PrintMode.singleCreate,
+                icon: Icons.add_circle_outline,
+              ),
+              const SizedBox(width: 6),
+              _buildModeChip(
+                label: 'Quick',
+                mode: _PrintMode.autoPrintManual,
+                icon: Icons.touch_app_outlined,
+              ),
+              const SizedBox(width: 6),
+              _buildModeChip(
+                label: 'Batch',
+                mode: _PrintMode.autoRepeat,
+                icon: Icons.repeat,
+              ),
+            ],
+          ),
+          if (_printMode == _PrintMode.autoRepeat) ...[
+            const SizedBox(height: 10),
+            Row(
               children: [
-                Icon(Icons.print, size: 20, color: Colors.blue.shade700),
+                Text(
+                  'Jumlah label:',
+                  style: TextStyle(fontSize: 13, color: Colors.blue.shade800),
+                ),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Auto Create',
+                SizedBox(
+                  width: 60,
+                  child: TextField(
+                    controller: _repeatCountCtrl,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w700,
                       color: Colors.blue.shade900,
+                    ),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 6,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: BorderSide(color: Colors.blue.shade300),
+                      ),
                     ),
                   ),
                 ),
-                Switch(
-                  value: _isAutoPrintMode,
-                  onChanged: (val) => setState(() => _isAutoPrintMode = val),
-                  activeColor: Colors.blue.shade700,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Text(
+                    '×',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.blue.shade700,
+                    ),
+                  ),
                 ),
               ],
             ),
-          ),
+          ],
         ],
-      ],
+      ),
     );
   }
 

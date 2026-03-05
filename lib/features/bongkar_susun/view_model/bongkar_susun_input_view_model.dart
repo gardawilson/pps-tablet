@@ -67,20 +67,20 @@ class TempItemsByLabel {
 
   int get totalCount =>
       brokerItems.length +
-          brokerPartials.length +
-          bbItems.length +
-          bbPartials.length +
-          washingItems.length +
-          crusherItems.length +
-          gilinganItems.length +
-          gilinganPartials.length +
-          mixerItems.length +
-          mixerPartials.length +
-          bonggolanItems.length +
-          furnitureWipItems.length +
-          furnitureWipPartials.length +
-          barangJadiItems.length +
-          barangJadiPartials.length;
+      brokerPartials.length +
+      bbItems.length +
+      bbPartials.length +
+      washingItems.length +
+      crusherItems.length +
+      gilinganItems.length +
+      gilinganPartials.length +
+      mixerItems.length +
+      mixerPartials.length +
+      bonggolanItems.length +
+      furnitureWipItems.length +
+      furnitureWipPartials.length +
+      barangJadiItems.length +
+      barangJadiPartials.length;
 
   bool get isEmpty => totalCount == 0;
 
@@ -262,11 +262,17 @@ class BongkarSusunInputViewModel extends ChangeNotifier {
     _dumpList('tempMixerPartial', tempMixerPartial, _keyFromMixerItem);
     _dumpList('tempBonggolan', tempBonggolan, _keyFromBonggolanItem);
     _dumpList('tempFurnitureWip', tempFurnitureWip, _keyFromFurnitureWipItem);
-    _dumpList('tempFurnitureWipPartial', tempFurnitureWipPartial,
-        _keyFromFurnitureWipItem);
+    _dumpList(
+      'tempFurnitureWipPartial',
+      tempFurnitureWipPartial,
+      _keyFromFurnitureWipItem,
+    );
     _dumpList('tempBarangJadi', tempBarangJadi, _keyFromBarangJadiItem);
     _dumpList(
-        'tempBarangJadiPartial', tempBarangJadiPartial, _keyFromBarangJadiItem);
+      'tempBarangJadiPartial',
+      tempBarangJadiPartial,
+      _keyFromBarangJadiItem,
+    );
     _d('TOTAL TEMP COUNT = $totalTempCount');
     _d('========================================');
   }
@@ -279,7 +285,9 @@ class BongkarSusunInputViewModel extends ChangeNotifier {
       return;
     }
     _tempItemsByLabel.forEach((label, bucket) {
-      _d('Label "$label" • total=${bucket.totalCount} • since=${bucket.addedAt.toIso8601String()}');
+      _d(
+        'Label "$label" • total=${bucket.totalCount} • since=${bucket.addedAt.toIso8601String()}',
+      );
       for (final it in bucket.allItems) {
         _d('  - ${_fmtItem(it)}');
       }
@@ -326,8 +334,10 @@ class BongkarSusunInputViewModel extends ChangeNotifier {
   // Prevent duplicate per-row inputs fetch
   final Map<String, Future<BongkarSusunInputs>> _inflight = {};
 
-  Future<BongkarSusunInputs?> loadInputs(String noBongkarSusun,
-      {bool force = false}) async {
+  Future<BongkarSusunInputs?> loadInputs(
+    String noBongkarSusun, {
+    bool force = false,
+  }) async {
     if (!force && _inputsCache.containsKey(noBongkarSusun)) {
       return _inputsCache[noBongkarSusun];
     }
@@ -382,8 +392,10 @@ class BongkarSusunInputViewModel extends ChangeNotifier {
   // Track temp items by label code
   final Map<String, TempItemsByLabel> _tempItemsByLabel = {};
 
-  Future<ProductionLabelLookupResult?> lookupLabel(String code,
-      {bool force = false}) async {
+  Future<ProductionLabelLookupResult?> lookupLabel(
+    String code, {
+    bool force = false,
+  }) async {
     final trimmed = code.trim();
     if (trimmed.isEmpty) {
       lookupError = 'Kode label kosong';
@@ -485,7 +497,9 @@ class BongkarSusunInputViewModel extends ChangeNotifier {
   }
 
   void removeTemporaryItemsForLabel(
-      String labelCode, List<dynamic> itemsToRemove) {
+    String labelCode,
+    List<dynamic> itemsToRemove,
+  ) {
     final trimmed = labelCode.trim();
     final t = _tempItemsByLabel[trimmed];
     if (t == null) return;
@@ -534,41 +548,53 @@ class BongkarSusunInputViewModel extends ChangeNotifier {
   void _updateTempItemsByLabel(String labelCode) {
     final code = labelCode.trim();
 
-    final brokerFull =
-    tempBroker.where((e) => _getItemLabelCode(e) == code).toList();
-    final brokerPart =
-    tempBrokerPartial.where((e) => _getItemLabelCode(e) == code).toList();
+    final brokerFull = tempBroker
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
+    final brokerPart = tempBrokerPartial
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
 
     final bbFull = tempBb.where((e) => _getItemLabelCode(e) == code).toList();
-    final bbPart =
-    tempBbPartial.where((e) => _getItemLabelCode(e) == code).toList();
+    final bbPart = tempBbPartial
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
 
-    final washingItems =
-    tempWashing.where((e) => _getItemLabelCode(e) == code).toList();
-    final crusherItems =
-    tempCrusher.where((e) => _getItemLabelCode(e) == code).toList();
+    final washingItems = tempWashing
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
+    final crusherItems = tempCrusher
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
 
-    final gilFull =
-    tempGilingan.where((e) => _getItemLabelCode(e) == code).toList();
-    final gilPart =
-    tempGilinganPartial.where((e) => _getItemLabelCode(e) == code).toList();
+    final gilFull = tempGilingan
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
+    final gilPart = tempGilinganPartial
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
 
-    final mixFull =
-    tempMixer.where((e) => _getItemLabelCode(e) == code).toList();
-    final mixPart =
-    tempMixerPartial.where((e) => _getItemLabelCode(e) == code).toList();
+    final mixFull = tempMixer
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
+    final mixPart = tempMixerPartial
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
 
-    final bonggolanItems =
-    tempBonggolan.where((e) => _getItemLabelCode(e) == code).toList();
+    final bonggolanItems = tempBonggolan
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
 
-    final fwFull =
-    tempFurnitureWip.where((e) => _getItemLabelCode(e) == code).toList();
+    final fwFull = tempFurnitureWip
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
     final fwPart = tempFurnitureWipPartial
         .where((e) => _getItemLabelCode(e) == code)
         .toList();
 
-    final bjFull =
-    tempBarangJadi.where((e) => _getItemLabelCode(e) == code).toList();
+    final bjFull = tempBarangJadi
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
     final bjPart = tempBarangJadiPartial
         .where((e) => _getItemLabelCode(e) == code)
         .toList();
@@ -588,7 +614,7 @@ class BongkarSusunInputViewModel extends ChangeNotifier {
       fwFull,
       fwPart,
       bjFull,
-      bjPart
+      bjPart,
     ].every((l) => l.isEmpty)) {
       _tempItemsByLabel.remove(code);
       return;
@@ -652,19 +678,20 @@ class BongkarSusunInputViewModel extends ChangeNotifier {
     // ✅ TAMBAHKAN: FurnitureWipItem
     if (item is FurnitureWipItem) {
       final part = (item.noFurnitureWIPPartial ?? '').trim();
-      if (part.isNotEmpty) return part;  // BC.XXXXXXXXXX
-      return item.noFurnitureWIP;         // BB.0000044512
+      if (part.isNotEmpty) return part; // BC.XXXXXXXXXX
+      return item.noFurnitureWIP; // BB.0000044512
     }
 
     // ✅ TAMBAHKAN: BarangJadiItem
     if (item is BarangJadiItem) {
       final part = (item.noBJPartial ?? '').trim();
-      if (part.isNotEmpty) return part;  // BL.XXXXXXXXXX
-      return item.noBJ;                   // BA.XXXXXXXXXX
+      if (part.isNotEmpty) return part; // BL.XXXXXXXXXX
+      return item.noBJ; // BA.XXXXXXXXXX
     }
 
     return null;
   }
+
   // ---------------------------------------------------------------------------
   // Temp selections (anti-duplicate)
   // ---------------------------------------------------------------------------
@@ -840,7 +867,7 @@ class BongkarSusunInputViewModel extends ChangeNotifier {
       'IsPartial',
       'isPartial',
       'IsPartialRow',
-      'isPartialRow'
+      'isPartialRow',
     ];
     for (final k in candKeys) {
       final v = row[k];
@@ -855,8 +882,9 @@ class BongkarSusunInputViewModel extends ChangeNotifier {
             .trim();
         return s.isNotEmpty;
       case PrefixType.bb:
-        final s =
-        (row['NoBBPartial'] ?? row['noBBPartial'] ?? '').toString().trim();
+        final s = (row['NoBBPartial'] ?? row['noBBPartial'] ?? '')
+            .toString()
+            .trim();
         return s.isNotEmpty;
       case PrefixType.gilingan:
         final s = (row['NoGilinganPartial'] ?? row['noGilinganPartial'] ?? '')
@@ -869,20 +897,22 @@ class BongkarSusunInputViewModel extends ChangeNotifier {
             .trim();
         return s.isNotEmpty;
       case PrefixType.furnitureWip:
-        final s = (row['NoFurnitureWIPPartial'] ??
-            row['noFurnitureWIPPartial'] ??
-            row['noFurnitureWipPartial'] ??
-            '')
-            .toString()
-            .trim();
+        final s =
+            (row['NoFurnitureWIPPartial'] ??
+                    row['noFurnitureWIPPartial'] ??
+                    row['noFurnitureWipPartial'] ??
+                    '')
+                .toString()
+                .trim();
         return s.isNotEmpty;
       case PrefixType.barangJadi:
-        final s = (row['NoBJPartial'] ??
-            row['noBJPartial'] ??
-            row['noBjPartial'] ??
-            '')
-            .toString()
-            .trim();
+        final s =
+            (row['NoBJPartial'] ??
+                    row['noBJPartial'] ??
+                    row['noBjPartial'] ??
+                    '')
+                .toString()
+                .trim();
         return s.isNotEmpty;
       default:
         return false;
@@ -973,8 +1003,7 @@ class BongkarSusunInputViewModel extends ChangeNotifier {
       }
       seenTemp.add(simpleKey);
 
-      final newItem =
-      _withTempPartialIfNeeded(item, ctx.prefixType, isPartial);
+      final newItem = _withTempPartialIfNeeded(item, ctx.prefixType, isPartial);
 
       bool itemAdded = false;
       if (newItem is BrokerItem) {
@@ -1029,12 +1058,18 @@ class BongkarSusunInputViewModel extends ChangeNotifier {
         tempBonggolan.add(newItem);
         itemAdded = true;
       } else if (newItem is FurnitureWipItem) {
-        if (newItem.isPartialRow) { tempFurnitureWipPartial.add(newItem); }
-        else { tempFurnitureWip.add(newItem); }
+        if (newItem.isPartialRow) {
+          tempFurnitureWipPartial.add(newItem);
+        } else {
+          tempFurnitureWip.add(newItem);
+        }
         itemAdded = true;
       } else if (newItem is BarangJadiItem) {
-        if (newItem.isPartialRow) { tempBarangJadiPartial.add(newItem); }
-        else { tempBarangJadi.add(newItem); }
+        if (newItem.isPartialRow) {
+          tempBarangJadiPartial.add(newItem);
+        } else {
+          tempBarangJadi.add(newItem);
+        }
         itemAdded = true;
       }
 
@@ -1086,14 +1121,14 @@ class BongkarSusunInputViewModel extends ChangeNotifier {
         final noBong = row['NoBonggolan'] ?? row['noBonggolan'] ?? '';
         return 'M.|Bonggolan|$noBong';
       case PrefixType.furnitureWip:
-        final noFw = row['NoFurnitureWIP'] ??
+        final noFw =
+            row['NoFurnitureWIP'] ??
             row['noFurnitureWIP'] ??
             row['noFurnitureWip'] ??
             '';
         return 'BB.|FurnitureWIP|$noFw';
       case PrefixType.barangJadi:
-        final noBj =
-            row['NoBJ'] ?? row['noBJ'] ?? row['noBj'] ?? '';
+        final noBj = row['NoBJ'] ?? row['noBJ'] ?? row['noBj'] ?? '';
         return 'BA.|BarangJadi|$noBj';
       default:
         return '';
@@ -1308,8 +1343,8 @@ class BongkarSusunInputViewModel extends ChangeNotifier {
       ok = tempBonggolan.remove(item);
       if (ok) _tempKeys.remove(_keyFromBonggolanItem(item));
     } else if (item is FurnitureWipItem) {
-      ok = tempFurnitureWip.remove(item) ||
-          tempFurnitureWipPartial.remove(item);
+      ok =
+          tempFurnitureWip.remove(item) || tempFurnitureWipPartial.remove(item);
       if (ok) _tempKeys.remove(_keyFromFurnitureWipItem(item));
     } else if (item is BarangJadiItem) {
       ok = tempBarangJadi.remove(item) || tempBarangJadiPartial.remove(item);
@@ -1344,8 +1379,8 @@ class BongkarSusunInputViewModel extends ChangeNotifier {
     PrefixType.gilingan: 0,
     PrefixType.mixer: 0,
     PrefixType.reject: 0,
-    PrefixType.furnitureWip: 0,  // ✅ TAMBAHKAN
-    PrefixType.barangJadi: 0,     // ✅ TAMBAHKAN
+    PrefixType.furnitureWip: 0, // ✅ TAMBAHKAN
+    PrefixType.barangJadi: 0, // ✅ TAMBAHKAN
   };
 
   int _nextPartialSeq(PrefixType t) {
@@ -1368,18 +1403,18 @@ class BongkarSusunInputViewModel extends ChangeNotifier {
       case PrefixType.bonggolan:
         return 'BK.XXXXXXXX ($numStr)';
       case PrefixType.furnitureWip:
-        return 'BC.XXXXXXXX ($numStr)';  // ✅ GANTI dari W. ke BC.
+        return 'BC.XXXXXXXX ($numStr)'; // ✅ GANTI dari W. ke BC.
       case PrefixType.barangJadi:
-        return 'BL.XXXXXXXX ($numStr)';  // ✅ GANTI dari Z. ke BL.
+        return 'BL.XXXXXXXX ($numStr)'; // ✅ GANTI dari Z. ke BL.
       default:
         return '';
     }
   }
 
   /// create copy with temp-partial only if `isPartial==true` and category supports it
-  dynamic _withTempPartialIfNeeded(
-      dynamic item, PrefixType t, bool isPartial) {
-    final supports = t == PrefixType.broker ||
+  dynamic _withTempPartialIfNeeded(dynamic item, PrefixType t, bool isPartial) {
+    final supports =
+        t == PrefixType.broker ||
         t == PrefixType.bb ||
         t == PrefixType.gilingan ||
         t == PrefixType.mixer ||
@@ -1446,20 +1481,20 @@ class BongkarSusunInputViewModel extends ChangeNotifier {
 
   int get totalTempCount =>
       tempBroker.length +
-          tempBrokerPartial.length +
-          tempBb.length +
-          tempBbPartial.length +
-          tempWashing.length +
-          tempCrusher.length +
-          tempGilingan.length +
-          tempGilinganPartial.length +
-          tempMixer.length +
-          tempMixerPartial.length +
-          tempBonggolan.length +
-          tempFurnitureWip.length +
-          tempFurnitureWipPartial.length +
-          tempBarangJadi.length +
-          tempBarangJadiPartial.length;
+      tempBrokerPartial.length +
+      tempBb.length +
+      tempBbPartial.length +
+      tempWashing.length +
+      tempCrusher.length +
+      tempGilingan.length +
+      tempGilinganPartial.length +
+      tempMixer.length +
+      tempMixerPartial.length +
+      tempBonggolan.length +
+      tempFurnitureWip.length +
+      tempFurnitureWipPartial.length +
+      tempBarangJadi.length +
+      tempBarangJadiPartial.length;
 
   // ---------------------------------------------------------------------------
   // Submit temp items to backend
@@ -1474,78 +1509,61 @@ class BongkarSusunInputViewModel extends ChangeNotifier {
     // Full items (non-partial)
     if (tempBroker.isNotEmpty) {
       payload['broker'] = tempBroker
-          .map((e) => {
-        'noBroker': e.noBroker,
-        'noSak': e.noSak,
-      })
+          .map((e) => {'noBroker': e.noBroker, 'noSak': e.noSak})
           .toList();
     }
 
     if (tempBb.isNotEmpty) {
       payload['bb'] = tempBb
-          .map((e) => {
-        'noBahanBaku': e.noBahanBaku,
-        'noPallet': e.noPallet,
-        'noSak': e.noSak,
-      })
+          .map(
+            (e) => {
+              'noBahanBaku': e.noBahanBaku,
+              'noPallet': e.noPallet,
+              'noSak': e.noSak,
+            },
+          )
           .toList();
     }
 
     if (tempWashing.isNotEmpty) {
       payload['washing'] = tempWashing
-          .map((e) => {
-        'noWashing': e.noWashing,
-        'noSak': e.noSak,
-      })
+          .map((e) => {'noWashing': e.noWashing, 'noSak': e.noSak})
           .toList();
     }
 
     if (tempCrusher.isNotEmpty) {
       payload['crusher'] = tempCrusher
-          .map((e) => {
-        'noCrusher': e.noCrusher,
-      })
+          .map((e) => {'noCrusher': e.noCrusher})
           .toList();
     }
 
     if (tempGilingan.isNotEmpty) {
       payload['gilingan'] = tempGilingan
-          .map((e) => {
-        'noGilingan': e.noGilingan,
-      })
+          .map((e) => {'noGilingan': e.noGilingan})
           .toList();
     }
 
     if (tempMixer.isNotEmpty) {
       payload['mixer'] = tempMixer
-          .map((e) => {
-        'noMixer': e.noMixer,
-        'noSak': e.noSak,
-      })
+          .map((e) => {'noMixer': e.noMixer, 'noSak': e.noSak})
           .toList();
     }
 
     if (tempBonggolan.isNotEmpty) {
       payload['bonggolan'] = tempBonggolan
-          .map((e) => {
-        'noBonggolan': e.noBonggolan,
-      })
+          .map((e) => {'noBonggolan': e.noBonggolan})
           .toList();
     }
 
     if (tempFurnitureWip.isNotEmpty) {
       payload['furnitureWip'] = tempFurnitureWip
-          .map((e) => {
-        'noFurnitureWIP': e.noFurnitureWIP,
-      })
+          .map((e) => {'noFurnitureWIP': e.noFurnitureWIP})
           .toList();
     }
 
     if (tempBarangJadi.isNotEmpty) {
       payload['barangJadi'] = tempBarangJadi
-          .map((e) => {
-        'noBj': e.noBJ,
-      })
+          .map((e) => {'noBJ': e.noBJ})
           .toList();
     }
 
@@ -1574,10 +1592,7 @@ class BongkarSusunInputViewModel extends ChangeNotifier {
       _d('Submitting temp items to $noBongkarSusun');
       _d('Payload: ${json.encode(payload)}');
 
-      final response = await repository.submitInputs(
-        noBongkarSusun,
-        payload,
-      );
+      final response = await repository.submitInputs(noBongkarSusun, payload);
 
       _d('Submit response: ${json.encode(response)}');
 
@@ -1696,18 +1711,16 @@ class BongkarSusunInputViewModel extends ChangeNotifier {
     final payload = <String, dynamic>{};
 
     void add(String key, Map<String, dynamic> row) {
-      final list = (payload[key] ?? <Map<String, dynamic>>[])
-      as List<Map<String, dynamic>>;
+      final list =
+          (payload[key] ?? <Map<String, dynamic>>[])
+              as List<Map<String, dynamic>>;
       list.add(row);
       payload[key] = list;
     }
 
     for (final it in items) {
       if (it is BrokerItem) {
-        add('broker', {
-          'noBroker': it.noBroker,
-          'noSak': it.noSak,
-        });
+        add('broker', {'noBroker': it.noBroker, 'noSak': it.noSak});
       } else if (it is BbItem) {
         add('bb', {
           'noBahanBaku': it.noBahanBaku,
@@ -1715,35 +1728,19 @@ class BongkarSusunInputViewModel extends ChangeNotifier {
           'noSak': it.noSak,
         });
       } else if (it is WashingItem) {
-        add('washing', {
-          'noWashing': it.noWashing,
-          'noSak': it.noSak,
-        });
+        add('washing', {'noWashing': it.noWashing, 'noSak': it.noSak});
       } else if (it is CrusherItem) {
-        add('crusher', {
-          'noCrusher': it.noCrusher,
-        });
+        add('crusher', {'noCrusher': it.noCrusher});
       } else if (it is GilinganItem) {
-        add('gilingan', {
-          'noGilingan': it.noGilingan,
-        });
+        add('gilingan', {'noGilingan': it.noGilingan});
       } else if (it is MixerItem) {
-        add('mixer', {
-          'noMixer': it.noMixer,
-          'noSak': it.noSak,
-        });
+        add('mixer', {'noMixer': it.noMixer, 'noSak': it.noSak});
       } else if (it is BonggolanItem) {
-        add('bonggolan', {
-          'noBonggolan': it.noBonggolan,
-        });
+        add('bonggolan', {'noBonggolan': it.noBonggolan});
       } else if (it is FurnitureWipItem) {
-        add('furnitureWip', {
-          'noFurnitureWIP': it.noFurnitureWIP,
-        });
+        add('furnitureWip', {'noFurnitureWIP': it.noFurnitureWIP});
       } else if (it is BarangJadiItem) {
-        add('barangJadi', {
-          'noBj': it.noBJ,
-        });
+        add('barangJadi', {'noBJ': it.noBJ});
       }
     }
     return payload;

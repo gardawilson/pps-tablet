@@ -199,27 +199,23 @@ class _GilinganRowPopoverState extends State<GilinganRowPopover> {
                 icon: Icons.print_outlined,
                 label: 'Print',
                 enabled: true,
-                onTap: () => _runAndClose(() async {
+                onTap: () => _runAndClose(() {
                   final rootCtx = Navigator.of(
                     context,
                     rootNavigator: true,
                   ).context;
 
-                  final pdfService = PdfPrintService(
-                    defaultSystem: 'pps',
-                  );
-
-                  final success = await pdfService.directPrintReport80mm(
+                  PdfPrintService(defaultSystem: 'pps').previewReport80mm(
                     context: rootCtx,
                     reportName: 'CrLabelGilingan',
                     query: {'NoGilingan': widget.header.noGilingan},
+                    title: widget.header.noGilingan,
+                    onPrinted: () {
+                      GilinganRepository().markAsPrinted(
+                        widget.header.noGilingan,
+                      );
+                    },
                   );
-
-                  if (success) {
-                    await GilinganRepository().markAsPrinted(
-                      widget.header.noGilingan,
-                    );
-                  }
                 }),
               ),
               divider,

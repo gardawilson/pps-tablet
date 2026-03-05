@@ -82,6 +82,7 @@ class _MixerRowPopoverState extends State<MixerRowPopover> {
     final perm = context.watch<PermissionViewModel>();
     final canEdit = perm.can('label_mixer:update');
     final canDelete = perm.can('label_mixer:delete');
+    final canQC = perm.can('qc_label:update');
 
     final statusText = widget.header.statusText.trim().isEmpty
         ? '-'
@@ -210,7 +211,7 @@ class _MixerRowPopoverState extends State<MixerRowPopover> {
               LabelPopoverMenuTile(
                 icon: Icons.science_outlined,
                 label: 'Input QC',
-                enabled: canEdit,
+                enabled: canQC,
                 tooltipWhenDisabled: 'Tidak punya izin update QC',
                 onTap: () => _runAndClose(widget.onQc),
               ),
@@ -219,27 +220,21 @@ class _MixerRowPopoverState extends State<MixerRowPopover> {
                 icon: Icons.print_outlined,
                 label: 'Print',
                 enabled: true,
-                onTap: () => _runAndClose(() async {
+                onTap: () => _runAndClose(() {
                   final rootCtx = Navigator.of(
                     context,
                     rootNavigator: true,
                   ).context;
 
-                  final pdfService = PdfPrintService(
-                    defaultSystem: 'pps',
-                  );
-
-                  final success = await pdfService.directPrintReport80mm(
+                  PdfPrintService(defaultSystem: 'pps').previewReport80mm(
                     context: rootCtx,
                     reportName: 'CrLabelPalletMixer',
                     query: {'noMixer': widget.header.noMixer},
+                    title: widget.header.noMixer,
+                    onPrinted: () {
+                      MixerRepository().markAsPrinted(widget.header.noMixer);
+                    },
                   );
-
-                  if (success) {
-                    await MixerRepository().markAsPrinted(
-                      widget.header.noMixer,
-                    );
-                  }
                 }),
               ),
               divider,

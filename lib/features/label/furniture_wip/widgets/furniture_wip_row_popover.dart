@@ -202,27 +202,23 @@ class _FurnitureWipRowPopoverState extends State<FurnitureWipRowPopover> {
                 icon: Icons.print_outlined,
                 label: 'Print',
                 enabled: true,
-                onTap: () => _runAndClose(() async {
+                onTap: () => _runAndClose(() {
                   final rootCtx = Navigator.of(
                     context,
                     rootNavigator: true,
                   ).context;
 
-                  final pdfService = PdfPrintService(
-                    defaultSystem: 'pps',
-                  );
-
-                  final success = await pdfService.directPrintReport80mm(
+                  PdfPrintService(defaultSystem: 'pps').previewReport80mm(
                     context: rootCtx,
                     reportName: 'CrLabelFurnitureWIP',
                     query: {'NoFurnitureWIP': widget.header.noFurnitureWip},
+                    title: widget.header.noFurnitureWip,
+                    onPrinted: () {
+                      FurnitureWipRepository().markAsPrinted(
+                        widget.header.noFurnitureWip,
+                      );
+                    },
                   );
-
-                  if (success) {
-                    await FurnitureWipRepository().markAsPrinted(
-                      widget.header.noFurnitureWip,
-                    );
-                  }
                 }),
               ),
               divider,

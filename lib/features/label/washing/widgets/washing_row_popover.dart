@@ -81,6 +81,7 @@ class _WashingRowPopoverState extends State<WashingRowPopover> {
     final perm = context.watch<PermissionViewModel>();
     final canEdit = perm.can('label_washing:update');
     final canDelete = perm.can('label_washing:delete');
+    final canQC = perm.can('qc_label:update');
 
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 240, maxWidth: 320),
@@ -196,7 +197,7 @@ class _WashingRowPopoverState extends State<WashingRowPopover> {
               LabelPopoverMenuTile(
                 icon: Icons.science_outlined,
                 label: 'Input QC',
-                enabled: canEdit,
+                enabled: canQC,
                 tooltipWhenDisabled: 'Tidak punya izin update QC',
                 onTap: () => _runAndClose(widget.onQc),
               ),
@@ -211,21 +212,15 @@ class _WashingRowPopoverState extends State<WashingRowPopover> {
                     rootNavigator: true,
                   ).context;
 
-                  final pdfService = PdfPrintService(
-                    defaultSystem: 'pps',
-                  );
-
-                  final success = await pdfService.directPrintReport80mm(
+                  final noWashing = widget.header.noWashing;
+                  await PdfPrintService(defaultSystem: 'pps').previewReport80mm(
                     context: rootCtx,
                     reportName: 'CrLabelPalletWashing',
-                    query: {'NoWashing': widget.header.noWashing},
+                    query: {'NoWashing': noWashing},
+                    title: 'Label $noWashing',
+                    onPrinted: () =>
+                        WashingRepository().markAsPrinted(noWashing).ignore(),
                   );
-
-                  if (success) {
-                    await WashingRepository().markAsPrinted(
-                      widget.header.noWashing,
-                    );
-                  }
                 }),
               ),
               divider,

@@ -10,7 +10,7 @@ class BongkarSusunRepository {
   final ApiClient _apiClient;
 
   BongkarSusunRepository({ApiClient? apiClient})
-      : _apiClient = apiClient ?? ApiClient();
+    : _apiClient = apiClient ?? ApiClient();
 
   // =========================
   //  BY DATE (tetap ada)
@@ -46,7 +46,6 @@ class BongkarSusunRepository {
     // VM convenience: prefer this if provided
     String? noBongkarSusun,
     bool exactNoBongkarSusun = false, // backend currently does LIKE only
-
     // Other optional filters (siap untuk ekspansi backend)
     DateTime? date, // legacy single date -> maps to dateFrom/dateTo
     DateTime? dateFrom,
@@ -55,7 +54,7 @@ class BongkarSusunRepository {
   }) async {
     // Prefer explicit noBongkarSusun over generic search
     final String? effectiveSearch =
-    (noBongkarSusun != null && noBongkarSusun.trim().isNotEmpty)
+        (noBongkarSusun != null && noBongkarSusun.trim().isNotEmpty)
         ? noBongkarSusun.trim()
         : (search != null && search.trim().isNotEmpty ? search.trim() : null);
 
@@ -71,7 +70,8 @@ class BongkarSusunRepository {
     final qp = <String, dynamic>{
       'page': page,
       'pageSize': pageSize,
-      if (effectiveSearch != null) 'search': effectiveSearch, // API searches NoBongkarSusun
+      if (effectiveSearch != null)
+        'search': effectiveSearch, // API searches NoBongkarSusun
       if (df != null) 'dateFrom': df,
       if (dt != null) 'dateTo': dt,
       if (idUsername != null) 'idUsername': idUsername,
@@ -80,10 +80,7 @@ class BongkarSusunRepository {
     };
 
     try {
-      final body = await _apiClient.getJson(
-        '/api/bongkar-susun',
-        query: qp,
-      );
+      final body = await _apiClient.getJson('/api/bongkar-susun', query: qp);
 
       final List dataList = (body['data'] ?? []) as List;
       final items = dataList
@@ -96,7 +93,8 @@ class BongkarSusunRepository {
       final totalData = (body['totalData'] ?? meta['total'] ?? 0) as int;
 
       print(
-          '✅ BongkarSusun parsed ${items.length} items (page $currentPage/$totalPages, total: $totalData)');
+        '✅ BongkarSusun parsed ${items.length} items (page $currentPage/$totalPages, total: $totalData)',
+      );
 
       return {
         'items': items, // List<BongkarSusun>
@@ -187,7 +185,8 @@ class BongkarSusunRepository {
     }
 
     if (note != null) {
-      body['note'] = note; // boleh kosong string untuk clear jadi NULL (tergantung backend)
+      body['note'] =
+          note; // boleh kosong string untuk clear jadi NULL (tergantung backend)
     }
 
     final jsonResp = await _apiClient.putJson(
@@ -207,9 +206,7 @@ class BongkarSusunRepository {
   //  DELETE
   // =========================
   Future<void> deleteBongkarSusun(String noBongkarSusun) async {
-    await _apiClient.deleteJson(
-      '/api/bongkar-susun/$noBongkarSusun',
-    );
+    await _apiClient.deleteJson('/api/bongkar-susun/$noBongkarSusun');
 
     // kalau sebelumnya kita sudah pernah ambil inputs untuk noBongkarSusun ini, buang dari cache
     _inputsCache.remove(noBongkarSusun);

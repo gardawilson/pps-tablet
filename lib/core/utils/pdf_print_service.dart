@@ -8,10 +8,12 @@ import 'package:printing/printing.dart';
 import 'package:http/http.dart' as http;
 import 'dart:async';
 import '../../common/widgets/loading_dialog.dart';
+import '../../common/widgets/pdf_viewer_screen.dart';
+import 'bt_print_service.dart';
 
 class PdfPrintService {
   /// URL default Crystal Report server. Ganti di sini jika server pindah.
-  static const String defaultBaseUrl = 'http://192.168.10.100:3000';
+  static const String defaultBaseUrl = 'http://192.168.11.153:44381';
 
   PdfPrintService({
     this.baseUrl = PdfPrintService.defaultBaseUrl,
@@ -181,6 +183,80 @@ class PdfPrintService {
       );
     } else {
       return await core();
+    }
+  }
+
+  // =============== IN-APP PDF VIEWER MODE ===============
+
+  /// Fetch PDF dari backend, remap ke 80 mm, lalu buka [PdfViewerScreen]
+  /// di dalam aplikasi. Printer dipilih in-app dan PRINT langsung tanpa
+  /// membuka native Android print dialog.
+  Future<void> previewReport80mm({
+    required BuildContext context,
+    required String reportName,
+    required Map<String, String> query,
+    String? system,
+    String? title,
+    VoidCallback? onPrinted,
+  }) async {
+    final url = buildUri(reportName: reportName, query: query, system: system);
+
+    Uint8List pdfBytes;
+    try {
+      pdfBytes = await _withLoading<Uint8List>(
+        context: context,
+        enabled: true,
+        message: 'Menyiapkan PDF…',
+        run: () async {
+          final dl = await _download(url);
+          return _remapPdfTo80mm(dl.body);
+        },
+      );
+    } catch (_) {
+      // Error sudah ditampilkan oleh _withLoading / _showSnack
+      return;
+    }
+
+    if (!context.mounted) return;
+
+    // Buka PDF viewer — screen langsung close saat user tap CETAK LABEL
+    final outcome = await PdfViewerScreen.push(
+      context: context,
+      title:
+          title ??
+          _inferName(
+            reportName,
+            query,
+          ).replaceAll(RegExp(r'\.pdf$', caseSensitive: false), ''),
+      pdfBytes: pdfBytes,
+    );
+
+    // Jika user menutup tanpa mencetak
+    if (outcome == null || !context.mounted) return;
+
+    // Tampilkan snackbar loading sementara print berjalan
+    _showPrintingSnack(context, outcome.printerName);
+
+    final btService = BtPrintService(
+      baseUrl: baseUrl,
+      defaultSystem: system ?? defaultSystem,
+    );
+
+    String? errorMsg;
+    final ok = await btService.printLabel(
+      reportName: reportName,
+      query: query,
+      mac: outcome.mac,
+      onStatus: (_) {},
+      onError: (e) => errorMsg = e,
+    );
+
+    if (!context.mounted) return;
+    if (ok) {
+      onPrinted?.call();
+      _showPrintSuccessSnack(context, outcome.printerName);
+    } else {
+      _showPrintErrorSnack(context, errorMsg ?? 'Print gagal. Coba lagi.');
     }
   }
 
@@ -479,6 +555,177 @@ class PdfPrintService {
     final m = ScaffoldMessenger.maybeOf(ctx);
     m?.hideCurrentSnackBar();
     m?.showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  void _showPrintingSnack(BuildContext ctx, String printerName) {
+    final m = ScaffoldMessenger.maybeOf(ctx);
+    if (m == null) return;
+    m.hideCurrentSnackBar();
+    m.showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF1E3A5F),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        duration: const Duration(seconds: 30),
+        content: Row(
+          children: [
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Mencetak Label…',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      height: 1.2,
+                    ),
+                  ),
+                  Text(
+                    'Mengirim ke $printerName',
+                    style: const TextStyle(
+                      color: Colors.white60,
+                      fontSize: 11,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPrintErrorSnack(BuildContext ctx, String message) {
+    final m = ScaffoldMessenger.maybeOf(ctx);
+    if (m == null) return;
+    m.hideCurrentSnackBar();
+    m.showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF7F1D1D),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        duration: const Duration(seconds: 5),
+        content: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.print_disabled_rounded,
+                color: Colors.white,
+                size: 17,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Cetak Gagal',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      height: 1.2,
+                    ),
+                  ),
+                  Text(
+                    message,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 11,
+                      height: 1.3,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPrintSuccessSnack(BuildContext ctx, String printerName) {
+    final m = ScaffoldMessenger.maybeOf(ctx);
+    if (m == null) return;
+    m.hideCurrentSnackBar();
+    m.showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF166534),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        duration: const Duration(seconds: 4),
+        content: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.check_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Label Berhasil Dicetak',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      height: 1.2,
+                    ),
+                  ),
+                  Text(
+                    'Dicetak ke $printerName',
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 11,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

@@ -201,27 +201,23 @@ class _CrusherRowPopoverState extends State<CrusherRowPopover> {
                 icon: Icons.print_outlined,
                 label: 'Print',
                 enabled: true,
-                onTap: () => _runAndClose(() async {
+                onTap: () => _runAndClose(() {
                   final rootCtx = Navigator.of(
                     context,
                     rootNavigator: true,
                   ).context;
 
-                  final pdfService = PdfPrintService(
-                    defaultSystem: 'pps',
-                  );
-
-                  final success = await pdfService.directPrintReport80mm(
+                  PdfPrintService(defaultSystem: 'pps').previewReport80mm(
                     context: rootCtx,
                     reportName: 'CrLabelCrusher',
                     query: {'NoCrusher': widget.header.noCrusher},
+                    title: widget.header.noCrusher,
+                    onPrinted: () {
+                      CrusherRepository().markAsPrinted(
+                        widget.header.noCrusher,
+                      );
+                    },
                   );
-
-                  if (success) {
-                    await CrusherRepository().markAsPrinted(
-                      widget.header.noCrusher,
-                    );
-                  }
                 }),
               ),
               divider,

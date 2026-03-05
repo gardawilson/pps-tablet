@@ -3,6 +3,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:pps_tablet/core/view_model/permission_view_model.dart';
+import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/label_popover_widgets.dart';
 import '../../../../core/utils/pdf_print_service.dart';
@@ -69,6 +71,9 @@ class _BahanBakuPalletPopoverState extends State<BahanBakuPalletPopover> {
       thickness: 0.8,
       color: atlasBorder,
     );
+
+    final perm = context.watch<PermissionViewModel>();
+    final canQC = perm.can('qc_label:update');
 
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 240, maxWidth: 320),
@@ -168,7 +173,8 @@ class _BahanBakuPalletPopoverState extends State<BahanBakuPalletPopover> {
               LabelPopoverMenuTile(
                 icon: Icons.science_outlined,
                 label: 'Input QC',
-                enabled: true,
+                enabled: canQC,
+                tooltipWhenDisabled: 'Tidak punya izin input QC',
                 onTap: () => _runAndClose(widget.onInputQc),
               ),
               divider,
@@ -176,23 +182,23 @@ class _BahanBakuPalletPopoverState extends State<BahanBakuPalletPopover> {
                 icon: Icons.print_outlined,
                 label: 'Print',
                 enabled: true,
-                onTap: () => _runAndClose(() async {
+                onTap: () => _runAndClose(() {
                   final rootCtx = Navigator.of(
                     context,
                     rootNavigator: true,
                   ).context;
-                  final pdfService = PdfPrintService(defaultSystem: 'pps');
-                  final success = await pdfService.directPrintReport80mm(
+                  PdfPrintService(defaultSystem: 'pps').previewReport80mm(
                     context: rootCtx,
                     reportName: 'LabelPalletBB',
                     query: {
                       'NoBahanBaku': widget.pallet.noBahanBaku,
                       'NoPallet': widget.pallet.noPallet,
                     },
+                    title: widget.pallet.noPallet,
+                    onPrinted: () {
+                      widget.onAfterPrint?.call();
+                    },
                   );
-                  if (success) {
-                    widget.onAfterPrint?.call();
-                  }
                 }),
               ),
             ],

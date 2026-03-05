@@ -200,25 +200,23 @@ class _PackingRowPopoverState extends State<PackingRowPopover> {
                 icon: Icons.print_outlined,
                 label: 'Print',
                 enabled: true,
-                onTap: () => _runAndClose(() async {
+                onTap: () => _runAndClose(() {
                   final rootCtx = Navigator.of(
                     context,
                     rootNavigator: true,
                   ).context;
 
-                  final pdfService = PdfPrintService(defaultSystem: 'pps');
-
-                  final success = await pdfService.directPrintReport80mm(
+                  PdfPrintService(defaultSystem: 'pps').previewReport80mm(
                     context: rootCtx,
                     reportName: 'CrLabelBarangJadi',
                     query: {'NoBJ': widget.header.noBJ},
+                    title: widget.header.noBJ,
+                    onPrinted: () {
+                      PackingRepository(
+                        api: ApiClient(),
+                      ).markAsPrinted(widget.header.noBJ);
+                    },
                   );
-
-                  if (success) {
-                    await PackingRepository(
-                      api: ApiClient(),
-                    ).markAsPrinted(widget.header.noBJ);
-                  }
                 }),
               ),
               divider,

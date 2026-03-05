@@ -84,6 +84,7 @@ class _BrokerRowPopoverState extends State<BrokerRowPopover> {
     final perm = context.watch<PermissionViewModel>();
     final canEdit = perm.can('label_broker:update');
     final canDelete = perm.can('label_broker:delete');
+    final canQC = perm.can('qc_label:update');
 
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 240, maxWidth: 320),
@@ -199,7 +200,7 @@ class _BrokerRowPopoverState extends State<BrokerRowPopover> {
               LabelPopoverMenuTile(
                 icon: Icons.science_outlined,
                 label: 'Input QC',
-                enabled: canEdit,
+                enabled: canQC,
                 tooltipWhenDisabled: 'Tidak punya izin update QC',
                 onTap: () => _runAndClose(widget.onQc),
               ),
@@ -208,27 +209,23 @@ class _BrokerRowPopoverState extends State<BrokerRowPopover> {
                 icon: Icons.print_outlined,
                 label: 'Print',
                 enabled: true,
-                onTap: () => _runAndClose(() async {
+                onTap: () => _runAndClose(() {
                   final rootCtx = Navigator.of(
                     context,
                     rootNavigator: true,
                   ).context;
 
-                  final pdfService = PdfPrintService(
-                    defaultSystem: 'pps',
-                  );
-
-                  final success = await pdfService.directPrintReport80mm(
+                  PdfPrintService(defaultSystem: 'pps').previewReport80mm(
                     context: rootCtx,
                     reportName: 'CrLabelPalletBroker',
                     query: {'NoBroker': widget.header.noBroker},
+                    title: widget.header.noBroker,
+                    onPrinted: () {
+                      BrokerRepository(
+                        api: ApiClient(),
+                      ).markAsPrinted(widget.header.noBroker);
+                    },
                   );
-
-                  if (success) {
-                    await BrokerRepository(
-                      api: ApiClient(),
-                    ).markAsPrinted(widget.header.noBroker);
-                  }
                 }),
               ),
               divider,

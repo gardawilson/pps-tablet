@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:flutter/material.dart';
@@ -257,10 +258,10 @@ class BtPrintService {
   /// Proses:
   /// 1. Raster PDF ke PNG pada 406 DPI (2× resolusi fisik 203 DPI)
   /// 2. Flatten alpha-transparan → background putih (hindari background hitam)
-  /// 3. Boost contrast 30% → teks/barcode makin hitam, background makin putih
-  /// 4. Grayscale → threshold 1-bit lebih bersih
-  /// 5. Auto-trim whitespace kosong di bagian bawah gambar
-  /// 6. Resize ke 576px dengan cubic interpolation
+  /// 3. Grayscale
+  /// 4. Auto-trim whitespace kosong di bagian bawah gambar
+  /// 5. Resize ke 576px dengan cubic interpolation
+  /// 6. Floyd-Steinberg dithering → watermark/grayscale terpreservasi sebagai halftone dots
   /// 7. imageRaster dengan high density horizontal + vertical
   Future<List<int>> _pdfToEscPos(Uint8List pdfBytes) async {
     final profile = await CapabilityProfile.load();
@@ -268,63 +269,27 @@ class BtPrintService {
     final List<int> bytes = [];
 
     // 406 DPI = 2× resolusi fisik printer (203 DPI).
-    // Teknik standar thermal: render di 2× target resolusi lalu resize down.
-    // Hasil downsampling dari sumber 2× jauh lebih tajam daripada render
-    // langsung di resolusi target (teks kecil, garis tipis, barcode lebih bersih).
     final pages = Printing.raster(pdfBytes, dpi: 406);
     await for (final page in pages) {
       final pngBytes = await page.toPng();
 
-      var decoded = img.decodeImage(pngBytes);
-      if (decoded == null) continue;
+      // Jalankan image processing (CPU-intensive) di background isolate
+      // agar UI tidak freeze selama proses dithering & resize.
+      final result = await Isolate.run(() => _processPage(pngBytes));
+      if (result == null) continue;
 
-      // Flatten transparency → background putih.
-      // PDF raster sering punya channel alpha transparan di background.
-      // ESC/POS imageRaster() tidak mengerti alpha: piksel transparan → hitam.
-      // Fix: composite di atas canvas putih opaque (RGB, tanpa alpha).
-      final whiteBg = img.Image(
-        width: decoded.width,
-        height: decoded.height,
+      // Rekonstruksi img.Image dari raw bytes yang dikembalikan isolate
+      final processed = img.Image.fromBytes(
+        width: result.$1,
+        height: result.$2,
+        bytes: result.$3.buffer,
         numChannels: 3,
       );
-      img.fill(whiteBg, color: img.ColorRgb8(255, 255, 255));
-      img.compositeImage(whiteBg, decoded);
-      decoded = whiteBg;
+      debugPrint('✂️ Page processed: ${result.$2}px high');
 
-      // Boost contrast sebelum grayscale.
-      // contrast: 0.3 = 30% peningkatan — teks/garis/barcode makin hitam,
-      // background putih makin putih → threshold 1-bit lebih crisp.
-      final contrasted = img.adjustColor(decoded, contrast: 0.3);
-
-      // Grayscale untuk konversi 1-bit
-      final gray = img.grayscale(contrasted);
-
-      // Auto-trim whitespace kosong di bagian bawah menggunakan img.trim().
-      // - mode: bottomRightColor → warna referensi diambil dari piksel pojok
-      //   kanan-bawah (yang pasti berada di area margin kosong PDF).
-      //   Library mencocokkan warna itu ke semua baris bawah dan memotongnya.
-      //   Ini menghindari masalah format piksel (uint8 vs float) dan threshold
-      //   manual yang tidak reliabel.
-      // - sides: Trim.bottom → hanya potong dari bawah, atas/kiri/kanan aman.
-      final trimmed = img.trim(
-        gray,
-        mode: img.TrimMode.bottomRightColor,
-        sides: img.Trim.bottom,
-      );
-      debugPrint('✂️ Auto-trim: ${gray.height}px → ${trimmed.height}px');
-
-      // Resize ke 576 dots dengan cubic interpolation.
-      // Cubic memberi anti-aliasing lebih baik dibanding linear saat downscale.
-      final resized = img.copyResize(
-        trimmed,
-        width: 576,
-        interpolation: img.Interpolation.cubic,
-      );
-
-      // highDensityHorizontal + highDensityVertical = full 203×203 DPI mode
       bytes.addAll(
         generator.imageRaster(
-          resized,
+          processed,
           highDensityHorizontal: true,
           highDensityVertical: true,
         ),
@@ -336,5 +301,89 @@ class BtPrintService {
     bytes.addAll(generator.cut());
 
     return bytes;
+  }
+
+  /// Semua operasi image processing yang berat dijalankan di background isolate.
+  /// Static agar bisa diakses dari Isolate.run() tanpa closure capture.
+  /// Mengembalikan (width, height, rawRgbBytes) atau null jika decode gagal.
+  static (int, int, Uint8List)? _processPage(Uint8List pngBytes) {
+    var decoded = img.decodeImage(pngBytes);
+    if (decoded == null) return null;
+
+    // Flatten transparency → background putih
+    final whiteBg = img.Image(
+      width: decoded.width,
+      height: decoded.height,
+      numChannels: 3,
+    );
+    img.fill(whiteBg, color: img.ColorRgb8(255, 255, 255));
+    img.compositeImage(whiteBg, decoded);
+    decoded = whiteBg;
+
+    // Grayscale → trim bawah → resize 576px cubic → Floyd-Steinberg dither
+    final gray = img.grayscale(decoded);
+    final trimmed = img.trim(
+      gray,
+      mode: img.TrimMode.bottomRightColor,
+      sides: img.Trim.bottom,
+    );
+    final resized = img.copyResize(
+      trimmed,
+      width: 576,
+      interpolation: img.Interpolation.cubic,
+    );
+    final dithered = _floydSteinbergDither(resized);
+
+    return (dithered.width, dithered.height, dithered.getBytes());
+  }
+
+  /// Floyd-Steinberg error diffusion dithering.
+  ///
+  /// Mengkonversi grayscale image → 1-bit melalui error diffusion, bukan simple threshold.
+  /// Watermark abu-abu terpreservasi sebagai pola halftone dots (mirip output RawBT).
+  ///
+  /// Distribusi error:
+  ///        X    7/16
+  ///   3/16 5/16 1/16
+  static img.Image _floydSteinbergDither(img.Image src) {
+    final w = src.width;
+    final h = src.height;
+
+    // Salin nilai luminance channel R (image sudah grayscale, semua channel sama)
+    // ke buffer float untuk error diffusion
+    final buf = List<double>.filled(w * h, 0.0);
+    for (var y = 0; y < h; y++) {
+      for (var x = 0; x < w; x++) {
+        buf[y * w + x] = src.getPixel(x, y).r.toDouble();
+      }
+    }
+
+    // Error diffusion pass
+    for (var y = 0; y < h; y++) {
+      for (var x = 0; x < w; x++) {
+        final idx = y * w + x;
+        final old = buf[idx].clamp(0.0, 255.0);
+        final neu = old < 128.0 ? 0.0 : 255.0;
+        final err = old - neu;
+        buf[idx] = neu;
+
+        if (x + 1 < w) buf[idx + 1] += err * 7 / 16;
+        if (y + 1 < h) {
+          if (x > 0) buf[idx + w - 1] += err * 3 / 16;
+          buf[idx + w] += err * 5 / 16;
+          if (x + 1 < w) buf[idx + w + 1] += err * 1 / 16;
+        }
+      }
+    }
+
+    // Tulis ke image baru — hanya piksel hitam (0) atau putih (255)
+    final out = img.Image(width: w, height: h, numChannels: 3);
+    for (var y = 0; y < h; y++) {
+      for (var x = 0; x < w; x++) {
+        final v = buf[y * w + x] < 128.0 ? 0 : 255;
+        out.setPixelRgb(x, y, v, v, v);
+      }
+    }
+    return out;
   }
 }

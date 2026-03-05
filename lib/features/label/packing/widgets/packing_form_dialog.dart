@@ -833,13 +833,13 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
               ),
               const SizedBox(width: 6),
               _buildModeChip(
-                label: 'Quick',
+                label: 'Multiple',
                 mode: _PrintMode.autoPrintManual,
                 icon: Icons.touch_app_outlined,
               ),
               const SizedBox(width: 6),
               _buildModeChip(
-                label: 'Batch',
+                label: 'Quick',
                 mode: _PrintMode.autoRepeat,
                 icon: Icons.repeat,
               ),

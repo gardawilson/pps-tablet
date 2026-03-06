@@ -1,20 +1,18 @@
 // lib/features/report/config/report_endpoints.dart
 class ReportEndpoints {
-  /// ✅ GANTI sesuai server kamu (untuk HP, JANGAN localhost)
-  /// contoh: '192.168.10.100:44381'
+  /// Crystal Report server
   static const String hostWithPort = '192.168.10.100:3000';
 
-  /// kalau server benar HTTPS, true. Kalau HTTP, false.
-  static const bool useHttps = false;
+  /// PPS API server
+  static const String ppsApiHost = '192.168.11.50:8000';
 
   static Uri exportPdf(Map<String, String> query) {
-    if (useHttps) {
-      return Uri.https(
-        hostWithPort,
-        '/api/crystalreport/pps/export-pdf',
-        query,
-      );
-    }
     return Uri.http(hostWithPort, '/api/crystalreport/pps/export-pdf', query);
+  }
+
+  /// PPS API - single date report. [path] adalah path endpoint,
+  /// [reportDate] format: dd-MM-yyyy
+  static Uri ppsApiPdf(String path, String reportDate) {
+    return Uri.http(ppsApiHost, path, {'report_date': reportDate});
   }
 }

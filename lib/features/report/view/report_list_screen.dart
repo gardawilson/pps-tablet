@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../common/widgets/loading_dialog.dart';
+import '../../../core/network/api_client.dart';
 import '../model/report_item.dart';
 import '../service/report_pdf_service.dart';
 import '../view_model/report_list_view_model.dart';
 import '../widgets/report_param_dialog.dart';
+import 'report_pdf_viewer_screen.dart';
 
 class ReportListScreen extends StatelessWidget {
   const ReportListScreen({super.key});
@@ -66,6 +68,60 @@ class ReportListScreen extends StatelessWidget {
       reportName: 'MutasiReject',
       icon: Icons.picture_as_pdf_outlined,
     ),
+    ReportItem(
+      title: 'Rekap Produksi',
+      subtitle: '',
+      reportName: 'RekapProduksi',
+      icon: Icons.summarize_outlined,
+      isSingleDate: true,
+      source: ReportSource.ppsApi,
+      ppsApiPath: '/api/reports/pps/rekap-produksi/inject/pdf',
+    ),
+    ReportItem(
+      title: 'Rekap Produksi BJ',
+      subtitle: '',
+      reportName: 'RekapProduksiBJ',
+      icon: Icons.summarize_outlined,
+      isSingleDate: true,
+      source: ReportSource.ppsApi,
+      ppsApiPath: '/api/reports/pps/rekap-produksi/inject-bj/pdf',
+    ),
+    ReportItem(
+      title: 'Packing BJ',
+      subtitle: '',
+      reportName: 'PackingBJ',
+      icon: Icons.inventory_2_outlined,
+      isSingleDate: true,
+      source: ReportSource.ppsApi,
+      ppsApiPath: '/api/reports/pps/rekap-produksi/packing-bj/pdf',
+    ),
+    ReportItem(
+      title: 'Hot Stamping FWIP',
+      subtitle: '',
+      reportName: 'HotStampingFWIP',
+      icon: Icons.local_fire_department_outlined,
+      isSingleDate: true,
+      source: ReportSource.ppsApi,
+      ppsApiPath: '/api/reports/pps/rekap-produksi/hot-stamping-fwip/pdf',
+    ),
+    ReportItem(
+      title: 'Spanner FWIP',
+      subtitle: '',
+      reportName: 'SpannerFWIP',
+      icon: Icons.build_outlined,
+      isSingleDate: true,
+      source: ReportSource.ppsApi,
+      ppsApiPath: '/api/reports/pps/rekap-produksi/spanner-fwip/pdf',
+    ),
+    ReportItem(
+      title: 'Pasang Kunci FWIP',
+      subtitle: '',
+      reportName: 'PasangKunciFWIP',
+      icon: Icons.key_outlined,
+      isSingleDate: true,
+      source: ReportSource.ppsApi,
+      ppsApiPath: '/api/reports/pps/rekap-produksi/pasang-kunci-fwip/pdf',
+    ),
   ];
 
   @override
@@ -77,6 +133,7 @@ class ReportListScreen extends StatelessWidget {
       create: (_) => ReportListViewModel(
         initialReports: reports,
         pdfService: ReportPdfService(),
+        apiClient: ApiClient(),
         username: username,
       ),
       child: const _ReportListView(),
@@ -121,10 +178,7 @@ class _ReportListViewState extends State<_ReportListView> {
         iconTheme: const IconThemeData(color: Colors.white),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Container(
-            color: Colors.white.withOpacity(0.2),
-            height: 1,
-          ),
+          child: Container(color: Colors.white.withOpacity(0.2), height: 1),
         ),
       ),
       body: Column(
@@ -135,10 +189,7 @@ class _ReportListViewState extends State<_ReportListView> {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [
-                  const Color(0xFF0D47A1),
-                  Colors.grey[100]!,
-                ],
+                colors: [const Color(0xFF0D47A1), Colors.grey[100]!],
               ),
             ),
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
@@ -161,21 +212,32 @@ class _ReportListViewState extends State<_ReportListView> {
                 decoration: InputDecoration(
                   hintText: 'Cari laporan...',
                   hintStyle: TextStyle(color: Colors.grey[400]),
-                  prefixIcon: Icon(Icons.search_rounded, color: Colors.grey[600], size: 22),
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    color: Colors.grey[600],
+                    size: 22,
+                  ),
                   suffixIcon: _searchCtrl.text.isNotEmpty
                       ? IconButton(
-                    icon: Icon(Icons.clear_rounded, color: Colors.grey[600], size: 20),
-                    onPressed: () {
-                      _searchCtrl.clear();
-                      vm.search = '';
-                    },
-                  )
+                          icon: Icon(
+                            Icons.clear_rounded,
+                            color: Colors.grey[600],
+                            size: 20,
+                          ),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            vm.search = '';
+                          },
+                        )
                       : null,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
                 ),
               ),
             ),
@@ -188,7 +250,10 @@ class _ReportListViewState extends State<_ReportListView> {
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF0D47A1).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(20),
@@ -209,37 +274,41 @@ class _ReportListViewState extends State<_ReportListView> {
           Expanded(
             child: items.isEmpty
                 ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.search_off_rounded, size: 72, color: Colors.grey[400]),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Tidak ada laporan',
-                    style: TextStyle(
-                      color: Colors.grey[700],
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.search_off_rounded,
+                          size: 72,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Tidak ada laporan',
+                          style: TextStyle(
+                            color: Colors.grey[700],
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
-              ),
-            )
+                  )
                 : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              itemCount: items.length,
-              itemBuilder: (_, i) {
-                final item = items[i];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _ReportCard(
-                    title: item.title,
-                    icon: item.icon,
-                    onTap: () => _openParamDialog(item),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    itemCount: items.length,
+                    itemBuilder: (_, i) {
+                      final item = items[i];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _ReportCard(
+                          title: item.title,
+                          icon: item.icon,
+                          onTap: () => _openParamDialog(item),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
         ],
       ),
@@ -253,16 +322,18 @@ class _ReportListViewState extends State<_ReportListView> {
       builder: (_) => ReportParamDialog(
         title: item.title,
         icon: item.icon,
-        onGenerate: (startDate, endDate) => _handleGenerateReport(item, startDate, endDate),
+        singleDate: item.isSingleDate,
+        onGenerate: (startDate, endDate) =>
+            _handleGenerateReport(item, startDate, endDate),
       ),
     );
   }
 
   Future<void> _handleGenerateReport(
-      ReportItem item,
-      DateTime startDate,
-      DateTime endDate,
-      ) async {
+    ReportItem item,
+    DateTime startDate,
+    DateTime endDate,
+  ) async {
     final vm = context.read<ReportListViewModel>();
 
     showDialog(
@@ -272,13 +343,24 @@ class _ReportListViewState extends State<_ReportListView> {
     );
 
     try {
-      await vm.generateReport(
-        reportName: item.reportName,
+      final bytes = await vm.generateReport(
+        item: item,
         startDate: startDate,
         endDate: endDate,
       );
 
-      if (mounted) Navigator.pop(context); // close loading
+      if (!mounted) return;
+      Navigator.pop(context); // close loading
+      await ReportPdfViewerScreen.push(
+        context: context,
+        title: item.title,
+        pdfBytes: bytes,
+        isSingleDate: item.isSingleDate,
+        startDate: startDate,
+        endDate: endDate,
+        onRegenerate: (s, e) =>
+            vm.generateReport(item: item, startDate: s, endDate: e),
+      );
     } catch (e) {
       if (mounted) Navigator.pop(context); // close loading
 
@@ -294,7 +376,9 @@ class _ReportListViewState extends State<_ReportListView> {
           ),
           backgroundColor: Colors.red[700],
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
           duration: const Duration(seconds: 4),
         ),
       );

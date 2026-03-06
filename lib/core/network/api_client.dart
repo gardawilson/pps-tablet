@@ -1,6 +1,7 @@
 // lib/core/network/api_client.dart
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -190,7 +191,11 @@ class ApiClient {
     if (body != null) print('📦 Body: $body');
 
     final resp = await _client
-        .patch(url, headers: headers, body: body != null ? json.encode(body) : null)
+        .patch(
+          url,
+          headers: headers,
+          body: body != null ? json.encode(body) : null,
+        )
         .timeout(_timeout);
 
     print('⬅️ [${resp.statusCode}]');
@@ -208,6 +213,36 @@ class ApiClient {
     }
 
     return _decodeJsonBody(resp);
+  }
+
+  /// Download PDF dengan auth header. Validasi signature %PDF.
+  Future<Uint8List> getPdfBytes(Uri uri) async {
+    final headers = await _headers();
+    final pdfHeaders = Map<String, String>.from(headers)
+      ..['Accept'] = 'application/pdf'
+      ..remove('Content-Type');
+
+    final resp = await _client.get(uri, headers: pdfHeaders).timeout(_timeout);
+
+    if (resp.statusCode != 200) {
+      final preview =
+          resp.body.length > 300 ? resp.body.substring(0, 300) : resp.body;
+      throw ApiException(
+        resp.statusCode,
+        'PDF download failed',
+        responseBody: preview,
+      );
+    }
+
+    final bytes = resp.bodyBytes;
+    if (bytes.isEmpty) throw ApiException(0, 'PDF kosong (bytes=0)');
+
+    final head = String.fromCharCodes(bytes.take(4));
+    if (head != '%PDF') {
+      throw ApiException(0, 'Data bukan PDF valid. Head="$head"');
+    }
+
+    return bytes;
   }
 
   /// Delete yang mungkin mengembalikan body (200) atau tidak (204).

@@ -2,6 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'dart:typed_data';
+
+import '../../../core/network/api_client.dart';
 import '../../../core/network/report_endpoints.dart';
 import '../model/report_item.dart';
 import '../service/report_pdf_service.dart';
@@ -10,12 +13,15 @@ class ReportListViewModel extends ChangeNotifier {
   ReportListViewModel({
     required List<ReportItem> initialReports,
     required ReportPdfService pdfService,
+    required ApiClient apiClient,
     required this.username,
-  })  : _pdfService = pdfService,
-        _allReports = initialReports,
-        _filteredReports = initialReports;
+  }) : _pdfService = pdfService,
+       _apiClient = apiClient,
+       _allReports = initialReports,
+       _filteredReports = initialReports;
 
   final ReportPdfService _pdfService;
+  final ApiClient _apiClient;
   final String username;
 
   final List<ReportItem> _allReports;
@@ -49,7 +55,11 @@ class ReportListViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Uri _buildUri(String reportName, DateTime startDate, DateTime endDate) {
+  Uri _buildCrystalUri(
+    String reportName,
+    DateTime startDate,
+    DateTime endDate,
+  ) {
     final qp = <String, String>{
       'reportName': reportName,
       'StartDate': df.format(startDate),
@@ -59,13 +69,8 @@ class ReportListViewModel extends ChangeNotifier {
     return ReportEndpoints.exportPdf(qp);
   }
 
-  String _buildFileName(String reportName, DateTime startDate, DateTime endDate) {
-    final safe = reportName.replaceAll(RegExp(r'[^\w\-]+'), '_');
-    return '${safe}_${df.format(startDate)}_${df.format(endDate)}.pdf';
-  }
-
-  Future<void> generateReport({
-    required String reportName,
+  Future<Uint8List> generateReport({
+    required ReportItem item,
     required DateTime startDate,
     required DateTime endDate,
   }) async {
@@ -73,17 +78,24 @@ class ReportListViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final uri = _buildUri(reportName, startDate, endDate);
-      final filename = _buildFileName(reportName, startDate, endDate);
+      late Uri uri;
 
-      debugPrint('🧾 [REPORT] URL => $uri');
-
-      await _pdfService.downloadSaveAndOpenPdf(
-        uri: uri,
-        filename: filename,
-      );
+      if (item.source == ReportSource.ppsApi) {
+        assert(
+          item.ppsApiPath != null,
+          'ppsApiPath wajib diisi untuk ReportSource.ppsApi',
+        );
+        final reportDate = DateFormat('dd-MM-yyyy').format(startDate);
+        uri = ReportEndpoints.ppsApiPdf(item.ppsApiPath!, reportDate);
+        debugPrint('[REPORT] URL => $uri');
+        return await _apiClient.getPdfBytes(uri);
+      } else {
+        uri = _buildCrystalUri(item.reportName, startDate, endDate);
+        debugPrint('[REPORT] URL => $uri');
+        return await _pdfService.downloadPdfBytes(uri: uri);
+      }
     } catch (e) {
-      debugPrint('❌ [REPORT] Error: $e');
+      debugPrint('[REPORT] Error: $e');
       rethrow;
     } finally {
       _loading = false;

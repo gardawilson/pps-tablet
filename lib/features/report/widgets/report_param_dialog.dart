@@ -7,6 +7,7 @@ class ReportParamDialog extends StatefulWidget {
   final IconData icon;
   final DateTime? initialStartDate;
   final DateTime? initialEndDate;
+  final bool singleDate;
   final Future<void> Function(DateTime startDate, DateTime endDate) onGenerate;
 
   const ReportParamDialog({
@@ -15,6 +16,7 @@ class ReportParamDialog extends StatefulWidget {
     required this.icon,
     this.initialStartDate,
     this.initialEndDate,
+    this.singleDate = false,
     required this.onGenerate,
   });
 
@@ -57,7 +59,7 @@ class _ReportParamDialogState extends State<ReportParamDialog> {
         mainAxisSize: MainAxisSize.min,
         children: [
           _DateField(
-            label: 'Tanggal Mulai',
+            label: widget.singleDate ? 'Tanggal' : 'Tanggal Mulai',
             value: _startDate,
             onPick: () async {
               final picked = await showDatePicker(
@@ -79,41 +81,45 @@ class _ReportParamDialogState extends State<ReportParamDialog> {
               if (picked != null) {
                 setState(() {
                   _startDate = picked;
-                  if (_endDate != null && _endDate!.isBefore(picked)) {
+                  if (!widget.singleDate &&
+                      _endDate != null &&
+                      _endDate!.isBefore(picked)) {
                     _endDate = picked;
                   }
                 });
               }
             },
           ),
-          const SizedBox(height: 12),
-          _DateField(
-            label: 'Tanggal Akhir',
-            value: _endDate,
-            onPick: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: _endDate ?? DateTime.now(),
-                firstDate: DateTime(2000),
-                lastDate: DateTime(2100),
-                builder: (context, child) {
-                  return Theme(
-                    data: Theme.of(context).copyWith(
-                      colorScheme: const ColorScheme.light(
-                        primary: Color(0xFF0D47A1),
+          if (!widget.singleDate) ...[
+            const SizedBox(height: 12),
+            _DateField(
+              label: 'Tanggal Akhir',
+              value: _endDate,
+              onPick: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _endDate ?? DateTime.now(),
+                  firstDate: DateTime(2000),
+                  lastDate: DateTime(2100),
+                  builder: (context, child) {
+                    return Theme(
+                      data: Theme.of(context).copyWith(
+                        colorScheme: const ColorScheme.light(
+                          primary: Color(0xFF0D47A1),
+                        ),
                       ),
-                    ),
-                    child: child!,
-                  );
-                },
-              );
-              if (picked != null) {
-                setState(() {
-                  _endDate = picked;
-                });
-              }
-            },
-          ),
+                      child: child!,
+                    );
+                  },
+                );
+                if (picked != null) {
+                  setState(() {
+                    _endDate = picked;
+                  });
+                }
+              },
+            ),
+          ],
         ],
       ),
       actions: [
@@ -138,7 +144,8 @@ class _ReportParamDialogState extends State<ReportParamDialog> {
             elevation: 2,
           ),
           onPressed: () async {
-            if (_startDate == null || _endDate == null) {
+            if (_startDate == null ||
+                (!widget.singleDate && _endDate == null)) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Pilih tanggal terlebih dahulu')),
               );
@@ -147,7 +154,9 @@ class _ReportParamDialogState extends State<ReportParamDialog> {
 
             // Close dialog and execute callback
             Navigator.pop(context);
-            await widget.onGenerate(_startDate!, _endDate!);
+            final endDate =
+                widget.singleDate ? _startDate! : _endDate!;
+            await widget.onGenerate(_startDate!, endDate);
           },
         ),
       ],

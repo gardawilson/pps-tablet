@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/label_popover_widgets.dart';
+import '../../../../core/network/label_print_lock_api.dart';
+import '../../../../core/view_model/label_print_lock_socket_manager.dart';
 import '../../../../core/utils/pdf_print_service.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../model/washing_header_model.dart';
@@ -213,14 +215,40 @@ class _WashingRowPopoverState extends State<WashingRowPopover> {
                   ).context;
 
                   final noWashing = widget.header.noWashing;
-                  await PdfPrintService(defaultSystem: 'pps').previewReport80mm(
-                    context: rootCtx,
-                    reportName: 'CrLabelPalletWashing',
-                    query: {'NoWashing': noWashing},
-                    title: 'Label $noWashing',
-                    onPrinted: () =>
-                        WashingRepository().markAsPrinted(noWashing).ignore(),
-                  );
+                  final lockApi = LabelPrintLockApi();
+                  final repo = WashingRepository();
+                  final lockVm = context.read<LabelPrintLockSocketManager>();
+                  var isLockAcquired = false;
+                  try {
+                    await lockApi.acquire(noWashing);
+                    isLockAcquired = true;
+
+                    await PdfPrintService(
+                      defaultSystem: 'pps',
+                    ).previewReport80mm(
+                      context: rootCtx,
+                      reportName: 'CrLabelPalletWashing',
+                      query: {'NoWashing': noWashing},
+                      title: 'Label $noWashing',
+                      onPrinted: () {
+                        repo.markAsPrinted(noWashing).then((count) {
+                          if (count != null) {
+                            lockVm.setPrintCount(noWashing, count);
+                          }
+                        }).ignore();
+                      },
+                    );
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    final msg = e.toString().replaceFirst('Exception: ', '');
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(msg)));
+                  } finally {
+                    if (isLockAcquired) {
+                      lockApi.release(noWashing).ignore();
+                    }
+                  }
                 }),
               ),
               divider,

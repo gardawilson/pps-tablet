@@ -328,7 +328,7 @@ class WashingRepository {
   }
 
   /// Tandai washing sudah dicetak
-  Future<void> markAsPrinted(String noWashing) async {
+  Future<int?> markAsPrinted(String noWashing) async {
     final token = await TokenStorage.getToken();
     final url = Uri.parse(
       "${ApiConstants.baseUrl}/api/labels/washing/$noWashing/print",
@@ -351,6 +351,20 @@ class WashingRepository {
           : 'Gagal mark as printed (status: ${resp.statusCode})';
       throw Exception(msg);
     }
+
+    if (resp.body.trim().isEmpty) return null;
+    try {
+      final body = json.decode(resp.body);
+      if (body is Map<String, dynamic>) {
+        final data = body['data'];
+        if (data is Map<String, dynamic>) {
+          final raw = data['HasBeenPrinted'] ?? data['hasBeenPrinted'];
+          if (raw is num) return raw.toInt();
+          if (raw != null) return int.tryParse('$raw');
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 
   /// Delete washing by NoWashing

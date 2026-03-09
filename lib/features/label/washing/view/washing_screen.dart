@@ -239,8 +239,9 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
   ) async {
     final vm = context.read<WashingViewModel>();
     final screenHeight = MediaQuery.of(context).size.height;
-    final adaptiveMaxHeight =
-        (screenHeight - 32).clamp(480.0, 820.0).toDouble();
+    final adaptiveMaxHeight = (screenHeight - 32)
+        .clamp(480.0, 820.0)
+        .toDouble();
     vm.setSelectedNoWashing(header.noWashing);
 
     _popover.show(

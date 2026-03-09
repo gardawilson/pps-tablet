@@ -7,6 +7,7 @@ import '../../bongkar_susun/view/bongkar_susun_screen.dart';
 import 'package:provider/provider.dart'; // ⬅️ wajib agar context.read bisa digunakan
 import '../../home/view/widgets/user_profile_dialog.dart';
 import '../../../core/services/token_storage.dart';
+import '../../../core/view_model/label_print_lock_socket_manager.dart';
 import '../../../core/view_model/permission_view_model.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -64,6 +65,7 @@ class HomeScreen extends StatelessWidget {
                 if (shouldLogout != true) return;
 
                 // 🔹 1. Bersihkan token dan permissions di local storage
+                context.read<LabelPrintLockSocketManager>().disconnect();
                 await TokenStorage.clear();
                 await PermissionStorage.clear();
 

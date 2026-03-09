@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:pps_tablet/core/view_model/permission_view_model.dart';
+import 'package:pps_tablet/core/view_model/label_print_lock_socket_manager.dart';
 import 'package:pps_tablet/features/audit/repository/audit_repository.dart';
 import 'package:pps_tablet/features/audit/view_model/audit_view_model.dart';
 import 'package:pps_tablet/features/bj_jual/repository/bj_jual_input_repository.dart';
@@ -185,6 +186,9 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => UserProfileViewModel()),
         ChangeNotifierProvider(create: (_) => LokasiViewModel(repository: LokasiRepository())),
         ChangeNotifierProvider(create: (_) => SocketManager()),
+        ChangeNotifierProvider(
+          create: (_) => LabelPrintLockSocketManager()..connect(),
+        ),
         ChangeNotifierProvider(create: (_) => LabelDetailViewModel()),
         ChangeNotifierProvider(create: (_) => StockOpnameAscendViewModel(repository: StockOpnameAscendRepository()) ),
         ChangeNotifierProvider(create: (_) => StockOpnameFamilyViewModel(repository: StockOpnameFamilyRepository())),

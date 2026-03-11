@@ -4,6 +4,7 @@ import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart'
 import 'package:provider/provider.dart';
 import '../../../../core/services/dialog_service.dart';
 import '../../../../common/widgets/interactive_popover.dart';
+import '../../../../core/services/label_print_sync_queue.dart';
 import '../view_model/broker_view_model.dart';
 import '../model/broker_header_model.dart';
 import '../model/broker_detail_model.dart';
@@ -28,6 +29,8 @@ class _BrokerScreenState extends State<BrokerScreen> {
   final ScrollController _detailScrollController = ScrollController();
   bool _isLoadingMore = false;
   Timer? _debounce;
+  LabelPrintSyncQueue? _syncQueue;
+  int _lastPendingCount = 0;
 
   bool _isUsed(String? dateUsage) {
     final s = (dateUsage ?? '').trim();
@@ -164,18 +167,39 @@ class _BrokerScreenState extends State<BrokerScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<BrokerViewModel>().fetchBrokerHeaders();
       context.read<BrokerViewModel>().resetForScreen();
+      _syncQueue = context.read<LabelPrintSyncQueue>();
+      _lastPendingCount = _syncQueue!.pendingCountFor('broker');
+      _syncQueue!.addListener(_onSyncQueueChanged);
     });
     _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
+    _syncQueue?.removeListener(_onSyncQueueChanged);
     _popover.dispose(); // langsung bersih tanpa animasi
     _scrollController.dispose();
     _detailScrollController.dispose();
     searchCtrl.dispose();
     _debounce?.cancel();
     super.dispose();
+  }
+
+  void _onSyncQueueChanged() {
+    if (!mounted || _syncQueue == null) return;
+    final now = _syncQueue!.pendingCountFor('broker');
+
+    if (_lastPendingCount == 0 && now > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Sinkronisasi print broker tertunda ($now)')),
+      );
+    } else if (_lastPendingCount > 0 && now == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sinkronisasi print broker selesai')),
+      );
+    }
+
+    _lastPendingCount = now;
   }
 
   void _onScroll() {
@@ -333,6 +357,21 @@ class _BrokerScreenState extends State<BrokerScreen> {
             );
           },
         ),
+        actions: [
+          Consumer<LabelPrintSyncQueue>(
+            builder: (_, syncQueue, __) {
+              final pending = syncQueue.pendingCountFor('broker');
+              if (pending <= 0) return const SizedBox.shrink();
+              return Tooltip(
+                message: 'Sinkronisasi print broker tertunda ($pending)',
+                child: const Padding(
+                  padding: EdgeInsets.only(right: 12),
+                  child: Icon(Icons.sync, color: Color(0xFFFFE082)),
+                ),
+              );
+            },
+          ),
+        ],
         backgroundColor: const Color(0xFF1565C0),
         foregroundColor: Colors.white,
       ),

@@ -281,12 +281,19 @@ class RejectRepository {
   // =======================================================================
   // PATCH /api/labels/reject/:noReject/print
   // =======================================================================
-  Future<void> markAsPrinted(String noReject) async {
+  Future<int?> markAsPrinted(String noReject) async {
     try {
-      await api.patchJson(
+      final body = await api.patchJson(
         '/api/labels/reject/${Uri.encodeComponent(noReject)}/print',
       );
-      print('🖨️ PATCH Mark As Printed Reject: $noReject');
+      print('PATCH Mark As Printed Reject: $noReject');
+      final data = body['data'];
+      if (data is Map<String, dynamic>) {
+        final raw = data['HasBeenPrinted'] ?? data['hasBeenPrinted'];
+        if (raw is num) return raw.toInt();
+        if (raw != null) return int.tryParse('$raw');
+      }
+      return null;
     } on ApiException catch (e) {
       throw Exception(_friendlyError(e, 'Gagal mark as printed reject'));
     }

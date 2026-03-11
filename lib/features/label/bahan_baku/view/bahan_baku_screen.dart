@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/services/dialog_service.dart';
+import '../../../../core/services/label_print_sync_queue.dart';
 import '../model/bahan_baku_header.dart';
 import '../model/bahan_baku_pallet.dart';
 import '../view_model/bahan_baku_view_model.dart';
@@ -27,6 +28,8 @@ class _BahanBakuScreenState extends State<BahanBakuScreen> {
 
   bool _isLoadingMore = false;
   Timer? _debounce;
+  LabelPrintSyncQueue? _syncQueue;
+  int _lastPendingCount = 0;
 
   @override
   void initState() {
@@ -34,18 +37,39 @@ class _BahanBakuScreenState extends State<BahanBakuScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<BahanBakuViewModel>().fetchBahanBakuHeaders();
       context.read<BahanBakuViewModel>().resetForScreen();
+      _syncQueue = context.read<LabelPrintSyncQueue>();
+      _lastPendingCount = _syncQueue!.pendingCountFor('bahan_baku');
+      _syncQueue!.addListener(_onSyncQueueChanged);
     });
     _headerScrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
+    _syncQueue?.removeListener(_onSyncQueueChanged);
     _headerScrollController.dispose();
     _palletScrollController.dispose();
     _detailScrollController.dispose();
     searchCtrl.dispose();
     _debounce?.cancel();
     super.dispose();
+  }
+
+  void _onSyncQueueChanged() {
+    if (!mounted || _syncQueue == null) return;
+    final now = _syncQueue!.pendingCountFor('bahan_baku');
+
+    if (_lastPendingCount == 0 && now > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Sinkronisasi print bahan baku tertunda ($now)')),
+      );
+    } else if (_lastPendingCount > 0 && now == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sinkronisasi print bahan baku selesai')),
+      );
+    }
+
+    _lastPendingCount = now;
   }
 
   void _onScroll() {
@@ -153,7 +177,7 @@ class _BahanBakuScreenState extends State<BahanBakuScreen> {
         title: Consumer<BahanBakuViewModel>(
           builder: (_, vm, __) {
             final label = vm.isLoading && vm.items.isEmpty
-                ? 'LABEL BAHAN BAKU (…)'
+                ? 'LABEL BAHAN BAKU (...)'
                 : 'LABEL BAHAN BAKU (${vm.totalCount})';
             return Text(
               label,
@@ -165,6 +189,21 @@ class _BahanBakuScreenState extends State<BahanBakuScreen> {
             );
           },
         ),
+        actions: [
+          Consumer<LabelPrintSyncQueue>(
+            builder: (_, syncQueue, __) {
+              final pending = syncQueue.pendingCountFor('bahan_baku');
+              if (pending <= 0) return const SizedBox.shrink();
+              return Tooltip(
+                message: 'Sinkronisasi print bahan baku tertunda ($pending)',
+                child: const Padding(
+                  padding: EdgeInsets.only(right: 12),
+                  child: Icon(Icons.sync, color: Color(0xFFFFE082)),
+                ),
+              );
+            },
+          ),
+        ],
         backgroundColor: const Color(0xFF1565C0),
         foregroundColor: Colors.white,
       ),
@@ -226,3 +265,4 @@ class _BahanBakuScreenState extends State<BahanBakuScreen> {
     );
   }
 }
+

@@ -5,7 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/label_popover_widgets.dart';
+import '../../../../core/network/label_print_lock_api.dart';
+import '../../../../core/services/label_print_sync_queue.dart';
 import '../../../../core/utils/pdf_print_service.dart';
+import '../../../../core/view_model/label_print_lock_socket_manager.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../model/furniture_wip_header_model.dart';
 import '../repository/furniture_wip_repository.dart';
@@ -202,23 +205,86 @@ class _FurnitureWipRowPopoverState extends State<FurnitureWipRowPopover> {
                 icon: Icons.print_outlined,
                 label: 'Print',
                 enabled: true,
-                onTap: () => _runAndClose(() {
+                onTap: () => _runAndClose(() async {
                   final rootCtx = Navigator.of(
                     context,
                     rootNavigator: true,
                   ).context;
 
-                  PdfPrintService(defaultSystem: 'pps').previewReport80mm(
-                    context: rootCtx,
-                    reportName: 'CrLabelFurnitureWIP',
-                    query: {'NoFurnitureWIP': widget.header.noFurnitureWip},
-                    title: widget.header.noFurnitureWip,
-                    onPrinted: () {
-                      FurnitureWipRepository().markAsPrinted(
-                        widget.header.noFurnitureWip,
-                      );
-                    },
-                  );
+                  final noFurnitureWip = widget.header.noFurnitureWip;
+                  final lockApi = LabelPrintLockApi();
+                  final repo = FurnitureWipRepository();
+                  final lockVm = context.read<LabelPrintLockSocketManager>();
+                  final queue = context.read<LabelPrintSyncQueue>();
+                  var isLockAcquired = false;
+                  var isPrinted = false;
+
+                  try {
+                    await lockApi.acquire(noFurnitureWip);
+                    isLockAcquired = true;
+
+                    await PdfPrintService(
+                      defaultSystem: 'pps',
+                    ).previewReport80mm(
+                      context: rootCtx,
+                      reportName: 'CrLabelFurnitureWIP',
+                      query: {'NoFurnitureWIP': noFurnitureWip},
+                      title: noFurnitureWip,
+                      onPrinted: () {
+                        isPrinted = true;
+                        () async {
+                          var needsIncrement = false;
+                          var needsRelease = false;
+
+                          try {
+                            final count = await repo.markAsPrinted(
+                              noFurnitureWip,
+                            );
+                            if (count != null) {
+                              lockVm.setPrintCount(noFurnitureWip, count);
+                            }
+                          } catch (_) {
+                            needsIncrement = true;
+                          }
+
+                          try {
+                            await lockApi.release(noFurnitureWip);
+                          } catch (_) {
+                            needsRelease = true;
+                          }
+
+                          if (needsIncrement || needsRelease) {
+                            await queue.enqueue(
+                              feature: 'furniture_wip',
+                              noLabel: noFurnitureWip,
+                              needsIncrement: needsIncrement,
+                              needsReleaseLock: needsRelease,
+                            );
+                          }
+                        }().ignore();
+                      },
+                    );
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    final msg = e.toString().replaceFirst('Exception: ', '');
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(msg)));
+                  } finally {
+                    if (isLockAcquired && !isPrinted) {
+                      () async {
+                        try {
+                          await lockApi.release(noFurnitureWip);
+                        } catch (_) {
+                          await queue.enqueue(
+                            feature: 'furniture_wip',
+                            noLabel: noFurnitureWip,
+                            needsReleaseLock: true,
+                          );
+                        }
+                      }().ignore();
+                    }
+                  }
                 }),
               ),
               divider,

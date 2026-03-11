@@ -1,0 +1,43 @@
+﻿flowchart TB
+    U[User klik Print] --> L1[POST print-lock]
+    L1 --> C1{Lock berhasil?}
+
+    C1 -- Tidak --> ERR1[409: sedang diprint user lain]
+    ERR1 --> END[SELESAI]
+
+    C1 -- Ya --> V[Open PDF Preview]
+    V --> C2{User klik Cetak?}
+
+    C2 -- Tidak --> RL1[DELETE print-lock]
+    RL1 --> C3{DELETE sukses?}
+    C3 -- Ya --> END
+    C3 -- Tidak --> Q1[Queue Hive: needsReleaseLock]
+    Q1 --> END
+
+    C2 -- Ya --> WB[writeBytes ke printer]
+    WB --> C4{writeBytes == true?}
+
+    C4 -- Tidak --> RL1
+
+    C4 -- Ya --> P1[PATCH increment HasBeenPrinted]
+    P1 --> C5{PATCH sukses?}
+
+    C5 -- Ya --> UPD[Update count lokal + socket print_confirmed]
+    C5 -- Tidak --> Q2[Queue Hive: needsIncrement]
+
+    UPD --> RL2[DELETE print-lock]
+    Q2 --> RL2
+
+    RL2 --> C6{DELETE sukses?}
+    C6 -- Ya --> DONE[Queue kosong]
+    C6 -- Tidak --> Q3[Queue Hive: needsReleaseLock]
+
+    DONE --> UI1[Icon sync hilang]
+    Q3 --> UI2[Icon sync muncul]
+
+    UI2 --> WK[Worker retry periodik/resume]
+    WK --> RP[Retry PATCH jika needsIncrement]
+    RP --> RD[Retry DELETE jika needsReleaseLock]
+    RD --> C7{Semua sukses?}
+    C7 -- Ya --> UI1
+    C7 -- Tidak --> WK

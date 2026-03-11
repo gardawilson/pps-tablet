@@ -1,16 +1,19 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
+
 import '../../../../common/widgets/interactive_popover.dart';
 import '../../../../core/services/dialog_service.dart';
-import '../view_model/crusher_view_model.dart';
+import '../../../../core/services/label_print_sync_queue.dart';
 import '../model/crusher_header_model.dart';
-import '../widgets/crusher_row_popover.dart';
+import '../view_model/crusher_view_model.dart';
 import '../widgets/crusher_action_bar.dart';
-import '../widgets/crusher_header_table.dart';
-import '../widgets/crusher_form_dialog.dart';
 import '../widgets/crusher_delete_dialog.dart';
+import '../widgets/crusher_form_dialog.dart';
+import '../widgets/crusher_header_table.dart';
+import '../widgets/crusher_row_popover.dart';
 
 class CrusherScreen extends StatefulWidget {
   const CrusherScreen({super.key});
@@ -25,8 +28,9 @@ class _CrusherScreenState extends State<CrusherScreen> {
   final ScrollController _detailScrollController = ScrollController();
   bool _isLoadingMore = false;
   Timer? _debounce;
+  LabelPrintSyncQueue? _syncQueue;
+  int _lastPendingCount = 0;
 
-  // Popover animasi (custom)
   final InteractivePopover _popover = InteractivePopover();
 
   @override
@@ -35,13 +39,17 @@ class _CrusherScreenState extends State<CrusherScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<CrusherViewModel>().fetchHeaders();
       context.read<CrusherViewModel>().resetForScreen();
+      _syncQueue = context.read<LabelPrintSyncQueue>();
+      _lastPendingCount = _syncQueue!.pendingCountFor('crusher');
+      _syncQueue!.addListener(_onSyncQueueChanged);
     });
     _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
-    _popover.dispose(); // langsung bersih tanpa animasi
+    _syncQueue?.removeListener(_onSyncQueueChanged);
+    _popover.dispose();
     _scrollController.dispose();
     _detailScrollController.dispose();
     searchCtrl.dispose();
@@ -49,8 +57,24 @@ class _CrusherScreenState extends State<CrusherScreen> {
     super.dispose();
   }
 
+  void _onSyncQueueChanged() {
+    if (!mounted || _syncQueue == null) return;
+    final now = _syncQueue!.pendingCountFor('crusher');
+
+    if (_lastPendingCount == 0 && now > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Sinkronisasi print crusher tertunda ($now)')),
+      );
+    } else if (_lastPendingCount > 0 && now == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sinkronisasi print crusher selesai')),
+      );
+    }
+
+    _lastPendingCount = now;
+  }
+
   void _onScroll() {
-    // Tutup popover saat scroll supaya tidak "mengambang"
     if (_popover.isShown) {
       _popover.hide();
     }
@@ -90,9 +114,9 @@ class _CrusherScreenState extends State<CrusherScreen> {
         header: header,
         onSave: (headerData) {
           if (header != null) {
-            // vm.updateWashing(headerData, detailsData);
+            // vm.update
           } else {
-            // vm.createWashing(headerData, detailsData);
+            // vm.create
           }
         },
       ),
@@ -105,22 +129,17 @@ class _CrusherScreenState extends State<CrusherScreen> {
       builder: (_) => CrusherDeleteDialog(
         header: header,
         onConfirm: () async {
-          // Tutup dialog dahulu
           Navigator.of(context).pop();
-
-          // Lanjut eksekusi delete
           await _handleDelete(header);
         },
       ),
     );
   }
 
-  // Tutup popover (tidak mengubah selection — biarkan tetap menandai item aktif)
   void _closeContextMenu() {
     _popover.hide();
   }
 
-  /// Long-press handler: pindahkan highlight ke item & tampilkan popover.
   Future<void> _onItemLongPress(
     CrusherHeader header,
     Offset globalPosition,
@@ -130,7 +149,6 @@ class _CrusherScreenState extends State<CrusherScreen> {
     final adaptiveMaxHeight =
         (screenHeight - 32).clamp(480.0, 820.0).toDouble();
 
-    // Pindahkan highlight saat long-press
     vm.setSelected(header.noCrusher);
 
     _popover.show(
@@ -150,20 +168,18 @@ class _CrusherScreenState extends State<CrusherScreen> {
         },
         onPrint: () {
           _closeContextMenu();
-          // TODO: print/preview
         },
         onAuditHistory: () {
           _closeContextMenu();
           _navigateToAuditHistory(header);
         },
       ),
-      // animasi & penempatan cerdas
       preferAbove: true,
       verticalGap: 8,
       maxHeight: adaptiveMaxHeight,
       backdropOpacity: 0.06,
       duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutBack, // overshoot untuk SCALE tetap aman
+      curve: Curves.easeOutBack,
       startScale: 0.94,
     );
   }
@@ -185,7 +201,7 @@ class _CrusherScreenState extends State<CrusherScreen> {
         title: Consumer<CrusherViewModel>(
           builder: (_, vm, __) {
             final label = vm.isLoading && vm.items.isEmpty
-                ? 'LABEL CRUSHER (…)'
+                ? 'LABEL CRUSHER (...)'
                 : 'LABEL CRUSHER (${vm.totalCount})';
             return Text(
               label,
@@ -197,12 +213,26 @@ class _CrusherScreenState extends State<CrusherScreen> {
             );
           },
         ),
+        actions: [
+          Consumer<LabelPrintSyncQueue>(
+            builder: (_, syncQueue, __) {
+              final pending = syncQueue.pendingCountFor('crusher');
+              if (pending <= 0) return const SizedBox.shrink();
+              return Tooltip(
+                message: 'Sinkronisasi print crusher tertunda ($pending)',
+                child: const Padding(
+                  padding: EdgeInsets.only(right: 12),
+                  child: Icon(Icons.sync, color: Color(0xFFFFE082)),
+                ),
+              );
+            },
+          ),
+        ],
         backgroundColor: const Color(0xFF1565C0),
         foregroundColor: Colors.white,
       ),
       body: Row(
         children: [
-          // Master Table
           Expanded(
             flex: 4,
             child: Container(
@@ -214,7 +244,7 @@ class _CrusherScreenState extends State<CrusherScreen> {
                     onSearchChanged: _onSearchChanged,
                     onClear: () {
                       searchCtrl.clear();
-                      context.read<CrusherViewModel>().fetchHeaders(search: "");
+                      context.read<CrusherViewModel>().fetchHeaders(search: '');
                     },
                     onAddPressed: _showFormDialog,
                   ),
@@ -223,12 +253,9 @@ class _CrusherScreenState extends State<CrusherScreen> {
                       scrollController: _scrollController,
                       onItemTap: (header) {
                         final vm = context.read<CrusherViewModel>();
-                        // Klik: pindahkan highlight & (opsional) load detail
                         vm.setSelected(header.noCrusher);
                       },
-                      // Long-press: pindahkan highlight & tampilkan popover
                       onItemLongPress: _onItemLongPress,
-                      // ⚠️ Tidak perlu highlightedNoWashing lagi
                     ),
                   ),
                 ],
@@ -249,13 +276,11 @@ class _CrusherScreenState extends State<CrusherScreen> {
       await vm.deleteCrusher(no);
       DialogService.instance.hideLoading();
 
-      // Success toast/snackbar/dialog
       await DialogService.instance.showSuccess(
         title: 'Terhapus',
         message: 'Label $no berhasil dihapus.',
       );
 
-      // Bersihkan selection & (opsional) scroll detail ke atas
       vm.setSelected(null);
       if (_detailScrollController.hasClients) {
         _detailScrollController.jumpTo(0);

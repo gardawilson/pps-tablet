@@ -393,7 +393,7 @@ class MixerRepository {
   }
 
   /// Tandai mixer sudah dicetak
-  Future<void> markAsPrinted(String noMixer) async {
+  Future<int?> markAsPrinted(String noMixer) async {
     final token = await TokenStorage.getToken();
     final url = Uri.parse(
       "${ApiConstants.baseUrl}/api/labels/mixer/$noMixer/print",
@@ -413,6 +413,20 @@ class MixerRepository {
           : 'Gagal mark as printed (status: ${resp.statusCode})';
       throw Exception(msg);
     }
+
+    if (resp.body.trim().isEmpty) return null;
+    try {
+      final body = json.decode(resp.body);
+      if (body is Map<String, dynamic>) {
+        final data = body['data'];
+        if (data is Map<String, dynamic>) {
+          final raw = data['HasBeenPrinted'] ?? data['hasBeenPrinted'];
+          if (raw is num) return raw.toInt();
+          if (raw != null) return int.tryParse('$raw');
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 
   /// Fetch partial info for Mixer NoMixer + NoSak

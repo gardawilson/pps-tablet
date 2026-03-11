@@ -1,19 +1,22 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
+
 import '../../../../common/widgets/interactive_popover.dart';
 import '../../../../core/services/dialog_service.dart';
-import '../view_model/mixer_view_model.dart';
-import '../model/mixer_header_model.dart';
+import '../../../../core/services/label_print_sync_queue.dart';
 import '../model/mixer_detail_model.dart';
-import '../widgets/mixer_row_popover.dart';
+import '../model/mixer_header_model.dart';
+import '../view_model/mixer_view_model.dart';
 import '../widgets/mixer_action_bar.dart';
-import '../widgets/mixer_header_table.dart';
+import '../widgets/mixer_delete_dialog.dart';
 import '../widgets/mixer_detail_table.dart';
 import '../widgets/mixer_form_dialog.dart';
-import '../widgets/mixer_delete_dialog.dart';
+import '../widgets/mixer_header_table.dart';
 import '../widgets/mixer_qc_dialog.dart';
+import '../widgets/mixer_row_popover.dart';
 
 class MixerScreen extends StatefulWidget {
   const MixerScreen({super.key});
@@ -28,8 +31,9 @@ class _MixerScreenState extends State<MixerScreen> {
   final ScrollController _detailScrollController = ScrollController();
   bool _isLoadingMore = false;
   Timer? _debounce;
+  LabelPrintSyncQueue? _syncQueue;
+  int _lastPendingCount = 0;
 
-  // Popover animasi (custom)
   final InteractivePopover _popover = InteractivePopover();
 
   bool _isUsed(String? dateUsage) {
@@ -42,10 +46,8 @@ class _MixerScreenState extends State<MixerScreen> {
   Future<void> _onEditHeader(MixerHeader header) async {
     final vm = context.read<MixerViewModel>();
 
-    // pastikan selection benar
     vm.setSelectedNoMixer(header.noMixer);
 
-    // fetch detail terbaru untuk header ini
     DialogService.instance.showLoading(
       message: 'Cek detail ${header.noMixer}...',
     );
@@ -54,7 +56,6 @@ class _MixerScreenState extends State<MixerScreen> {
 
     if (!mounted) return;
 
-    // RULE: tidak boleh edit jika ada DateUsage terisi atau ada isPartial = true
     final hasUsed = vm.details.any((d) => _isUsed(d.dateUsage));
     final hasPartial = vm.details.any((d) => d.isPartial == true);
 
@@ -71,17 +72,14 @@ class _MixerScreenState extends State<MixerScreen> {
       return;
     }
 
-    // aman -> buka form edit
     _showFormDialog(header: header, details: vm.details);
   }
 
   Future<void> _onDeleteHeader(MixerHeader header) async {
     final vm = context.read<MixerViewModel>();
 
-    // pastikan selection benar
     vm.setSelectedNoMixer(header.noMixer);
 
-    // fetch detail terbaru untuk header ini (biar rule valid)
     DialogService.instance.showLoading(
       message: 'Cek detail ${header.noMixer}...',
     );
@@ -106,7 +104,6 @@ class _MixerScreenState extends State<MixerScreen> {
       return;
     }
 
-    // aman -> lanjut confirm delete
     _confirmDelete(header);
   }
 
@@ -159,13 +156,17 @@ class _MixerScreenState extends State<MixerScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<MixerViewModel>().fetchHeaders();
       context.read<MixerViewModel>().resetForScreen();
+      _syncQueue = context.read<LabelPrintSyncQueue>();
+      _lastPendingCount = _syncQueue!.pendingCountFor('mixer');
+      _syncQueue!.addListener(_onSyncQueueChanged);
     });
     _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
-    _popover.dispose(); // langsung bersih tanpa animasi
+    _syncQueue?.removeListener(_onSyncQueueChanged);
+    _popover.dispose();
     _scrollController.dispose();
     _detailScrollController.dispose();
     searchCtrl.dispose();
@@ -173,8 +174,24 @@ class _MixerScreenState extends State<MixerScreen> {
     super.dispose();
   }
 
+  void _onSyncQueueChanged() {
+    if (!mounted || _syncQueue == null) return;
+    final now = _syncQueue!.pendingCountFor('mixer');
+
+    if (_lastPendingCount == 0 && now > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Sinkronisasi print mixer tertunda ($now)')),
+      );
+    } else if (_lastPendingCount > 0 && now == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sinkronisasi print mixer selesai')),
+      );
+    }
+
+    _lastPendingCount = now;
+  }
+
   void _onScroll() {
-    // Tutup popover saat scroll supaya tidak "mengambang"
     if (_popover.isShown) {
       _popover.hide();
     }
@@ -215,9 +232,9 @@ class _MixerScreenState extends State<MixerScreen> {
         details: details,
         onSave: (headerData, detailsData) {
           if (header != null) {
-            // vm.updateWashing(headerData, detailsData);
+            // vm.update
           } else {
-            // vm.createWashing(headerData, detailsData);
+            // vm.create
           }
         },
       ),
@@ -230,22 +247,17 @@ class _MixerScreenState extends State<MixerScreen> {
       builder: (_) => MixerDeleteDialog(
         header: header,
         onConfirm: () async {
-          // Tutup dialog dahulu
           Navigator.of(context).pop();
-
-          // Lanjut eksekusi delete
           await _handleDelete(header);
         },
       ),
     );
   }
 
-  // Tutup popover (tidak mengubah selection — biarkan tetap menandai item aktif)
   void _closeContextMenu() {
     _popover.hide();
   }
 
-  /// Long-press handler: pindahkan highlight ke item & tampilkan popover.
   Future<void> _onItemLongPress(
     MixerHeader header,
     Offset globalPosition,
@@ -255,7 +267,6 @@ class _MixerScreenState extends State<MixerScreen> {
     final adaptiveMaxHeight =
         (screenHeight - 32).clamp(480.0, 820.0).toDouble();
 
-    // Pindahkan highlight saat long-press
     vm.setSelectedNoMixer(header.noMixer);
 
     _popover.show(
@@ -268,16 +279,13 @@ class _MixerScreenState extends State<MixerScreen> {
           _closeContextMenu();
           await _onEditHeader(header);
         },
-
         onDelete: () async {
           if (context.read<MixerViewModel>().isLoading) return;
           _closeContextMenu();
           await _onDeleteHeader(header);
         },
-
         onPrint: () {
           _closeContextMenu();
-          // TODO: print/preview
         },
         onAuditHistory: () {
           _closeContextMenu();
@@ -288,13 +296,12 @@ class _MixerScreenState extends State<MixerScreen> {
           await _onQcHeader(header);
         },
       ),
-      // animasi & penempatan cerdas
       preferAbove: true,
       verticalGap: 8,
       maxHeight: adaptiveMaxHeight,
       backdropOpacity: 0.06,
       duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutBack, // overshoot untuk SCALE tetap aman
+      curve: Curves.easeOutBack,
       startScale: 0.94,
     );
   }
@@ -317,7 +324,7 @@ class _MixerScreenState extends State<MixerScreen> {
         title: Consumer<MixerViewModel>(
           builder: (_, vm, __) {
             final label = vm.isLoading && vm.items.isEmpty
-                ? 'LABEL MIXER (…)'
+                ? 'LABEL MIXER (...)'
                 : 'LABEL MIXER (${vm.totalCount})';
             return Text(
               label,
@@ -329,12 +336,26 @@ class _MixerScreenState extends State<MixerScreen> {
             );
           },
         ),
+        actions: [
+          Consumer<LabelPrintSyncQueue>(
+            builder: (_, syncQueue, __) {
+              final pending = syncQueue.pendingCountFor('mixer');
+              if (pending <= 0) return const SizedBox.shrink();
+              return Tooltip(
+                message: 'Sinkronisasi print mixer tertunda ($pending)',
+                child: const Padding(
+                  padding: EdgeInsets.only(right: 12),
+                  child: Icon(Icons.sync, color: Color(0xFFFFE082)),
+                ),
+              );
+            },
+          ),
+        ],
         backgroundColor: const Color(0xFF1565C0),
         foregroundColor: Colors.white,
       ),
       body: Row(
         children: [
-          // Master Table
           Expanded(
             flex: 4,
             child: Container(
@@ -346,7 +367,7 @@ class _MixerScreenState extends State<MixerScreen> {
                     onSearchChanged: _onSearchChanged,
                     onClear: () {
                       searchCtrl.clear();
-                      context.read<MixerViewModel>().fetchHeaders(search: "");
+                      context.read<MixerViewModel>().fetchHeaders(search: '');
                     },
                     onAddPressed: _showFormDialog,
                   ),
@@ -355,24 +376,17 @@ class _MixerScreenState extends State<MixerScreen> {
                       scrollController: _scrollController,
                       onItemTap: (header) {
                         final vm = context.read<MixerViewModel>();
-                        // Klik: pindahkan highlight & (opsional) load detail
                         vm.setSelectedNoMixer(header.noMixer);
                         vm.fetchDetails(header.noMixer);
                       },
-                      // Long-press: pindahkan highlight & tampilkan popover
                       onItemLongPress: _onItemLongPress,
-                      // ⚠️ Tidak perlu highlightedNoWashing lagi
                     ),
                   ),
                 ],
               ),
             ),
           ),
-
-          // Divider
           Container(width: 2, color: Colors.grey.shade300),
-
-          // Detail Panel
           Expanded(
             flex: 1,
             child: MixerDetailTable(scrollController: _detailScrollController),
@@ -384,23 +398,19 @@ class _MixerScreenState extends State<MixerScreen> {
 
   Future<void> _handleDelete(MixerHeader header) async {
     final vm = context.read<MixerViewModel>();
-    final noBroker = header.noMixer;
+    final noMixer = header.noMixer;
 
-    DialogService.instance.showLoading(message: 'Menghapus $noBroker...');
-    final ok = await vm.deleteMixer(noBroker);
+    DialogService.instance.showLoading(message: 'Menghapus $noMixer...');
+    final ok = await vm.deleteMixer(noMixer);
     DialogService.instance.hideLoading();
 
     if (ok) {
       await DialogService.instance.showSuccess(
         title: 'Terhapus',
-        message: 'Label $noBroker berhasil dihapus.',
+        message: 'Label $noMixer berhasil dihapus.',
       );
 
-      // Selalu bersihkan panel detail & selection
       vm.setSelectedNoMixer(null);
-
-      // (Opsional) scroll panel detail ke atas
-      // _detailScrollController.jumpTo(0);
     } else {
       await DialogService.instance.showError(
         title: 'Gagal',

@@ -7,7 +7,13 @@ import 'package:pps_tablet/core/view_model/permission_view_model.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/label_popover_widgets.dart';
+import '../../../../core/network/api_client.dart';
+import '../../../../core/network/label_print_lock_api.dart';
+import '../../../../core/services/label_print_sync_queue.dart';
 import '../../../../core/utils/pdf_print_service.dart';
+import '../../../../core/view_model/label_print_lock_socket_manager.dart';
+import '../repository/bahan_baku_repository.dart';
+import '../view_model/bahan_baku_view_model.dart';
 import '../model/bahan_baku_pallet.dart';
 
 class BahanBakuPalletPopover extends StatefulWidget {
@@ -182,23 +188,103 @@ class _BahanBakuPalletPopoverState extends State<BahanBakuPalletPopover> {
                 icon: Icons.print_outlined,
                 label: 'Print',
                 enabled: true,
-                onTap: () => _runAndClose(() {
+                onTap: () => _runAndClose(() async {
                   final rootCtx = Navigator.of(
                     context,
                     rootNavigator: true,
                   ).context;
-                  PdfPrintService(defaultSystem: 'pps').previewReport80mm(
-                    context: rootCtx,
-                    reportName: 'LabelPalletBB',
-                    query: {
-                      'NoBahanBaku': widget.pallet.noBahanBaku,
-                      'NoPallet': widget.pallet.noPallet,
-                    },
-                    title: widget.pallet.noPallet,
-                    onPrinted: () {
-                      widget.onAfterPrint?.call();
-                    },
-                  );
+
+                  final noBahanBaku = widget.pallet.noBahanBaku;
+                  final noPallet = widget.pallet.noPallet;
+                  final lockApi = LabelPrintLockApi();
+                  final repo = BahanBakuRepository(api: ApiClient());
+                  final lockVm = context.read<LabelPrintLockSocketManager>();
+                  final queue = context.read<LabelPrintSyncQueue>();
+                  final vm = context.read<BahanBakuViewModel>();
+                  var isLockAcquired = false;
+                  var isPrinted = false;
+
+                  try {
+                    await lockApi.acquire(noPallet);
+                    isLockAcquired = true;
+
+                    await PdfPrintService(
+                      defaultSystem: 'pps',
+                    ).previewReport80mm(
+                      context: rootCtx,
+                      reportName: 'LabelPalletBB',
+                      query: {'NoBahanBaku': noBahanBaku, 'NoPallet': noPallet},
+                      title: '$noBahanBaku-$noPallet',
+                      onPrinted: () {
+                        isPrinted = true;
+                        () async {
+                          var needsIncrement = false;
+                          var needsRelease = false;
+
+                          try {
+                            final count = await repo.markAsPrinted(
+                              noBahanBaku: noBahanBaku,
+                              noPallet: noPallet,
+                            );
+                            if (count != null) {
+                              lockVm.setPrintCount(noPallet, count);
+                              vm.setPalletPrintedCount(
+                                noPallet: noPallet,
+                                count: count,
+                              );
+                            } else {
+                              widget.onAfterPrint?.call();
+                            }
+                          } catch (_) {
+                            needsIncrement = true;
+                          }
+
+                          try {
+                            await lockApi.release(noPallet);
+                          } catch (_) {
+                            needsRelease = true;
+                          }
+
+                          if (needsIncrement || needsRelease) {
+                            await queue.enqueue(
+                              feature: 'bahan_baku',
+                              noLabel: noPallet,
+                              extra: {
+                                'noBahanBaku': noBahanBaku,
+                                'noPallet': noPallet,
+                              },
+                              needsIncrement: needsIncrement,
+                              needsReleaseLock: needsRelease,
+                            );
+                          }
+                        }().ignore();
+                      },
+                    );
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    final msg = e.toString().replaceFirst('Exception: ', '');
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(msg)));
+                  } finally {
+                    if (isLockAcquired && !isPrinted) {
+                      () async {
+                        try {
+                          await lockApi.release(noPallet);
+                        } catch (_) {
+                          await queue.enqueue(
+                            feature: 'bahan_baku',
+                            noLabel: noPallet,
+                            extra: {
+                              'noBahanBaku': noBahanBaku,
+                              'noPallet': noPallet,
+                            },
+                            needsReleaseLock: true,
+                          );
+                        }
+                      }().ignore();
+                    }
+                  }
                 }),
               ),
             ],

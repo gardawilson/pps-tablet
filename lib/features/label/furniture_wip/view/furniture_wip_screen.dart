@@ -1,20 +1,20 @@
-// lib/features/furniture_wip/view/reject_screen.dart
-
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/interactive_popover.dart';
 import '../../../../core/services/dialog_service.dart';
-import '../view_model/furniture_wip_view_model.dart';
+import '../../../../core/services/label_print_sync_queue.dart';
 import '../model/furniture_wip_header_model.dart';
-import '../widgets/furniture_wip_row_popover.dart';
+import '../view_model/furniture_wip_view_model.dart';
 import '../widgets/furniture_wip_action_bar.dart';
-import '../widgets/furniture_wip_header_table.dart';
-import '../widgets/furniture_wip_form_dialog.dart';
 import '../widgets/furniture_wip_delete_dialog.dart';
+import '../widgets/furniture_wip_form_dialog.dart';
+import '../widgets/furniture_wip_header_table.dart';
 import '../widgets/furniture_wip_partial_info_popover.dart';
+import '../widgets/furniture_wip_row_popover.dart';
 
 class FurnitureWipScreen extends StatefulWidget {
   const FurnitureWipScreen({super.key});
@@ -27,14 +27,12 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
   final TextEditingController searchCtrl = TextEditingController();
   final ScrollController _detailScrollController = ScrollController();
   Timer? _debounce;
+  LabelPrintSyncQueue? _syncQueue;
+  int _lastPendingCount = 0;
 
-  /// Satu popover controller untuk:
-  /// - Row popover (edit/print/delete)
-  /// - Partial info popover
   final InteractivePopover _popover = InteractivePopover();
 
   bool _isPartialHeader(FurnitureWipHeader h) {
-    // sesuaikan kalau nama field berbeda (mis: isPartialBool / IsPartial)
     return h.isPartial == 1;
   }
 
@@ -69,14 +67,17 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final vm = context.read<FurnitureWipViewModel>();
-      // Bebas: implementasi dalam VM boleh reset search + refresh paging.
       vm.resetForScreen();
-      vm.fetchHeaders(); // di VM bisa di-mapping ke pagingController.refresh()
+      vm.fetchHeaders();
+      _syncQueue = context.read<LabelPrintSyncQueue>();
+      _lastPendingCount = _syncQueue!.pendingCountFor('furniture_wip');
+      _syncQueue!.addListener(_onSyncQueueChanged);
     });
   }
 
   @override
   void dispose() {
+    _syncQueue?.removeListener(_onSyncQueueChanged);
     _popover.dispose();
     _detailScrollController.dispose();
     searchCtrl.dispose();
@@ -84,11 +85,29 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
     super.dispose();
   }
 
+  void _onSyncQueueChanged() {
+    if (!mounted || _syncQueue == null) return;
+    final now = _syncQueue!.pendingCountFor('furniture_wip');
+
+    if (_lastPendingCount == 0 && now > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Sinkronisasi print furniture wip tertunda ($now)'),
+        ),
+      );
+    } else if (_lastPendingCount > 0 && now == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sinkronisasi print furniture wip selesai')),
+      );
+    }
+
+    _lastPendingCount = now;
+  }
+
   void _onSearchChanged(String query) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 500), () {
       context.read<FurnitureWipViewModel>().fetchHeaders(search: query);
-      // Tidak perlu scrollController lagi; paging table akan handle sendiri.
     });
   }
 
@@ -107,10 +126,7 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
       builder: (_) => FurnitureWipDeleteDialog(
         header: header,
         onConfirm: () async {
-          // Tutup dialog dulu
           Navigator.of(context).pop();
-
-          // Baru eksekusi delete
           await _handleDelete(header);
         },
       ),
@@ -121,7 +137,6 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
     _popover.hide();
   }
 
-  /// Long-press handler: set highlight & show row popover (Edit / Print / Delete)
   Future<void> _onItemLongPress(
     FurnitureWipHeader header,
     Offset globalPosition,
@@ -131,7 +146,6 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
     final adaptiveMaxHeight =
         (screenHeight - 32).clamp(480.0, 820.0).toDouble();
 
-    // Pindah highlight ke row ini
     vm.setSelected(header.noFurnitureWip);
 
     _popover.show(
@@ -155,7 +169,6 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
         },
         onPrint: () {
           _closeContextMenu();
-          // printing sudah dihandle di dalam FurnitureWipRowPopover
         },
         onAuditHistory: () {
           _closeContextMenu();
@@ -181,17 +194,14 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
     );
   }
 
-  /// Hanya dipakai dari menu "Info Partial" di row popover.
   Future<void> _showPartialInfoPopover(FurnitureWipHeader header) async {
     final vm = context.read<FurnitureWipViewModel>();
 
-    // Set selected row
     vm.setSelected(header.noFurnitureWip);
 
     final size = MediaQuery.of(context).size;
     final defaultPos = Offset(size.width * 0.5, size.height * 0.3);
 
-    // Tampilkan popover partial menggunakan controller yang sama.
     await showFurnitureWipPartialInfoPopover(
       context: context,
       vm: vm,
@@ -209,7 +219,7 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
         title: Consumer<FurnitureWipViewModel>(
           builder: (_, vm, __) {
             final label = vm.isLoading && vm.items.isEmpty
-                ? 'LABEL FURNITURE WIP (…)'
+                ? 'LABEL FURNITURE WIP (...)'
                 : 'LABEL FURNITURE WIP (${vm.totalCount})';
             return Text(
               label,
@@ -221,12 +231,26 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
             );
           },
         ),
+        actions: [
+          Consumer<LabelPrintSyncQueue>(
+            builder: (_, syncQueue, __) {
+              final pending = syncQueue.pendingCountFor('furniture_wip');
+              if (pending <= 0) return const SizedBox.shrink();
+              return Tooltip(
+                message: 'Sinkronisasi print furniture wip tertunda ($pending)',
+                child: const Padding(
+                  padding: EdgeInsets.only(right: 12),
+                  child: Icon(Icons.sync, color: Color(0xFFFFE082)),
+                ),
+              );
+            },
+          ),
+        ],
         backgroundColor: const Color(0xFF1565C0),
         foregroundColor: Colors.white,
       ),
       body: Row(
         children: [
-          // Master table only (no detail panel yet)
           Expanded(
             flex: 4,
             child: Container(
@@ -239,7 +263,7 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
                     onClear: () {
                       searchCtrl.clear();
                       context.read<FurnitureWipViewModel>().fetchHeaders(
-                        search: "",
+                        search: '',
                       );
                     },
                     onAddPressed: _showFormDialog,
@@ -248,19 +272,12 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
                     child: Consumer<FurnitureWipViewModel>(
                       builder: (context, vm, _) {
                         return FurnitureWipHeaderTable(
-                          // ✅ pakai PagingController dari ViewModel
                           pagingController: vm.pagingController,
-                          // ✅ highlight row terpilih
                           selectedNoFurnitureWip: vm.selectedNoFurnitureWip,
-                          // Tap biasa: hanya set selected row (dan optional: load detail)
                           onItemTap: (header) {
                             vm.setSelected(header.noFurnitureWip);
-                            // optional: vm.fetchDetail(header.noFurnitureWip);
                           },
-                          // Long-press: row popover (Edit / Print / Delete)
                           onItemLongPress: _onItemLongPress,
-                          // Tap khusus untuk row partial (isPartialBool == true)
-                          // Dinonaktifkan: info partial hanya lewat row popover.
                           onPartialTap: (header) {
                             vm.setSelected(header.noFurnitureWip);
                           },

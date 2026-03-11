@@ -199,7 +199,7 @@ class CrusherRepository {
   }
 
   /// Tandai crusher sudah dicetak
-  Future<void> markAsPrinted(String noCrusher) async {
+  Future<int?> markAsPrinted(String noCrusher) async {
     final token = await TokenStorage.getToken();
     final uri = Uri.parse(
       "${ApiConstants.baseUrl}/api/labels/crusher/${Uri.encodeComponent(noCrusher)}/print",
@@ -226,6 +226,20 @@ class CrusherRepository {
               .toString();
       throw Exception(msg);
     }
+
+    if (resp.body.trim().isEmpty) return null;
+    try {
+      final body = json.decode(resp.body);
+      if (body is Map<String, dynamic>) {
+        final data = body['data'];
+        if (data is Map<String, dynamic>) {
+          final raw = data['HasBeenPrinted'] ?? data['hasBeenPrinted'];
+          if (raw is num) return raw.toInt();
+          if (raw != null) return int.tryParse('$raw');
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 
   // DELETE Crusher

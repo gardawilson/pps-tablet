@@ -208,11 +208,18 @@ class PackingRepository {
     }
   }
 
-  Future<void> markAsPrinted(String noBJ) async {
+  Future<int?> markAsPrinted(String noBJ) async {
     try {
-      await api.patchJson(
+      final body = await api.patchJson(
         '/api/labels/packing/${Uri.encodeComponent(noBJ)}/print',
       );
+      final data = body['data'];
+      if (data is Map<String, dynamic>) {
+        final raw = data['HasBeenPrinted'] ?? data['hasBeenPrinted'];
+        if (raw is num) return raw.toInt();
+        if (raw != null) return int.tryParse('$raw');
+      }
+      return null;
     } on ApiException catch (e) {
       throw Exception(_friendlyError(e, 'Gagal mark as printed packing'));
     }

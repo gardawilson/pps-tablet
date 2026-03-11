@@ -240,6 +240,17 @@ class BahanBakuViewModel extends ChangeNotifier {
     }
   }
 
+  void setPalletPrintedCount({
+    required String noPallet,
+    required int count,
+  }) {
+    final idx = pallets.indexWhere((p) => p.noPallet == noPallet);
+    if (idx == -1) return;
+    if (pallets[idx].hasBeenPrinted == count) return;
+    pallets[idx] = pallets[idx].copyWith(hasBeenPrinted: count);
+    notifyListeners();
+  }
+
   /// Reset state saat masuk/keluar screen
   void resetForScreen() {
     selectedNoBahanBaku = null;

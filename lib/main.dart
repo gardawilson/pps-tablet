@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:pps_tablet/core/view_model/permission_view_model.dart';
 import 'package:pps_tablet/core/view_model/label_print_lock_socket_manager.dart';
+import 'package:pps_tablet/core/services/label_print_sync_queue.dart';
 import 'package:pps_tablet/features/audit/repository/audit_repository.dart';
 import 'package:pps_tablet/features/audit/view_model/audit_view_model.dart';
 import 'package:pps_tablet/features/bj_jual/repository/bj_jual_input_repository.dart';
@@ -162,6 +164,7 @@ Future<void> main() async {
 
   // Env
   await dotenv.load(fileName: ".env");
+  await Hive.initFlutter();
 
   // Locale Indonesia untuk nama hari/bulan (Intl)
   await initializeDateFormatting('id_ID', null);
@@ -189,6 +192,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => LabelPrintLockSocketManager()..connect(),
         ),
+        ChangeNotifierProvider(create: (_) => LabelPrintSyncQueue()..start()),
         ChangeNotifierProvider(create: (_) => LabelDetailViewModel()),
         ChangeNotifierProvider(create: (_) => StockOpnameAscendViewModel(repository: StockOpnameAscendRepository()) ),
         ChangeNotifierProvider(create: (_) => StockOpnameFamilyViewModel(repository: StockOpnameFamilyRepository())),

@@ -198,8 +198,15 @@ class BrokerRepository {
   }
 
   /// Tandai broker sudah dicetak
-  Future<void> markAsPrinted(String noBroker) async {
-    await api.patchJson('/api/labels/broker/$noBroker/print');
+  Future<int?> markAsPrinted(String noBroker) async {
+    final body = await api.patchJson('/api/labels/broker/$noBroker/print');
+    final data = body['data'];
+    if (data is Map<String, dynamic>) {
+      final raw = data['HasBeenPrinted'] ?? data['hasBeenPrinted'];
+      if (raw is num) return raw.toInt();
+      if (raw != null) return int.tryParse('$raw');
+    }
+    return null;
   }
 
   Future<BrokerPartialInfo> fetchPartialInfo({

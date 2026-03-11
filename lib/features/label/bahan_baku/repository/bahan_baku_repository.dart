@@ -74,15 +74,22 @@ class BahanBakuRepository {
         .toList();
   }
 
-  Future<void> markAsPrinted({
+  Future<int?> markAsPrinted({
     required String noBahanBaku,
     required String noPallet,
   }) async {
     final encodedNoBahanBaku = Uri.encodeComponent(noBahanBaku);
     final encodedNoPallet = Uri.encodeComponent(noPallet);
-    await api.patchJson(
+    final body = await api.patchJson(
       '/api/labels/bahan-baku/$encodedNoBahanBaku/pallet/$encodedNoPallet/print',
     );
+    final data = body['data'];
+    if (data is Map<String, dynamic>) {
+      final raw = data['HasBeenPrinted'] ?? data['hasBeenPrinted'];
+      if (raw is num) return raw.toInt();
+      if (raw != null) return int.tryParse('$raw');
+    }
+    return null;
   }
 
   Future<Map<String, dynamic>> updatePalletQc({

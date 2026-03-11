@@ -5,7 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/label_popover_widgets.dart';
+import '../../../../core/network/label_print_lock_api.dart';
+import '../../../../core/services/label_print_sync_queue.dart';
 import '../../../../core/utils/pdf_print_service.dart';
+import '../../../../core/view_model/label_print_lock_socket_manager.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../model/gilingan_header_model.dart';
 import '../repository/gilingan_repository.dart';
@@ -199,23 +202,84 @@ class _GilinganRowPopoverState extends State<GilinganRowPopover> {
                 icon: Icons.print_outlined,
                 label: 'Print',
                 enabled: true,
-                onTap: () => _runAndClose(() {
+                onTap: () => _runAndClose(() async {
                   final rootCtx = Navigator.of(
                     context,
                     rootNavigator: true,
                   ).context;
 
-                  PdfPrintService(defaultSystem: 'pps').previewReport80mm(
-                    context: rootCtx,
-                    reportName: 'CrLabelGilingan',
-                    query: {'NoGilingan': widget.header.noGilingan},
-                    title: widget.header.noGilingan,
-                    onPrinted: () {
-                      GilinganRepository().markAsPrinted(
-                        widget.header.noGilingan,
-                      );
-                    },
-                  );
+                  final noGilingan = widget.header.noGilingan;
+                  final lockApi = LabelPrintLockApi();
+                  final repo = GilinganRepository();
+                  final lockVm = context.read<LabelPrintLockSocketManager>();
+                  final queue = context.read<LabelPrintSyncQueue>();
+                  var isLockAcquired = false;
+                  var isPrinted = false;
+
+                  try {
+                    await lockApi.acquire(noGilingan);
+                    isLockAcquired = true;
+
+                    await PdfPrintService(
+                      defaultSystem: 'pps',
+                    ).previewReport80mm(
+                      context: rootCtx,
+                      reportName: 'CrLabelGilingan',
+                      query: {'NoGilingan': noGilingan},
+                      title: noGilingan,
+                      onPrinted: () {
+                        isPrinted = true;
+                        () async {
+                          var needsIncrement = false;
+                          var needsRelease = false;
+
+                          try {
+                            final count = await repo.markAsPrinted(noGilingan);
+                            if (count != null) {
+                              lockVm.setPrintCount(noGilingan, count);
+                            }
+                          } catch (_) {
+                            needsIncrement = true;
+                          }
+
+                          try {
+                            await lockApi.release(noGilingan);
+                          } catch (_) {
+                            needsRelease = true;
+                          }
+
+                          if (needsIncrement || needsRelease) {
+                            await queue.enqueue(
+                              feature: 'gilingan',
+                              noLabel: noGilingan,
+                              needsIncrement: needsIncrement,
+                              needsReleaseLock: needsRelease,
+                            );
+                          }
+                        }().ignore();
+                      },
+                    );
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    final msg = e.toString().replaceFirst('Exception: ', '');
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(msg)));
+                  } finally {
+                    if (isLockAcquired && !isPrinted) {
+                      () async {
+                        try {
+                          await lockApi.release(noGilingan);
+                        } catch (_) {
+                          await queue.enqueue(
+                            feature: 'gilingan',
+                            noLabel: noGilingan,
+                            needsReleaseLock: true,
+                          );
+                        }
+                      }().ignore();
+                    }
+                  }
                 }),
               ),
               divider,

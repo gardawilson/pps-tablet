@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/interactive_popover.dart';
 import '../../../../core/services/dialog_service.dart';
+import '../../../../core/services/label_print_sync_queue.dart';
 import '../view_model/washing_view_model.dart';
 import '../model/washing_header_model.dart';
 import '../model/washing_detail_model.dart';
@@ -29,6 +30,8 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
   final ScrollController _detailScrollController = ScrollController();
   bool _isLoadingMore = false;
   Timer? _debounce;
+  LabelPrintSyncQueue? _syncQueue;
+  int _lastPendingCount = 0;
 
   // Popover animasi (custom)
   final InteractivePopover _popover = InteractivePopover();
@@ -47,12 +50,17 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
       final vm = context.read<WashingViewModel>();
       vm.resetForScreen();
       vm.fetchWashingHeaders();
+
+      _syncQueue = context.read<LabelPrintSyncQueue>();
+      _lastPendingCount = _syncQueue!.pendingCountFor('washing');
+      _syncQueue!.addListener(_onSyncQueueChanged);
     });
     _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
+    _syncQueue?.removeListener(_onSyncQueueChanged);
     _popover.dispose();
     _scrollController.dispose();
     _detailScrollController.dispose();
@@ -62,6 +70,23 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
   }
 
   void _closeContextMenu() => _popover.hide();
+
+  void _onSyncQueueChanged() {
+    if (!mounted || _syncQueue == null) return;
+    final now = _syncQueue!.pendingCountFor('washing');
+
+    if (_lastPendingCount == 0 && now > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Sinkronisasi print tertunda ($now)')),
+      );
+    } else if (_lastPendingCount > 0 && now == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sinkronisasi print selesai')),
+      );
+    }
+
+    _lastPendingCount = now;
+  }
 
   void _onScroll() {
     if (_popover.isShown) _popover.hide();
@@ -299,7 +324,7 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
         title: Consumer<WashingViewModel>(
           builder: (_, vm, __) {
             final label = vm.isLoading && vm.items.isEmpty
-                ? 'LABEL WASHING (…)'
+                ? 'LABEL WASHING (...)'
                 : 'LABEL WASHING (${vm.totalCount})';
             return Text(
               label,
@@ -311,6 +336,21 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
             );
           },
         ),
+        actions: [
+          Consumer<LabelPrintSyncQueue>(
+            builder: (_, syncQueue, __) {
+              final pending = syncQueue.pendingCountFor('washing');
+              if (pending <= 0) return const SizedBox.shrink();
+              return Tooltip(
+                message: 'Sinkronisasi print tertunda ($pending)',
+                child: const Padding(
+                  padding: EdgeInsets.only(right: 12),
+                  child: Icon(Icons.sync, color: Color(0xFFFFE082)),
+                ),
+              );
+            },
+          ),
+        ],
         backgroundColor: const Color(0xFF1565C0),
         foregroundColor: Colors.white,
       ),

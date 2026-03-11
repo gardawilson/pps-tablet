@@ -5,7 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/label_popover_widgets.dart';
+import '../../../../core/network/label_print_lock_api.dart';
+import '../../../../core/services/label_print_sync_queue.dart';
 import '../../../../core/utils/pdf_print_service.dart';
+import '../../../../core/view_model/label_print_lock_socket_manager.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../model/mixer_header_model.dart';
 import '../repository/mixer_repository.dart';
@@ -220,21 +223,84 @@ class _MixerRowPopoverState extends State<MixerRowPopover> {
                 icon: Icons.print_outlined,
                 label: 'Print',
                 enabled: true,
-                onTap: () => _runAndClose(() {
+                onTap: () => _runAndClose(() async {
                   final rootCtx = Navigator.of(
                     context,
                     rootNavigator: true,
                   ).context;
 
-                  PdfPrintService(defaultSystem: 'pps').previewReport80mm(
-                    context: rootCtx,
-                    reportName: 'CrLabelPalletMixer',
-                    query: {'noMixer': widget.header.noMixer},
-                    title: widget.header.noMixer,
-                    onPrinted: () {
-                      MixerRepository().markAsPrinted(widget.header.noMixer);
-                    },
-                  );
+                  final noMixer = widget.header.noMixer;
+                  final lockApi = LabelPrintLockApi();
+                  final repo = MixerRepository();
+                  final lockVm = context.read<LabelPrintLockSocketManager>();
+                  final queue = context.read<LabelPrintSyncQueue>();
+                  var isLockAcquired = false;
+                  var isPrinted = false;
+
+                  try {
+                    await lockApi.acquire(noMixer);
+                    isLockAcquired = true;
+
+                    await PdfPrintService(
+                      defaultSystem: 'pps',
+                    ).previewReport80mm(
+                      context: rootCtx,
+                      reportName: 'CrLabelPalletMixer',
+                      query: {'noMixer': noMixer},
+                      title: noMixer,
+                      onPrinted: () {
+                        isPrinted = true;
+                        () async {
+                          var needsIncrement = false;
+                          var needsRelease = false;
+
+                          try {
+                            final count = await repo.markAsPrinted(noMixer);
+                            if (count != null) {
+                              lockVm.setPrintCount(noMixer, count);
+                            }
+                          } catch (_) {
+                            needsIncrement = true;
+                          }
+
+                          try {
+                            await lockApi.release(noMixer);
+                          } catch (_) {
+                            needsRelease = true;
+                          }
+
+                          if (needsIncrement || needsRelease) {
+                            await queue.enqueue(
+                              feature: 'mixer',
+                              noLabel: noMixer,
+                              needsIncrement: needsIncrement,
+                              needsReleaseLock: needsRelease,
+                            );
+                          }
+                        }().ignore();
+                      },
+                    );
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    final msg = e.toString().replaceFirst('Exception: ', '');
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(msg)));
+                  } finally {
+                    if (isLockAcquired && !isPrinted) {
+                      () async {
+                        try {
+                          await lockApi.release(noMixer);
+                        } catch (_) {
+                          await queue.enqueue(
+                            feature: 'mixer',
+                            noLabel: noMixer,
+                            needsReleaseLock: true,
+                          );
+                        }
+                      }().ignore();
+                    }
+                  }
                 }),
               ),
               divider,

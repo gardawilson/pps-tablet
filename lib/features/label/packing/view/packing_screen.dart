@@ -1,21 +1,20 @@
-// lib/features/packing/view/reject_screen.dart
-
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/interactive_popover.dart';
 import '../../../../core/services/dialog_service.dart';
-import '../view_model/packing_view_model.dart';
+import '../../../../core/services/label_print_sync_queue.dart';
 import '../model/packing_header_model.dart';
-
-import '../widgets/packing_row_popover.dart';
+import '../view_model/packing_view_model.dart';
 import '../widgets/packing_action_bar.dart';
-import '../widgets/packing_header_table.dart';
-import '../widgets/packing_form_dialog.dart';
 import '../widgets/packing_delete_dialog.dart';
+import '../widgets/packing_form_dialog.dart';
+import '../widgets/packing_header_table.dart';
 import '../widgets/packing_partial_info_popover.dart';
+import '../widgets/packing_row_popover.dart';
 
 class PackingScreen extends StatefulWidget {
   const PackingScreen({super.key});
@@ -28,14 +27,12 @@ class _PackingScreenState extends State<PackingScreen> {
   final TextEditingController searchCtrl = TextEditingController();
   final ScrollController _detailScrollController = ScrollController();
   Timer? _debounce;
+  LabelPrintSyncQueue? _syncQueue;
+  int _lastPendingCount = 0;
 
-  /// Satu popover controller untuk:
-  /// - Row popover (edit/print/delete)
-  /// - Partial info popover
   final InteractivePopover _popover = InteractivePopover();
 
   bool _isPartialHeader(PackingHeader h) {
-    // sesuaikan kalau nama field beda (mis: IsPartial / isPartialBool / partial)
     return h.isPartial == 1;
   }
 
@@ -71,16 +68,37 @@ class _PackingScreenState extends State<PackingScreen> {
       final vm = context.read<PackingViewModel>();
       vm.resetForScreen();
       vm.fetchHeaders();
+      _syncQueue = context.read<LabelPrintSyncQueue>();
+      _lastPendingCount = _syncQueue!.pendingCountFor('packing');
+      _syncQueue!.addListener(_onSyncQueueChanged);
     });
   }
 
   @override
   void dispose() {
+    _syncQueue?.removeListener(_onSyncQueueChanged);
     _popover.dispose();
     _detailScrollController.dispose();
     searchCtrl.dispose();
     _debounce?.cancel();
     super.dispose();
+  }
+
+  void _onSyncQueueChanged() {
+    if (!mounted || _syncQueue == null) return;
+    final now = _syncQueue!.pendingCountFor('packing');
+
+    if (_lastPendingCount == 0 && now > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Sinkronisasi print packing tertunda ($now)')),
+      );
+    } else if (_lastPendingCount > 0 && now == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sinkronisasi print packing selesai')),
+      );
+    }
+
+    _lastPendingCount = now;
   }
 
   void _onSearchChanged(String query) {
@@ -105,10 +123,7 @@ class _PackingScreenState extends State<PackingScreen> {
       builder: (_) => PackingDeleteDialog(
         header: header,
         onConfirm: () async {
-          // Tutup dialog dulu
           Navigator.of(context).pop();
-
-          // Baru eksekusi delete
           await _handleDelete(header);
         },
       ),
@@ -119,7 +134,6 @@ class _PackingScreenState extends State<PackingScreen> {
     _popover.hide();
   }
 
-  /// Long-press handler: set highlight & show row popover (Edit / Print / Delete)
   Future<void> _onItemLongPress(
     PackingHeader header,
     Offset globalPosition,
@@ -129,7 +143,6 @@ class _PackingScreenState extends State<PackingScreen> {
     final adaptiveMaxHeight =
         (screenHeight - 32).clamp(480.0, 820.0).toDouble();
 
-    // Pindah highlight ke row ini
     vm.setSelected(header.noBJ);
 
     _popover.show(
@@ -151,10 +164,8 @@ class _PackingScreenState extends State<PackingScreen> {
           _closeContextMenu();
           await _onDeleteHeader(header);
         },
-
         onPrint: () {
           _closeContextMenu();
-          // printing sudah dihandle di dalam PackingRowPopover
         },
         onAuditHistory: () {
           _closeContextMenu();
@@ -180,7 +191,6 @@ class _PackingScreenState extends State<PackingScreen> {
     );
   }
 
-  /// Hanya dipakai dari menu "Info Partial" di row popover.
   Future<void> _showPartialInfoPopover(PackingHeader header) async {
     final vm = context.read<PackingViewModel>();
 
@@ -206,7 +216,7 @@ class _PackingScreenState extends State<PackingScreen> {
         title: Consumer<PackingViewModel>(
           builder: (_, vm, __) {
             final label = vm.isLoading && vm.items.isEmpty
-                ? 'LABEL BARANG JADI (…)'
+                ? 'LABEL BARANG JADI (...)'
                 : 'LABEL BARANG JADI (${vm.totalCount})';
             return Text(
               label,
@@ -218,12 +228,26 @@ class _PackingScreenState extends State<PackingScreen> {
             );
           },
         ),
+        actions: [
+          Consumer<LabelPrintSyncQueue>(
+            builder: (_, syncQueue, __) {
+              final pending = syncQueue.pendingCountFor('packing');
+              if (pending <= 0) return const SizedBox.shrink();
+              return Tooltip(
+                message: 'Sinkronisasi print packing tertunda ($pending)',
+                child: const Padding(
+                  padding: EdgeInsets.only(right: 12),
+                  child: Icon(Icons.sync, color: Color(0xFFFFE082)),
+                ),
+              );
+            },
+          ),
+        ],
         backgroundColor: const Color(0xFF1565C0),
         foregroundColor: Colors.white,
       ),
       body: Row(
         children: [
-          // Master table only (no detail panel yet)
           Expanded(
             flex: 4,
             child: Container(
@@ -235,7 +259,7 @@ class _PackingScreenState extends State<PackingScreen> {
                     onSearchChanged: _onSearchChanged,
                     onClear: () {
                       searchCtrl.clear();
-                      context.read<PackingViewModel>().fetchHeaders(search: "");
+                      context.read<PackingViewModel>().fetchHeaders(search: '');
                     },
                     onAddPressed: _showFormDialog,
                   ),
@@ -247,7 +271,6 @@ class _PackingScreenState extends State<PackingScreen> {
                           selectedNoBJ: vm.selectedNoBJ,
                           onItemTap: (header) {
                             vm.setSelected(header.noBJ);
-                            // optional: vm.fetchDetail(header.noBJ);
                           },
                           onItemLongPress: _onItemLongPress,
                           onPartialTap: (header) {

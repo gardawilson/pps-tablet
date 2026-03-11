@@ -45,7 +45,9 @@ class LabelPrintLockApi {
       },
     );
 
-    if (resp.statusCode != 200 && resp.statusCode != 204) {
+    if (resp.statusCode != 200 &&
+        resp.statusCode != 204 &&
+        resp.statusCode != 404) {
       throw Exception(
         _extractApiMessage(resp.body, 'Gagal melepas print lock'),
       );

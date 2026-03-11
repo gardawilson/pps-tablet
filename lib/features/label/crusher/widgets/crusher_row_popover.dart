@@ -5,7 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/label_popover_widgets.dart';
+import '../../../../core/network/label_print_lock_api.dart';
+import '../../../../core/services/label_print_sync_queue.dart';
 import '../../../../core/utils/pdf_print_service.dart';
+import '../../../../core/view_model/label_print_lock_socket_manager.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../model/crusher_header_model.dart';
 import '../repository/crusher_repository.dart';
@@ -201,23 +204,84 @@ class _CrusherRowPopoverState extends State<CrusherRowPopover> {
                 icon: Icons.print_outlined,
                 label: 'Print',
                 enabled: true,
-                onTap: () => _runAndClose(() {
+                onTap: () => _runAndClose(() async {
                   final rootCtx = Navigator.of(
                     context,
                     rootNavigator: true,
                   ).context;
 
-                  PdfPrintService(defaultSystem: 'pps').previewReport80mm(
-                    context: rootCtx,
-                    reportName: 'CrLabelCrusher',
-                    query: {'NoCrusher': widget.header.noCrusher},
-                    title: widget.header.noCrusher,
-                    onPrinted: () {
-                      CrusherRepository().markAsPrinted(
-                        widget.header.noCrusher,
-                      );
-                    },
-                  );
+                  final noCrusher = widget.header.noCrusher;
+                  final lockApi = LabelPrintLockApi();
+                  final repo = CrusherRepository();
+                  final lockVm = context.read<LabelPrintLockSocketManager>();
+                  final queue = context.read<LabelPrintSyncQueue>();
+                  var isLockAcquired = false;
+                  var isPrinted = false;
+
+                  try {
+                    await lockApi.acquire(noCrusher);
+                    isLockAcquired = true;
+
+                    await PdfPrintService(
+                      defaultSystem: 'pps',
+                    ).previewReport80mm(
+                      context: rootCtx,
+                      reportName: 'CrLabelCrusher',
+                      query: {'NoCrusher': noCrusher},
+                      title: noCrusher,
+                      onPrinted: () {
+                        isPrinted = true;
+                        () async {
+                          var needsIncrement = false;
+                          var needsRelease = false;
+
+                          try {
+                            final count = await repo.markAsPrinted(noCrusher);
+                            if (count != null) {
+                              lockVm.setPrintCount(noCrusher, count);
+                            }
+                          } catch (_) {
+                            needsIncrement = true;
+                          }
+
+                          try {
+                            await lockApi.release(noCrusher);
+                          } catch (_) {
+                            needsRelease = true;
+                          }
+
+                          if (needsIncrement || needsRelease) {
+                            await queue.enqueue(
+                              feature: 'crusher',
+                              noLabel: noCrusher,
+                              needsIncrement: needsIncrement,
+                              needsReleaseLock: needsRelease,
+                            );
+                          }
+                        }().ignore();
+                      },
+                    );
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    final msg = e.toString().replaceFirst('Exception: ', '');
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(msg)));
+                  } finally {
+                    if (isLockAcquired && !isPrinted) {
+                      () async {
+                        try {
+                          await lockApi.release(noCrusher);
+                        } catch (_) {
+                          await queue.enqueue(
+                            feature: 'crusher',
+                            noLabel: noCrusher,
+                            needsReleaseLock: true,
+                          );
+                        }
+                      }().ignore();
+                    }
+                  }
                 }),
               ),
               divider,

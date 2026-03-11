@@ -6,7 +6,10 @@ import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/label_popover_widgets.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/network/label_print_lock_api.dart';
+import '../../../../core/services/label_print_sync_queue.dart';
 import '../../../../core/utils/pdf_print_service.dart';
+import '../../../../core/view_model/label_print_lock_socket_manager.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../model/reject_header_model.dart';
 import '../repository/reject_repository.dart';
@@ -198,23 +201,84 @@ class _RejectRowPopoverState extends State<RejectRowPopover> {
                 icon: Icons.print_outlined,
                 label: 'Print',
                 enabled: true,
-                onTap: () => _runAndClose(() {
+                onTap: () => _runAndClose(() async {
                   final rootCtx = Navigator.of(
                     context,
                     rootNavigator: true,
                   ).context;
 
-                  PdfPrintService(defaultSystem: 'pps').previewReport80mm(
-                    context: rootCtx,
-                    reportName: 'CrLabelRejectV2',
-                    query: {'NoReject': widget.header.noReject},
-                    title: widget.header.noReject,
-                    onPrinted: () {
-                      RejectRepository(
-                        api: ApiClient(),
-                      ).markAsPrinted(widget.header.noReject);
-                    },
-                  );
+                  final noReject = widget.header.noReject;
+                  final lockApi = LabelPrintLockApi();
+                  final repo = RejectRepository(api: ApiClient());
+                  final lockVm = context.read<LabelPrintLockSocketManager>();
+                  final queue = context.read<LabelPrintSyncQueue>();
+                  var isLockAcquired = false;
+                  var isPrinted = false;
+
+                  try {
+                    await lockApi.acquire(noReject);
+                    isLockAcquired = true;
+
+                    await PdfPrintService(
+                      defaultSystem: 'pps',
+                    ).previewReport80mm(
+                      context: rootCtx,
+                      reportName: 'CrLabelRejectV2',
+                      query: {'NoReject': noReject},
+                      title: noReject,
+                      onPrinted: () {
+                        isPrinted = true;
+                        () async {
+                          var needsIncrement = false;
+                          var needsRelease = false;
+
+                          try {
+                            final count = await repo.markAsPrinted(noReject);
+                            if (count != null) {
+                              lockVm.setPrintCount(noReject, count);
+                            }
+                          } catch (_) {
+                            needsIncrement = true;
+                          }
+
+                          try {
+                            await lockApi.release(noReject);
+                          } catch (_) {
+                            needsRelease = true;
+                          }
+
+                          if (needsIncrement || needsRelease) {
+                            await queue.enqueue(
+                              feature: 'reject',
+                              noLabel: noReject,
+                              needsIncrement: needsIncrement,
+                              needsReleaseLock: needsRelease,
+                            );
+                          }
+                        }().ignore();
+                      },
+                    );
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    final msg = e.toString().replaceFirst('Exception: ', '');
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(msg)));
+                  } finally {
+                    if (isLockAcquired && !isPrinted) {
+                      () async {
+                        try {
+                          await lockApi.release(noReject);
+                        } catch (_) {
+                          await queue.enqueue(
+                            feature: 'reject',
+                            noLabel: noReject,
+                            needsReleaseLock: true,
+                          );
+                        }
+                      }().ignore();
+                    }
+                  }
                 }),
               ),
               divider,

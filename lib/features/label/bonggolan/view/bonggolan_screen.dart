@@ -1,9 +1,12 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
+
 import '../../../../common/widgets/interactive_popover.dart';
 import '../../../../core/services/dialog_service.dart';
+import '../../../../core/services/label_print_sync_queue.dart';
 import '../view_model/bonggolan_view_model.dart';
 import '../model/bonggolan_header_model.dart';
 import '../widgets/bonggolan_row_popover.dart';
@@ -25,8 +28,9 @@ class _BonggolanScreenState extends State<BonggolanScreen> {
   final ScrollController _detailScrollController = ScrollController();
   bool _isLoadingMore = false;
   Timer? _debounce;
+  LabelPrintSyncQueue? _syncQueue;
+  int _lastPendingCount = 0;
 
-  // Popover animasi (custom)
   final InteractivePopover _popover = InteractivePopover();
 
   @override
@@ -35,13 +39,17 @@ class _BonggolanScreenState extends State<BonggolanScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<BonggolanViewModel>().fetchHeaders();
       context.read<BonggolanViewModel>().resetForScreen();
+      _syncQueue = context.read<LabelPrintSyncQueue>();
+      _lastPendingCount = _syncQueue!.pendingCountFor('bonggolan');
+      _syncQueue!.addListener(_onSyncQueueChanged);
     });
     _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
-    _popover.dispose(); // langsung bersih tanpa animasi
+    _syncQueue?.removeListener(_onSyncQueueChanged);
+    _popover.dispose();
     _scrollController.dispose();
     _detailScrollController.dispose();
     searchCtrl.dispose();
@@ -49,8 +57,24 @@ class _BonggolanScreenState extends State<BonggolanScreen> {
     super.dispose();
   }
 
+  void _onSyncQueueChanged() {
+    if (!mounted || _syncQueue == null) return;
+    final now = _syncQueue!.pendingCountFor('bonggolan');
+
+    if (_lastPendingCount == 0 && now > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Sinkronisasi print bonggolan tertunda ($now)')),
+      );
+    } else if (_lastPendingCount > 0 && now == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sinkronisasi print bonggolan selesai')),
+      );
+    }
+
+    _lastPendingCount = now;
+  }
+
   void _onScroll() {
-    // Tutup popover saat scroll supaya tidak "mengambang"
     if (_popover.isShown) {
       _popover.hide();
     }
@@ -90,9 +114,9 @@ class _BonggolanScreenState extends State<BonggolanScreen> {
         header: header,
         onSave: (headerData) {
           if (header != null) {
-            // vm.updateWashing(headerData, detailsData);
+            // vm.update
           } else {
-            // vm.createWashing(headerData, detailsData);
+            // vm.create
           }
         },
       ),
@@ -105,22 +129,17 @@ class _BonggolanScreenState extends State<BonggolanScreen> {
       builder: (_) => BonggolanDeleteDialog(
         header: header,
         onConfirm: () async {
-          // Tutup dialog dahulu
           Navigator.of(context).pop();
-
-          // Lanjut eksekusi delete
           await _handleDelete(header);
         },
       ),
     );
   }
 
-  // Tutup popover (tidak mengubah selection — biarkan tetap menandai item aktif)
   void _closeContextMenu() {
     _popover.hide();
   }
 
-  /// Long-press handler: pindahkan highlight ke item & tampilkan popover.
   Future<void> _onItemLongPress(
     BonggolanHeader header,
     Offset globalPosition,
@@ -130,7 +149,6 @@ class _BonggolanScreenState extends State<BonggolanScreen> {
     final adaptiveMaxHeight =
         (screenHeight - 32).clamp(480.0, 820.0).toDouble();
 
-    // Pindahkan highlight saat long-press
     vm.setSelected(header.noBonggolan);
 
     _popover.show(
@@ -150,20 +168,18 @@ class _BonggolanScreenState extends State<BonggolanScreen> {
         },
         onPrint: () {
           _closeContextMenu();
-          // TODO: print/preview
         },
         onAuditHistory: () {
           _closeContextMenu();
           _navigateToAuditHistory(header);
         },
       ),
-      // animasi & penempatan cerdas
       preferAbove: true,
       verticalGap: 8,
       maxHeight: adaptiveMaxHeight,
       backdropOpacity: 0.06,
       duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutBack, // overshoot untuk SCALE tetap aman
+      curve: Curves.easeOutBack,
       startScale: 0.94,
     );
   }
@@ -185,7 +201,7 @@ class _BonggolanScreenState extends State<BonggolanScreen> {
         title: Consumer<BonggolanViewModel>(
           builder: (_, vm, __) {
             final label = vm.isLoading && vm.items.isEmpty
-                ? 'LABEL BONGGOLAN (…)'
+                ? 'LABEL BONGGOLAN (...)'
                 : 'LABEL BONGGOLAN (${vm.totalCount})';
             return Text(
               label,
@@ -197,12 +213,26 @@ class _BonggolanScreenState extends State<BonggolanScreen> {
             );
           },
         ),
+        actions: [
+          Consumer<LabelPrintSyncQueue>(
+            builder: (_, syncQueue, __) {
+              final pending = syncQueue.pendingCountFor('bonggolan');
+              if (pending <= 0) return const SizedBox.shrink();
+              return Tooltip(
+                message: 'Sinkronisasi print bonggolan tertunda ($pending)',
+                child: const Padding(
+                  padding: EdgeInsets.only(right: 12),
+                  child: Icon(Icons.sync, color: Color(0xFFFFE082)),
+                ),
+              );
+            },
+          ),
+        ],
         backgroundColor: const Color(0xFF1565C0),
         foregroundColor: Colors.white,
       ),
       body: Row(
         children: [
-          // Master Table
           Expanded(
             flex: 4,
             child: Container(
@@ -215,7 +245,7 @@ class _BonggolanScreenState extends State<BonggolanScreen> {
                     onClear: () {
                       searchCtrl.clear();
                       context.read<BonggolanViewModel>().fetchHeaders(
-                        search: "",
+                        search: '',
                       );
                     },
                     onAddPressed: _showFormDialog,
@@ -225,12 +255,9 @@ class _BonggolanScreenState extends State<BonggolanScreen> {
                       scrollController: _scrollController,
                       onItemTap: (header) {
                         final vm = context.read<BonggolanViewModel>();
-                        // Klik: pindahkan highlight & (opsional) load detail
                         vm.setSelected(header.noBonggolan);
                       },
-                      // Long-press: pindahkan highlight & tampilkan popover
                       onItemLongPress: _onItemLongPress,
-                      // ⚠️ Tidak perlu highlightedNoWashing lagi
                     ),
                   ),
                 ],
@@ -251,13 +278,11 @@ class _BonggolanScreenState extends State<BonggolanScreen> {
       await vm.deleteBonggolan(no);
       DialogService.instance.hideLoading();
 
-      // Success toast/snackbar/dialog
       await DialogService.instance.showSuccess(
         title: 'Terhapus',
         message: 'Label $no berhasil dihapus.',
       );
 
-      // Bersihkan selection & (opsional) scroll detail ke atas
       vm.setSelected(null);
       if (_detailScrollController.hasClients) {
         _detailScrollController.jumpTo(0);

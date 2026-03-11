@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../../../common/widgets/label_popover_widgets.dart';
 import '../../../../core/network/label_print_lock_api.dart';
 import '../../../../core/view_model/label_print_lock_socket_manager.dart';
+import '../../../../core/services/label_print_sync_queue.dart';
 import '../../../../core/utils/pdf_print_service.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../model/washing_header_model.dart';
@@ -218,7 +219,9 @@ class _WashingRowPopoverState extends State<WashingRowPopover> {
                   final lockApi = LabelPrintLockApi();
                   final repo = WashingRepository();
                   final lockVm = context.read<LabelPrintLockSocketManager>();
+                  final queue = context.read<LabelPrintSyncQueue>();
                   var isLockAcquired = false;
+                  var isPrinted = false;
                   try {
                     await lockApi.acquire(noWashing);
                     isLockAcquired = true;
@@ -231,11 +234,35 @@ class _WashingRowPopoverState extends State<WashingRowPopover> {
                       query: {'NoWashing': noWashing},
                       title: 'Label $noWashing',
                       onPrinted: () {
-                        repo.markAsPrinted(noWashing).then((count) {
-                          if (count != null) {
-                            lockVm.setPrintCount(noWashing, count);
+                        isPrinted = true;
+                        () async {
+                          var needsIncrement = false;
+                          var needsRelease = false;
+
+                          try {
+                            final count = await repo.markAsPrinted(noWashing);
+                            if (count != null) {
+                              lockVm.setPrintCount(noWashing, count);
+                            }
+                          } catch (_) {
+                            needsIncrement = true;
                           }
-                        }).ignore();
+
+                          try {
+                            await lockApi.release(noWashing);
+                          } catch (_) {
+                            needsRelease = true;
+                          }
+
+                          if (needsIncrement || needsRelease) {
+                            await queue.enqueue(
+                              feature: 'washing',
+                              noLabel: noWashing,
+                              needsIncrement: needsIncrement,
+                              needsReleaseLock: needsRelease,
+                            );
+                          }
+                        }().ignore();
                       },
                     );
                   } catch (e) {
@@ -245,8 +272,18 @@ class _WashingRowPopoverState extends State<WashingRowPopover> {
                       context,
                     ).showSnackBar(SnackBar(content: Text(msg)));
                   } finally {
-                    if (isLockAcquired) {
-                      lockApi.release(noWashing).ignore();
+                    if (isLockAcquired && !isPrinted) {
+                      () async {
+                        try {
+                          await lockApi.release(noWashing);
+                        } catch (_) {
+                          await queue.enqueue(
+                            feature: 'washing',
+                            noLabel: noWashing,
+                            needsReleaseLock: true,
+                          );
+                        }
+                      }().ignore();
                     }
                   }
                 }),

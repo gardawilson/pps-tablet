@@ -1,19 +1,20 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/interactive_popover.dart';
 import '../../../../core/services/dialog_service.dart';
-import '../view_model/reject_view_model.dart';
+import '../../../../core/services/label_print_sync_queue.dart';
 import '../model/reject_header_model.dart';
-
-import '../widgets/reject_row_popover.dart';
+import '../view_model/reject_view_model.dart';
 import '../widgets/reject_action_bar.dart';
-import '../widgets/reject_header_table.dart';
-import '../widgets/reject_form_dialog.dart';
 import '../widgets/reject_delete_dialog.dart';
+import '../widgets/reject_form_dialog.dart';
+import '../widgets/reject_header_table.dart';
 import '../widgets/reject_partial_info_popover.dart';
+import '../widgets/reject_row_popover.dart';
 
 class RejectScreen extends StatefulWidget {
   const RejectScreen({super.key});
@@ -26,14 +27,12 @@ class _RejectScreenState extends State<RejectScreen> {
   final TextEditingController searchCtrl = TextEditingController();
   final ScrollController _detailScrollController = ScrollController();
   Timer? _debounce;
+  LabelPrintSyncQueue? _syncQueue;
+  int _lastPendingCount = 0;
 
-  /// Satu popover controller untuk:
-  /// - Row popover (edit/print/delete)
-  /// - Partial info popover
   final InteractivePopover _popover = InteractivePopover();
 
   bool _isPartialHeader(RejectHeader h) {
-    // sesuaikan kalau nama field beda (mis: IsPartial / isPartialBool / partial)
     return h.isPartial == 1;
   }
 
@@ -68,11 +67,15 @@ class _RejectScreenState extends State<RejectScreen> {
       final vm = context.read<RejectViewModel>();
       vm.resetForScreen();
       vm.fetchHeaders();
+      _syncQueue = context.read<LabelPrintSyncQueue>();
+      _lastPendingCount = _syncQueue!.pendingCountFor('reject');
+      _syncQueue!.addListener(_onSyncQueueChanged);
     });
   }
 
   @override
   void dispose() {
+    _syncQueue?.removeListener(_onSyncQueueChanged);
     _popover.dispose();
     _detailScrollController.dispose();
     searchCtrl.dispose();
@@ -80,9 +83,22 @@ class _RejectScreenState extends State<RejectScreen> {
     super.dispose();
   }
 
-  // ==========================
-  // SEARCH
-  // ==========================
+  void _onSyncQueueChanged() {
+    if (!mounted || _syncQueue == null) return;
+    final now = _syncQueue!.pendingCountFor('reject');
+
+    if (_lastPendingCount == 0 && now > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Sinkronisasi print reject tertunda ($now)')),
+      );
+    } else if (_lastPendingCount > 0 && now == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sinkronisasi print reject selesai')),
+      );
+    }
+
+    _lastPendingCount = now;
+  }
 
   void _onSearchChanged(String query) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
@@ -90,10 +106,6 @@ class _RejectScreenState extends State<RejectScreen> {
       context.read<RejectViewModel>().fetchHeaders(search: query);
     });
   }
-
-  // ==========================
-  // FORM DIALOG
-  // ==========================
 
   void _showFormDialog({RejectHeader? header}) {
     showDialog(
@@ -104,20 +116,13 @@ class _RejectScreenState extends State<RejectScreen> {
     );
   }
 
-  // ==========================
-  // DELETE FLOW
-  // ==========================
-
   void _confirmDelete(RejectHeader header) {
     showDialog(
       context: context,
       builder: (_) => RejectDeleteDialog(
         header: header,
         onConfirm: () async {
-          // Tutup dialog dulu
           Navigator.of(context).pop();
-
-          // Baru eksekusi delete
           await _handleDelete(header);
         },
       ),
@@ -151,15 +156,10 @@ class _RejectScreenState extends State<RejectScreen> {
     }
   }
 
-  // ==========================
-  // POPOVER HELPERS
-  // ==========================
-
   void _closeContextMenu() {
     _popover.hide();
   }
 
-  /// Long-press handler: set highlight & show row popover (Edit / Print / Delete)
   Future<void> _onItemLongPress(
     RejectHeader header,
     Offset globalPosition,
@@ -169,7 +169,6 @@ class _RejectScreenState extends State<RejectScreen> {
     final adaptiveMaxHeight =
         (screenHeight - 32).clamp(480.0, 820.0).toDouble();
 
-    // Pindah highlight ke row ini
     vm.setSelected(header.noReject);
 
     _popover.show(
@@ -193,7 +192,6 @@ class _RejectScreenState extends State<RejectScreen> {
         },
         onPrint: () {
           _closeContextMenu();
-          // printing sudah di-handle di dalam RejectRowPopover
         },
         onAuditHistory: () {
           _closeContextMenu();
@@ -219,7 +217,6 @@ class _RejectScreenState extends State<RejectScreen> {
     );
   }
 
-  /// Hanya dipakai dari menu "Info Partial" di row popover.
   Future<void> _showPartialInfoPopover(RejectHeader header) async {
     final vm = context.read<RejectViewModel>();
 
@@ -237,10 +234,6 @@ class _RejectScreenState extends State<RejectScreen> {
     );
   }
 
-  // ==========================
-  // BUILD
-  // ==========================
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -249,7 +242,7 @@ class _RejectScreenState extends State<RejectScreen> {
         title: Consumer<RejectViewModel>(
           builder: (_, vm, __) {
             final label = vm.isLoading && vm.items.isEmpty
-                ? 'LABEL REJECT (…)'
+                ? 'LABEL REJECT (...)'
                 : 'LABEL REJECT (${vm.totalCount})';
             return Text(
               label,
@@ -261,12 +254,26 @@ class _RejectScreenState extends State<RejectScreen> {
             );
           },
         ),
+        actions: [
+          Consumer<LabelPrintSyncQueue>(
+            builder: (_, syncQueue, __) {
+              final pending = syncQueue.pendingCountFor('reject');
+              if (pending <= 0) return const SizedBox.shrink();
+              return Tooltip(
+                message: 'Sinkronisasi print reject tertunda ($pending)',
+                child: const Padding(
+                  padding: EdgeInsets.only(right: 12),
+                  child: Icon(Icons.sync, color: Color(0xFFFFE082)),
+                ),
+              );
+            },
+          ),
+        ],
         backgroundColor: const Color(0xFF1565C0),
         foregroundColor: Colors.white,
       ),
       body: Row(
         children: [
-          // Master table only (no detail panel yet)
           Expanded(
             flex: 4,
             child: Container(
@@ -278,7 +285,7 @@ class _RejectScreenState extends State<RejectScreen> {
                     onSearchChanged: _onSearchChanged,
                     onClear: () {
                       searchCtrl.clear();
-                      context.read<RejectViewModel>().fetchHeaders(search: "");
+                      context.read<RejectViewModel>().fetchHeaders(search: '');
                     },
                     onAddPressed: _showFormDialog,
                   ),
@@ -290,7 +297,6 @@ class _RejectScreenState extends State<RejectScreen> {
                           selectedNoReject: vm.selectedNoReject,
                           onItemTap: (header) {
                             vm.setSelected(header.noReject);
-                            // optional: vm.fetchDetail(header.noReject);
                           },
                           onItemLongPress: _onItemLongPress,
                           onPartialTap: (header) {

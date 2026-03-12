@@ -45,6 +45,7 @@ class WashingHeader {
   final int? idLokasi;
 
   final int hasBeenPrinted;
+  final bool used;
 
   bool get isPrinted => hasBeenPrinted > 0;
 
@@ -71,6 +72,7 @@ class WashingHeader {
     this.blok,
     this.idLokasi,
     this.hasBeenPrinted = 0,
+    this.used = false,
   });
 
   // Converter boolean yang robust
@@ -113,6 +115,7 @@ class WashingHeader {
       blok: json['Blok'],
       idLokasi: (json['IdLokasi'] as num?)?.toInt(),
       hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
+      used: json['Used'] == true,
     );
   }
 
@@ -139,6 +142,7 @@ class WashingHeader {
     'Blok': blok,
     'IdLokasi': idLokasi,
     'HasBeenPrinted': hasBeenPrinted,
+    'Used': used,
   };
 
   WashingHeader copyWith({
@@ -164,6 +168,7 @@ class WashingHeader {
     String? blok,
     int? idLokasi,
     int? hasBeenPrinted,
+    bool? used,
   }) {
     return WashingHeader(
       noWashing: noWashing ?? this.noWashing,
@@ -188,6 +193,7 @@ class WashingHeader {
       blok: blok ?? this.blok,
       idLokasi: idLokasi ?? this.idLokasi,
       hasBeenPrinted: hasBeenPrinted ?? this.hasBeenPrinted,
+      used: used ?? this.used,
     );
   }
 }

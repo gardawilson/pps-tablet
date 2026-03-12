@@ -40,6 +40,7 @@ class CrusherHeader {
   final String? noBongkarSusun; // from BongkarSusunOutputCrusher.NoBongkarSusun
 
   final int hasBeenPrinted;
+  final bool used;
 
   bool get isPrinted => hasBeenPrinted > 0;
 
@@ -58,6 +59,7 @@ class CrusherHeader {
     this.crusherNamaMesin,
     this.noBongkarSusun,
     this.hasBeenPrinted = 0,
+    this.used = false,
   });
 
   // Optional convenience (e.g., for a unified “ref” display)
@@ -96,6 +98,7 @@ class CrusherHeader {
       crusherNamaMesin: json['CrusherNamaMesin'],
       noBongkarSusun: json['NoBongkarSusun'],
       hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
+      used: json['Used'] == true,
     );
   }
 
@@ -116,6 +119,7 @@ class CrusherHeader {
     'CrusherNamaMesin': crusherNamaMesin,
     'NoBongkarSusun': noBongkarSusun,
     'HasBeenPrinted': hasBeenPrinted,
+    'Used': used,
   };
 
   CrusherHeader copyWith({
@@ -133,6 +137,7 @@ class CrusherHeader {
     String? crusherNamaMesin,
     String? noBongkarSusun,
     int? hasBeenPrinted,
+    bool? used,
   }) {
     return CrusherHeader(
       noCrusher: noCrusher ?? this.noCrusher,
@@ -149,6 +154,7 @@ class CrusherHeader {
       crusherNamaMesin: crusherNamaMesin ?? this.crusherNamaMesin,
       noBongkarSusun: noBongkarSusun ?? this.noBongkarSusun,
       hasBeenPrinted: hasBeenPrinted ?? this.hasBeenPrinted,
+      used: used ?? this.used,
     );
   }
 }

@@ -16,10 +16,16 @@ class BahanBakuRepository {
     int page = 1,
     int limit = 20,
     String search = '',
+    bool includeUsed = false,
   }) async {
     final body = await api.getJson(
       '/api/labels/bahan-baku',
-      query: {'page': page, 'limit': limit, 'search': search},
+      query: {
+        'page': page,
+        'limit': limit,
+        'search': search,
+        if (includeUsed) 'includeUsed': 'true',
+      },
     );
 
     final List<dynamic> data = body['data'] ?? [];

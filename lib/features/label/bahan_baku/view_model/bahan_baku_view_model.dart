@@ -20,6 +20,13 @@ class BahanBakuViewModel extends ChangeNotifier {
   int _totalPages = 1;
   int _total = 0;
   String _search = '';
+  bool includeUsed = false;
+
+  void setIncludeUsed(bool value) {
+    if (includeUsed == value) return;
+    includeUsed = value;
+    fetchBahanBakuHeaders(search: _search);
+  }
 
   /// Public getter for total rows from the API
   int get totalCount => _total;
@@ -83,6 +90,7 @@ class BahanBakuViewModel extends ChangeNotifier {
         page: _page,
         limit: 20,
         search: _search,
+        includeUsed: includeUsed,
       );
 
       items = result['items'] as List<BahanBakuHeader>;
@@ -112,6 +120,7 @@ class BahanBakuViewModel extends ChangeNotifier {
         page: _page,
         limit: 20,
         search: _search,
+        includeUsed: includeUsed,
       );
 
       final moreItems = result['items'] as List<BahanBakuHeader>;

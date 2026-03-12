@@ -15,19 +15,21 @@ class BahanBakuHeaderTable extends StatelessWidget {
   final ValueChanged<BahanBakuHeader> onItemTap;
   final void Function(BahanBakuHeader header, Offset globalPosition)?
   onItemLongPress;
+  final Future<void> Function()? onRefresh;
 
   const BahanBakuHeaderTable({
     super.key,
     required this.scrollController,
     required this.onItemTap,
     this.onItemLongPress,
+    this.onRefresh,
   });
 
   @override
   Widget build(BuildContext context) {
     return Consumer<BahanBakuViewModel>(
       builder: (context, vm, _) {
-        return AtlasDataTable<BahanBakuHeader>(
+        final table = AtlasDataTable<BahanBakuHeader>(
           columns: _buildColumns(),
           items: vm.items,
           scrollController: scrollController,
@@ -40,6 +42,12 @@ class BahanBakuHeaderTable extends StatelessWidget {
           onRowTap: onItemTap,
           onRowLongPress: onItemLongPress,
         );
+
+        if (onRefresh != null) {
+          return RefreshIndicator(onRefresh: onRefresh!, child: table);
+        }
+
+        return table;
       },
     );
   }
@@ -50,18 +58,49 @@ class BahanBakuHeaderTable extends StatelessWidget {
         title: 'NO. BB',
         width: _colNoBbWidth,
         cellBuilder: (context, item, rowState) {
-          return Text(
-            item.noBahanBaku,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: rowState.isSelected
-                  ? FontWeight.w700
-                  : FontWeight.w600,
-              color: rowState.isSelected
-                  ? const Color(0xFF0C66E4)
-                  : Colors.black87,
-            ),
-            softWrap: true,
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                item.noBahanBaku,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: rowState.isSelected
+                      ? FontWeight.w700
+                      : FontWeight.w600,
+                  color: rowState.isSelected
+                      ? const Color(0xFF0C66E4)
+                      : Colors.black87,
+                ),
+                softWrap: true,
+              ),
+              if (item.used) ...[
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFB71C1C).withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: const Color(0xFFB71C1C).withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: const Text(
+                    'Terpakai',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFB71C1C),
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           );
         },
       ),

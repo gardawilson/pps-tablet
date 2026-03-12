@@ -65,6 +65,7 @@ class MixerHeader {
   final String? dateTimeCreate; // DateTimeCreate
 
   final int hasBeenPrinted;
+  final bool used;
 
   bool get isPrinted => hasBeenPrinted > 0;
 
@@ -92,6 +93,7 @@ class MixerHeader {
     this.createBy,
     this.dateTimeCreate,
     this.hasBeenPrinted = 0,
+    this.used = false,
   });
 
   // ---- helpers ----
@@ -195,6 +197,7 @@ class MixerHeader {
       createBy: json['CreateBy']?.toString(),
       dateTimeCreate: json['DateTimeCreate']?.toString(),
       hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
+      used: json['Used'] == true,
     );
   }
 
@@ -229,6 +232,7 @@ class MixerHeader {
     'CreateBy': createBy,
     'DateTimeCreate': dateTimeCreate,
     'HasBeenPrinted': hasBeenPrinted,
+    'Used': used,
   };
 
   MixerHeader copyWith({
@@ -255,6 +259,7 @@ class MixerHeader {
     String? createBy,
     String? dateTimeCreate,
     int? hasBeenPrinted,
+    bool? used,
   }) {
     return MixerHeader(
       noMixer: noMixer ?? this.noMixer,
@@ -280,6 +285,7 @@ class MixerHeader {
       createBy: createBy ?? this.createBy,
       dateTimeCreate: dateTimeCreate ?? this.dateTimeCreate,
       hasBeenPrinted: hasBeenPrinted ?? this.hasBeenPrinted,
+      used: used ?? this.used,
     );
   }
 }

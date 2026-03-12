@@ -97,7 +97,9 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
       );
     } else if (_lastPendingCount > 0 && now == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sinkronisasi print furniture wip selesai')),
+        const SnackBar(
+          content: Text('Sinkronisasi print furniture wip selesai'),
+        ),
       );
     }
 
@@ -143,8 +145,9 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
   ) async {
     final vm = context.read<FurnitureWipViewModel>();
     final screenHeight = MediaQuery.of(context).size.height;
-    final adaptiveMaxHeight =
-        (screenHeight - 32).clamp(480.0, 820.0).toDouble();
+    final adaptiveMaxHeight = (screenHeight - 32)
+        .clamp(480.0, 820.0)
+        .toDouble();
 
     vm.setSelected(header.noFurnitureWip);
 
@@ -257,16 +260,18 @@ class _FurnitureWipScreenState extends State<FurnitureWipScreen> {
               color: Colors.white,
               child: Column(
                 children: [
-                  FurnitureWipActionBar(
-                    controller: searchCtrl,
-                    onSearchChanged: _onSearchChanged,
-                    onClear: () {
-                      searchCtrl.clear();
-                      context.read<FurnitureWipViewModel>().fetchHeaders(
-                        search: '',
-                      );
-                    },
-                    onAddPressed: _showFormDialog,
+                  Consumer<FurnitureWipViewModel>(
+                    builder: (_, vm, __) => FurnitureWipActionBar(
+                      controller: searchCtrl,
+                      onSearchChanged: _onSearchChanged,
+                      onClear: () {
+                        searchCtrl.clear();
+                        vm.fetchHeaders(search: '');
+                      },
+                      onAddPressed: _showFormDialog,
+                      includeUsed: vm.includeUsed,
+                      onIncludeUsedChanged: vm.setIncludeUsed,
+                    ),
                   ),
                   Expanded(
                     child: Consumer<FurnitureWipViewModel>(

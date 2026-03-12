@@ -19,6 +19,7 @@ class FurnitureWipRepository {
     int page = 1,
     int limit = 20,
     String search = '',
+    bool includeUsed = false,
   }) async {
     final token = await TokenStorage.getToken();
 
@@ -28,6 +29,7 @@ class FurnitureWipRepository {
         'page': page.toString(),
         'limit': limit.toString(),
         if (search.trim().isNotEmpty) 'search': search.trim(),
+        if (includeUsed) 'includeUsed': 'true',
       },
     );
 

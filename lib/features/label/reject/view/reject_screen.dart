@@ -280,14 +280,18 @@ class _RejectScreenState extends State<RejectScreen> {
               color: Colors.white,
               child: Column(
                 children: [
-                  RejectActionBar(
-                    controller: searchCtrl,
-                    onSearchChanged: _onSearchChanged,
-                    onClear: () {
-                      searchCtrl.clear();
-                      context.read<RejectViewModel>().fetchHeaders(search: '');
-                    },
-                    onAddPressed: _showFormDialog,
+                  Consumer<RejectViewModel>(
+                    builder: (_, vm, __) => RejectActionBar(
+                      controller: searchCtrl,
+                      onSearchChanged: _onSearchChanged,
+                      onClear: () {
+                        searchCtrl.clear();
+                        vm.fetchHeaders(search: '');
+                      },
+                      onAddPressed: _showFormDialog,
+                      includeUsed: vm.includeUsed,
+                      onIncludeUsedChanged: vm.setIncludeUsed,
+                    ),
                   ),
                   Expanded(
                     child: Consumer<RejectViewModel>(

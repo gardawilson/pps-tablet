@@ -14,12 +14,18 @@ class MixerRepository {
     int page = 1,
     int limit = 20,
     String search = '',
+    bool includeUsed = false,
   }) async {
     final token = await TokenStorage.getToken();
 
     final url = Uri.parse(
-      "${ApiConstants.baseUrl}/api/labels/mixer?page=$page&limit=$limit&search=$search",
-    );
+      "${ApiConstants.baseUrl}/api/labels/mixer",
+    ).replace(queryParameters: {
+      'page': page.toString(),
+      'limit': limit.toString(),
+      if (search.trim().isNotEmpty) 'search': search.trim(),
+      if (includeUsed) 'includeUsed': 'true',
+    });
 
     print("➡️ Fetching Mixer Headers: $url");
 

@@ -10,6 +10,8 @@ class BahanBakuHeader {
   final String? createBy;         // CreateBy
   final String? dateTimeCreate;   // DateTimeCreate
 
+  final bool used;
+
   const BahanBakuHeader({
     required this.noBahanBaku,
     required this.idSupplier,
@@ -18,6 +20,7 @@ class BahanBakuHeader {
     required this.dateCreate,
     this.createBy,
     this.dateTimeCreate,
+    this.used = false,
   });
 
   static int _toInt(dynamic v) {
@@ -38,6 +41,7 @@ class BahanBakuHeader {
 
       createBy: json['CreateBy']?.toString(),
       dateTimeCreate: json['DateTimeCreate']?.toString(),
+      used: json['Used'] == true,
     );
   }
 
@@ -49,6 +53,7 @@ class BahanBakuHeader {
     'DateCreate': dateCreate,
     'CreateBy': createBy,
     'DateTimeCreate': dateTimeCreate,
+    'Used': used,
   };
 
   BahanBakuHeader copyWith({
@@ -59,6 +64,7 @@ class BahanBakuHeader {
     String? dateCreate,
     String? createBy,
     String? dateTimeCreate,
+    bool? used,
   }) {
     return BahanBakuHeader(
       noBahanBaku: noBahanBaku ?? this.noBahanBaku,
@@ -68,6 +74,7 @@ class BahanBakuHeader {
       dateCreate: dateCreate ?? this.dateCreate,
       createBy: createBy ?? this.createBy,
       dateTimeCreate: dateTimeCreate ?? this.dateTimeCreate,
+      used: used ?? this.used,
     );
   }
 }

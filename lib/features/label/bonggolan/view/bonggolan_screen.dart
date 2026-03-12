@@ -239,16 +239,18 @@ class _BonggolanScreenState extends State<BonggolanScreen> {
               color: Colors.white,
               child: Column(
                 children: [
-                  BonggolanActionBar(
-                    controller: searchCtrl,
-                    onSearchChanged: _onSearchChanged,
-                    onClear: () {
-                      searchCtrl.clear();
-                      context.read<BonggolanViewModel>().fetchHeaders(
-                        search: '',
-                      );
-                    },
-                    onAddPressed: _showFormDialog,
+                  Consumer<BonggolanViewModel>(
+                    builder: (_, vm, __) => BonggolanActionBar(
+                      controller: searchCtrl,
+                      onSearchChanged: _onSearchChanged,
+                      onClear: () {
+                        searchCtrl.clear();
+                        vm.fetchHeaders(search: '');
+                      },
+                      onAddPressed: _showFormDialog,
+                      includeUsed: vm.includeUsed,
+                      onIncludeUsedChanged: vm.setIncludeUsed,
+                    ),
                   ),
                   Expanded(
                     child: BonggolanHeaderTable(

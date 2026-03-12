@@ -254,14 +254,18 @@ class _PackingScreenState extends State<PackingScreen> {
               color: Colors.white,
               child: Column(
                 children: [
-                  PackingActionBar(
-                    controller: searchCtrl,
-                    onSearchChanged: _onSearchChanged,
-                    onClear: () {
-                      searchCtrl.clear();
-                      context.read<PackingViewModel>().fetchHeaders(search: '');
-                    },
-                    onAddPressed: _showFormDialog,
+                  Consumer<PackingViewModel>(
+                    builder: (_, vm, __) => PackingActionBar(
+                      controller: searchCtrl,
+                      onSearchChanged: _onSearchChanged,
+                      onClear: () {
+                        searchCtrl.clear();
+                        vm.fetchHeaders(search: '');
+                      },
+                      onAddPressed: _showFormDialog,
+                      includeUsed: vm.includeUsed,
+                      onIncludeUsedChanged: vm.setIncludeUsed,
+                    ),
                   ),
                   Expanded(
                     child: Consumer<PackingViewModel>(

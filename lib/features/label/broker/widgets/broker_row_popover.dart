@@ -230,7 +230,9 @@ class _BrokerRowPopoverState extends State<BrokerRowPopover> {
                     await lockApi.acquire(noBroker);
                     isLockAcquired = true;
 
-                    await PdfPrintService(defaultSystem: 'pps').previewReport80mm(
+                    await PdfPrintService(
+                      defaultSystem: 'pps',
+                    ).previewReport80mm(
                       context: rootCtx,
                       reportName: 'CrLabelPalletBroker',
                       query: {'NoBroker': noBroker},

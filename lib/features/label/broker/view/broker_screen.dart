@@ -282,8 +282,9 @@ class _BrokerScreenState extends State<BrokerScreen> {
   ) async {
     final vm = context.read<BrokerViewModel>();
     final screenHeight = MediaQuery.of(context).size.height;
-    final adaptiveMaxHeight =
-        (screenHeight - 32).clamp(480.0, 820.0).toDouble();
+    final adaptiveMaxHeight = (screenHeight - 32)
+        .clamp(480.0, 820.0)
+        .toDouble();
 
     // Pindahkan highlight saat long-press
     vm.setSelectedNoBroker(header.noBroker);
@@ -384,16 +385,18 @@ class _BrokerScreenState extends State<BrokerScreen> {
               color: Colors.white,
               child: Column(
                 children: [
-                  BrokerActionBar(
-                    controller: searchCtrl,
-                    onSearchChanged: _onSearchChanged,
-                    onClear: () {
-                      searchCtrl.clear();
-                      context.read<BrokerViewModel>().fetchBrokerHeaders(
-                        search: "",
-                      );
-                    },
-                    onAddPressed: _showFormDialog,
+                  Consumer<BrokerViewModel>(
+                    builder: (_, vm, __) => BrokerActionBar(
+                      controller: searchCtrl,
+                      onSearchChanged: _onSearchChanged,
+                      onClear: () {
+                        searchCtrl.clear();
+                        vm.fetchBrokerHeaders(search: "");
+                      },
+                      onAddPressed: _showFormDialog,
+                      includeUsed: vm.includeUsed,
+                      onIncludeUsedChanged: vm.setIncludeUsed,
+                    ),
                   ),
                   Expanded(
                     child: BrokerHeaderTable(

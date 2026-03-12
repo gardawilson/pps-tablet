@@ -24,6 +24,13 @@ class CrusherViewModel extends ChangeNotifier {
   int get totalCount => _total;
   String get currentSearch => _search;
   bool get hasMore => _page < _totalPages;
+  bool includeUsed = false;
+
+  void setIncludeUsed(bool value) {
+    if (includeUsed == value) return;
+    includeUsed = value;
+    fetchHeaders(search: _search);
+  }
 
   // Highlight row
   String? selectedNoCrusher;
@@ -53,6 +60,7 @@ class CrusherViewModel extends ChangeNotifier {
         page: _page,
         limit: 20,
         search: _search,
+        includeUsed: includeUsed,
       );
 
       items = (result['items'] as List<CrusherHeader>);
@@ -82,6 +90,7 @@ class CrusherViewModel extends ChangeNotifier {
         page: _page,
         limit: 20,
         search: _search,
+        includeUsed: includeUsed,
       );
       final more = (result['items'] as List<CrusherHeader>);
       items.addAll(more);

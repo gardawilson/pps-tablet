@@ -38,6 +38,7 @@ class GilinganHeader {
   final String? noBongkarSusun;     // dari BongkarSusunOutputGilingan.NoBongkarSusun
 
   final int hasBeenPrinted;
+  final bool used;
 
   bool get isPrinted => hasBeenPrinted > 0;
 
@@ -56,6 +57,7 @@ class GilinganHeader {
     this.gilinganNamaMesin,
     this.noBongkarSusun,
     this.hasBeenPrinted = 0,
+    this.used = false,
   });
 
   // Convenience getters (optional, buat dipakai UI)
@@ -109,6 +111,7 @@ class GilinganHeader {
       gilinganNamaMesin: json['GilinganNamaMesin'],
       noBongkarSusun: json['NoBongkarSusun'],
       hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
+      used: json['Used'] == true,
     );
   }
 
@@ -127,6 +130,7 @@ class GilinganHeader {
     'GilinganNamaMesin': gilinganNamaMesin,
     'NoBongkarSusun': noBongkarSusun,
     'HasBeenPrinted': hasBeenPrinted,
+    'Used': used,
   };
 
   GilinganHeader copyWith({
@@ -144,6 +148,7 @@ class GilinganHeader {
     String? gilinganNamaMesin,
     String? noBongkarSusun,
     int? hasBeenPrinted,
+    bool? used,
   }) {
     return GilinganHeader(
       noGilingan: noGilingan ?? this.noGilingan,
@@ -156,12 +161,11 @@ class GilinganHeader {
       idStatus: idStatus ?? this.idStatus,
       isPartial: isPartial ?? this.isPartial,
       statusText: statusText ?? this.statusText,
-      gilinganNoProduksi:
-      gilinganNoProduksi ?? this.gilinganNoProduksi,
-      gilinganNamaMesin:
-      gilinganNamaMesin ?? this.gilinganNamaMesin,
+      gilinganNoProduksi: gilinganNoProduksi ?? this.gilinganNoProduksi,
+      gilinganNamaMesin: gilinganNamaMesin ?? this.gilinganNamaMesin,
       noBongkarSusun: noBongkarSusun ?? this.noBongkarSusun,
       hasBeenPrinted: hasBeenPrinted ?? this.hasBeenPrinted,
+      used: used ?? this.used,
     );
   }
 }

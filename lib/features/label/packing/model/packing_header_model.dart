@@ -47,6 +47,7 @@ class PackingHeader {
   final String? outputNamaMesin;
 
   final int hasBeenPrinted;
+  final bool used;
 
   bool get isPrinted => hasBeenPrinted > 0;
 
@@ -65,6 +66,7 @@ class PackingHeader {
     this.outputCode,
     this.outputNamaMesin,
     this.hasBeenPrinted = 0,
+    this.used = false,
   });
 
   // ---------------------------------------------------------------------------
@@ -133,6 +135,7 @@ class PackingHeader {
       outputCode: json['OutputCode']?.toString(),
       outputNamaMesin: json['OutputNamaMesin']?.toString(),
       hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
+      used: json['Used'] == true,
     );
   }
 
@@ -151,6 +154,7 @@ class PackingHeader {
     'OutputCode': outputCode,
     'OutputNamaMesin': outputNamaMesin,
     'HasBeenPrinted': hasBeenPrinted,
+    'Used': used,
   };
 
   PackingHeader copyWith({
@@ -168,6 +172,7 @@ class PackingHeader {
     String? outputCode,
     String? outputNamaMesin,
     int? hasBeenPrinted,
+    bool? used,
   }) {
     return PackingHeader(
       noBJ: noBJ ?? this.noBJ,
@@ -184,6 +189,7 @@ class PackingHeader {
       outputCode: outputCode ?? this.outputCode,
       outputNamaMesin: outputNamaMesin ?? this.outputNamaMesin,
       hasBeenPrinted: hasBeenPrinted ?? this.hasBeenPrinted,
+      used: used ?? this.used,
     );
   }
 }

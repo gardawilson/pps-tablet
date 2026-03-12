@@ -8,12 +8,16 @@ class BahanBakuActionBar extends StatefulWidget {
   final TextEditingController controller;
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onClear;
+  final bool includeUsed;
+  final ValueChanged<bool> onIncludeUsedChanged;
 
   const BahanBakuActionBar({
     super.key,
     required this.controller,
     required this.onSearchChanged,
     required this.onClear,
+    required this.includeUsed,
+    required this.onIncludeUsedChanged,
   });
 
   @override
@@ -74,14 +78,14 @@ class _BahanBakuActionBarState extends State<BahanBakuActionBar> {
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: _focused
-                              ? cs.primary.withOpacity(.5)
+                              ? cs.primary.withValues(alpha: .5)
                               : Colors.grey.shade300,
                           width: _focused ? 1.6 : 1,
                         ),
                         boxShadow: _focused
                             ? [
                                 BoxShadow(
-                                  color: cs.primary.withOpacity(.12),
+                                  color: cs.primary.withValues(alpha: .12),
                                   blurRadius: 14,
                                   offset: const Offset(0, 6),
                                 ),
@@ -142,24 +146,66 @@ class _BahanBakuActionBarState extends State<BahanBakuActionBar> {
                     ),
                   ),
 
-                  if (!isTight) const SizedBox(width: 8),
+                  const SizedBox(width: 8),
 
-                  // 🔁 Tombol reset eksternal (layout sempit)
-                  if (isTight)
-                    IconButton.filledTonal(
-                      icon: const Icon(Icons.refresh_rounded),
-                      tooltip: 'Reset pencarian',
-                      onPressed: () {
-                        widget.controller.clear();
-                        setState(() {});
-                        widget.onClear();
-                      },
-                      style: IconButton.styleFrom(
-                        shape: RoundedRectangleBorder(
+                  // Toggle: tampilkan semua data (termasuk sudah dipakai)
+                  Tooltip(
+                    message: widget.includeUsed
+                        ? 'Tampilkan hanya yang belum dipakai'
+                        : 'Tampilkan semua data',
+                    waitDuration: const Duration(milliseconds: 400),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () =>
+                          widget.onIncludeUsedChanged(!widget.includeUsed),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: widget.includeUsed
+                              ? const Color(0xFF1565C0).withValues(alpha: 0.10)
+                              : Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: widget.includeUsed
+                                ? const Color(0xFF1565C0).withValues(alpha: 0.35)
+                                : Colors.grey.shade300,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              widget.includeUsed
+                                  ? Icons.check_box_rounded
+                                  : Icons.check_box_outline_blank_rounded,
+                              size: 18,
+                              color: widget.includeUsed
+                                  ? const Color(0xFF1565C0)
+                                  : Colors.grey.shade500,
+                            ),
+                            if (!isTight) ...[
+                              const SizedBox(width: 6),
+                              Text(
+                                'Tampilkan Semua',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: widget.includeUsed
+                                      ? const Color(0xFF1565C0)
+                                      : Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                     ),
+                  ),
+
                 ],
               );
             },

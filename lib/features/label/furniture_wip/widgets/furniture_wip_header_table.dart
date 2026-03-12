@@ -47,22 +47,47 @@ class FurnitureWipHeaderTable extends StatelessWidget {
         title: 'NO. FWIP',
         width: 150,
         cellBuilder: (context, item, rowState) {
-          return Row(
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: Text(
-                  item.noFurnitureWip,
-                  softWrap: true,
-                  style: TextStyle(
-                    fontWeight: rowState.isSelected
-                        ? FontWeight.w700
-                        : FontWeight.w600,
-                    color: rowState.isSelected
-                        ? const Color(0xFF0C66E4)
-                        : Colors.black87,
-                  ),
+              Text(
+                item.noFurnitureWip,
+                softWrap: true,
+                style: TextStyle(
+                  fontWeight: rowState.isSelected
+                      ? FontWeight.w700
+                      : FontWeight.w600,
+                  color: rowState.isSelected
+                      ? const Color(0xFF0C66E4)
+                      : Colors.black87,
                 ),
               ),
+              if (item.used) ...[
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFB71C1C).withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: const Color(0xFFB71C1C).withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: const Text(
+                    'Terpakai',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFB71C1C),
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ),
+              ],
             ],
           );
         },

@@ -57,6 +57,7 @@ class BrokerHeader {
   final String? dateTimeCreate;
 
   final int hasBeenPrinted;
+  final bool used;
 
   bool get isPrinted => hasBeenPrinted > 0;
 
@@ -87,6 +88,7 @@ class BrokerHeader {
     this.createBy,
     this.dateTimeCreate,
     this.hasBeenPrinted = 0,
+    this.used = false,
   });
 
   static bool? _statusToBool(String? s) {
@@ -145,6 +147,7 @@ class BrokerHeader {
       createBy: json['CreateBy']?.toString(),
       dateTimeCreate: json['DateTimeCreate']?.toString(),
       hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
+      used: json['Used'] == true,
     );
   }
 
@@ -180,6 +183,7 @@ class BrokerHeader {
     'CreateBy': createBy,
     'DateTimeCreate': dateTimeCreate,
     'HasBeenPrinted': hasBeenPrinted,
+    'Used': used,
   };
 
   BrokerHeader copyWith({
@@ -209,6 +213,7 @@ class BrokerHeader {
     String? createBy,
     String? dateTimeCreate,
     int? hasBeenPrinted,
+    bool? used,
   }) {
     return BrokerHeader(
       noBroker: noBroker ?? this.noBroker,
@@ -237,6 +242,7 @@ class BrokerHeader {
       createBy: createBy ?? this.createBy,
       dateTimeCreate: dateTimeCreate ?? this.dateTimeCreate,
       hasBeenPrinted: hasBeenPrinted ?? this.hasBeenPrinted,
+      used: used ?? this.used,
     );
   }
 }

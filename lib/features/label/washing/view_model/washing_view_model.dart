@@ -30,6 +30,7 @@ class WashingViewModel extends ChangeNotifier {
   int _totalPages = 1;
   int _total = 0;
   String _search = '';
+  bool includeUsed = false;
 
   int get totalCount => _total;
   bool get hasMore => _page < _totalPages;
@@ -101,6 +102,15 @@ class WashingViewModel extends ChangeNotifier {
   }
 
   // =============================
+  // Filter: include used
+  // =============================
+  void setIncludeUsed(bool value) {
+    if (includeUsed == value) return;
+    includeUsed = value;
+    fetchWashingHeaders(search: _search);
+  }
+
+  // =============================
   // Fetch headers (reset)
   // =============================
   Future<void> fetchWashingHeaders({String search = ''}) async {
@@ -124,6 +134,7 @@ class WashingViewModel extends ChangeNotifier {
         page: _page,
         limit: 20,
         search: _search,
+        includeUsed: includeUsed,
       );
 
       items = (result['items'] as List<WashingHeader>);
@@ -158,6 +169,7 @@ class WashingViewModel extends ChangeNotifier {
         page: _page,
         limit: 20,
         search: _search,
+        includeUsed: includeUsed,
       );
 
       final moreItems = (result['items'] as List<WashingHeader>);

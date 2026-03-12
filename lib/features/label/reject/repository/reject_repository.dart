@@ -39,6 +39,7 @@ class RejectRepository {
     int page = 1,
     int limit = 20,
     String search = '',
+    bool includeUsed = false,
   }) async {
     try {
       final body = await api.getJson(
@@ -47,6 +48,7 @@ class RejectRepository {
           'page': page,
           'limit': limit,
           if (search.trim().isNotEmpty) 'search': search.trim(),
+          if (includeUsed) 'includeUsed': 'true',
         },
       );
 

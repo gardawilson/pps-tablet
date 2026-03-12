@@ -216,20 +216,27 @@ class _BahanBakuScreenState extends State<BahanBakuScreen> {
               color: Colors.white,
               child: Column(
                 children: [
-                  BahanBakuActionBar(
-                    controller: searchCtrl,
-                    onSearchChanged: _onSearchChanged,
-                    onClear: () {
-                      searchCtrl.clear();
-                      context.read<BahanBakuViewModel>().fetchBahanBakuHeaders(
-                        search: "",
-                      );
-                    },
+                  Consumer<BahanBakuViewModel>(
+                    builder: (_, vm, __) => BahanBakuActionBar(
+                      controller: searchCtrl,
+                      onSearchChanged: _onSearchChanged,
+                      onClear: () {
+                        searchCtrl.clear();
+                        vm.fetchBahanBakuHeaders(search: '');
+                      },
+                      includeUsed: vm.includeUsed,
+                      onIncludeUsedChanged: vm.setIncludeUsed,
+                    ),
                   ),
                   Expanded(
                     child: BahanBakuHeaderTable(
                       scrollController: _headerScrollController,
                       onItemTap: _onHeaderTap,
+                      onRefresh: () => context
+                          .read<BahanBakuViewModel>()
+                          .fetchBahanBakuHeaders(
+                            search: searchCtrl.text.trim(),
+                          ),
                     ),
                   ),
                 ],

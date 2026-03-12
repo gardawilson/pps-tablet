@@ -53,8 +53,6 @@ class _BahanBakuPalletTableState extends State<BahanBakuPalletTable> {
   }
 
   void _showPalletPopover(BahanBakuPallet pallet, Offset globalPosition) {
-    if (pallet.isEmpty) return;
-
     final screenHeight = MediaQuery.of(context).size.height;
     final adaptiveMaxHeight = (screenHeight - 32)
         .clamp(480.0, 820.0)
@@ -144,8 +142,11 @@ class _BahanBakuPalletTableState extends State<BahanBakuPalletTable> {
                       if (pallet.isEmpty) return;
                       widget.onPalletTap(pallet);
                     },
+                    onRowTapWithPosition: (pallet, pos) {
+                      if (!pallet.isEmpty) return;
+                      _showPalletPopover(pallet, pos);
+                    },
                     onRowLongPress: (pallet, pos) {
-                      if (pallet.isEmpty) return;
                       _showPalletPopover(pallet, pos);
                     },
                   ),
@@ -445,4 +446,3 @@ class _PrintCellState {
   @override
   int get hashCode => Object.hash(lock, count);
 }
-

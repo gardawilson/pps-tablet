@@ -362,14 +362,18 @@ class _MixerScreenState extends State<MixerScreen> {
               color: Colors.white,
               child: Column(
                 children: [
-                  MixerActionBar(
-                    controller: searchCtrl,
-                    onSearchChanged: _onSearchChanged,
-                    onClear: () {
-                      searchCtrl.clear();
-                      context.read<MixerViewModel>().fetchHeaders(search: '');
-                    },
-                    onAddPressed: _showFormDialog,
+                  Consumer<MixerViewModel>(
+                    builder: (_, vm, __) => MixerActionBar(
+                      controller: searchCtrl,
+                      onSearchChanged: _onSearchChanged,
+                      onClear: () {
+                        searchCtrl.clear();
+                        vm.fetchHeaders(search: '');
+                      },
+                      onAddPressed: _showFormDialog,
+                      includeUsed: vm.includeUsed,
+                      onIncludeUsedChanged: vm.setIncludeUsed,
+                    ),
                   ),
                   Expanded(
                     child: MixerHeaderTable(

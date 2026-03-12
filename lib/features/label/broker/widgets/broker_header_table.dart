@@ -54,18 +54,49 @@ class BrokerHeaderTable extends StatelessWidget {
         title: 'NO. BROKER',
         width: _colNoBrokerWidth,
         cellBuilder: (context, item, rowState) {
-          return Text(
-            item.noBroker,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: rowState.isSelected
-                  ? FontWeight.w700
-                  : FontWeight.w600,
-              color: rowState.isSelected
-                  ? const Color(0xFF0C66E4)
-                  : Colors.black87,
-            ),
-            softWrap: true,
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                item.noBroker,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: rowState.isSelected
+                      ? FontWeight.w700
+                      : FontWeight.w600,
+                  color: rowState.isSelected
+                      ? const Color(0xFF0C66E4)
+                      : Colors.black87,
+                ),
+                softWrap: true,
+              ),
+              if (item.used) ...[
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFB71C1C).withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: const Color(0xFFB71C1C).withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: const Text(
+                    'Terpakai',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFB71C1C),
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           );
         },
       ),
@@ -184,7 +215,10 @@ class BrokerHeaderTable extends StatelessWidget {
               final count = state.count ?? item.hasBeenPrinted;
               if (count == 0) {
                 return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade100,
                     borderRadius: BorderRadius.circular(20),

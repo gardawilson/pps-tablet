@@ -12,11 +12,17 @@ class WashingRepository {
     int page = 1,
     int limit = 20,
     String search = '',
+    bool includeUsed = false,
   }) async {
     final token = await TokenStorage.getToken();
 
+    final queryParams = StringBuffer(
+      "page=$page&limit=$limit&search=$search",
+    );
+    if (includeUsed) queryParams.write('&includeUsed=true');
+
     final url = Uri.parse(
-      "${ApiConstants.baseUrl}/api/labels/washing?page=$page&limit=$limit&search=$search",
+      "${ApiConstants.baseUrl}/api/labels/washing?$queryParams",
     );
 
     print("➡️ Fetching Washing Headers: $url");

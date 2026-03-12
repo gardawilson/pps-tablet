@@ -23,6 +23,13 @@ class MixerViewModel extends ChangeNotifier {
 
   /// Public getter for total rows from the API
   int get totalCount => _total;
+  bool includeUsed = false;
+
+  void setIncludeUsed(bool value) {
+    if (includeUsed == value) return;
+    includeUsed = value;
+    fetchHeaders(search: _search);
+  }
 
   // === DETAIL STATE ===
   String? selectedNoMixer; // single source of highlight
@@ -70,6 +77,7 @@ class MixerViewModel extends ChangeNotifier {
         page: _page,
         limit: 20,
         search: _search,
+        includeUsed: includeUsed,
       );
 
       items = result['items'] as List<MixerHeader>;
@@ -101,6 +109,7 @@ class MixerViewModel extends ChangeNotifier {
         page: _page,
         limit: 20,
         search: _search,
+        includeUsed: includeUsed,
       );
 
       final moreItems = result['items'] as List<MixerHeader>;

@@ -47,30 +47,44 @@ class RejectHeaderTable extends StatelessWidget {
         title: 'NO. LABEL',
         width: 170,
         cellBuilder: (context, item, rowState) {
-          return Row(
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: Text(
-                  item.noReject,
-                  softWrap: true,
-                  style: TextStyle(
-                    fontWeight: rowState.isSelected
-                        ? FontWeight.w700
-                        : FontWeight.w600,
-                    color: rowState.isSelected
-                        ? const Color(0xFF0C66E4)
-                        : Colors.black87,
-                  ),
+              Text(
+                item.noReject,
+                softWrap: true,
+                style: TextStyle(
+                  fontWeight: rowState.isSelected
+                      ? FontWeight.w700
+                      : FontWeight.w600,
+                  color: rowState.isSelected
+                      ? const Color(0xFF0C66E4)
+                      : Colors.black87,
                 ),
               ),
-              if (item.isPartialBool) ...[
-                const SizedBox(width: 4),
-                Tooltip(
-                  message: 'Lihat detail partial dari menu row popover',
-                  child: Icon(
-                    Icons.info_outline,
-                    size: 16,
-                    color: Colors.orange.shade600,
+              if (item.used) ...[
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFB71C1C).withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: const Color(0xFFB71C1C).withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: const Text(
+                    'Terpakai',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFB71C1C),
+                      letterSpacing: 0.2,
+                    ),
                   ),
                 ),
               ],
@@ -143,7 +157,13 @@ class RejectHeaderTable extends StatelessWidget {
         cellBuilder: (context, item, rowState) {
           return Text(
             _formatBerat(item.berat),
-            style: TextStyle(fontSize: 14, color: rowState.textColor),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: item.isPartialBool
+                  ? FontWeight.w700
+                  : FontWeight.w500,
+              color: item.isPartialBool ? Colors.red : rowState.textColor,
+            ),
             softWrap: true,
           );
         },

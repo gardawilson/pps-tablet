@@ -18,11 +18,15 @@ class BrokerRepository {
     int page = 1,
     int limit = 20,
     String search = '',
+    bool includeUsed = false,
   }) async {
-    final body = await api.getJson(
-      '/api/labels/broker',
-      query: {'page': page, 'limit': limit, 'search': search},
-    );
+    final query = <String, dynamic>{
+      'page': page,
+      'limit': limit,
+      'search': search,
+      if (includeUsed) 'includeUsed': true,
+    };
+    final body = await api.getJson('/api/labels/broker', query: query);
 
     final List<dynamic> data = body['data'] ?? [];
     final items = data

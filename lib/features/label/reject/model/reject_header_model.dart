@@ -41,6 +41,7 @@ class RejectHeader {
   final String? outputNamaMesin;  // NamaMesin / 'BJ Sortir'
 
   final int hasBeenPrinted;
+  final bool used;
 
   bool get isPrinted => hasBeenPrinted > 0;
 
@@ -58,6 +59,7 @@ class RejectHeader {
     this.outputCode,
     this.outputNamaMesin,
     this.hasBeenPrinted = 0,
+    this.used = false,
   });
 
   // ---------------------------------------------------------------------------
@@ -128,6 +130,7 @@ class RejectHeader {
       outputCode: json['OutputCode']?.toString(),
       outputNamaMesin: json['OutputNamaMesin']?.toString(),
       hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
+      used: json['Used'] == true,
     );
   }
 
@@ -145,6 +148,7 @@ class RejectHeader {
     'OutputCode': outputCode,
     'OutputNamaMesin': outputNamaMesin,
     'HasBeenPrinted': hasBeenPrinted,
+    'Used': used,
   };
 
   RejectHeader copyWith({
@@ -161,6 +165,7 @@ class RejectHeader {
     String? outputCode,
     String? outputNamaMesin,
     int? hasBeenPrinted,
+    bool? used,
   }) {
     return RejectHeader(
       noReject: noReject ?? this.noReject,
@@ -176,6 +181,7 @@ class RejectHeader {
       outputCode: outputCode ?? this.outputCode,
       outputNamaMesin: outputNamaMesin ?? this.outputNamaMesin,
       hasBeenPrinted: hasBeenPrinted ?? this.hasBeenPrinted,
+      used: used ?? this.used,
     );
   }
 }

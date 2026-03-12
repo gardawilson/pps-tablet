@@ -282,16 +282,18 @@ class _GilinganScreenState extends State<GilinganScreen> {
               color: Colors.white,
               child: Column(
                 children: [
-                  GilinganActionBar(
-                    controller: searchCtrl,
-                    onSearchChanged: _onSearchChanged,
-                    onClear: () {
-                      searchCtrl.clear();
-                      context.read<GilinganViewModel>().fetchHeaders(
-                        search: '',
-                      );
-                    },
-                    onAddPressed: _showFormDialog,
+                  Consumer<GilinganViewModel>(
+                    builder: (_, vm, __) => GilinganActionBar(
+                      controller: searchCtrl,
+                      onSearchChanged: _onSearchChanged,
+                      onClear: () {
+                        searchCtrl.clear();
+                        vm.fetchHeaders(search: '');
+                      },
+                      onAddPressed: _showFormDialog,
+                      includeUsed: vm.includeUsed,
+                      onIncludeUsedChanged: vm.setIncludeUsed,
+                    ),
                   ),
                   Expanded(
                     child: GilinganHeaderTable(

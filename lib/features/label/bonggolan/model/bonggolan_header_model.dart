@@ -44,6 +44,7 @@ class BonggolanHeader {
   final String? noBongkarSusun; // NoBongkarSusun
 
   final int hasBeenPrinted;
+  final bool used;
 
   bool get isPrinted => hasBeenPrinted > 0;
 
@@ -64,6 +65,7 @@ class BonggolanHeader {
     this.injectNamaMesin,
     this.noBongkarSusun,
     this.hasBeenPrinted = 0,
+    this.used = false,
   });
 
   // Convenience: prefer Inject* then fallback to Broker*
@@ -113,6 +115,7 @@ class BonggolanHeader {
       injectNamaMesin: json['InjectNamaMesin'],
       noBongkarSusun: json['NoBongkarSusun'],
       hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
+      used: json['Used'] == true,
     );
   }
 
@@ -133,6 +136,7 @@ class BonggolanHeader {
     'InjectNamaMesin': injectNamaMesin,
     'NoBongkarSusun': noBongkarSusun,
     'HasBeenPrinted': hasBeenPrinted,
+    'Used': used,
   };
 
   BonggolanHeader copyWith({
@@ -152,6 +156,7 @@ class BonggolanHeader {
     String? injectNamaMesin,
     String? noBongkarSusun,
     int? hasBeenPrinted,
+    bool? used,
   }) {
     return BonggolanHeader(
       noBonggolan: noBonggolan ?? this.noBonggolan,
@@ -170,6 +175,7 @@ class BonggolanHeader {
       injectNamaMesin: injectNamaMesin ?? this.injectNamaMesin,
       noBongkarSusun: noBongkarSusun ?? this.noBongkarSusun,
       hasBeenPrinted: hasBeenPrinted ?? this.hasBeenPrinted,
+      used: used ?? this.used,
     );
   }
 }

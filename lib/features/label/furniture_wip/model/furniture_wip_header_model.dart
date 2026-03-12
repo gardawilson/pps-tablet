@@ -44,6 +44,7 @@ class FurnitureWipHeader {
   final String? outputNamaMesin;  // NamaMesin / 'Bongkar Susun' / NamaPembeli
 
   final int hasBeenPrinted;
+  final bool used;
 
   bool get isPrinted => hasBeenPrinted > 0;
 
@@ -62,6 +63,7 @@ class FurnitureWipHeader {
     this.outputCode,
     this.outputNamaMesin,
     this.hasBeenPrinted = 0,
+    this.used = false,
   });
 
   // Convenience getters buat UI
@@ -126,6 +128,7 @@ class FurnitureWipHeader {
       outputCode: json['OutputCode']?.toString(),
       outputNamaMesin: json['OutputNamaMesin']?.toString(),
       hasBeenPrinted: (json['HasBeenPrinted'] as num?)?.toInt() ?? 0,
+      used: json['Used'] == true,
     );
   }
 
@@ -145,6 +148,7 @@ class FurnitureWipHeader {
     'OutputCode': outputCode,
     'OutputNamaMesin': outputNamaMesin,
     'HasBeenPrinted': hasBeenPrinted,
+    'Used': used,
   };
 
   FurnitureWipHeader copyWith({
@@ -162,6 +166,7 @@ class FurnitureWipHeader {
     String? outputCode,
     String? outputNamaMesin,
     int? hasBeenPrinted,
+    bool? used,
   }) {
     return FurnitureWipHeader(
       noFurnitureWip: noFurnitureWip ?? this.noFurnitureWip,
@@ -178,6 +183,7 @@ class FurnitureWipHeader {
       outputCode: outputCode ?? this.outputCode,
       outputNamaMesin: outputNamaMesin ?? this.outputNamaMesin,
       hasBeenPrinted: hasBeenPrinted ?? this.hasBeenPrinted,
+      used: used ?? this.used,
     );
   }
 }

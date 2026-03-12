@@ -53,18 +53,49 @@ class MixerHeaderTable extends StatelessWidget {
         title: 'NO. MIXER',
         width: _colNoMixerWidth,
         cellBuilder: (context, item, rowState) {
-          return Text(
-            item.noMixer,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: rowState.isSelected
-                  ? FontWeight.w700
-                  : FontWeight.w600,
-              color: rowState.isSelected
-                  ? const Color(0xFF0C66E4)
-                  : Colors.black87,
-            ),
-            softWrap: true,
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                item.noMixer,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: rowState.isSelected
+                      ? FontWeight.w700
+                      : FontWeight.w600,
+                  color: rowState.isSelected
+                      ? const Color(0xFF0C66E4)
+                      : Colors.black87,
+                ),
+                softWrap: true,
+              ),
+              if (item.used) ...[
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFB71C1C).withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: const Color(0xFFB71C1C).withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: const Text(
+                    'Terpakai',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFB71C1C),
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           );
         },
       ),

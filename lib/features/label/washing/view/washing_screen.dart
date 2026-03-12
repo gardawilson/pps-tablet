@@ -363,16 +363,18 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
               color: Colors.white,
               child: Column(
                 children: [
-                  WashingActionBar(
-                    controller: searchCtrl,
-                    onSearchChanged: _onSearchChanged,
-                    onClear: () {
-                      searchCtrl.clear();
-                      context.read<WashingViewModel>().fetchWashingHeaders(
-                        search: "",
-                      );
-                    },
-                    onAddPressed: _showFormDialog,
+                  Consumer<WashingViewModel>(
+                    builder: (_, vm, __) => WashingActionBar(
+                      controller: searchCtrl,
+                      onSearchChanged: _onSearchChanged,
+                      onClear: () {
+                        searchCtrl.clear();
+                        vm.fetchWashingHeaders(search: "");
+                      },
+                      onAddPressed: _showFormDialog,
+                      includeUsed: vm.includeUsed,
+                      onIncludeUsedChanged: vm.setIncludeUsed,
+                    ),
                   ),
                   Expanded(
                     child: WashingHeaderTable(

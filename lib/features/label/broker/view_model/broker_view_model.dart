@@ -21,6 +21,7 @@ class BrokerViewModel extends ChangeNotifier {
   int _totalPages = 1;
   int _total = 0;
   String _search = '';
+  bool includeUsed = false;
 
   /// Public getter for total rows from the API
   int get totalCount => _total;
@@ -95,6 +96,13 @@ class BrokerViewModel extends ChangeNotifier {
     }
   }
 
+  // === FILTER: include used ===
+  void setIncludeUsed(bool value) {
+    if (includeUsed == value) return;
+    includeUsed = value;
+    fetchBrokerHeaders(search: _search);
+  }
+
   // === FETCH HEADER (RESET) ===
   Future<void> fetchBrokerHeaders({String search = ''}) async {
     _page = 1;
@@ -111,6 +119,7 @@ class BrokerViewModel extends ChangeNotifier {
         page: _page,
         limit: 20,
         search: _search,
+        includeUsed: includeUsed,
       );
 
       items = result['items'] as List<BrokerHeader>;
@@ -140,6 +149,7 @@ class BrokerViewModel extends ChangeNotifier {
         page: _page,
         limit: 20,
         search: _search,
+        includeUsed: includeUsed,
       );
 
       final moreItems = result['items'] as List<BrokerHeader>;

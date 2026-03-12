@@ -23,6 +23,7 @@ class GilinganViewModel extends ChangeNotifier {
   int _totalPages = 1;
   int _total = 0;
   String _search = '';
+  bool includeUsed = false;
 
   int get totalCount => _total;
   String get currentSearch => _search;
@@ -50,6 +51,13 @@ class GilinganViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  // === FILTER: include used ===
+  void setIncludeUsed(bool value) {
+    if (includeUsed == value) return;
+    includeUsed = value;
+    fetchHeaders(search: _search);
+  }
+
   // === FETCH HEADER (RESET) ===
   Future<void> fetchHeaders({String search = ''}) async {
     _page = 1;
@@ -65,6 +73,7 @@ class GilinganViewModel extends ChangeNotifier {
         page: _page,
         limit: 20,
         search: _search,
+        includeUsed: includeUsed,
       );
 
       items = (result['items'] as List<GilinganHeader>);
@@ -94,6 +103,7 @@ class GilinganViewModel extends ChangeNotifier {
         page: _page,
         limit: 20,
         search: _search,
+        includeUsed: includeUsed,
       );
       final more = (result['items'] as List<GilinganHeader>);
       items.addAll(more);

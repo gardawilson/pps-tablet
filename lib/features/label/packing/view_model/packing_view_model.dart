@@ -46,6 +46,14 @@ class PackingViewModel extends ChangeNotifier {
   String _search = '';
   String get currentSearch => _search;
 
+  bool includeUsed = false;
+
+  void setIncludeUsed(bool value) {
+    if (includeUsed == value) return;
+    includeUsed = value;
+    fetchHeaders(search: _search);
+  }
+
   // pakai info dari PagingState
   bool get hasMore => pagingController.value.hasNextPage;
 
@@ -116,6 +124,7 @@ class PackingViewModel extends ChangeNotifier {
         page: apiPage,
         limit: _pageSize,
         search: _search,
+        includeUsed: includeUsed,
       );
 
       final list = (result['items'] as List<PackingHeader>);

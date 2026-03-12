@@ -10,11 +10,12 @@ import '../model/gilingan_partial_model.dart';
 class GilinganRepository {
   static const _timeout = Duration(seconds: 15);
 
-  /// GET /api/labels/gilingan?page=&limit=&search=
+  /// GET /api/labels/gilingan?page=&limit=&search=&includeUsed=true
   Future<Map<String, dynamic>> fetchHeaders({
     int page = 1,
     int limit = 20,
     String search = '',
+    bool includeUsed = false,
   }) async {
     final token = await TokenStorage.getToken();
 
@@ -23,6 +24,7 @@ class GilinganRepository {
       'page': page.toString(),
       'limit': limit.toString(),
       if (search.trim().isNotEmpty) 'search': search.trim(),
+      if (includeUsed) 'includeUsed': 'true',
     });
 
     // ignore: avoid_print

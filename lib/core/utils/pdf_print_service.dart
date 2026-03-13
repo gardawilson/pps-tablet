@@ -13,8 +13,8 @@ import 'bt_print_service.dart';
 
 class PdfPrintService {
   /// URL default Crystal Report server. Ganti di sini jika server pindah.
-  // static const String defaultBaseUrl = 'http://192.168.11.153:44381';
-  static const String defaultBaseUrl = 'http://192.168.10.100:3000';
+  static const String defaultBaseUrl = 'http://192.168.11.153:44381';
+  // static const String defaultBaseUrl = 'http://192.168.10.100:3000';
 
   PdfPrintService({
     this.baseUrl = PdfPrintService.defaultBaseUrl,

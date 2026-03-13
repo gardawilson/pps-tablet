@@ -140,6 +140,7 @@ import 'package:pps_tablet/features/stock_opname/view_model/stock_opname_ascend_
 import 'package:pps_tablet/features/stock_opname/view_model/stock_opname_family_view_model.dart';
 import 'core/navigation/app_nav.dart';
 import 'core/network/api_client.dart';
+import 'core/utils/master_printer_repository.dart';
 import 'features/bongkar_susun/repository/bongkar_susun_repository.dart';
 import 'features/bongkar_susun/view_model/bongkar_susun_view_model.dart';
 import 'features/label/crusher/repository/crusher_repository.dart';
@@ -181,6 +182,9 @@ class MyApp extends StatelessWidget {
         // 🔹 Sediakan ApiClient sekali untuk seluruh app
         Provider<ApiClient>(
           create: (_) => ApiClient(),
+        ),
+        Provider<MasterPrinterRepository>(
+          create: (ctx) => MasterPrinterRepository(api: ctx.read<ApiClient>()),
         ),
 
         ChangeNotifierProvider(create: (_) => StockOpnameViewModel(repository: StockOpnameRepository())),

@@ -962,23 +962,14 @@ class _BtPrinterSheetState extends State<_BtPrinterSheet> {
                             ),
                           ),
                           if (hasAlias)
-                            Container(
-                              margin: const EdgeInsets.only(left: 4),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.shade50,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                'alias',
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.blue.shade400,
-                                  letterSpacing: 0.3,
+                            Padding(
+                              padding: const EdgeInsets.only(left: 4),
+                              child: Tooltip(
+                                message: 'Sudah diberi nama',
+                                child: Icon(
+                                  Icons.label_rounded,
+                                  size: 14,
+                                  color: Colors.blue.shade300,
                                 ),
                               ),
                             ),

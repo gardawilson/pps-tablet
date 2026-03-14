@@ -42,6 +42,7 @@ class _StockOpnameAscendDetailScreenState
         "ASCEND DETAIL → noSO=${widget.noSO}, idWarehouses=${widget.idWarehouses}",
       );
 
+      context.read<StockOpnameAscendViewModel>().reset();
       context.read<StockOpnameFamilyViewModel>().fetchFamilies(widget.noSO);
     });
   }
@@ -70,10 +71,16 @@ class _StockOpnameAscendDetailScreenState
       builder: (_) => const LoadingDialog(message: "Menyimpan data..."),
     );
 
-    final success = await ascendVM.saveAscendItems(widget.noSO);
+    bool success = false;
+    String? errorMsg;
+    try {
+      success = await ascendVM.saveAscendItems(widget.noSO);
+    } catch (e) {
+      errorMsg = e.toString();
+    }
 
     if (!mounted) return;
-    Navigator.pop(context);
+    Navigator.pop(context); // pastikan loading dialog selalu tertutup
 
     if (success) {
       await familyVM.fetchFamilies(widget.noSO);
@@ -83,10 +90,14 @@ class _StockOpnameAscendDetailScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("✅ Data berhasil disimpan & di-refresh")),
       );
+    } else if (errorMsg != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("❌ Gagal menyimpan: $errorMsg")),
+      );
     } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("❌ Gagal menyimpan data")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("❌ Gagal menyimpan data")),
+      );
     }
   }
 

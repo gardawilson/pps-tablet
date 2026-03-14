@@ -344,7 +344,7 @@ class AscendItemSection extends StatelessWidget {
                                       hintText: 'Catatan...',
                                       hintStyle: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
                                     ),
-                                    onChanged: (val) => vm.updateUsage(item.itemID, item.qtyUsage ?? -1, val),
+                                    onChanged: (val) => vm.updateRemark(item.itemID, val),
                                   ),
                                 ),
                               ),

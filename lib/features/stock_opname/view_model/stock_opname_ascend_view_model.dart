@@ -18,13 +18,23 @@ class StockOpnameAscendViewModel extends ChangeNotifier {
   bool isUsageLoading(int itemID) => _loadingUsageItems.contains(itemID);
 
   // Fetch items
-  Future<void> fetchAscendItems(String noSO, int familyID, {String keyword = ''}) async {
+  Future<void> fetchAscendItems(
+    String noSO,
+    int familyID, {
+    String keyword = '',
+  }) async {
     isLoading = true;
     errorMessage = '';
+    _fetchedUsageItems.clear();
+    _loadingUsageItems.clear();
     notifyListeners();
 
     try {
-      items = await repository.fetchAscendItems(noSO, familyID, keyword: keyword);
+      items = await repository.fetchAscendItems(
+        noSO,
+        familyID,
+        keyword: keyword,
+      );
     } catch (e) {
       errorMessage = e.toString();
       items = [];
@@ -34,11 +44,15 @@ class StockOpnameAscendViewModel extends ChangeNotifier {
     }
   }
 
-
-
   // Fetch usage
-  Future<void> fetchQtyUsage(int itemID, String tglSO, List<int> idWarehouses) async {
-    if (_loadingUsageItems.contains(itemID) || _fetchedUsageItems.contains(itemID)) return;
+  Future<void> fetchQtyUsage(
+    int itemID,
+    String tglSO,
+    List<int> idWarehouses,
+  ) async {
+    if (_loadingUsageItems.contains(itemID) ||
+        _fetchedUsageItems.contains(itemID))
+      return;
 
     // kalau mau strict:
     if (idWarehouses.isEmpty) {
@@ -52,7 +66,9 @@ class StockOpnameAscendViewModel extends ChangeNotifier {
     try {
       final usage = await repository.fetchQtyUsage(itemID, tglSO, idWarehouses);
 
-      debugPrint("QtyUsage LOG → hasil fetch itemID=$itemID, wids=$idWarehouses, usage=$usage");
+      debugPrint(
+        "QtyUsage LOG → hasil fetch itemID=$itemID, wids=$idWarehouses, usage=$usage",
+      );
 
       final index = items.indexWhere((e) => e.itemID == itemID);
       if (index != -1) {
@@ -67,7 +83,6 @@ class StockOpnameAscendViewModel extends ChangeNotifier {
     }
   }
 
-
   // Save
   Future<bool> saveAscendItems(String noSO) async {
     if (items.isEmpty) return false;
@@ -76,17 +91,24 @@ class StockOpnameAscendViewModel extends ChangeNotifier {
     final updatedItems = items.where((e) => e.isUpdateUsage).toList();
 
     if (updatedItems.isEmpty) {
-      debugPrint("SaveAscendItems LOG → tidak ada item yang diupdate, skip save.");
+      debugPrint(
+        "SaveAscendItems LOG → tidak ada item yang diupdate, skip save.",
+      );
       return false;
     }
 
-    debugPrint("SaveAscendItems LOG → menyimpan ${updatedItems.length} item yang diupdate");
+    debugPrint(
+      "SaveAscendItems LOG → menyimpan ${updatedItems.length} item yang diupdate",
+    );
     return repository.saveAscendItems(noSO, updatedItems);
   }
 
-
   // Delete
-  Future<bool> deleteAscendItem(String noSO, int itemID, {TextEditingController? qtyCtrl}) async {
+  Future<bool> deleteAscendItem(
+    String noSO,
+    int itemID, {
+    TextEditingController? qtyCtrl,
+  }) async {
     final success = await repository.deleteAscendItem(noSO, itemID);
     if (success) {
       final index = items.indexWhere((e) => e.itemID == itemID);
@@ -121,18 +143,28 @@ class StockOpnameAscendViewModel extends ChangeNotifier {
     }
   }
 
+  // Hanya update remark tanpa mengubah isUpdateUsage,
+  // agar tidak memblokir fetchQtyUsage saat qty belum diisi.
+  void updateRemark(int itemID, String remark) {
+    final index = items.indexWhere((e) => e.itemID == itemID);
+    if (index != -1) {
+      items[index].usageRemark = remark;
+      // tidak notifyListeners karena tidak perlu rebuild UI
+    }
+  }
+
   void resetQtyUsage(int itemID) {
     final index = items.indexWhere((e) => e.itemID == itemID);
     if (index != -1) {
       items[index].qtyUsage = -1;
       items[index].isUpdateUsage = false; // <- supaya fetch bisa jalan lagi
-      _fetchedUsageItems.remove(itemID);  // <- reset cache
-      debugPrint("QtyUsage LOG → reset itemID=$itemID, qtyUsage=-1, isUpdateUsage=false (cache dihapus)");
+      _fetchedUsageItems.remove(itemID); // <- reset cache
+      debugPrint(
+        "QtyUsage LOG → reset itemID=$itemID, qtyUsage=-1, isUpdateUsage=false (cache dihapus)",
+      );
     }
     notifyListeners();
   }
-
-
 
   void reset() {
     items.clear();

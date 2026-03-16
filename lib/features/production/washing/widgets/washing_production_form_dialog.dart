@@ -53,6 +53,7 @@ class _WashingProductionFormDialogState
   MstMesin? _selectedMesin;
   MstOperator? _selectedOperator;
   int? _selectedShift; // ← sama seperti washing
+  bool _isBlower = false;
 
   // hold the preselect id for operator (from mesin.defaultOperatorId)
   int? _operatorPreselectId;
@@ -99,6 +100,7 @@ class _WashingProductionFormDialogState
     hourMeterCtrl = TextEditingController(
       text: widget.header?.hourMeter?.toString() ?? '',
     );
+    _isBlower = widget.header?.isBlower ?? false;
 
     // washing sudah punya hourStart/hourEnd di model
     hourStartCtrl = TextEditingController(text: widget.header?.hourStart);
@@ -212,6 +214,7 @@ class _WashingProductionFormDialogState
           idOperator: operatorId,
           jamKerja: jamRange, // ⚠️ PERBEDAAN: jamKerja (bukan jam)
           shift: _selectedShift!,
+          isBlower: _isBlower,
           hourStart: hourStartSql,
           hourEnd: hourEndSql,
           jmlhAnggota: jlhAnggota,
@@ -226,6 +229,7 @@ class _WashingProductionFormDialogState
           idOperator: operatorId,
           jamKerja: jamRange,
           shift: _selectedShift!,
+          isBlower: _isBlower,
           hourStart: hourStartSql,
           hourEnd: hourEndSql,
           jmlhAnggota: jlhAnggota,
@@ -412,7 +416,7 @@ class _WashingProductionFormDialogState
                 icon: Icons.label,
                 asText: true, // readonly text (bold)
                 // ⬅️ Washing: prefix 'C' tanpa titik
-                placeholderText: 'CXXXXXXXXXX',
+                placeholderText: 'C.XXXXXXXXXX',
               ),
 
               const SizedBox(height: 16),
@@ -434,6 +438,64 @@ class _WashingProductionFormDialogState
                     await _checkOverlapIfReadyVM(); // guard mencegah hit jika belum lengkap
                   }
                 },
+              ),
+
+              const SizedBox(height: 16),
+
+              Text(
+                'Tipe Produksi',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: RadioListTile<bool>(
+                        value: false,
+                        groupValue: _isBlower,
+                        dense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                        ),
+                        title: const Text('Cuci'),
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setState(() => _isBlower = value);
+                        },
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 52,
+                      color: Colors.grey.shade200,
+                    ),
+                    Expanded(
+                      child: RadioListTile<bool>(
+                        value: true,
+                        groupValue: _isBlower,
+                        dense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                        ),
+                        title: const Text('Blower'),
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setState(() => _isBlower = value);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
 
               const SizedBox(height: 16),

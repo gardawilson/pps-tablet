@@ -55,14 +55,31 @@ class LabelPrintLockSocketManager extends ChangeNotifier
   UnmodifiableMapView<String, LabelPrintLockInfo> get locks =>
       UnmodifiableMapView(_locks);
 
-  LabelPrintLockInfo? lockOf(String noLabel) => _locks[noLabel];
-  int? printCountOf(String noLabel) => _printCounts[noLabel];
+  LabelPrintLockInfo? lockOf(String noLabel) => _locks[noLabel.trim()];
+  int? printCountOf(String noLabel) => _printCounts[noLabel.trim()];
 
   void setPrintCount(String noLabel, int count) {
-    if (noLabel.trim().isEmpty) return;
-    if (_printCounts[noLabel] == count) return;
-    _printCounts[noLabel] = count;
+    final key = noLabel.trim();
+    if (key.isEmpty) return;
+    if (_printCounts[key] == count) return;
+    _printCounts[key] = count;
     notifyListeners();
+  }
+
+  /// Optimistic local lock update — panggil setelah lockApi.acquire() berhasil
+  /// agar badge "Printing" muncul tanpa menunggu WebSocket broadcast dari server.
+  void setLocalLock(String noLabel, LabelPrintLockInfo info) {
+    final key = noLabel.trim();
+    if (key.isEmpty) return;
+    _locks[key] = info;
+    notifyListeners();
+  }
+
+  /// Hapus lock secara lokal — panggil setelah lockApi.release() selesai
+  /// sebagai fallback jika server lambat broadcast lock_released.
+  void clearLocalLock(String noLabel) {
+    final key = noLabel.trim();
+    if (_locks.remove(key) != null) notifyListeners();
   }
 
   void connect() {

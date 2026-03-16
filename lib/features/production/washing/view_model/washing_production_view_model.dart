@@ -186,6 +186,7 @@ class WashingProductionViewModel extends ChangeNotifier {
     int? jmlhAnggota,
     int? hadir,
     double? hourMeter,
+    bool isBlower = false,
 
     // ⬇️ baru: ikuti repository
     String? hourStart,
@@ -208,6 +209,7 @@ class WashingProductionViewModel extends ChangeNotifier {
         jmlhAnggota: jmlhAnggota,
         hadir: hadir,
         hourMeter: hourMeter,
+        isBlower: isBlower,
         // ⬇️ lempar ke repo
         hourStart: hourStart,
         hourEnd: hourEnd,
@@ -246,6 +248,7 @@ class WashingProductionViewModel extends ChangeNotifier {
     int? idOperator,
     dynamic jamKerja, // ⚠️ PERBEDAAN: jamKerja (bukan jam)
     int? shift,
+    bool? isBlower,
     String? hourStart,
     String? hourEnd,
     String? checkBy1,
@@ -265,7 +268,9 @@ class WashingProductionViewModel extends ChangeNotifier {
         tglProduksi: tglProduksi,
         idMesin: idMesin,
         idOperator: idOperator,
+        jamKerja: jamKerja,
         shift: shift,
+        isBlower: isBlower,
         hourStart: hourStart,
         hourEnd: hourEnd,
         checkBy1: checkBy1,

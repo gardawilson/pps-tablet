@@ -10,6 +10,7 @@ class WashingProduction {
   final DateTime? tglProduksi;
   final int jamKerja;
   final int shift;
+  final bool isBlower;
   final String createBy;
   final String? checkBy1;
   final String? checkBy2;
@@ -33,6 +34,7 @@ class WashingProduction {
     required this.tglProduksi,
     required this.jamKerja,
     required this.shift,
+    this.isBlower = false,
     required this.createBy,
     this.checkBy1,
     this.checkBy2,
@@ -140,6 +142,7 @@ class WashingProduction {
       tglProduksi: _asDateTime(j['TglProduksi']),
       jamKerja: _asIntRequired(j['JamKerja']),
       shift: _asIntRequired(j['Shift']),
+      isBlower: _asBool(j['IsBlower'] ?? j['isBlower'], fallback: false),
       createBy: _asString(j['CreateBy']),
       checkBy1: (j['CheckBy1'] == null || _asString(j['CheckBy1']).trim().isEmpty)
           ? null
@@ -176,6 +179,7 @@ class WashingProduction {
         : tglProduksi!.toIso8601String()),
     'JamKerja': jamKerja,
     'Shift': shift,
+    'IsBlower': isBlower,
     'CreateBy': createBy,
     'CheckBy1': checkBy1,
     'CheckBy2': checkBy2,

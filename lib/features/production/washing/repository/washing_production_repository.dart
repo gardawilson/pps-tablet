@@ -164,6 +164,7 @@ class WashingProductionRepository {
     int? jmlhAnggota,
     int? hadir,
     double? hourMeter,
+    bool isBlower = false,
 
     // ⬇️ baru: ikutkan jam mulai & selesai
     String? hourStart,   // format kirim: 'HH:mm:00' atau 'HH:mm'
@@ -178,6 +179,7 @@ class WashingProductionRepository {
       'idOperator': idOperator,
       'jamKerja': jamKerja,
       'shift': shift,
+      'isBlower': isBlower ? 1 : 0,
       if (checkBy1 != null) 'checkBy1': checkBy1,
       if (checkBy2 != null) 'checkBy2': checkBy2,
       if (approveBy != null) 'approveBy': approveBy,
@@ -242,8 +244,9 @@ class WashingProductionRepository {
     DateTime? tglProduksi,
     int? idMesin,
     int? idOperator,
-    dynamic jam,                    // int atau 'HH:mm-HH:mm'
+    dynamic jamKerja,               // int atau 'HH:mm-HH:mm'
     int? shift,
+    bool? isBlower,
     String? hourStart,
     String? hourEnd,
     String? checkBy1,
@@ -278,11 +281,14 @@ class WashingProductionRepository {
     if (idOperator != null) {
       body['idOperator'] = idOperator.toString();
     }
-    if (jam != null) {
-      body['jam'] = jam.toString();
+    if (jamKerja != null) {
+      body['jamKerja'] = jamKerja.toString();
     }
     if (shift != null) {
       body['shift'] = shift.toString();
+    }
+    if (isBlower != null) {
+      body['isBlower'] = isBlower ? '1' : '0';
     }
     if (hourStart != null && hourStart.isNotEmpty) {
       body['hourStart'] = _normalizeTime(hourStart);

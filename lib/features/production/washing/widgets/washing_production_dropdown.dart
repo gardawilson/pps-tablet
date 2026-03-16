@@ -80,6 +80,7 @@ class _WashingProductionDropdownState extends State<WashingProductionDropdown> {
         tglProduksi: DateTime.now().toUtc(),
         jamKerja: 0,
         shift: widget.shiftFilter ?? 0,
+        isBlower: false,
         createBy: '',
         checkBy1: null,
         checkBy2: null,

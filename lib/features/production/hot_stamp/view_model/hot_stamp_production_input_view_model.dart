@@ -35,10 +35,7 @@ class TempItemsByLabel {
   int get totalCount => furnitureWipItems.length + furnitureWipPartials.length;
   bool get isEmpty => totalCount == 0;
 
-  List<dynamic> get allItems => [
-    ...furnitureWipItems,
-    ...furnitureWipPartials,
-  ];
+  List<dynamic> get allItems => [...furnitureWipItems, ...furnitureWipPartials];
 }
 
 // -----------------------------------------------------------------------------
@@ -108,10 +105,16 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
     final hdr = tag.isEmpty ? '' : ' <$tag>';
     _d('========== TEMP LIST DUMP$hdr ==========');
     _dumpList('tempFurnitureWip', tempFurnitureWip, _keyFromFurnitureWipItem);
-    _dumpList('tempFurnitureWipPartial', tempFurnitureWipPartial,
-        _keyFromFurnitureWipItem);
     _dumpList(
-        'tempCabinetMaterial', tempCabinetMaterial, _keyFromCabinetMaterialItem);
+      'tempFurnitureWipPartial',
+      tempFurnitureWipPartial,
+      _keyFromFurnitureWipItem,
+    );
+    _dumpList(
+      'tempCabinetMaterial',
+      tempCabinetMaterial,
+      _keyFromCabinetMaterialItem,
+    );
     _d('TOTAL TEMP COUNT = $totalTempCount');
     _d('========================================');
   }
@@ -124,7 +127,9 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
       return;
     }
     _tempItemsByLabel.forEach((label, bucket) {
-      _d('Label "$label" • total=${bucket.totalCount} • since=${bucket.addedAt.toIso8601String()}');
+      _d(
+        'Label "$label" • total=${bucket.totalCount} • since=${bucket.addedAt.toIso8601String()}',
+      );
       for (final it in bucket.allItems) {
         _d('  - ${_fmtItem(it)}');
       }
@@ -161,15 +166,16 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
   final Map<String, String?> _inputsError = {};
   final Map<String, Future<HotStampingInputs>> _inflight = {};
 
-  bool isInputsLoading(String noProduksi) =>
-      _inputsLoading[noProduksi] == true;
+  bool isInputsLoading(String noProduksi) => _inputsLoading[noProduksi] == true;
   String? inputsError(String noProduksi) => _inputsError[noProduksi];
   HotStampingInputs? inputsOf(String noProduksi) => _inputsCache[noProduksi];
   int inputsCount(String noProduksi, String key) =>
       _inputsCache[noProduksi]?.summary[key] ?? 0;
 
-  Future<HotStampingInputs?> loadInputs(String noProduksi,
-      {bool force = false}) async {
+  Future<HotStampingInputs?> loadInputs(
+    String noProduksi, {
+    bool force = false,
+  }) async {
     if (!force && _inputsCache.containsKey(noProduksi)) {
       return _inputsCache[noProduksi];
     }
@@ -278,8 +284,10 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
 
   final Map<String, TempItemsByLabel> _tempItemsByLabel = {};
 
-  Future<ProductionLabelLookupResult?> lookupFwipLabel(String code,
-      {bool force = false}) async {
+  Future<ProductionLabelLookupResult?> lookupFwipLabel(
+    String code, {
+    bool force = false,
+  }) async {
     final trimmed = code.trim();
     if (trimmed.isEmpty) {
       lookupError = 'Kode label kosong';
@@ -339,12 +347,15 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
     }
 
     // ✅ Jika sudah ada, update Jumlah
-    final idx = tempCabinetMaterial
-        .indexWhere((x) => (x.IdCabinetMaterial ?? 0) == id);
+    final idx = tempCabinetMaterial.indexWhere(
+      (x) => (x.IdCabinetMaterial ?? 0) == id,
+    );
     if (idx >= 0) {
       final old = tempCabinetMaterial[idx];
       tempCabinetMaterial[idx] = old.copyWith(Jumlah: Jumlah);
-      _d('✅ Updated existing material temp: ${tempCabinetMaterial[idx].toDebugString()}');
+      _d(
+        '✅ Updated existing material temp: ${tempCabinetMaterial[idx].toDebugString()}',
+      );
       debugDumpTempLists(tag: 'after addTempCabinetMaterialFromMaster(update)');
       notifyListeners();
       return;
@@ -366,8 +377,9 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
     required int IdCabinetMaterial,
     required num Jumlah,
   }) {
-    final idx = tempCabinetMaterial
-        .indexWhere((x) => (x.IdCabinetMaterial ?? 0) == IdCabinetMaterial);
+    final idx = tempCabinetMaterial.indexWhere(
+      (x) => (x.IdCabinetMaterial ?? 0) == IdCabinetMaterial,
+    );
     if (idx == -1) {
       _d('⚠️ Material $IdCabinetMaterial not found in temp');
       return;
@@ -375,15 +387,18 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
     final old = tempCabinetMaterial[idx];
     tempCabinetMaterial[idx] = old.copyWith(Jumlah: Jumlah);
 
-    _d('✅ Updated cabinet material temp: ${tempCabinetMaterial[idx].toDebugString()}');
+    _d(
+      '✅ Updated cabinet material temp: ${tempCabinetMaterial[idx].toDebugString()}',
+    );
     debugDumpTempLists(tag: 'after updateTempCabinetMaterialJumlah');
     notifyListeners();
   }
 
   /// ✅ Check if cabinet material already in temp
   bool hasCabinetMaterialInTemp(int IdCabinetMaterial) {
-    return tempCabinetMaterial
-        .any((x) => (x.IdCabinetMaterial ?? 0) == IdCabinetMaterial);
+    return tempCabinetMaterial.any(
+      (x) => (x.IdCabinetMaterial ?? 0) == IdCabinetMaterial,
+    );
   }
 
   /// ✅ Get total jumlah cabinet material (temp + db)
@@ -392,12 +407,12 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
 
     final tempTotal = tempCabinetMaterial.fold<num>(
       0,
-          (sum, item) => sum + (item.Jumlah ?? 0),
+      (sum, item) => sum + (item.Jumlah ?? 0),
     );
 
     final dbTotal = (inputs?.cabinetMaterial ?? []).fold<num>(
       0,
-          (sum, item) => sum + (item.Jumlah ?? 0),
+      (sum, item) => sum + (item.Jumlah ?? 0),
     );
 
     return tempTotal + dbTotal;
@@ -434,7 +449,9 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
   }
 
   void removeTemporaryItemsForLabel(
-      String labelCode, List<dynamic> itemsToRemove) {
+    String labelCode,
+    List<dynamic> itemsToRemove,
+  ) {
     final trimmed = labelCode.trim();
     final t = _tempItemsByLabel[trimmed];
     if (t == null) return;
@@ -454,8 +471,9 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
   void _updateTempItemsByLabel(String labelCode) {
     final code = labelCode.trim();
 
-    final fwipFull =
-    tempFurnitureWip.where((e) => _getItemLabelCode(e) == code).toList();
+    final fwipFull = tempFurnitureWip
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
     final fwipPart = tempFurnitureWipPartial
         .where((e) => _getItemLabelCode(e) == code)
         .toList();
@@ -531,9 +549,7 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
   int countNewRowsInLastLookup(String noProduksi) {
     final ctx = lastLookup;
     if (ctx == null) return 0;
-    return ctx.data
-        .where((r) => !_tempKeys.contains(ctx.simpleKey(r)))
-        .length;
+    return ctx.data.where((r) => !_tempKeys.contains(ctx.simpleKey(r))).length;
   }
 
   bool willBeDuplicate(Map<String, dynamic> row, String noProduksi) {
@@ -597,8 +613,7 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
   }
 
   void unpickAll() => clearPicks();
-  List<Map<String, dynamic>> get pickedRows =>
-      List.unmodifiable(_pickedRows);
+  List<Map<String, dynamic>> get pickedRows => List.unmodifiable(_pickedRows);
 
   void clearPicks() {
     _pickedKeys.clear();
@@ -611,12 +626,7 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
   // Commit picked → TEMP (untuk FWIP)
   // ---------------------------------------------------------------------------
   bool _rowIsPartial(Map<String, dynamic> row, PrefixType t) {
-    final candKeys = [
-      'IsPartial',
-      'isPartial',
-      'IsPartialRow',
-      'isPartialRow'
-    ];
+    final candKeys = ['IsPartial', 'isPartial', 'IsPartialRow', 'isPartialRow'];
     for (final k in candKeys) {
       final v = row[k];
       if (v is bool && v) return true;
@@ -625,9 +635,9 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
     }
 
     final partCode =
-    (row['NoFurnitureWIPPartial'] ?? row['noFurnitureWIPPartial'] ?? '')
-        .toString()
-        .trim();
+        (row['NoFurnitureWIPPartial'] ?? row['noFurnitureWIPPartial'] ?? '')
+            .toString()
+            .trim();
     return partCode.isNotEmpty;
   }
 
@@ -694,8 +704,7 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
       }
       seenTemp.add(simpleKey);
 
-      final newItem =
-      _withTempPartialIfNeeded(item, ctx.prefixType, isPartial);
+      final newItem = _withTempPartialIfNeeded(item, ctx.prefixType, isPartial);
 
       bool itemAdded = false;
       if (newItem is FurnitureWipItem) {
@@ -797,8 +806,8 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
   bool deleteIfTemp(dynamic item) {
     bool ok = false;
     if (item is FurnitureWipItem) {
-      ok = tempFurnitureWip.remove(item) ||
-          tempFurnitureWipPartial.remove(item);
+      ok =
+          tempFurnitureWip.remove(item) || tempFurnitureWipPartial.remove(item);
       if (ok) _tempKeys.remove(_keyFromFurnitureWipItem(item));
     } else if (item is CabinetMaterialItem) {
       ok = tempCabinetMaterial.remove(item);
@@ -840,8 +849,7 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
     return 'BC.XXXXXXXX ($numStr)';
   }
 
-  dynamic _withTempPartialIfNeeded(
-      dynamic item, PrefixType t, bool isPartial) {
+  dynamic _withTempPartialIfNeeded(dynamic item, PrefixType t, bool isPartial) {
     if (!isPartial) return item;
 
     if (item is FurnitureWipItem) {
@@ -859,8 +867,8 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
   /// ✅ Total count of all temp items
   int get totalTempCount =>
       tempFurnitureWip.length +
-          tempFurnitureWipPartial.length +
-          tempCabinetMaterial.length;
+      tempFurnitureWipPartial.length +
+      tempCabinetMaterial.length;
 
   // ---------------------------------------------------------------------------
   // Submit temp items
@@ -875,37 +883,40 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
     // attach full FWIP
     if (tempFurnitureWip.isNotEmpty) {
       payload['furnitureWip'] = tempFurnitureWip
-          .map((e) => {
-        'noFurnitureWIP': e.noFurnitureWIP, // ✅
-      })
+          .map(
+            (e) => {
+              'noFurnitureWIP': e.noFurnitureWIP, // ✅
+            },
+          )
           .toList();
     }
 
-    // upsert cabinet material (ikuti config keyColumn = IdCabinetMaterial)
+    // upsert cabinet material
     if (tempCabinetMaterial.isNotEmpty) {
       payload['cabinetMaterial'] = tempCabinetMaterial
-          .map((e) => {
-        'IdCabinetMaterial': e.IdCabinetMaterial,
-        'Jumlah': e.Jumlah,
-      })
+          .map(
+            (e) => {
+              'idCabinetMaterial': e.IdCabinetMaterial,
+              'jumlah': e.Jumlah,
+            },
+          )
           .toList();
     }
 
     // create partial FWIP (controller sekarang expect furnitureWipPartial)
     if (tempFurnitureWipPartial.isNotEmpty) {
       payload['furnitureWipPartial'] = tempFurnitureWipPartial
-          .map((e) => {
-        'noFurnitureWIP': e.noFurnitureWIP, // ✅ match $.noFurnitureWIP
-        'pcs': e.pcs,                       // ✅ match $.pcs
-      })
+          .map(
+            (e) => {
+              'noFurnitureWIP': e.noFurnitureWIP, // ✅ match $.noFurnitureWIP
+              'pcs': e.pcs, // ✅ match $.pcs
+            },
+          )
           .toList();
     }
 
-
     return payload;
   }
-
-
 
   /// ✅ Submit all temp items to backend
   Future<bool> submitTempItems(String noProduksi) async {
@@ -925,8 +936,10 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
       _d('Submitting temp items to $noProduksi');
       _d('Payload: ${json.encode(payload)}');
 
-      final response =
-      await repository.submitInputsAndPartials(noProduksi, payload);
+      final response = await repository.submitInputsAndPartials(
+        noProduksi,
+        payload,
+      );
 
       _d('Submit response: ${json.encode(response)}');
 
@@ -950,7 +963,8 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
       _d('Submit successful!');
 
       if (data != null) {
-        final createdPartials = data['createdPartials'] as Map<String, dynamic>?;
+        final createdPartials =
+            data['createdPartials'] as Map<String, dynamic>?;
         if (createdPartials != null) {
           _d('Created partials: ${json.encode(createdPartials)}');
         }
@@ -1005,7 +1019,8 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
 
     void add(String key, Map<String, dynamic> row) {
       final list =
-      (payload[key] ?? <Map<String, dynamic>>[]) as List<Map<String, dynamic>>;
+          (payload[key] ?? <Map<String, dynamic>>[])
+              as List<Map<String, dynamic>>;
       list.add(row);
       payload[key] = list;
     }
@@ -1013,30 +1028,24 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
     for (final it in items) {
       if (it is FurnitureWipItem) {
         final isPart =
-            it.isPartialRow || ((it.noFurnitureWIPPartial ?? '').trim().isNotEmpty);
+            it.isPartialRow ||
+            ((it.noFurnitureWIPPartial ?? '').trim().isNotEmpty);
 
         if (isPart) {
           final code = (it.noFurnitureWIPPartial ?? '').trim();
           if (code.isNotEmpty) {
-            add('furnitureWipPartial', {
-              'NoFurnitureWIPPartial': code,
-            });
+            add('furnitureWipPartial', {'noFurnitureWIPPartial': code});
           }
         } else {
-          add('furnitureWip', {
-            'NoFurnitureWIP': it.noFurnitureWIP,
-          });
+          add('furnitureWip', {'noFurnitureWIP': it.noFurnitureWIP});
         }
       } else if (it is CabinetMaterialItem) {
-        add('cabinetMaterial', {
-          'IdCabinetMaterial': it.IdCabinetMaterial,
-        });
+        add('cabinetMaterial', {'idCabinetMaterial': it.IdCabinetMaterial});
       }
     }
 
     return payload;
   }
-
 
   /// ✅ Delete items (TEMP + DB)
   /// - Items di temp akan dihapus lokal tanpa API call
@@ -1081,8 +1090,7 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
       _d('deleteItems: calling deleteInputsAndPartials for $noProduksi');
       _d('Delete payload: ${json.encode(payload)}');
 
-      final res =
-      await repository.deleteInputsAndPartials(noProduksi, payload);
+      final res = await repository.deleteInputsAndPartials(noProduksi, payload);
       lastDeleteResult = res;
 
       final success = res['success'] == true;

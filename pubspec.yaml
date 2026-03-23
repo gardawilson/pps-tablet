@@ -2,7 +2,7 @@ name: pps_tablet
 description: "A new Flutter project."
 publish_to: "none"
 
-version: 1.0.55+1
+version: 1.0.60+6
 
 environment:
   sdk: ^3.8.0

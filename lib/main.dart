@@ -180,70 +180,156 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         // 🔹 Sediakan ApiClient sekali untuk seluruh app
-        Provider<ApiClient>(
-          create: (_) => ApiClient(),
-        ),
+        Provider<ApiClient>(create: (_) => ApiClient()),
         Provider<MasterPrinterRepository>(
           create: (ctx) => MasterPrinterRepository(api: ctx.read<ApiClient>()),
         ),
 
-        ChangeNotifierProvider(create: (_) => StockOpnameViewModel(repository: StockOpnameRepository())),
-        ChangeNotifierProvider(create: (_) => StockOpnameLabelBeforeViewModel()),
+        ChangeNotifierProvider(
+          create: (_) =>
+              StockOpnameViewModel(repository: StockOpnameRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => StockOpnameLabelBeforeViewModel(),
+        ),
         ChangeNotifierProvider(create: (_) => StockOpnameDetailViewModel()),
         ChangeNotifierProvider(create: (_) => UserProfileViewModel()),
-        ChangeNotifierProvider(create: (_) => LokasiViewModel(repository: LokasiRepository())),
+        ChangeNotifierProvider(
+          create: (_) => LokasiViewModel(repository: LokasiRepository()),
+        ),
         ChangeNotifierProvider(create: (_) => SocketManager()),
         ChangeNotifierProvider(
           create: (_) => LabelPrintLockSocketManager()..connect(),
         ),
         ChangeNotifierProvider(create: (_) => LabelPrintSyncQueue()..start()),
         ChangeNotifierProvider(create: (_) => LabelDetailViewModel()),
-        ChangeNotifierProvider(create: (_) => StockOpnameAscendViewModel(repository: StockOpnameAscendRepository()) ),
-        ChangeNotifierProvider(create: (_) => StockOpnameFamilyViewModel(repository: StockOpnameFamilyRepository())),
-        ChangeNotifierProvider(create: (_) => WashingViewModel(repository: WashingRepository())),
-        ChangeNotifierProvider(create: (_) => JenisPlastikViewModel(repository: JenisPlastikRepository())),
-        ChangeNotifierProvider(create: (_) => WashingProductionViewModel(repository: WashingProductionRepository())),
-        ChangeNotifierProvider(create: (_) => WashingProductionInputViewModel(repository: WashingProductionInputRepository())),
-        ChangeNotifierProvider(create: (_) => BongkarSusunViewModel(repository: BongkarSusunRepository())),
-        Provider<MaxSakService>(create: (_) => MaxSakService(MaxSakRepository())),
-        ChangeNotifierProvider(create: (_) => PermissionViewModel()..loadPermissions()),
+        ChangeNotifierProvider(
+          create: (_) => StockOpnameAscendViewModel(
+            repository: StockOpnameAscendRepository(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => StockOpnameFamilyViewModel(
+            repository: StockOpnameFamilyRepository(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => WashingViewModel(repository: WashingRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) =>
+              JenisPlastikViewModel(repository: JenisPlastikRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => WashingProductionViewModel(
+            repository: WashingProductionRepository(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => WashingProductionInputViewModel(
+            repository: WashingProductionInputRepository(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) =>
+              BongkarSusunViewModel(repository: BongkarSusunRepository()),
+        ),
+        Provider<MaxSakService>(
+          create: (_) => MaxSakService(MaxSakRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => PermissionViewModel()..loadPermissions(),
+        ),
         ChangeNotifierProvider<BahanBakuViewModel>(
           create: (ctx) => BahanBakuViewModel(
-            repository: BahanBakuRepository(
-              api: ctx.read<ApiClient>(),
-            ),
+            repository: BahanBakuRepository(api: ctx.read<ApiClient>()),
           ),
         ),
         ChangeNotifierProvider<BrokerViewModel>(
           create: (ctx) => BrokerViewModel(
-            repository: BrokerRepository(
-              api: ctx.read<ApiClient>(),
-            ),
+            repository: BrokerRepository(api: ctx.read<ApiClient>()),
           ),
         ),
-        ChangeNotifierProvider(create: (_) => BonggolanViewModel(repository: BonggolanRepository())),
-        ChangeNotifierProvider(create: (_) => CrusherViewModel(repository: CrusherRepository())),
-        ChangeNotifierProvider(create: (_) => CrusherProductionInputViewModel(repository: CrusherProductionInputRepository())),
-        ChangeNotifierProvider(create: (_) => BrokerProductionViewModel(repository: BrokerProductionRepository())),
-        ChangeNotifierProvider(create: (_) => BrokerProductionInputViewModel(repository: BrokerProductionInputRepository())),
-        ChangeNotifierProvider(create: (_) => JenisBonggolanViewModel(repository: JenisBonggolanRepository())),
-        ChangeNotifierProvider(create: (_) => CrusherProductionViewModel(repository: CrusherProductionRepository())),
-        ChangeNotifierProvider(create: (_) => CrusherTypeViewModel(repository: CrusherTypeRepository())),
-        ChangeNotifierProvider(create: (_) => MesinViewModel(repository: MesinRepository())),
-        ChangeNotifierProvider(create: (_) => OperatorViewModel(repository: OperatorRepository())),
-        ChangeNotifierProvider(create: (_) => PembeliViewModel(repository: PembeliRepository())),
-        ChangeNotifierProvider(create: (_) => WarehouseViewModel(repository: WarehouseRepository())),
-        ChangeNotifierProvider(create: (_) => OverlapViewModel(repository: OverlapRepository())),
-        ChangeNotifierProvider(create: (_) => MixerViewModel(repository: MixerRepository())),
-        ChangeNotifierProvider(create: (_) => MixerProductionViewModel(repository: MixerProductionRepository())),
-        ChangeNotifierProvider(create: (_) => MixerTypeViewModel(repository: MixerTypeRepository())),
-        ChangeNotifierProvider(create: (_) => GilinganViewModel(repository: GilinganRepository())),
-        ChangeNotifierProvider(create: (_) => GilinganTypeViewModel(repository: GilinganTypeRepository())),
-        ChangeNotifierProvider(create: (_) => GilinganProductionViewModel(repository: GilinganProductionRepository())),
-        ChangeNotifierProvider(create: (_) => FurnitureWipViewModel(repository: FurnitureWipRepository())),
-        ChangeNotifierProvider(create: (_) => BongkarSusunInputViewModel(repository: BongkarSusunInputRepository())),
-
-
+        ChangeNotifierProvider(
+          create: (_) => BonggolanViewModel(repository: BonggolanRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => CrusherViewModel(repository: CrusherRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => CrusherProductionInputViewModel(
+            repository: CrusherProductionInputRepository(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => BrokerProductionViewModel(
+            repository: BrokerProductionRepository(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => BrokerProductionInputViewModel(
+            repository: BrokerProductionInputRepository(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) =>
+              JenisBonggolanViewModel(repository: JenisBonggolanRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => CrusherProductionViewModel(
+            repository: CrusherProductionRepository(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) =>
+              CrusherTypeViewModel(repository: CrusherTypeRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => MesinViewModel(repository: MesinRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => OperatorViewModel(repository: OperatorRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => PembeliViewModel(repository: PembeliRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => WarehouseViewModel(repository: WarehouseRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => OverlapViewModel(repository: OverlapRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => MixerViewModel(repository: MixerRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) =>
+              MixerProductionViewModel(repository: MixerProductionRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => MixerTypeViewModel(repository: MixerTypeRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => GilinganViewModel(repository: GilinganRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) =>
+              GilinganTypeViewModel(repository: GilinganTypeRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => GilinganProductionViewModel(
+            repository: GilinganProductionRepository(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) =>
+              FurnitureWipViewModel(repository: FurnitureWipRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => BongkarSusunInputViewModel(
+            repository: BongkarSusunInputRepository(),
+          ),
+        ),
 
         ChangeNotifierProvider<HotStampProductionViewModel>(
           create: (ctx) => HotStampProductionViewModel(
@@ -267,9 +353,7 @@ class MyApp extends StatelessWidget {
 
         ChangeNotifierProvider<SpannerProductionViewModel>(
           create: (ctx) => SpannerProductionViewModel(
-            repository: SpannerProductionRepository(
-              api: ctx.read<ApiClient>(),
-            ),
+            repository: SpannerProductionRepository(api: ctx.read<ApiClient>()),
           ),
         ),
 
@@ -278,7 +362,6 @@ class MyApp extends StatelessWidget {
             repository: SpannerProductionInputRepository(),
           ),
         ),
-
 
         ChangeNotifierProvider<KeyFittingProductionViewModel>(
           create: (ctx) => KeyFittingProductionViewModel(
@@ -294,39 +377,27 @@ class MyApp extends StatelessWidget {
           ),
         ),
 
-
         ChangeNotifierProvider<ReturnProductionViewModel>(
           create: (ctx) => ReturnProductionViewModel(
-            repository: ReturnProductionRepository(
-              api: ctx.read<ApiClient>(),
-            ),
+            repository: ReturnProductionRepository(api: ctx.read<ApiClient>()),
           ),
         ),
-
 
         ChangeNotifierProvider<FurnitureWipTypeViewModel>(
           create: (ctx) => FurnitureWipTypeViewModel(
-            repository: FurnitureWipTypeRepository(
-              api: ctx.read<ApiClient>(),
-            ),
+            repository: FurnitureWipTypeRepository(api: ctx.read<ApiClient>()),
           ),
         ),
-
 
         ChangeNotifierProvider<PackingViewModel>(
           create: (ctx) => PackingViewModel(
-            repository: PackingRepository(
-              api: ctx.read<ApiClient>(),
-            ),
+            repository: PackingRepository(api: ctx.read<ApiClient>()),
           ),
         ),
 
-
         ChangeNotifierProvider<PackingProductionViewModel>(
           create: (ctx) => PackingProductionViewModel(
-            repository: PackingProductionRepository(
-              api: ctx.read<ApiClient>(),
-            ),
+            repository: PackingProductionRepository(api: ctx.read<ApiClient>()),
           ),
         ),
 
@@ -338,50 +409,35 @@ class MyApp extends StatelessWidget {
           ),
         ),
 
-
         ChangeNotifierProvider<BJJualInputViewModel>(
           create: (ctx) => BJJualInputViewModel(
-            repository: BJJualInputRepository(
-              apiClient: ctx.read<ApiClient>(),
-            ),
+            repository: BJJualInputRepository(apiClient: ctx.read<ApiClient>()),
           ),
         ),
-
 
         ChangeNotifierProvider<PackingTypeViewModel>(
           create: (ctx) => PackingTypeViewModel(
-            repository: PackingTypeRepository(
-              api: ctx.read<ApiClient>(),
-            ),
+            repository: PackingTypeRepository(api: ctx.read<ApiClient>()),
           ),
         ),
-
 
         ChangeNotifierProvider<InjectProductionViewModel>(
           create: (ctx) => InjectProductionViewModel(
-            repository: InjectProductionRepository(
-            ),
+            repository: InjectProductionRepository(),
           ),
         ),
-
 
         ChangeNotifierProvider<RejectViewModel>(
           create: (ctx) => RejectViewModel(
-            repository: RejectRepository(
-              api: ctx.read<ApiClient>(),
-            ),
+            repository: RejectRepository(api: ctx.read<ApiClient>()),
           ),
         ),
-
 
         ChangeNotifierProvider<RejectTypeViewModel>(
           create: (ctx) => RejectTypeViewModel(
-            repository: RejectTypeRepository(
-              api: ctx.read<ApiClient>(),
-            ),
+            repository: RejectTypeRepository(api: ctx.read<ApiClient>()),
           ),
         ),
-
 
         ChangeNotifierProvider<SortirRejectProductionViewModel>(
           create: (ctx) => SortirRejectProductionViewModel(
@@ -407,7 +463,6 @@ class MyApp extends StatelessWidget {
           ),
         ),
 
-
         ChangeNotifierProvider<MixerProductionInputViewModel>(
           create: (ctx) => MixerProductionInputViewModel(
             repository: MixerProductionInputRepository(
@@ -415,9 +470,6 @@ class MyApp extends StatelessWidget {
             ),
           ),
         ),
-
-
-
       ],
       child: MaterialApp(
         title: 'PPS Tablet',
@@ -426,7 +478,6 @@ class MyApp extends StatelessWidget {
         // 🎨 THEME: pakai biru sebagai warna utama + atur default button
         theme: ThemeData(
           useMaterial3: true, // boleh kamu ganti false kalau belum mau M3
-
           // Warna utama seluruh aplikasi
           colorScheme: ColorScheme.fromSeed(
             seedColor: const Color(0xFF1565C0), // 🔵 biru utama
@@ -463,10 +514,7 @@ class MyApp extends StatelessWidget {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        supportedLocales: const [
-          Locale('id', 'ID'),
-          Locale('en', 'US'),
-        ],
+        supportedLocales: const [Locale('id', 'ID'), Locale('en', 'US')],
         locale: const Locale('id', 'ID'),
 
         initialRoute: '/',
@@ -496,11 +544,11 @@ class MyApp extends StatelessWidget {
           '/production/key-fitting': (context) => KeyFittingProductionScreen(),
           '/production/spanner': (context) => SpannerProductionScreen(),
           '/production/packing': (context) => PackingProductionScreen(),
-          '/production/sortir-reject': (context) => SortirRejectProductionScreen(),
+          '/production/sortir-reject': (context) =>
+              SortirRejectProductionScreen(),
           '/production/return': (context) => ReturnProductionScreen(),
         },
       ),
-
     );
   }
 }

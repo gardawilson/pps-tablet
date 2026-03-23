@@ -60,10 +60,10 @@ class _HotStampingLookupLabelPartialDialogState
   }
 
   _Presence _presenceForRow(
-      HotStampingProductionInputViewModel vm,
-      Map<String, dynamic> row,
-      ProductionLabelLookupResult ctx,
-      ) {
+    HotStampingProductionInputViewModel vm,
+    Map<String, dynamic> row,
+    ProductionLabelLookupResult ctx,
+  ) {
     final sk = ctx.simpleKey(row);
     if (vm.isInTempKeys(sk)) {
       return _Presence.temp;
@@ -85,8 +85,10 @@ class _HotStampingLookupLabelPartialDialogState
     });
   }
 
-  void _commitSelection(HotStampingProductionInputViewModel vm,
-      ProductionLabelLookupResult result) {
+  void _commitSelection(
+    HotStampingProductionInputViewModel vm,
+    ProductionLabelLookupResult result,
+  ) {
     if (_selectedIndex == null) return;
 
     final row = result.data[_selectedIndex!];
@@ -138,15 +140,17 @@ class _HotStampingLookupLabelPartialDialogState
         if (result == null) {
           return const Dialog(
             child: SizedBox(
-                height: 120,
-                child: Center(child: Text('Tidak ada hasil lookup'))),
+              height: 120,
+              child: Center(child: Text('Tidak ada hasil lookup')),
+            ),
           );
         }
 
         if (!_inputsReady) {
           return Dialog(
-            shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             child: Container(
               height: 160,
               padding: const EdgeInsets.all(24),
@@ -158,8 +162,9 @@ class _HotStampingLookupLabelPartialDialogState
                   Text(
                     'Memuat data...',
                     style: TextStyle(
-                        color: Colors.grey.shade700,
-                        fontWeight: FontWeight.w600),
+                      color: Colors.grey.shade700,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
@@ -172,8 +177,9 @@ class _HotStampingLookupLabelPartialDialogState
 
         if (allTypedItems.isEmpty) {
           return Dialog(
-            shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             child: Container(
               padding: const EdgeInsets.all(32),
               child: Column(
@@ -185,8 +191,11 @@ class _HotStampingLookupLabelPartialDialogState
                       color: Colors.orange.shade50,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.info_outline,
-                        size: 48, color: Colors.orange.shade700),
+                    child: Icon(
+                      Icons.info_outline,
+                      size: 48,
+                      color: Colors.orange.shade700,
+                    ),
                   ),
                   const SizedBox(height: 20),
                   const Text(
@@ -196,8 +205,7 @@ class _HotStampingLookupLabelPartialDialogState
                   const SizedBox(height: 8),
                   Text(
                     'Label ini tidak memiliki data.',
-                    style:
-                    TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
@@ -206,7 +214,9 @@ class _HotStampingLookupLabelPartialDialogState
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.orange,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 12),
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -225,11 +235,14 @@ class _HotStampingLookupLabelPartialDialogState
         final namaJenis = 'Furniture WIP';
 
         return Dialog(
-          shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           elevation: 8,
-          insetPadding:
-          const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 24,
+          ),
           child: Container(
             constraints: const BoxConstraints(maxWidth: 700, maxHeight: 600),
             decoration: BoxDecoration(
@@ -244,10 +257,7 @@ class _HotStampingLookupLabelPartialDialogState
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [
-                        Colors.amber.shade600,
-                        Colors.amber.shade700,
-                      ],
+                      colors: [Colors.amber.shade600, Colors.amber.shade700],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -264,8 +274,11 @@ class _HotStampingLookupLabelPartialDialogState
                           color: Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.content_cut,
-                            size: 28, color: Colors.white),
+                        child: const Icon(
+                          Icons.content_cut,
+                          size: 28,
+                          color: Colors.white,
+                        ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
@@ -285,7 +298,9 @@ class _HotStampingLookupLabelPartialDialogState
                                 const SizedBox(width: 10),
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 4),
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: Colors.white.withOpacity(0.3),
                                     borderRadius: BorderRadius.circular(6),
@@ -316,7 +331,9 @@ class _HotStampingLookupLabelPartialDialogState
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(20),
@@ -340,10 +357,7 @@ class _HotStampingLookupLabelPartialDialogState
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [
-                        Colors.blue.shade50,
-                        Colors.blue.shade100,
-                      ],
+                      colors: [Colors.blue.shade50, Colors.blue.shade100],
                     ),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.blue.shade200),
@@ -356,8 +370,11 @@ class _HotStampingLookupLabelPartialDialogState
                           color: Colors.blue.shade200,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Icon(Icons.lightbulb_outline,
-                            size: 20, color: Colors.blue.shade700),
+                        child: Icon(
+                          Icons.lightbulb_outline,
+                          size: 20,
+                          color: Colors.blue.shade700,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       const Expanded(
@@ -376,8 +393,10 @@ class _HotStampingLookupLabelPartialDialogState
 
                 // COLUMN HEADERS
                 Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade50,
                     border: Border(
@@ -446,14 +465,18 @@ class _HotStampingLookupLabelPartialDialogState
                       final originalPcs = _pcsOf(item);
                       final originalBerat = _beratOf(item);
 
-                      final displayPcs =
-                      isSelected && _editedPcs != null ? _editedPcs! : originalPcs;
+                      final displayPcs = isSelected && _editedPcs != null
+                          ? _editedPcs!
+                          : originalPcs;
                       final pcsText = displayPcs?.toString() ?? '-';
-                      final beratText = originalBerat == null ? '-' : num2(originalBerat);
+                      final beratText = originalBerat == null
+                          ? '-'
+                          : num2(originalBerat);
 
                       final isOriginalPartial = _isPartialOf(item, rawRow);
 
-                      final isPcsEdited = isSelected &&
+                      final isPcsEdited =
+                          isSelected &&
                           _editedPcs != null &&
                           _editedPcs != originalPcs;
 
@@ -493,13 +516,14 @@ class _HotStampingLookupLabelPartialDialogState
                                     borderRadius: BorderRadius.circular(12),
                                     boxShadow: isSelected && !isDisabled
                                         ? [
-                                      BoxShadow(
-                                        color:
-                                        Colors.amber.withOpacity(0.2),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ]
+                                            BoxShadow(
+                                              color: Colors.amber.withOpacity(
+                                                0.2,
+                                              ),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ]
                                         : null,
                                   ),
                                   child: Row(
@@ -516,9 +540,12 @@ class _HotStampingLookupLabelPartialDialogState
                                           onChanged: isDisabled
                                               ? null
                                               : (_) => _toggleRow(
-                                              idx, rawRow, isDisabled),
+                                                  idx,
+                                                  rawRow,
+                                                  isDisabled,
+                                                ),
                                           materialTapTargetSize:
-                                          MaterialTapTargetSize.shrinkWrap,
+                                              MaterialTapTargetSize.shrinkWrap,
                                         ),
                                       ),
 
@@ -529,13 +556,14 @@ class _HotStampingLookupLabelPartialDialogState
                                           children: [
                                             if (isOriginalPartial) ...[
                                               Container(
-                                                padding:
-                                                const EdgeInsets.all(4),
+                                                padding: const EdgeInsets.all(
+                                                  4,
+                                                ),
                                                 decoration: BoxDecoration(
                                                   color: Colors.orange
                                                       .withOpacity(0.2),
                                                   borderRadius:
-                                                  BorderRadius.circular(6),
+                                                      BorderRadius.circular(6),
                                                 ),
                                                 child: const Icon(
                                                   Icons.content_cut,
@@ -575,27 +603,24 @@ class _HotStampingLookupLabelPartialDialogState
                                               gradient: LinearGradient(
                                                 colors: isPcsEdited
                                                     ? [
-                                                  Colors.amber.shade300,
-                                                  Colors.amber.shade400,
-                                                ]
+                                                        Colors.amber.shade300,
+                                                        Colors.amber.shade400,
+                                                      ]
                                                     : statusText != null
                                                     ? [
-                                                  statusColor!
-                                                      .withOpacity(
-                                                      0.2),
-                                                  statusColor
-                                                      .withOpacity(
-                                                      0.3),
-                                                ]
+                                                        statusColor!
+                                                            .withOpacity(0.2),
+                                                        statusColor.withOpacity(
+                                                          0.3,
+                                                        ),
+                                                      ]
                                                     : [
-                                                  Colors
-                                                      .green.shade100,
-                                                  Colors
-                                                      .green.shade200,
-                                                ],
+                                                        Colors.green.shade100,
+                                                        Colors.green.shade200,
+                                                      ],
                                               ),
                                               borderRadius:
-                                              BorderRadius.circular(20),
+                                                  BorderRadius.circular(20),
                                             ),
                                             child: Text(
                                               '$beratText kg',
@@ -606,8 +631,7 @@ class _HotStampingLookupLabelPartialDialogState
                                                     ? Colors.amber.shade900
                                                     : statusText != null
                                                     ? statusColor
-                                                    : Colors
-                                                    .green.shade800,
+                                                    : Colors.green.shade800,
                                               ),
                                             ),
                                           ),
@@ -621,59 +645,59 @@ class _HotStampingLookupLabelPartialDialogState
                                         width: 140,
                                         child: Row(
                                           mainAxisAlignment:
-                                          MainAxisAlignment.end,
+                                              MainAxisAlignment.end,
                                           children: [
                                             // ✅ Edit PCS button
                                             if (isSelected && !isDisabled)
                                               Container(
                                                 height: 32,
                                                 child: OutlinedButton.icon(
-                                                  style:
-                                                  OutlinedButton.styleFrom(
+                                                  style: OutlinedButton.styleFrom(
                                                     padding:
-                                                    const EdgeInsets
-                                                        .symmetric(
-                                                      horizontal: 10,
-                                                      vertical: 4,
-                                                    ),
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 10,
+                                                          vertical: 4,
+                                                        ),
                                                     side: BorderSide(
-                                                      color: Colors
-                                                          .amber.shade600,
+                                                      color:
+                                                          Colors.amber.shade600,
                                                       width: 1.5,
                                                     ),
-                                                    shape:
-                                                    RoundedRectangleBorder(
+                                                    shape: RoundedRectangleBorder(
                                                       borderRadius:
-                                                      BorderRadius.circular(
-                                                          8),
+                                                          BorderRadius.circular(
+                                                            8,
+                                                          ),
                                                     ),
                                                   ),
                                                   icon: Icon(
                                                     Icons.edit_outlined,
                                                     size: 14,
                                                     color:
-                                                    Colors.amber.shade700,
+                                                        Colors.amber.shade700,
                                                   ),
                                                   label: Text(
                                                     'Edit',
                                                     style: TextStyle(
                                                       fontSize: 11,
                                                       fontWeight:
-                                                      FontWeight.w600,
-                                                      color: Colors
-                                                          .amber.shade700,
+                                                          FontWeight.w600,
+                                                      color:
+                                                          Colors.amber.shade700,
                                                     ),
                                                   ),
                                                   onPressed: () async {
-                                                    final originalPcs =
-                                                    _pcsOf(item);
+                                                    final originalPcs = _pcsOf(
+                                                      item,
+                                                    );
                                                     if (originalPcs != null) {
                                                       final newPcs =
-                                                      await _showPcsInputDialog(
-                                                        context,
-                                                        maxPcs: originalPcs,
-                                                        currentPcs: _editedPcs,
-                                                      );
+                                                          await _showPcsInputDialog(
+                                                            context,
+                                                            maxPcs: originalPcs,
+                                                            currentPcs:
+                                                                _editedPcs,
+                                                          );
 
                                                       if (newPcs != null &&
                                                           mounted) {
@@ -693,15 +717,15 @@ class _HotStampingLookupLabelPartialDialogState
                                             if (statusText != null)
                                               Container(
                                                 padding:
-                                                const EdgeInsets.symmetric(
-                                                  horizontal: 10,
-                                                  vertical: 4,
-                                                ),
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 10,
+                                                      vertical: 4,
+                                                    ),
                                                 decoration: BoxDecoration(
                                                   color: statusColor!
                                                       .withOpacity(0.15),
                                                   borderRadius:
-                                                  BorderRadius.circular(6),
+                                                      BorderRadius.circular(6),
                                                   border: Border.all(
                                                     color: statusColor
                                                         .withOpacity(0.4),
@@ -720,18 +744,18 @@ class _HotStampingLookupLabelPartialDialogState
                                             else if (isPcsEdited)
                                               Container(
                                                 padding:
-                                                const EdgeInsets.symmetric(
-                                                  horizontal: 10,
-                                                  vertical: 4,
-                                                ),
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 10,
+                                                      vertical: 4,
+                                                    ),
                                                 decoration: BoxDecoration(
                                                   color: Colors.amber
                                                       .withOpacity(0.15),
                                                   borderRadius:
-                                                  BorderRadius.circular(6),
+                                                      BorderRadius.circular(6),
                                                   border: Border.all(
                                                     color:
-                                                    Colors.amber.shade400,
+                                                        Colors.amber.shade400,
                                                   ),
                                                 ),
                                                 child: Text(
@@ -740,39 +764,39 @@ class _HotStampingLookupLabelPartialDialogState
                                                     fontSize: 10,
                                                     fontWeight: FontWeight.w800,
                                                     color:
-                                                    Colors.amber.shade700,
+                                                        Colors.amber.shade700,
                                                     letterSpacing: 0.5,
                                                   ),
                                                 ),
                                               )
                                             else if (isOriginalPartial)
-                                                Container(
-                                                  padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 10,
-                                                    vertical: 4,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.orange
-                                                        .withOpacity(0.15),
-                                                    borderRadius:
-                                                    BorderRadius.circular(6),
-                                                    border: Border.all(
-                                                      color: Colors
-                                                          .orange.shade400,
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 10,
+                                                      vertical: 4,
                                                     ),
-                                                  ),
-                                                  child: Text(
-                                                    'PARTIAL',
-                                                    style: TextStyle(
-                                                      fontSize: 10,
-                                                      fontWeight: FontWeight.w800,
-                                                      color: Colors
-                                                          .orange.shade700,
-                                                      letterSpacing: 0.5,
-                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.orange
+                                                      .withOpacity(0.15),
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                  border: Border.all(
+                                                    color:
+                                                        Colors.orange.shade400,
                                                   ),
                                                 ),
+                                                child: Text(
+                                                  'PARTIAL',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w800,
+                                                    color:
+                                                        Colors.orange.shade700,
+                                                    letterSpacing: 0.5,
+                                                  ),
+                                                ),
+                                              ),
                                           ],
                                         ),
                                       ),
@@ -806,9 +830,9 @@ class _HotStampingLookupLabelPartialDialogState
                       TextButton.icon(
                         onPressed: _selectedIndex != null
                             ? () => setState(() {
-                          _selectedIndex = null;
-                          _editedPcs = null;
-                        })
+                                _selectedIndex = null;
+                                _editedPcs = null;
+                              })
                             : null,
                         icon: const Icon(Icons.clear, size: 18),
                         label: const Text('Batal'),
@@ -820,7 +844,9 @@ class _HotStampingLookupLabelPartialDialogState
                       if (_selectedIndex != null)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           margin: const EdgeInsets.only(right: 12),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
@@ -920,10 +946,10 @@ class _HotStampingLookupLabelPartialDialogState
 
   // ✅ PCS Input Dialog
   Future<int?> _showPcsInputDialog(
-      BuildContext context, {
-        required int maxPcs,
-        int? currentPcs,
-      }) async {
+    BuildContext context, {
+    required int maxPcs,
+    int? currentPcs,
+  }) async {
     final controller = TextEditingController(
       text: currentPcs?.toString() ?? '',
     );

@@ -33,10 +33,7 @@ class TempItemsByLabel {
   int get totalCount => furnitureWipItems.length + furnitureWipPartials.length;
   bool get isEmpty => totalCount == 0;
 
-  List<dynamic> get allItems => [
-    ...furnitureWipItems,
-    ...furnitureWipPartials,
-  ];
+  List<dynamic> get allItems => [...furnitureWipItems, ...furnitureWipPartials];
 }
 
 // -----------------------------------------------------------------------------
@@ -104,10 +101,16 @@ class SpannerProductionInputViewModel extends ChangeNotifier {
     final hdr = tag.isEmpty ? '' : ' <$tag>';
     _d('========== TEMP LIST DUMP$hdr ==========');
     _dumpList('tempFurnitureWip', tempFurnitureWip, _keyFromFurnitureWipItem);
-    _dumpList('tempFurnitureWipPartial', tempFurnitureWipPartial,
-        _keyFromFurnitureWipItem);
     _dumpList(
-        'tempCabinetMaterial', tempCabinetMaterial, _keyFromCabinetMaterialItem);
+      'tempFurnitureWipPartial',
+      tempFurnitureWipPartial,
+      _keyFromFurnitureWipItem,
+    );
+    _dumpList(
+      'tempCabinetMaterial',
+      tempCabinetMaterial,
+      _keyFromCabinetMaterialItem,
+    );
     _d('TOTAL TEMP COUNT = $totalTempCount');
     _d('========================================');
   }
@@ -121,7 +124,8 @@ class SpannerProductionInputViewModel extends ChangeNotifier {
     }
     _tempItemsByLabel.forEach((label, bucket) {
       _d(
-          'Label "$label" • total=${bucket.totalCount} • since=${bucket.addedAt.toIso8601String()}');
+        'Label "$label" • total=${bucket.totalCount} • since=${bucket.addedAt.toIso8601String()}',
+      );
       for (final it in bucket.allItems) {
         _d('  - ${_fmtItem(it)}');
       }
@@ -164,7 +168,10 @@ class SpannerProductionInputViewModel extends ChangeNotifier {
   int inputsCount(String noProduksi, String key) =>
       _inputsCache[noProduksi]?.summary[key] ?? 0;
 
-  Future<SpannerInputs?> loadInputs(String noProduksi, {bool force = false}) async {
+  Future<SpannerInputs?> loadInputs(
+    String noProduksi, {
+    bool force = false,
+  }) async {
     if (!force && _inputsCache.containsKey(noProduksi)) {
       return _inputsCache[noProduksi];
     }
@@ -273,8 +280,10 @@ class SpannerProductionInputViewModel extends ChangeNotifier {
 
   final Map<String, TempItemsByLabel> _tempItemsByLabel = {};
 
-  Future<ProductionLabelLookupResult?> lookupFwipLabel(String code,
-      {bool force = false}) async {
+  Future<ProductionLabelLookupResult?> lookupFwipLabel(
+    String code, {
+    bool force = false,
+  }) async {
     final trimmed = code.trim();
     if (trimmed.isEmpty) {
       lookupError = 'Kode label kosong';
@@ -331,12 +340,15 @@ class SpannerProductionInputViewModel extends ChangeNotifier {
       return;
     }
 
-    final idx =
-    tempCabinetMaterial.indexWhere((x) => (x.IdCabinetMaterial ?? 0) == id);
+    final idx = tempCabinetMaterial.indexWhere(
+      (x) => (x.IdCabinetMaterial ?? 0) == id,
+    );
     if (idx >= 0) {
       final old = tempCabinetMaterial[idx];
       tempCabinetMaterial[idx] = old.copyWith(Jumlah: Jumlah);
-      _d('✅ Updated existing material temp: ${tempCabinetMaterial[idx].toDebugString()}');
+      _d(
+        '✅ Updated existing material temp: ${tempCabinetMaterial[idx].toDebugString()}',
+      );
       debugDumpTempLists(tag: 'after addTempCabinetMaterialFromMaster(update)');
       notifyListeners();
       return;
@@ -356,8 +368,9 @@ class SpannerProductionInputViewModel extends ChangeNotifier {
     required int IdCabinetMaterial,
     required num Jumlah,
   }) {
-    final idx = tempCabinetMaterial
-        .indexWhere((x) => (x.IdCabinetMaterial ?? 0) == IdCabinetMaterial);
+    final idx = tempCabinetMaterial.indexWhere(
+      (x) => (x.IdCabinetMaterial ?? 0) == IdCabinetMaterial,
+    );
     if (idx == -1) {
       _d('⚠️ Material $IdCabinetMaterial not found in temp');
       return;
@@ -365,23 +378,30 @@ class SpannerProductionInputViewModel extends ChangeNotifier {
     final old = tempCabinetMaterial[idx];
     tempCabinetMaterial[idx] = old.copyWith(Jumlah: Jumlah);
 
-    _d('✅ Updated cabinet material temp: ${tempCabinetMaterial[idx].toDebugString()}');
+    _d(
+      '✅ Updated cabinet material temp: ${tempCabinetMaterial[idx].toDebugString()}',
+    );
     debugDumpTempLists(tag: 'after updateTempCabinetMaterialJumlah');
     notifyListeners();
   }
 
   bool hasCabinetMaterialInTemp(int IdCabinetMaterial) {
-    return tempCabinetMaterial
-        .any((x) => (x.IdCabinetMaterial ?? 0) == IdCabinetMaterial);
+    return tempCabinetMaterial.any(
+      (x) => (x.IdCabinetMaterial ?? 0) == IdCabinetMaterial,
+    );
   }
 
   num getTotalCabinetMaterialJumlah(String noProduksi) {
     final inputs = _inputsCache[noProduksi];
 
-    final tempTotal =
-    tempCabinetMaterial.fold<num>(0, (sum, item) => sum + (item.Jumlah ?? 0));
-    final dbTotal = (inputs?.cabinetMaterial ?? [])
-        .fold<num>(0, (sum, item) => sum + (item.Jumlah ?? 0));
+    final tempTotal = tempCabinetMaterial.fold<num>(
+      0,
+      (sum, item) => sum + (item.Jumlah ?? 0),
+    );
+    final dbTotal = (inputs?.cabinetMaterial ?? []).fold<num>(
+      0,
+      (sum, item) => sum + (item.Jumlah ?? 0),
+    );
 
     return tempTotal + dbTotal;
   }
@@ -416,7 +436,10 @@ class SpannerProductionInputViewModel extends ChangeNotifier {
     if (t != null && !t.isEmpty) onShowTemporaryDataDialog?.call(t);
   }
 
-  void removeTemporaryItemsForLabel(String labelCode, List<dynamic> itemsToRemove) {
+  void removeTemporaryItemsForLabel(
+    String labelCode,
+    List<dynamic> itemsToRemove,
+  ) {
     final trimmed = labelCode.trim();
     final t = _tempItemsByLabel[trimmed];
     if (t == null) return;
@@ -436,10 +459,12 @@ class SpannerProductionInputViewModel extends ChangeNotifier {
   void _updateTempItemsByLabel(String labelCode) {
     final code = labelCode.trim();
 
-    final fwipFull =
-    tempFurnitureWip.where((e) => _getItemLabelCode(e) == code).toList();
-    final fwipPart =
-    tempFurnitureWipPartial.where((e) => _getItemLabelCode(e) == code).toList();
+    final fwipFull = tempFurnitureWip
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
+    final fwipPart = tempFurnitureWipPartial
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
 
     if ([fwipFull, fwipPart].every((l) => l.isEmpty)) {
       _tempItemsByLabel.remove(code);
@@ -597,9 +622,9 @@ class SpannerProductionInputViewModel extends ChangeNotifier {
     }
 
     final partCode =
-    (row['NoFurnitureWIPPartial'] ?? row['noFurnitureWIPPartial'] ?? '')
-        .toString()
-        .trim();
+        (row['NoFurnitureWIPPartial'] ?? row['noFurnitureWIPPartial'] ?? '')
+            .toString()
+            .trim();
     return partCode.isNotEmpty;
   }
 
@@ -656,8 +681,9 @@ class SpannerProductionInputViewModel extends ChangeNotifier {
         continue;
       }
 
-      final String tempKey =
-      item is FurnitureWipItem ? _keyFromFurnitureWipItem(item) : simpleKey;
+      final String tempKey = item is FurnitureWipItem
+          ? _keyFromFurnitureWipItem(item)
+          : simpleKey;
 
       if (!_tempKeys.add(tempKey)) {
         skipped++;
@@ -744,7 +770,8 @@ class SpannerProductionInputViewModel extends ChangeNotifier {
   bool deleteIfTemp(dynamic item) {
     bool ok = false;
     if (item is FurnitureWipItem) {
-      ok = tempFurnitureWip.remove(item) || tempFurnitureWipPartial.remove(item);
+      ok =
+          tempFurnitureWip.remove(item) || tempFurnitureWipPartial.remove(item);
       if (ok) _tempKeys.remove(_keyFromFurnitureWipItem(item));
     } else if (item is CabinetMaterialItem) {
       ok = tempCabinetMaterial.remove(item);
@@ -820,8 +847,8 @@ class SpannerProductionInputViewModel extends ChangeNotifier {
 
   int get totalTempCount =>
       tempFurnitureWip.length +
-          tempFurnitureWipPartial.length +
-          tempCabinetMaterial.length;
+      tempFurnitureWipPartial.length +
+      tempCabinetMaterial.length;
 
   // ---------------------------------------------------------------------------
   // Submit temp items
@@ -835,32 +862,37 @@ class SpannerProductionInputViewModel extends ChangeNotifier {
     // attach full FWIP
     if (tempFurnitureWip.isNotEmpty) {
       payload['furnitureWip'] = tempFurnitureWip
-          .map((e) => {
-        'noFurnitureWIP': e.noFurnitureWIP, // ✅
-      })
+          .map(
+            (e) => {
+              'noFurnitureWIP': e.noFurnitureWIP, // ✅
+            },
+          )
           .toList();
     }
 
-    // upsert cabinet material (ikuti config keyColumn = IdCabinetMaterial)
+    // upsert cabinet material
     if (tempCabinetMaterial.isNotEmpty) {
       payload['cabinetMaterial'] = tempCabinetMaterial
-          .map((e) => {
-        'IdCabinetMaterial': e.IdCabinetMaterial,
-        'Jumlah': e.Jumlah,
-      })
+          .map(
+            (e) => {
+              'idCabinetMaterial': e.IdCabinetMaterial,
+              'jumlah': e.Jumlah,
+            },
+          )
           .toList();
     }
 
     // create partial FWIP (controller sekarang expect furnitureWipPartial)
     if (tempFurnitureWipPartial.isNotEmpty) {
       payload['furnitureWipPartial'] = tempFurnitureWipPartial
-          .map((e) => {
-        'noFurnitureWIP': e.noFurnitureWIP, // ✅ match $.noFurnitureWIP
-        'pcs': e.pcs,                       // ✅ match $.pcs
-      })
+          .map(
+            (e) => {
+              'noFurnitureWIP': e.noFurnitureWIP, // ✅ match $.noFurnitureWIP
+              'pcs': e.pcs, // ✅ match $.pcs
+            },
+          )
           .toList();
     }
-
 
     return payload;
   }
@@ -882,7 +914,10 @@ class SpannerProductionInputViewModel extends ChangeNotifier {
       _d('Submitting temp items to $noProduksi');
       _d('Payload: ${json.encode(payload)}');
 
-      final response = await repository.submitInputsAndPartials(noProduksi, payload);
+      final response = await repository.submitInputsAndPartials(
+        noProduksi,
+        payload,
+      );
 
       _d('Submit response: ${json.encode(response)}');
 
@@ -903,7 +938,8 @@ class SpannerProductionInputViewModel extends ChangeNotifier {
       _d('Submit successful!');
 
       if (data != null) {
-        final createdPartials = data['createdPartials'] as Map<String, dynamic>?;
+        final createdPartials =
+            data['createdPartials'] as Map<String, dynamic>?;
         if (createdPartials != null) {
           _d('Created partials: ${json.encode(createdPartials)}');
         }
@@ -929,7 +965,8 @@ class SpannerProductionInputViewModel extends ChangeNotifier {
     if (totalTempCount == 0) return 'Tidak ada data';
 
     final parts = <String>[];
-    if (tempFurnitureWip.isNotEmpty) parts.add('${tempFurnitureWip.length} FWIP (full)');
+    if (tempFurnitureWip.isNotEmpty)
+      parts.add('${tempFurnitureWip.length} FWIP (full)');
     if (tempFurnitureWipPartial.isNotEmpty) {
       parts.add('${tempFurnitureWipPartial.length} FWIP Partial');
     }
@@ -952,7 +989,8 @@ class SpannerProductionInputViewModel extends ChangeNotifier {
 
     void add(String key, Map<String, dynamic> row) {
       final list =
-      (payload[key] ?? <Map<String, dynamic>>[]) as List<Map<String, dynamic>>;
+          (payload[key] ?? <Map<String, dynamic>>[])
+              as List<Map<String, dynamic>>;
       list.add(row);
       payload[key] = list;
     }
@@ -960,27 +998,22 @@ class SpannerProductionInputViewModel extends ChangeNotifier {
     for (final it in items) {
       if (it is FurnitureWipItem) {
         final isPart =
-            it.isPartialRow || ((it.noFurnitureWIPPartial ?? '').trim().isNotEmpty);
+            it.isPartialRow ||
+            ((it.noFurnitureWIPPartial ?? '').trim().isNotEmpty);
 
         if (isPart) {
           final code = (it.noFurnitureWIPPartial ?? '').trim();
           if (code.isNotEmpty) {
             // ✅ NoFurnitureWIPPartial -> noFurnitureWIPPartial
-            add('furnitureWipPartial', {
-              'noFurnitureWIPPartial': code,
-            });
+            add('furnitureWipPartial', {'noFurnitureWIPPartial': code});
           }
         } else {
           // ✅ NoFurnitureWIP -> noFurnitureWIP
-          add('furnitureWip', {
-            'noFurnitureWIP': it.noFurnitureWIP,
-          });
+          add('furnitureWip', {'noFurnitureWIP': it.noFurnitureWIP});
         }
       } else if (it is CabinetMaterialItem) {
         // ✅ IdCabinetMaterial -> idCabinetMaterial
-        add('cabinetMaterial', {
-          'idCabinetMaterial': it.IdCabinetMaterial,
-        });
+        add('cabinetMaterial', {'idCabinetMaterial': it.IdCabinetMaterial});
       }
     }
 

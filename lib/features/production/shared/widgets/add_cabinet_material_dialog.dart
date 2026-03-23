@@ -3,17 +3,19 @@ import 'package:flutter/services.dart';
 
 import '../models/cabinet_material_item.dart';
 
-typedef LoadCabinetMaterials = Future<List<CabinetMaterialItem>> Function({
-required int idWarehouse,
-bool force,
-});
+typedef LoadCabinetMaterials =
+    Future<List<CabinetMaterialItem>> Function({
+      required int idWarehouse,
+      bool force,
+    });
 
 typedef IsCabinetMaterialInTemp = bool Function(int idCabinetMaterial);
 
-typedef AddTempCabinetMaterial = void Function({
-required CabinetMaterialItem masterItem,
-required num jumlah,
-});
+typedef AddTempCabinetMaterial =
+    void Function({
+      required CabinetMaterialItem masterItem,
+      required num jumlah,
+    });
 
 class AddCabinetMaterialDialog extends StatefulWidget {
   final int idWarehouse;
@@ -36,7 +38,8 @@ class AddCabinetMaterialDialog extends StatefulWidget {
   });
 
   @override
-  State<AddCabinetMaterialDialog> createState() => _AddCabinetMaterialDialogState();
+  State<AddCabinetMaterialDialog> createState() =>
+      _AddCabinetMaterialDialogState();
 }
 
 class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
@@ -105,7 +108,10 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
     final id = selected.IdCabinetMaterial ?? 0;
 
     if (widget.isAlreadyInTemp(id)) {
-      _showSnack('${selected.Nama ?? "Material"} sudah ada di TEMP', isError: true);
+      _showSnack(
+        '${selected.Nama ?? "Material"} sudah ada di TEMP',
+        isError: true,
+      );
       return;
     }
 
@@ -115,19 +121,16 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
       return;
     }
 
-    final available = (selected.SaldoAkhir ?? 0);
-    if (jumlah > available) {
-      _showSnack(
-        'Jumlah melebihi stok tersedia ($available ${selected.NamaUOM ?? "unit"})',
-        isError: true,
-      );
-      return;
-    }
+    // final available = (selected.SaldoAkhir ?? 0);
+    // if (jumlah > available) {
+    //   _showSnack(
+    //     'Jumlah melebihi stok tersedia ($available ${selected.NamaUOM ?? "unit"})',
+    //     isError: true,
+    //   );
+    //   return;
+    // }
 
-    widget.onAddTemp(
-      masterItem: selected,
-      jumlah: jumlah,
-    );
+    widget.onAddTemp(masterItem: selected, jumlah: jumlah);
 
     Navigator.pop(context);
     _showSnack('✅ ${selected.Nama ?? "Material"} ditambahkan ke TEMP');
@@ -161,7 +164,10 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Colors.deepPurple.shade600, Colors.deepPurple.shade800],
+                  colors: [
+                    Colors.deepPurple.shade600,
+                    Colors.deepPurple.shade800,
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -236,7 +242,11 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.error_outline, color: Colors.red.shade700, size: 22),
+                          Icon(
+                            Icons.error_outline,
+                            color: Colors.red.shade700,
+                            size: 22,
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
@@ -253,14 +263,22 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
                                 const SizedBox(height: 2),
                                 Text(
                                   _loadError!,
-                                  style: TextStyle(fontSize: 11, color: Colors.red.shade700),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.red.shade700,
+                                  ),
                                 ),
                               ],
                             ),
                           ),
                           IconButton(
-                            onPressed: _isLoading ? null : () => _loadMasterMaterials(force: true),
-                            icon: Icon(Icons.refresh, color: Colors.red.shade700),
+                            onPressed: _isLoading
+                                ? null
+                                : () => _loadMasterMaterials(force: true),
+                            icon: Icon(
+                              Icons.refresh,
+                              color: Colors.red.shade700,
+                            ),
                             tooltip: 'Coba lagi',
                           ),
                         ],
@@ -269,7 +287,9 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
                     const SizedBox(height: 20),
                   ],
 
-                  if (!_isLoading && _loadError == null && _materials.isEmpty) ...[
+                  if (!_isLoading &&
+                      _loadError == null &&
+                      _materials.isEmpty) ...[
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -278,7 +298,11 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
                       ),
                       child: Column(
                         children: [
-                          Icon(Icons.inventory_outlined, size: 48, color: Colors.grey.shade400),
+                          Icon(
+                            Icons.inventory_outlined,
+                            size: 48,
+                            color: Colors.grey.shade400,
+                          ),
                           const SizedBox(height: 12),
                           Text(
                             'Tidak ada material tersedia',
@@ -311,7 +335,10 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.deepPurple.shade600, width: 2),
+                        borderSide: BorderSide(
+                          color: Colors.deepPurple.shade600,
+                          width: 2,
+                        ),
                       ),
                     ),
                     value: _selected?.IdCabinetMaterial,
@@ -319,84 +346,115 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
                     items: _isLoading
                         ? const []
                         : _materials.map((m) {
-                      final stock = (m.SaldoAkhir ?? 0);
-                      final uom = m.NamaUOM ?? 'unit';
-                      final name = m.Nama ?? 'Material ${m.IdCabinetMaterial ?? 0}';
+                            final stock = (m.SaldoAkhir ?? 0);
+                            final uom = m.NamaUOM ?? 'unit';
+                            final name =
+                                m.Nama ??
+                                'Material ${m.IdCabinetMaterial ?? 0}';
 
-                      return DropdownMenuItem<int>(
-                        value: m.IdCabinetMaterial,
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                name,
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                            return DropdownMenuItem<int>(
+                              value: m.IdCabinetMaterial,
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      name,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: stock > 0
+                                          ? Colors.green.shade50
+                                          : Colors.red.shade50,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: stock > 0
+                                            ? Colors.green.shade200
+                                            : Colors.red.shade200,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      '$stock $uom',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: stock > 0
+                                            ? Colors.green.shade700
+                                            : Colors.red.shade700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: stock > 0 ? Colors.green.shade50 : Colors.red.shade50,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: stock > 0 ? Colors.green.shade200 : Colors.red.shade200,
-                                ),
-                              ),
-                              child: Text(
-                                '$stock $uom',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: stock > 0 ? Colors.green.shade700 : Colors.red.shade700,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
+                            );
+                          }).toList(),
                     onChanged: _isLoading
                         ? null
                         : (value) {
-                      if (value == null) {
-                        setState(() => _selected = null);
-                        return;
-                      }
-                      final picked = _materials.firstWhere(
-                            (x) => (x.IdCabinetMaterial ?? 0) == value,
-                        orElse: () => _materials.first,
-                      );
-                      setState(() => _selected = picked);
-                    },
+                            if (value == null) {
+                              setState(() => _selected = null);
+                              return;
+                            }
+                            final picked = _materials.firstWhere(
+                              (x) => (x.IdCabinetMaterial ?? 0) == value,
+                              orElse: () => _materials.first,
+                            );
+                            setState(() => _selected = picked);
+                          },
                   ),
 
                   const SizedBox(height: 16),
 
                   if (_selected != null)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
                       decoration: BoxDecoration(
-                        color: selectedStock > 0 ? Colors.green.shade50 : Colors.red.shade50,
+                        color: selectedStock > 0
+                            ? Colors.green.shade50
+                            : Colors.red.shade50,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
                         children: [
                           Icon(
-                            selectedStock > 0 ? Icons.check_circle : Icons.warning_rounded,
+                            selectedStock > 0
+                                ? Icons.check_circle
+                                : Icons.warning_rounded,
                             size: 18,
-                            color: selectedStock > 0 ? Colors.green.shade700 : Colors.red.shade700,
+                            color: selectedStock > 0
+                                ? Colors.green.shade700
+                                : Colors.red.shade700,
                           ),
                           const SizedBox(width: 10),
-                          Text('Stok tersedia: ', style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
+                          Text(
+                            'Stok tersedia: ',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
                           Text(
                             '$selectedStock $selectedUom',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: selectedStock > 0 ? Colors.green.shade700 : Colors.red.shade700,
+                              color: selectedStock > 0
+                                  ? Colors.green.shade700
+                                  : Colors.red.shade700,
                             ),
                           ),
                         ],
@@ -427,7 +485,10 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.deepPurple.shade600, width: 2),
+                        borderSide: BorderSide(
+                          color: Colors.deepPurple.shade600,
+                          width: 2,
+                        ),
                       ),
                     ),
                   ),
@@ -446,7 +507,9 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         side: BorderSide(color: Colors.grey.shade300),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: const Text('Batal'),
                     ),
@@ -454,14 +517,18 @@ class _AddCabinetMaterialDialogState extends State<AddCabinetMaterialDialog> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: (_isLoading || _selected == null) ? null : _handleSubmit,
+                      onPressed: (_isLoading || _selected == null)
+                          ? null
+                          : _handleSubmit,
                       icon: const Icon(Icons.add, size: 20),
                       label: const Text('Tambah'),
                       style: FilledButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         backgroundColor: Colors.deepPurple.shade600,
                         disabledBackgroundColor: Colors.grey.shade300,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
                   ),

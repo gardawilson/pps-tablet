@@ -9,8 +9,21 @@ class ProductionSelectionScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final perm = context.watch<PermissionViewModel>();
 
-    final canReadWashing = perm.can('label_washing:read');
-    final canReadBroker = perm.can('label_washing:read');
+    final canReadWashing = perm.can('produksi_washing:read');
+    final canReadBroker = perm.can('produksi_broker:read');
+    final canReadCrusher = perm.can('produksi_crusher:read');
+    final canReadBonggolan = perm.can('produksi_bonggolan:read');
+    final canReadMixer = perm.can('produksi_mixer:read');
+    final canReadGilingan = perm.can('produksi_gilingan:read');
+    final canReadInject = perm.can('injectproduksi:read');
+    final canReadHotStamping = perm.can('hotstamping:read');
+    final canReadPasangKunci = perm.can('pasangkunci:read');
+    final canReadSpanner = perm.can('spanner:read');
+    final canReadPacking = perm.can('packing:read');
+    final canReadSortirReject = perm.can('barangjadisortirreject:read');
+    final canReadRetur = perm.can('barangjadiretur:read');
+    final canReadFurnitureAssembly = perm.can('furnitureassembly:read');
+    final canReadFurnitureMaterial = perm.can('furniturematerial:read');
 
     return Scaffold(
       appBar: AppBar(
@@ -56,8 +69,8 @@ class ProductionSelectionScreen extends StatelessWidget {
             title: 'Proses Crusher',
             subtitle: 'Buat label untuk proses crusher',
             icon: Icons.inventory_2_outlined,
-            enabled: canReadBroker,
-            onTap: canReadBroker
+            enabled: canReadCrusher,
+            onTap: canReadCrusher
                 ? () => Navigator.pushNamed(context, '/production/crusher')
                 : null,
           ),
@@ -70,11 +83,13 @@ class ProductionSelectionScreen extends StatelessWidget {
             title: 'Proses Gilingan',
             subtitle: 'Buat label untuk proses gilingan',
             icon: Icons.inventory_2_outlined,
-            enabled: canReadBroker,
-            onTap: canReadBroker
+            enabled: canReadGilingan,
+            onTap: canReadGilingan
                 ? () => Navigator.pushNamed(context, '/production/gilingan')
                 : null,
           ),
+
+          const SizedBox(height: 16),
 
           // 🔹 Card Label Mixer
           _buildLabelCard(
@@ -82,35 +97,41 @@ class ProductionSelectionScreen extends StatelessWidget {
             title: 'Proses Mixer',
             subtitle: 'Buat label untuk proses mixer',
             icon: Icons.inventory_2_outlined,
-            enabled: canReadBroker,
-            onTap: canReadBroker
+            enabled: canReadMixer,
+            onTap: canReadMixer
                 ? () => Navigator.pushNamed(context, '/production/mixer')
                 : null,
           ),
 
-          // 🔹 Card Label Mixer
+          const SizedBox(height: 16),
+
+          // 🔹 Card Label Inject
           _buildLabelCard(
             context,
             title: 'Proses Inject',
             subtitle: 'Buat label untuk proses inject',
             icon: Icons.inventory_2_outlined,
-            enabled: canReadBroker,
-            onTap: canReadBroker
+            enabled: canReadInject,
+            onTap: canReadInject
                 ? () => Navigator.pushNamed(context, '/production/inject')
                 : null,
           ),
+
+          const SizedBox(height: 16),
 
           // 🔹 Card Label HotStamping
           _buildLabelCard(
             context,
             title: 'Proses HotStamping',
-            subtitle: 'Buat label untuk proses mixer',
+            subtitle: 'Buat label untuk proses hot stamping',
             icon: Icons.inventory_2_outlined,
-            enabled: canReadBroker,
-            onTap: canReadBroker
+            enabled: canReadHotStamping,
+            onTap: canReadHotStamping
                 ? () => Navigator.pushNamed(context, '/production/hot-stamp')
                 : null,
           ),
+
+          const SizedBox(height: 16),
 
           // 🔹 Card Label PasangKunci
           _buildLabelCard(
@@ -118,53 +139,65 @@ class ProductionSelectionScreen extends StatelessWidget {
             title: 'Proses Pasang Kunci',
             subtitle: 'Buat label untuk proses pasang kunci',
             icon: Icons.inventory_2_outlined,
-            enabled: canReadBroker,
-            onTap: canReadBroker
+            enabled: canReadPasangKunci,
+            onTap: canReadPasangKunci
                 ? () => Navigator.pushNamed(context, '/production/key-fitting')
                 : null,
           ),
+
+          const SizedBox(height: 16),
 
           // 🔹 Card Label Spanner
           _buildLabelCard(
             context,
             title: 'Proses Spanner',
-            subtitle: 'Buat label untuk proses Spanner',
+            subtitle: 'Buat label untuk proses spanner',
             icon: Icons.inventory_2_outlined,
-            enabled: canReadBroker,
-            onTap: canReadBroker
+            enabled: canReadSpanner,
+            onTap: canReadSpanner
                 ? () => Navigator.pushNamed(context, '/production/spanner')
                 : null,
           ),
+
+          const SizedBox(height: 16),
 
           // 🔹 Card Label Packing
           _buildLabelCard(
             context,
             title: 'Proses Packing',
-            subtitle: 'Buat label untuk proses Packing',
+            subtitle: 'Buat label untuk proses packing',
             icon: Icons.inventory_2_outlined,
-            enabled: canReadBroker,
-            onTap: canReadBroker
+            enabled: canReadPacking,
+            onTap: canReadPacking
                 ? () => Navigator.pushNamed(context, '/production/packing')
                 : null,
           ),
+
+          const SizedBox(height: 16),
+
           // 🔹 Card Label Sortir Reject
           _buildLabelCard(
             context,
             title: 'Proses Sortir Reject',
-            subtitle: 'Buat label untuk proses Packing',
+            subtitle: 'Buat label untuk proses sortir reject',
             icon: Icons.inventory_2_outlined,
-            enabled: canReadBroker,
-            onTap: canReadBroker
-                ? () => Navigator.pushNamed(context, '/production/sortir-reject')
+            enabled: canReadSortirReject,
+            onTap: canReadSortirReject
+                ? () =>
+                      Navigator.pushNamed(context, '/production/sortir-reject')
                 : null,
           ),
+
+          const SizedBox(height: 16),
+
+          // 🔹 Card Label Retur
           _buildLabelCard(
             context,
             title: 'Proses Retur',
             subtitle: 'Buat label untuk proses retur',
             icon: Icons.inventory_2_outlined,
-            enabled: canReadBroker,
-            onTap: canReadBroker
+            enabled: canReadRetur,
+            onTap: canReadRetur
                 ? () => Navigator.pushNamed(context, '/production/return')
                 : null,
           ),
@@ -175,22 +208,20 @@ class ProductionSelectionScreen extends StatelessWidget {
 
   // 🔹 Reusable builder untuk setiap kartu label
   Widget _buildLabelCard(
-      BuildContext context, {
-        required String title,
-        required String subtitle,
-        required IconData icon,
-        required VoidCallback? onTap,
-        bool enabled = true,
-      }) {
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required VoidCallback? onTap,
+    bool enabled = true,
+  }) {
     final Color baseColor = enabled ? Colors.blue : Colors.grey;
     return Opacity(
       opacity: enabled ? 1.0 : 0.5,
       child: Card(
         elevation: 4,
         shadowColor: Colors.black12,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: ListTile(
           onTap: enabled ? onTap : null,
           contentPadding: const EdgeInsets.all(20),
@@ -217,11 +248,7 @@ class ProductionSelectionScreen extends StatelessWidget {
               color: enabled ? Colors.grey.shade600 : Colors.grey.shade400,
             ),
           ),
-          trailing: Icon(
-            Icons.arrow_forward_ios,
-            size: 16,
-            color: baseColor,
-          ),
+          trailing: Icon(Icons.arrow_forward_ios, size: 16, color: baseColor),
         ),
       ),
     );

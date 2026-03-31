@@ -5,7 +5,7 @@ set -e
 # deploy.sh — Automate Flutter APK release & publish
 #
 # Usage:
-#   ./deploy.sh <version> "<changelog>" [options]
+#   ./deploy.sh "<changelog>" [options]
 #
 # Options:
 #   --dev        Build + publish ke backend lokal (test dulu)
@@ -13,19 +13,18 @@ set -e
 #   --min <ver>  Set minVersion (default: 1.0.26)
 #
 # Alur yang disarankan:
-#   1. ./deploy.sh 1.0.58 "Fix Bug" --dev    ← test di lokal dulu
-#   2. ./deploy.sh 1.0.58 "Fix Bug"          ← production jika oke
+#   1. ./deploy.sh "Fix Bug" --dev    ← test di lokal dulu
+#   2. ./deploy.sh "Fix Bug"          ← production jika oke
 # ============================================================
 
-VERSION=$1
-CHANGELOG=$2
+CHANGELOG=$1
 
 # --- Parse flags ---
 MODE="production"
 FORCE_UPDATE="false"
 MIN_VERSION="1.0.26"
 
-shift 2 2>/dev/null || true
+shift 1 2>/dev/null || true
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dev)   MODE="dev" ;;
@@ -42,7 +41,7 @@ APK_OUTPUT="build/app/outputs/flutter-apk/app-release.apk"
 UPDATE_TOKEN="${UPDATE_TOKEN:-"UTAMA-UPDATE-SECRET-123"}"
 
 DEV_SERVER="http://192.168.11.153:7500"
-PROD_SERVER="http://192.168.10.100:7500"
+PROD_SERVER="http://192.168.11.79:7500"
 
 if [ "$MODE" == "dev" ]; then
   API_BASE_URL="$DEV_SERVER"
@@ -53,20 +52,30 @@ fi
 PUBLISH_URL="$API_BASE_URL/api/update/tablet/publish"
 
 # --- Validation ---
-if [ -z "$VERSION" ] || [ -z "$CHANGELOG" ]; then
+if [ -z "$CHANGELOG" ]; then
   echo ""
-  echo "Usage: ./deploy.sh <version> \"<changelog>\" [--dev] [--force] [--min <ver>]"
+  echo "Usage: ./deploy.sh \"<changelog>\" [--dev] [--force] [--min <ver>]"
   echo ""
   echo "Examples:"
-  echo "  ./deploy.sh 1.0.58 \"Fix Bug\"              # production"
-  echo "  ./deploy.sh 1.0.58 \"Fix Bug\" --dev         # test lokal dulu"
-  echo "  ./deploy.sh 1.0.58 \"Fix Bug\" --force       # production force update"
+  echo "  ./deploy.sh \"Fix Bug\"              # production"
+  echo "  ./deploy.sh \"Fix Bug\" --dev         # test lokal dulu"
+  echo "  ./deploy.sh \"Fix Bug\" --force       # production force update"
   echo ""
   exit 1
 fi
 
-# Extract build number from current pubspec (increment by 1)
+# --- Auto increment version dari pubspec.yaml ---
+CURRENT_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
 CURRENT_BUILD=$(grep '^version:' pubspec.yaml | sed 's/.*+//')
+
+# Pecah major.minor.patch
+MAJOR=$(echo "$CURRENT_VERSION" | cut -d. -f1)
+MINOR=$(echo "$CURRENT_VERSION" | cut -d. -f2)
+PATCH=$(echo "$CURRENT_VERSION" | cut -d. -f3)
+
+# Increment patch
+NEXT_PATCH=$((PATCH + 1))
+NEXT_VERSION="$MAJOR.$MINOR.$NEXT_PATCH"
 NEXT_BUILD=$((CURRENT_BUILD + 1))
 
 echo ""
@@ -75,7 +84,7 @@ echo " PPS Tablet — Deploy Script"
 echo "=================================================="
 echo " Mode        : $MODE"
 echo " Server      : $API_BASE_URL"
-echo " Version     : $VERSION+$NEXT_BUILD"
+echo " Version     : $CURRENT_VERSION → $NEXT_VERSION+$NEXT_BUILD"
 echo " Min Version : $MIN_VERSION"
 echo " Force Update: $FORCE_UPDATE"
 echo " Changelog   : $CHANGELOG"
@@ -96,8 +105,8 @@ fi
 # --- Step 1: Update pubspec.yaml version ---
 echo ""
 echo "[1/5] Updating version in pubspec.yaml..."
-sed -i "s/^version: .*/version: $VERSION+$NEXT_BUILD/" pubspec.yaml
-echo "      Done: version set to $VERSION+$NEXT_BUILD"
+sed -i "s/^version: .*/version: $NEXT_VERSION+$NEXT_BUILD/" pubspec.yaml
+echo "      Done: $CURRENT_VERSION → $NEXT_VERSION+$NEXT_BUILD"
 
 # --- Step 2: Set .env ---
 echo ""
@@ -128,7 +137,7 @@ echo "[5/5] Uploading APK and publishing update ($MODE)..."
 RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$PUBLISH_URL" \
   -H "x-update-token: $UPDATE_TOKEN" \
   -F "apk=@$APK_OUTPUT;filename=$FILE_NAME" \
-  -F "latestVersion=$VERSION" \
+  -F "latestVersion=$NEXT_VERSION" \
   -F "minVersion=$MIN_VERSION" \
   -F "forceUpdate=$FORCE_UPDATE" \
   -F "changelog=$CHANGELOG")
@@ -148,11 +157,11 @@ fi
 echo ""
 echo "=================================================="
 if [ "$MODE" == "dev" ]; then
-  echo " Dev deploy selesai! Versi $VERSION tersedia di lokal."
+  echo " Dev deploy selesai! Versi $NEXT_VERSION tersedia di lokal."
   echo " Test di tablet, lalu jalankan:"
-  echo "   ./deploy.sh $VERSION \"$CHANGELOG\" untuk production"
+  echo "   ./deploy.sh \"$CHANGELOG\" untuk production"
 else
-  echo " Deploy selesai! Version $VERSION berhasil publish ke production."
+  echo " Deploy selesai! Version $NEXT_VERSION berhasil publish ke production."
 fi
 echo "=================================================="
 echo ""

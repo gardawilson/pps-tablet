@@ -28,7 +28,8 @@ class SpannerProductionActionBar extends StatefulWidget {
       _SpannerProductionActionBarState();
 }
 
-class _SpannerProductionActionBarState extends State<SpannerProductionActionBar> {
+class _SpannerProductionActionBarState
+    extends State<SpannerProductionActionBar> {
   final FocusNode _searchFocus = FocusNode();
   bool _focused = false;
 
@@ -80,7 +81,7 @@ class _SpannerProductionActionBarState extends State<SpannerProductionActionBar>
 
     // ✅ TODO: ganti permission key sesuai sistem kamu
     // contoh: 'spanner:create' atau 'production_spanner:create'
-    final canCreate = perm.can('label_crusher:create');
+    final canCreate = perm.can('spanner:create');
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
@@ -149,12 +150,12 @@ class _SpannerProductionActionBarState extends State<SpannerProductionActionBar>
                         ),
                         boxShadow: _focused
                             ? [
-                          BoxShadow(
-                            color: cs.primary.withOpacity(.12),
-                            blurRadius: 14,
-                            offset: const Offset(0, 6),
-                          ),
-                        ]
+                                BoxShadow(
+                                  color: cs.primary.withOpacity(.12),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ]
                             : null,
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -171,8 +172,9 @@ class _SpannerProductionActionBarState extends State<SpannerProductionActionBar>
                               textInputAction: TextInputAction.none,
                               decoration: InputDecoration(
                                 hintText: 'Cari NoProduksi Spanner (contains)…',
-                                hintStyle:
-                                TextStyle(color: Colors.grey.shade500),
+                                hintStyle: TextStyle(
+                                  color: Colors.grey.shade500,
+                                ),
                                 isCollapsed: true,
                                 border: InputBorder.none,
                                 contentPadding: const EdgeInsets.symmetric(
@@ -187,14 +189,14 @@ class _SpannerProductionActionBarState extends State<SpannerProductionActionBar>
                             duration: const Duration(milliseconds: 140),
                             child: _hasText
                                 ? IconButton(
-                              key: const ValueKey('clear_on'),
-                              tooltip: 'Bersihkan',
-                              icon: const Icon(Icons.close_rounded),
-                              onPressed: _handleClear,
-                            )
+                                    key: const ValueKey('clear_on'),
+                                    tooltip: 'Bersihkan',
+                                    icon: const Icon(Icons.close_rounded),
+                                    onPressed: _handleClear,
+                                  )
                                 : const SizedBox.shrink(
-                              key: ValueKey('clear_off'),
-                            ),
+                                    key: ValueKey('clear_off'),
+                                  ),
                           ),
                         ],
                       ),

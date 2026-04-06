@@ -171,10 +171,7 @@ class _HotStampProductionScreenState extends State<HotStampProductionScreen> {
     }
   }
 
-  Future<void> _openEditDialog(
-    BuildContext ctx,
-    HotStampProduction row,
-  ) async {
+  Future<void> _openEditDialog(BuildContext ctx, HotStampProduction row) async {
     final updated = await showDialog<HotStampProduction>(
       context: ctx,
       barrierDismissible: false,

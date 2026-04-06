@@ -13,6 +13,7 @@ class BrokerProductionHeaderTable extends StatelessWidget {
   static const _colShiftWidth = 70.0;
   static const _colMesinWidth = 180.0;
   static const _colOperatorWidth = 200.0;
+  static const _colReguWidth = 125.0;
   static const _colJamWidth = 70.0;
   static const _colHmWidth = 80.0;
   static const _colAnggotaWidth = 140.0;
@@ -106,6 +107,17 @@ class BrokerProductionHeaderTable extends StatelessWidget {
         cellBuilder: (context, item, rowState) {
           return Text(
             item.namaOperator,
+            style: TextStyle(fontSize: 14, color: rowState.textColor),
+            softWrap: true,
+          );
+        },
+      ),
+      AtlasTableColumn<BrokerProduction>(
+        title: 'REGU',
+        width: _colReguWidth,
+        cellBuilder: (context, item, rowState) {
+          return Text(
+            item.namaRegu ?? '-',
             style: TextStyle(fontSize: 14, color: rowState.textColor),
             softWrap: true,
           );

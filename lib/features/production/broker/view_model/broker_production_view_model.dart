@@ -302,6 +302,7 @@ class BrokerProductionViewModel extends ChangeNotifier {
     int? jmlhAnggota,
     int? hadir,
     double? hourMeter,
+    int? idRegu,
   }) async {
     debugPrint(
         '🆕 [BROKER_VM] createProduksi(tglProduksi=$tglProduksi, idMesin=$idMesin, idOperator=$idOperator, jam=$jam, shift=$shift, hourStart=$hourStart, hourEnd=$hourEnd, jmlhAnggota=$jmlhAnggota, hadir=$hadir, hourMeter=$hourMeter), VM hash=$hashCode');
@@ -324,6 +325,7 @@ class BrokerProductionViewModel extends ChangeNotifier {
         jmlhAnggota: jmlhAnggota,
         hadir: hadir,
         hourMeter: hourMeter,
+        idRegu: idRegu,
       );
 
       debugPrint(
@@ -367,6 +369,7 @@ class BrokerProductionViewModel extends ChangeNotifier {
     int? jmlhAnggota,
     int? hadir,
     double? hourMeter,
+    int? idRegu,
   }) async {
     debugPrint(
         '✏️ [BROKER_VM] updateProduksi(noProduksi=$noProduksi, tglProduksi=$tglProduksi, idMesin=$idMesin, idOperator=$idOperator, jam=$jam, shift=$shift, hourStart=$hourStart, hourEnd=$hourEnd, jmlhAnggota=$jmlhAnggota, hadir=$hadir, hourMeter=$hourMeter), VM hash=$hashCode');
@@ -390,6 +393,7 @@ class BrokerProductionViewModel extends ChangeNotifier {
         jmlhAnggota: jmlhAnggota,
         hadir: hadir,
         hourMeter: hourMeter,
+        idRegu: idRegu,
       );
 
       debugPrint(

@@ -208,6 +208,7 @@ class BrokerProductionRepository {
     int? jmlhAnggota,
     int? hadir,
     double? hourMeter,
+    int? idRegu,
   }) async {
     final token = await TokenStorage.getToken();
     final url = Uri.parse('$_base/api/production/broker');
@@ -242,6 +243,7 @@ class BrokerProductionRepository {
       if (jmlhAnggota != null) 'jmlhAnggota': jmlhAnggota.toString(),
       if (hadir != null) 'hadir': hadir.toString(),
       if (hourMeter != null) 'hourMeter': hourMeter.toString(),
+      if (idRegu != null) 'idRegu': idRegu.toString(),
     };
 
     final headers = {
@@ -309,6 +311,7 @@ class BrokerProductionRepository {
     int? jmlhAnggota,
     int? hadir,
     double? hourMeter,
+    int? idRegu,
   }) async {
     final token = await TokenStorage.getToken();
     final url = Uri.parse('$_base/api/production/broker/$noProduksi');
@@ -364,6 +367,9 @@ class BrokerProductionRepository {
     }
     if (hourMeter != null) {
       body['hourMeter'] = hourMeter.toString();
+    }
+    if (idRegu != null) {
+      body['idRegu'] = idRegu.toString();
     }
 
     final headers = {

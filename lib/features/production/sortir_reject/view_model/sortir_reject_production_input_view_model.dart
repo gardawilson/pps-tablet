@@ -45,9 +45,9 @@ class TempItemsByLabel {
 
   int get totalCount =>
       barangJadiItems.length +
-          barangJadiPartials.length +
-          furnitureWipItems.length +
-          furnitureWipPartials.length;
+      barangJadiPartials.length +
+      furnitureWipItems.length +
+      furnitureWipPartials.length;
 
   bool get isEmpty => totalCount == 0;
 
@@ -147,16 +147,28 @@ class SortirRejectInputViewModel extends ChangeNotifier {
     _d('========== TEMP LIST DUMP$hdr ==========');
 
     _dumpList('tempBarangJadi', tempBarangJadi, _payloadKeyFromBarangJadiItem);
-    _dumpList('tempBarangJadiPartial', tempBarangJadiPartial,
-        _payloadKeyFromBarangJadiItem);
+    _dumpList(
+      'tempBarangJadiPartial',
+      tempBarangJadiPartial,
+      _payloadKeyFromBarangJadiItem,
+    );
 
     _dumpList(
-        'tempFurnitureWip', tempFurnitureWip, _payloadKeyFromFurnitureWipItem);
-    _dumpList('tempFurnitureWipPartial', tempFurnitureWipPartial,
-        _payloadKeyFromFurnitureWipItem);
+      'tempFurnitureWip',
+      tempFurnitureWip,
+      _payloadKeyFromFurnitureWipItem,
+    );
+    _dumpList(
+      'tempFurnitureWipPartial',
+      tempFurnitureWipPartial,
+      _payloadKeyFromFurnitureWipItem,
+    );
 
-    _dumpList('tempCabinetMaterial', tempCabinetMaterial,
-        _keyFromCabinetMaterialItem);
+    _dumpList(
+      'tempCabinetMaterial',
+      tempCabinetMaterial,
+      _keyFromCabinetMaterialItem,
+    );
 
     _d('TOTAL TEMP COUNT = $totalTempCount');
     _d('========================================');
@@ -171,7 +183,8 @@ class SortirRejectInputViewModel extends ChangeNotifier {
     }
     _tempItemsByLabel.forEach((label, bucket) {
       _d(
-          'Label "$label" • total=${bucket.totalCount} • since=${bucket.addedAt.toIso8601String()}');
+        'Label "$label" • total=${bucket.totalCount} • since=${bucket.addedAt.toIso8601String()}',
+      );
       for (final it in bucket.allItems) {
         _d('  - ${_fmtItem(it)}');
       }
@@ -215,8 +228,10 @@ class SortirRejectInputViewModel extends ChangeNotifier {
   int inputsCount(String noBJSortir, String key) =>
       _inputsCache[noBJSortir]?.summary[key] ?? 0;
 
-  Future<SortirRejectInputs?> loadInputs(String noBJSortir,
-      {bool force = false}) async {
+  Future<SortirRejectInputs?> loadInputs(
+    String noBJSortir, {
+    bool force = false,
+  }) async {
     final key = noBJSortir.trim();
     if (key.isEmpty) return null;
 
@@ -330,9 +345,9 @@ class SortirRejectInputViewModel extends ChangeNotifier {
   final Map<String, TempItemsByLabel> _tempItemsByLabel = {};
 
   Future<ProductionLabelLookupResult?> lookupLabel(
-      String code, {
-        bool force = false,
-      }) async {
+    String code, {
+    bool force = false,
+  }) async {
     final trimmed = code.trim();
     if (trimmed.isEmpty) {
       lookupError = 'Kode label kosong';
@@ -414,7 +429,9 @@ class SortirRejectInputViewModel extends ChangeNotifier {
   }
 
   void removeTemporaryItemsForLabel(
-      String labelCode, List<dynamic> itemsToRemove) {
+    String labelCode,
+    List<dynamic> itemsToRemove,
+  ) {
     final code = _normLabel(labelCode);
     final t = _tempItemsByLabel[code];
     if (t == null) return;
@@ -647,12 +664,7 @@ class SortirRejectInputViewModel extends ChangeNotifier {
   }
 
   bool _rowIsPartial(Map<String, dynamic> row, PrefixType t) {
-    const candKeys = [
-      'IsPartial',
-      'isPartial',
-      'IsPartialRow',
-      'isPartialRow'
-    ];
+    const candKeys = ['IsPartial', 'isPartial', 'IsPartialRow', 'isPartialRow'];
     for (final k in candKeys) {
       final v = row[k];
       if (v is bool && v) return true;
@@ -660,15 +672,15 @@ class SortirRejectInputViewModel extends ChangeNotifier {
       if (v is String && (v == '1' || v.toLowerCase() == 'true')) return true;
     }
 
-    final bjPart =
-    (row['NoBJPartial'] ?? row['noBJPartial'] ?? '').toString().trim();
-    if (bjPart.isNotEmpty) return true;
-
-    final fwPart = (row['NoFurnitureWIPPartial'] ??
-        row['noFurnitureWIPPartial'] ??
-        '')
+    final bjPart = (row['NoBJPartial'] ?? row['noBJPartial'] ?? '')
         .toString()
         .trim();
+    if (bjPart.isNotEmpty) return true;
+
+    final fwPart =
+        (row['NoFurnitureWIPPartial'] ?? row['noFurnitureWIPPartial'] ?? '')
+            .toString()
+            .trim();
     if (fwPart.isNotEmpty) return true;
 
     return false;
@@ -794,12 +806,15 @@ class SortirRejectInputViewModel extends ChangeNotifier {
       return;
     }
 
-    final idx =
-    tempCabinetMaterial.indexWhere((x) => (x.IdCabinetMaterial ?? 0) == id);
+    final idx = tempCabinetMaterial.indexWhere(
+      (x) => (x.IdCabinetMaterial ?? 0) == id,
+    );
     if (idx >= 0) {
       final old = tempCabinetMaterial[idx];
       tempCabinetMaterial[idx] = old.copyWith(Jumlah: Jumlah);
-      _d('✅ Updated existing material temp: ${tempCabinetMaterial[idx].toDebugString()}');
+      _d(
+        '✅ Updated existing material temp: ${tempCabinetMaterial[idx].toDebugString()}',
+      );
       notifyListeners();
       return;
     }
@@ -815,20 +830,24 @@ class SortirRejectInputViewModel extends ChangeNotifier {
     required int IdCabinetMaterial,
     required num Jumlah,
   }) {
-    final idx = tempCabinetMaterial
-        .indexWhere((x) => (x.IdCabinetMaterial ?? 0) == IdCabinetMaterial);
+    final idx = tempCabinetMaterial.indexWhere(
+      (x) => (x.IdCabinetMaterial ?? 0) == IdCabinetMaterial,
+    );
     if (idx == -1) return;
 
     final old = tempCabinetMaterial[idx];
     tempCabinetMaterial[idx] = old.copyWith(Jumlah: Jumlah);
 
-    _d('✅ Updated cabinet material temp: ${tempCabinetMaterial[idx].toDebugString()}');
+    _d(
+      '✅ Updated cabinet material temp: ${tempCabinetMaterial[idx].toDebugString()}',
+    );
     notifyListeners();
   }
 
   bool hasCabinetMaterialInTemp(int IdCabinetMaterial) {
-    return tempCabinetMaterial
-        .any((x) => (x.IdCabinetMaterial ?? 0) == IdCabinetMaterial);
+    return tempCabinetMaterial.any(
+      (x) => (x.IdCabinetMaterial ?? 0) == IdCabinetMaterial,
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -846,8 +865,8 @@ class SortirRejectInputViewModel extends ChangeNotifier {
         if (sk != null) _tempKeys.remove(sk);
       }
     } else if (item is FurnitureWipItem) {
-      ok = tempFurnitureWip.remove(item) ||
-          tempFurnitureWipPartial.remove(item);
+      ok =
+          tempFurnitureWip.remove(item) || tempFurnitureWipPartial.remove(item);
 
       if (ok) {
         final pk = _payloadKeyFromFurnitureWipItem(item);
@@ -917,10 +936,10 @@ class SortirRejectInputViewModel extends ChangeNotifier {
 
   int get totalTempCount =>
       tempBarangJadi.length +
-          tempBarangJadiPartial.length +
-          tempFurnitureWip.length +
-          tempFurnitureWipPartial.length +
-          tempCabinetMaterial.length;
+      tempBarangJadiPartial.length +
+      tempFurnitureWip.length +
+      tempFurnitureWipPartial.length +
+      tempCabinetMaterial.length;
 
   // ---------------------------------------------------------------------------
   // Submit temp items
@@ -932,16 +951,14 @@ class SortirRejectInputViewModel extends ChangeNotifier {
     final payload = <String, dynamic>{};
 
     if (tempBarangJadi.isNotEmpty) {
-      payload['barangJadi'] =
-          tempBarangJadi.map((e) => {'noBJ': e.noBJ}).toList();
+      payload['barangJadi'] = tempBarangJadi
+          .map((e) => {'noBJ': e.noBJ})
+          .toList();
     }
 
     if (tempBarangJadiPartial.isNotEmpty) {
       payload['barangJadiPartial'] = tempBarangJadiPartial
-          .map((e) => {
-        'noBJ': e.noBJ,
-        'pcs': e.pcs,
-      })
+          .map((e) => {'noBJ': e.noBJ, 'pcs': e.pcs})
           .toList();
     }
 
@@ -953,19 +970,18 @@ class SortirRejectInputViewModel extends ChangeNotifier {
 
     if (tempFurnitureWipPartial.isNotEmpty) {
       payload['furnitureWipPartial'] = tempFurnitureWipPartial
-          .map((e) => {
-        'noFurnitureWIP': e.noFurnitureWIP,
-        'pcs': e.pcs,
-      })
+          .map((e) => {'noFurnitureWIP': e.noFurnitureWIP, 'pcs': e.pcs})
           .toList();
     }
 
     if (tempCabinetMaterial.isNotEmpty) {
       payload['cabinetMaterial'] = tempCabinetMaterial
-          .map((e) => {
-        'idCabinetMaterial': e.IdCabinetMaterial,
-        'jumlah': e.Jumlah,
-      })
+          .map(
+            (e) => {
+              'idCabinetMaterial': e.IdCabinetMaterial,
+              'jumlah': e.Jumlah,
+            },
+          )
           .toList();
     }
 
@@ -1049,7 +1065,8 @@ class SortirRejectInputViewModel extends ChangeNotifier {
 
     void add(String key, Map<String, dynamic> row) {
       final list =
-      (payload[key] ?? <Map<String, dynamic>>[]) as List<Map<String, dynamic>>;
+          (payload[key] ?? <Map<String, dynamic>>[])
+              as List<Map<String, dynamic>>;
       list.add(row);
       payload[key] = list;
     }

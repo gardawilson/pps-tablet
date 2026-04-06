@@ -47,6 +47,8 @@ import 'package:pps_tablet/features/mixer_type/repository/mixer_type_repository.
 import 'package:pps_tablet/features/mixer_type/view_model/mixer_type_view_model.dart';
 import 'package:pps_tablet/features/operator/repository/operator_repository.dart';
 import 'package:pps_tablet/features/operator/view_model/operator_view_model.dart';
+import 'package:pps_tablet/features/regu/repository/regu_repository.dart';
+import 'package:pps_tablet/features/regu/view_model/regu_view_model.dart';
 import 'package:pps_tablet/features/packing_type/repository/packing_type_repository.dart';
 import 'package:pps_tablet/features/packing_type/view_model/packing_type_view_model.dart';
 import 'package:pps_tablet/features/pembeli/repository/pembeli_repository.dart';
@@ -289,6 +291,9 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (_) => OperatorViewModel(repository: OperatorRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => ReguViewModel(repository: ReguRepository()),
         ),
         ChangeNotifierProvider(
           create: (_) => PembeliViewModel(repository: PembeliRepository()),

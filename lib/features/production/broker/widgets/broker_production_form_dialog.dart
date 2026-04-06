@@ -13,6 +13,7 @@ import '../../../../common/widgets/app_text_field.dart';
 import '../../../../core/utils/time_formatter.dart';
 import '../../../mesin/model/mesin_model.dart';
 import '../../../operator/widgets/operator_dropdown.dart';
+import '../../../regu/widgets/regu_dropdown.dart';
 import '../../../shared/overlap/repository/overlap_repository.dart';
 import '../../../shared/overlap/view_model/overlap_view_model.dart';
 import '../../../shared/shift/widgets/shift_dropdown.dart';
@@ -27,11 +28,7 @@ class BrokerProductionFormDialog extends StatefulWidget {
   final BrokerProduction? header;
   final Function(BrokerProduction)? onSave;
 
-  const BrokerProductionFormDialog({
-    super.key,
-    this.header,
-    this.onSave,
-  });
+  const BrokerProductionFormDialog({super.key, this.header, this.onSave});
 
   @override
   State<BrokerProductionFormDialog> createState() =>
@@ -55,6 +52,7 @@ class _BrokerProductionFormDialogState
   MstMesin? _selectedMesin;
   MstOperator? _selectedOperator;
   int? _selectedShift;
+  int? _selectedReguId;
 
   // hold the preselect id for operator (from mesin.defaultOperatorId)
   int? _operatorPreselectId;
@@ -89,8 +87,9 @@ class _BrokerProductionFormDialogState
     );
 
     mesinCtrl = TextEditingController(text: widget.header?.namaMesin ?? '');
-    operatorCtrl =
-        TextEditingController(text: widget.header?.namaOperator ?? '');
+    operatorCtrl = TextEditingController(
+      text: widget.header?.namaOperator ?? '',
+    );
     jlhAnggotaCtrl = TextEditingController(
       text: widget.header?.jmlhAnggota?.toString() ?? '',
     );
@@ -103,6 +102,7 @@ class _BrokerProductionFormDialogState
 
     hourStartCtrl = TextEditingController(text: widget.header?.hourStart);
     hourEndCtrl = TextEditingController(text: widget.header?.hourEnd);
+    _selectedReguId = widget.header?.idRegu;
   }
 
   @override
@@ -146,28 +146,31 @@ class _BrokerProductionFormDialogState
     // pastikan ada mesin & operator & shift
     final mesinId = _selectedMesin?.idMesin ?? widget.header?.idMesin;
     if (mesinId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mesin wajib dipilih')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Mesin wajib dipilih')));
       return;
     }
 
-    final operatorId = _selectedOperator?.idOperator ??
+    final operatorId =
+        _selectedOperator?.idOperator ??
         _operatorPreselectId ??
         widget.header?.idOperator;
     if (operatorId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Operator wajib dipilih')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Operator wajib dipilih')));
       return;
     }
 
     if (_selectedShift == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Shift wajib dipilih')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Shift wajib dipilih')));
       return;
     }
+
+    final reguId = _selectedReguId ?? widget.header?.idRegu;
 
     final jamRange = _buildJamRange();
     if (jamRange == null) {
@@ -194,7 +197,9 @@ class _BrokerProductionFormDialogState
 
     // ✅ Read VM from PARENT Screen context
     final prodVm = context.read<BrokerProductionViewModel>();
-    debugPrint('📝 [BROKER_FORM] Got VM from context: VM hash=${prodVm.hashCode}');
+    debugPrint(
+      '📝 [BROKER_FORM] Got VM from context: VM hash=${prodVm.hashCode}',
+    );
     debugPrint(
       '📝 [BROKER_FORM] Got controller from VM: controller hash=${prodVm.pagingController.hashCode}',
     );
@@ -224,6 +229,7 @@ class _BrokerProductionFormDialogState
           jmlhAnggota: jlhAnggota,
           hadir: hadir,
           hourMeter: hourMeter,
+          idRegu: reguId,
         );
         debugPrint(
           '📝 [BROKER_FORM] updateProduksi returned: ${result?.noProduksi}',
@@ -241,6 +247,7 @@ class _BrokerProductionFormDialogState
           jmlhAnggota: jlhAnggota,
           hadir: hadir,
           hourMeter: hourMeter,
+          idRegu: reguId,
         );
         debugPrint(
           '📝 [BROKER_FORM] createProduksi returned: ${result?.noProduksi}',
@@ -335,9 +342,7 @@ class _BrokerProductionFormDialogState
               Expanded(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(flex: 4, child: _buildLeftColumn()),
-                  ],
+                  children: [Expanded(flex: 4, child: _buildLeftColumn())],
                 ),
               ),
               const SizedBox(height: 16),
@@ -400,8 +405,11 @@ class _BrokerProductionFormDialogState
             children: [
               Row(
                 children: [
-                  Icon(Icons.description,
-                      color: Colors.blue.shade700, size: 20),
+                  Icon(
+                    Icons.description,
+                    color: Colors.blue.shade700,
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   const Text(
                     'Header',
@@ -430,8 +438,10 @@ class _BrokerProductionFormDialogState
                   if (d != null) {
                     setState(() {
                       _selectedDate = d;
-                      dateCreatedCtrl.text =
-                          DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(d);
+                      dateCreatedCtrl.text = DateFormat(
+                        'EEEE, dd MMM yyyy',
+                        'id_ID',
+                      ).format(d);
                     });
                     await _checkOverlapIfReadyVM();
                   }
@@ -461,7 +471,9 @@ class _BrokerProductionFormDialogState
 
               // Operator Default (Required/Optional sesuai kebutuhan)
               OperatorDropdown(
-                key: ValueKey(_operatorPreselectId ?? widget.header?.idOperator),
+                key: ValueKey(
+                  _operatorPreselectId ?? widget.header?.idOperator,
+                ),
                 preselectId: isEdit
                     ? widget.header?.idOperator
                     : _operatorPreselectId,
@@ -477,6 +489,18 @@ class _BrokerProductionFormDialogState
 
               const SizedBox(height: 16),
 
+              ReguDropdown(
+                preselectId: widget.header?.idRegu,
+                label: 'Regu',
+                hint: 'Pilih regu',
+                onChanged: (regu) {
+                  _selectedReguId = regu?.idRegu;
+                  setState(() {});
+                },
+              ),
+
+              const SizedBox(height: 16),
+
               // Jam Mulai & Jam Selesai
               Row(
                 children: [
@@ -486,8 +510,10 @@ class _BrokerProductionFormDialogState
                       label: 'Jam Mulai',
                       hintText: 'HH:mm',
                       onPick: () async {
-                        final picked =
-                        await pickTime24h(context, initial: _startTime);
+                        final picked = await pickTime24h(
+                          context,
+                          initial: _startTime,
+                        );
                         if (picked != null) {
                           setState(() {
                             _startTime = picked;
@@ -500,7 +526,9 @@ class _BrokerProductionFormDialogState
                         final s = parseHHmm(hourStartCtrl.text);
                         if (s == null) return 'Wajib isi jam mulai (HH:mm)';
                         final diff = durationBetweenHHmmWrap(
-                            hourStartCtrl.text, hourEndCtrl.text);
+                          hourStartCtrl.text,
+                          hourEndCtrl.text,
+                        );
                         if (diff == null &&
                             parseHHmm(hourEndCtrl.text) != null) {
                           return 'Durasi tidak boleh 0 menit';
@@ -516,8 +544,10 @@ class _BrokerProductionFormDialogState
                       label: 'Jam Selesai',
                       hintText: 'HH:mm',
                       onPick: () async {
-                        final picked = await pickTime24h(context,
-                            initial: _endTime ?? _startTime);
+                        final picked = await pickTime24h(
+                          context,
+                          initial: _endTime ?? _startTime,
+                        );
                         if (picked != null) {
                           setState(() {
                             _endTime = picked;
@@ -532,7 +562,9 @@ class _BrokerProductionFormDialogState
                         final s = parseHHmm(hourStartCtrl.text);
                         if (s != null) {
                           final diff = durationBetweenHHmmWrap(
-                              hourStartCtrl.text, hourEndCtrl.text);
+                            hourStartCtrl.text,
+                            hourEndCtrl.text,
+                          );
                           if (diff == null) {
                             return 'Durasi tidak boleh 0 menit';
                           }
@@ -578,9 +610,9 @@ class _BrokerProductionFormDialogState
                       allowNegative: false,
                       hintText: '0',
                       validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Wajib diisi' : null,
+                          (v == null || v.isEmpty) ? 'Wajib diisi' : null,
                     ),
-                  )
+                  ),
                 ],
               ),
 
@@ -597,7 +629,7 @@ class _BrokerProductionFormDialogState
                       allowNegative: false,
                       hintText: '0',
                       validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Wajib diisi' : null,
+                          (v == null || v.isEmpty) ? 'Wajib diisi' : null,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -610,7 +642,7 @@ class _BrokerProductionFormDialogState
                       allowNegative: false,
                       hintText: '0',
                       validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Wajib diisi' : null,
+                          (v == null || v.isEmpty) ? 'Wajib diisi' : null,
                     ),
                   ),
                 ],
@@ -643,8 +675,9 @@ class _BrokerProductionFormDialogState
         ElevatedButton(
           onPressed: (hasOverlap || isSaving) ? null : _submit,
           style: ElevatedButton.styleFrom(
-            backgroundColor:
-            isEdit ? const Color(0xFFF57C00) : const Color(0xFF00897B),
+            backgroundColor: isEdit
+                ? const Color(0xFFF57C00)
+                : const Color(0xFF00897B),
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
           ),

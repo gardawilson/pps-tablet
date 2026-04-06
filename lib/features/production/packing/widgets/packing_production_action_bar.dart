@@ -28,7 +28,8 @@ class PackingProductionActionBar extends StatefulWidget {
       _PackingProductionActionBarState();
 }
 
-class _PackingProductionActionBarState extends State<PackingProductionActionBar> {
+class _PackingProductionActionBarState
+    extends State<PackingProductionActionBar> {
   final FocusNode _searchFocus = FocusNode();
   bool _focused = false;
 
@@ -80,7 +81,7 @@ class _PackingProductionActionBarState extends State<PackingProductionActionBar>
 
     // ✅ TODO: ganti permission key sesuai sistem kamu
     // contoh: 'packing:create' atau 'production_packing:create'
-    final canCreate = perm.can('label_crusher:create');
+    final canCreate = perm.can('packing:create');
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
@@ -112,8 +113,9 @@ class _PackingProductionActionBarState extends State<PackingProductionActionBar>
                       icon: const Icon(Icons.add),
                       label: const Text('Tambah Produksi Packing'),
                       style: FilledButton.styleFrom(
-                        backgroundColor:
-                        canCreate ? const Color(0xFF3F51B5) : Colors.grey.shade400,
+                        backgroundColor: canCreate
+                            ? const Color(0xFF3F51B5)
+                            : Colors.grey.shade400,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 18,
@@ -148,12 +150,12 @@ class _PackingProductionActionBarState extends State<PackingProductionActionBar>
                         ),
                         boxShadow: _focused
                             ? [
-                          BoxShadow(
-                            color: cs.primary.withOpacity(.12),
-                            blurRadius: 14,
-                            offset: const Offset(0, 6),
-                          ),
-                        ]
+                                BoxShadow(
+                                  color: cs.primary.withOpacity(.12),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ]
                             : null,
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -170,8 +172,9 @@ class _PackingProductionActionBarState extends State<PackingProductionActionBar>
                               textInputAction: TextInputAction.none,
                               decoration: InputDecoration(
                                 hintText: 'Cari NoPacking (contains)…',
-                                hintStyle:
-                                TextStyle(color: Colors.grey.shade500),
+                                hintStyle: TextStyle(
+                                  color: Colors.grey.shade500,
+                                ),
                                 isCollapsed: true,
                                 border: InputBorder.none,
                                 contentPadding: const EdgeInsets.symmetric(
@@ -186,14 +189,14 @@ class _PackingProductionActionBarState extends State<PackingProductionActionBar>
                             duration: const Duration(milliseconds: 140),
                             child: _hasText
                                 ? IconButton(
-                              key: const ValueKey('clear_on'),
-                              tooltip: 'Bersihkan',
-                              icon: const Icon(Icons.close_rounded),
-                              onPressed: _handleClear,
-                            )
+                                    key: const ValueKey('clear_on'),
+                                    tooltip: 'Bersihkan',
+                                    icon: const Icon(Icons.close_rounded),
+                                    onPressed: _handleClear,
+                                  )
                                 : const SizedBox.shrink(
-                              key: ValueKey('clear_off'),
-                            ),
+                                    key: ValueKey('clear_off'),
+                                  ),
                           ),
                         ],
                       ),

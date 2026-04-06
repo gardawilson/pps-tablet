@@ -16,6 +16,8 @@ class BrokerProduction {
   final String? checkBy1;
   final String? checkBy2;
   final String? approveBy;
+  final int? idRegu;
+  final String? namaRegu;
 
   // time range
   final String? hourStart; // "HH:mm"
@@ -41,6 +43,8 @@ class BrokerProduction {
     this.checkBy1,
     this.checkBy2,
     this.approveBy,
+    this.idRegu,
+    this.namaRegu,
     this.hourStart,
     this.hourEnd,
 
@@ -131,6 +135,8 @@ class BrokerProduction {
       jmlhAnggota: _asInt(j['JmlhAnggota']),
       hadir: _asInt(j['Hadir']),
       hourMeter: _asInt(j['HourMeter']),
+      idRegu: _asInt(j['IdRegu']),
+      namaRegu: _asString(j['NamaRegu']),
       hourStart: _asTimeHHmm(j['HourStart']),
       hourEnd: _asTimeHHmm(j['HourEnd']),
 
@@ -162,6 +168,8 @@ class BrokerProduction {
     'HourMeter': hourMeter,
     'HourStart': hourStart,
     'HourEnd': hourEnd,
+    'IdRegu': idRegu,
+    'NamaRegu': namaRegu,
 
     // biasanya ini tidak perlu dikirim balik (read-only)
     // 'LastClosedDate': lastClosedDate?.toIso8601String(),

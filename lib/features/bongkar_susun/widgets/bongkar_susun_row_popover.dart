@@ -55,8 +55,8 @@ class BongkarSusunRowPopover extends StatelessWidget {
 
     // Permissions (sesuaikan dengan ACL backend)
     final perm = context.watch<PermissionViewModel>();
-    final canEdit = perm.can('label_crusher:update'); // <-- sesuaikan
-    final canDelete = perm.can('label_crusher:delete'); // <-- sesuaikan
+    final canEdit = perm.can('bongkarsusun:update'); // <-- sesuaikan
+    final canDelete = perm.can('bongkarsusun:delete'); // <-- sesuaikan
 
     // subtitle ala gilingan: "tanggal • note"
     final subtitle = [

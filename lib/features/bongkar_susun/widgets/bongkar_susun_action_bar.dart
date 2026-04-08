@@ -77,7 +77,7 @@ class _BongkarSusunActionBarState extends State<BongkarSusunActionBar> {
     // 🔐 Permission — sesuaikan key dengan ACL backend kamu
     // contoh: 'bongkar_susun:create' atau 'label_bongkar_susun:create'
     final perm = context.watch<PermissionViewModel>();
-    final canCreate = perm.can('label_crusher:create');
+    final canCreate = perm.can('bongkarsusun:create');
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
@@ -109,10 +109,14 @@ class _BongkarSusunActionBarState extends State<BongkarSusunActionBar> {
                       icon: const Icon(Icons.add),
                       label: const Text('Tambah Bongkar/Susun'),
                       style: FilledButton.styleFrom(
-                        backgroundColor:
-                        canCreate ? const Color(0xFF00897B) : Colors.grey.shade400,
+                        backgroundColor: canCreate
+                            ? const Color(0xFF00897B)
+                            : Colors.grey.shade400,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 14,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -135,17 +139,19 @@ class _BongkarSusunActionBarState extends State<BongkarSusunActionBar> {
                         color: Colors.grey.shade50,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: _focused ? cs.primary.withOpacity(.5) : Colors.grey.shade300,
+                          color: _focused
+                              ? cs.primary.withOpacity(.5)
+                              : Colors.grey.shade300,
                           width: _focused ? 1.6 : 1,
                         ),
                         boxShadow: _focused
                             ? [
-                          BoxShadow(
-                            color: cs.primary.withOpacity(.12),
-                            blurRadius: 14,
-                            offset: const Offset(0, 6),
-                          ),
-                        ]
+                                BoxShadow(
+                                  color: cs.primary.withOpacity(.12),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ]
                             : null,
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -162,11 +168,14 @@ class _BongkarSusunActionBarState extends State<BongkarSusunActionBar> {
                               textInputAction: TextInputAction.none,
                               decoration: InputDecoration(
                                 hintText: 'Cari No Bongkar/Susun (contains)…',
-                                hintStyle: TextStyle(color: Colors.grey.shade500),
+                                hintStyle: TextStyle(
+                                  color: Colors.grey.shade500,
+                                ),
                                 isCollapsed: true,
                                 border: InputBorder.none,
-                                contentPadding:
-                                const EdgeInsets.symmetric(vertical: 14),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                               ),
                             ),
                           ),
@@ -176,12 +185,14 @@ class _BongkarSusunActionBarState extends State<BongkarSusunActionBar> {
                             duration: const Duration(milliseconds: 140),
                             child: _hasText
                                 ? IconButton(
-                              key: const ValueKey('clear_on'),
-                              tooltip: 'Bersihkan',
-                              icon: const Icon(Icons.close_rounded),
-                              onPressed: _handleClear,
-                            )
-                                : const SizedBox.shrink(key: ValueKey('clear_off')),
+                                    key: const ValueKey('clear_on'),
+                                    tooltip: 'Bersihkan',
+                                    icon: const Icon(Icons.close_rounded),
+                                    onPressed: _handleClear,
+                                  )
+                                : const SizedBox.shrink(
+                                    key: ValueKey('clear_off'),
+                                  ),
                           ),
                         ],
                       ),

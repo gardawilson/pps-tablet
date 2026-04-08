@@ -122,12 +122,12 @@ class _FurnitureWipActionBarState extends State<FurnitureWipActionBar> {
                         ),
                         boxShadow: _focused
                             ? [
-                          BoxShadow(
-                            color: cs.primary.withValues(alpha: .12),
-                            blurRadius: 14,
-                            offset: const Offset(0, 6),
-                          ),
-                        ]
+                                BoxShadow(
+                                  color: cs.primary.withValues(alpha: .12),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ]
                             : null,
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -148,14 +148,15 @@ class _FurnitureWipActionBarState extends State<FurnitureWipActionBar> {
                               textInputAction: TextInputAction.search,
                               decoration: InputDecoration(
                                 hintText:
-                                'Search Furniture WIP No / Name / Location',
+                                    'Search Furniture WIP No / Name / Location',
                                 hintStyle: TextStyle(
                                   color: Colors.grey.shade500,
                                 ),
                                 isCollapsed: true,
                                 border: InputBorder.none,
-                                contentPadding:
-                                const EdgeInsets.symmetric(vertical: 14),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                               ),
                             ),
                           ),
@@ -164,20 +165,19 @@ class _FurnitureWipActionBarState extends State<FurnitureWipActionBar> {
                             duration: const Duration(milliseconds: 140),
                             child: _hasText
                                 ? IconButton(
-                              key: const ValueKey('clear_on_fwip'),
-                              tooltip: 'Clear',
-                              icon:
-                              const Icon(Icons.close_rounded),
-                              onPressed: () {
-                                widget.controller.clear();
-                                setState(() {});
-                                widget.onClear();
-                                _searchFocus.requestFocus();
-                              },
-                            )
+                                    key: const ValueKey('clear_on_fwip'),
+                                    tooltip: 'Clear',
+                                    icon: const Icon(Icons.close_rounded),
+                                    onPressed: () {
+                                      widget.controller.clear();
+                                      setState(() {});
+                                      widget.onClear();
+                                      _searchFocus.requestFocus();
+                                    },
+                                  )
                                 : const SizedBox.shrink(
-                              key: ValueKey('clear_off_fwip'),
-                            ),
+                                    key: ValueKey('clear_off_fwip'),
+                                  ),
                           ),
                         ],
                       ),
@@ -209,7 +209,9 @@ class _FurnitureWipActionBarState extends State<FurnitureWipActionBar> {
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: widget.includeUsed
-                                ? const Color(0xFF1565C0).withValues(alpha: 0.35)
+                                ? const Color(
+                                    0xFF1565C0,
+                                  ).withValues(alpha: 0.35)
                                 : Colors.grey.shade300,
                           ),
                         ),

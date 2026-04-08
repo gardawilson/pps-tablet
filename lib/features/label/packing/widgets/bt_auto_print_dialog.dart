@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
 import '../../../../common/widgets/info_box.dart';
-import '../../../../core/network/api_client.dart';
+import '../../../../common/widgets/master_printer_selector.dart';
 import '../../../../core/utils/bt_print_service.dart';
-import '../repository/packing_repository.dart';
 
 typedef GenerateSameCallback = Future<List<dynamic>> Function();
 
@@ -18,6 +16,9 @@ class BtAutoPrintDialog extends StatefulWidget {
   final String reportName;
   final String baseUrl;
   final GenerateSameCallback onGenerateSame;
+  final String labelQueryKey;
+  final String Function(dynamic header) labelExtractor;
+  final Future<void> Function(String code)? markAsPrinted;
 
   const BtAutoPrintDialog({
     super.key,
@@ -26,6 +27,9 @@ class BtAutoPrintDialog extends StatefulWidget {
     required this.reportName,
     required this.baseUrl,
     required this.onGenerateSame,
+    required this.labelQueryKey,
+    required this.labelExtractor,
+    this.markAsPrinted,
   });
 
   @override
@@ -74,9 +78,9 @@ class _BtAutoPrintDialogState extends State<BtAutoPrintDialog> {
 
   // ── Getters ──────────────────────────────────────────────────────────────
 
-  String get _currentNoBJ {
+  String get _currentLabel {
     if (_headers.isEmpty || _currentIndex >= _headers.length) return '-';
-    return _headers[_currentIndex]['NoBJ']?.toString() ?? '-';
+    return widget.labelExtractor(_headers[_currentIndex]);
   }
 
   bool get _hasPrev => _currentIndex > 0;
@@ -153,7 +157,7 @@ class _BtAutoPrintDialogState extends State<BtAutoPrintDialog> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            _currentNoBJ,
+                          _currentLabel,
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
@@ -164,18 +168,18 @@ class _BtAutoPrintDialogState extends State<BtAutoPrintDialog> {
                       ),
                     ),
                     IconButton(
-                      tooltip: 'Copy NoBJ',
-                      onPressed: (_currentNoBJ == '-' || _busy)
+                      tooltip: 'Copy label',
+                      onPressed: (_currentLabel == '-' || _busy)
                           ? null
                           : () async {
                               final messenger = ScaffoldMessenger.of(context);
                               await Clipboard.setData(
-                                ClipboardData(text: _currentNoBJ),
+                                ClipboardData(text: _currentLabel),
                               );
                               if (!mounted) return;
                               messenger.showSnackBar(
                                 SnackBar(
-                                  content: Text('Tersalin: $_currentNoBJ'),
+                                  content: Text('Tersalin: $_currentLabel'),
                                   duration: const Duration(milliseconds: 800),
                                 ),
                               );
@@ -367,26 +371,21 @@ class _BtAutoPrintDialogState extends State<BtAutoPrintDialog> {
     });
   }
 
-  /// Buka bottom sheet untuk memilih printer Bluetooth
+  /// Buka dialog MasterPrinterSelector untuk memilih printer Bluetooth
   Future<void> _selectPrinter() async {
-    await showModalBottomSheet<void>(
+    final outcome = await MasterPrinterSelector.show(
       context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (_) => _BtPrinterSelectorSheet(
-        currentMac: _printerMac,
-        onSelected: (mac, name) {
-          setState(() {
-            _printerMac = mac;
-            _printerName = name;
-            _error = null;
-            _status = 'Siap mencetak ke $name.';
-          });
-        },
-      ),
+      currentMac: _printerMac,
     );
+
+    if (outcome == null) return;
+
+    setState(() {
+      _printerMac = outcome.mac;
+      _printerName = outcome.printerName;
+      _error = null;
+      _status = 'Siap mencetak ke ${outcome.printerName}.';
+    });
   }
 
   Future<void> _doPrint() async {
@@ -403,11 +402,11 @@ class _BtAutoPrintDialogState extends State<BtAutoPrintDialog> {
       _status = 'Memulai proses cetak...';
     });
 
-    final noBJ = _currentNoBJ;
+    final labelCode = _currentLabel;
 
     final ok = await _btService.printLabel(
       reportName: widget.reportName,
-      query: {'NoBJ': noBJ},
+      query: {widget.labelQueryKey: labelCode},
       mac: _printerMac!,
       onStatus: (s) {
         if (mounted) setState(() => _status = s);
@@ -423,12 +422,12 @@ class _BtAutoPrintDialogState extends State<BtAutoPrintDialog> {
     if (ok) {
       setState(() {
         _lastPrintSuccess = true;
-        _status = 'Label $noBJ berhasil dicetak.';
+        _status = 'Label $labelCode berhasil dicetak.';
         _error = null;
       });
 
       // Tandai label sebagai sudah dicetak di backend
-      PackingRepository(api: ApiClient()).markAsPrinted(noBJ).ignore();
+      widget.markAsPrinted?.call(labelCode);
 
       // Auto-advance ke label berikutnya
       await Future.delayed(const Duration(milliseconds: 900));
@@ -473,7 +472,7 @@ class _BtAutoPrintDialogState extends State<BtAutoPrintDialog> {
         _count += newHeaders.length;
         _currentIndex = _headers.length - 1;
         _busy = false;
-        _status = 'Label baru dibuat. Siap mencetak...';
+              _status = 'Label baru dibuat. Siap mencetak...';
       });
 
       await _doPrint();
@@ -485,222 +484,5 @@ class _BtAutoPrintDialogState extends State<BtAutoPrintDialog> {
         _status = 'Terjadi kesalahan.';
       });
     }
-  }
-}
-
-// ── Printer Selector Bottom Sheet ─────────────────────────────────────────────
-
-class _BtPrinterSelectorSheet extends StatefulWidget {
-  final String? currentMac;
-  final void Function(String mac, String name) onSelected;
-
-  const _BtPrinterSelectorSheet({
-    required this.currentMac,
-    required this.onSelected,
-  });
-
-  @override
-  State<_BtPrinterSelectorSheet> createState() =>
-      _BtPrinterSelectorSheetState();
-}
-
-class _BtPrinterSelectorSheetState extends State<_BtPrinterSelectorSheet> {
-  List<BluetoothInfo> _devices = [];
-  bool _loading = true;
-  String? _errorMsg;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadDevices();
-  }
-
-  Future<void> _loadDevices() async {
-    setState(() {
-      _loading = true;
-      _errorMsg = null;
-    });
-
-    try {
-      // Cek permission dulu — jika ditolak, tampilkan pesan khusus
-      final granted = await BtPrintService.ensurePermissions();
-      if (!mounted) return;
-      if (!granted) {
-        setState(() {
-          _loading = false;
-          _errorMsg =
-              'Permission "Perangkat Terdekat" (Nearby Devices) belum diizinkan.\n\n'
-              'Buka Settings → Aplikasi → PPS Tablet → Izin → aktifkan Perangkat Terdekat, lalu kembali ke sini.';
-        });
-        return;
-      }
-
-      final devices = await BtPrintService.getPairedDevices();
-      if (mounted) {
-        setState(() {
-          _devices = devices;
-          _loading = false;
-          if (devices.isEmpty) {
-            _errorMsg =
-                'Tidak ada perangkat Bluetooth yang sudah di-pair.\n'
-                'Pair printer di Settings > Bluetooth Android terlebih dahulu.';
-          }
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _errorMsg = 'Gagal mengambil daftar perangkat: $e';
-        });
-      }
-    }
-  }
-
-  Future<void> _selectDevice(BluetoothInfo device) async {
-    final mac = device.macAdress;
-    final name = device.name.isNotEmpty ? device.name : mac;
-
-    // Simpan ke SharedPreferences
-    await BtPrintService.savePrinter(mac: mac, name: name);
-
-    if (!mounted) return;
-    widget.onSelected(mac, name);
-    Navigator.pop(context);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Handle bar
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            // Header
-            Row(
-              children: [
-                const Icon(Icons.bluetooth_searching),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'Pilih Printer Bluetooth',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-                  ),
-                ),
-                IconButton(
-                  onPressed: _loading ? null : _loadDevices,
-                  icon: const Icon(Icons.refresh),
-                  tooltip: 'Refresh',
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 4),
-            Text(
-              'Menampilkan perangkat yang sudah di-pair di Bluetooth Android.',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-            ),
-
-            const Divider(height: 20),
-
-            // Content
-            if (_loading)
-              const Padding(
-                padding: EdgeInsets.all(24),
-                child: Center(
-                  child: Column(
-                    children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 12),
-                      Text('Mengambil daftar perangkat...'),
-                    ],
-                  ),
-                ),
-              )
-            else if (_errorMsg != null)
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.bluetooth_disabled,
-                      size: 48,
-                      color: Colors.grey.shade400,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      _errorMsg!,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey.shade700),
-                    ),
-                    const SizedBox(height: 12),
-                    ElevatedButton.icon(
-                      onPressed: _loadDevices,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Coba Lagi'),
-                    ),
-                  ],
-                ),
-              )
-            else
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 320),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: _devices.length,
-                  separatorBuilder: (_, __) =>
-                      Divider(height: 1, color: Colors.grey.shade200),
-                  itemBuilder: (_, i) {
-                    final d = _devices[i];
-                    final isSelected = d.macAdress == widget.currentMac;
-                    return ListTile(
-                      leading: Icon(
-                        Icons.print,
-                        color: isSelected
-                            ? Colors.blue.shade700
-                            : Colors.grey.shade500,
-                      ),
-                      title: Text(
-                        d.name.isNotEmpty ? d.name : '(Tanpa nama)',
-                        style: TextStyle(
-                          fontWeight: isSelected
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                        ),
-                      ),
-                      subtitle: Text(
-                        d.macAdress,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade500,
-                        ),
-                      ),
-                      trailing: isSelected
-                          ? Icon(
-                              Icons.check_circle,
-                              color: Colors.blue.shade700,
-                            )
-                          : null,
-                      onTap: () => _selectDevice(d),
-                    );
-                  },
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
   }
 }

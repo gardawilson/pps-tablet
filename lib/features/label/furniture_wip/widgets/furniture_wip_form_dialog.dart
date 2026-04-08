@@ -27,6 +27,8 @@ import '../../../production/return/widgets/return_production_dropdown.dart';
 import '../../../production/spanner/widgets/spanner_production_dropdown.dart';
 
 import '../../../../common/widgets/label_output_panel.dart';
+import 'furniture_wip_auto_repeat_dialog.dart';
+import 'package:pps_tablet/features/label/packing/widgets/bt_auto_print_dialog.dart';
 import '../model/furniture_wip_header_model.dart';
 import '../repository/furniture_wip_repository.dart';
 import '../view_model/furniture_wip_view_model.dart';
@@ -35,6 +37,36 @@ import 'furniture_wip_text_field.dart';
 // Jenis Furniture WIP
 import '../../../furniture_wip_type/model/furniture_wip_type_model.dart';
 import '../../../furniture_wip_type/widgets/furniture_wip_type_dropdown.dart';
+
+enum _PrintMode { singleCreate, autoPrintManual, autoRepeat }
+
+class _FurnitureWipCreateDraft {
+  final int? idFurnitureWip;
+  final DateTime dateCreate;
+  final double? pcs;
+  final double? berat;
+  final FurnitureWipInputMode mode;
+  final String? hotStampCode;
+  final String? pasangKunciCode;
+  final String? bongkarSusunCode;
+  final String? returCode;
+  final String? spannerCode;
+  final String? injectCode;
+
+  const _FurnitureWipCreateDraft({
+    required this.idFurnitureWip,
+    required this.dateCreate,
+    required this.pcs,
+    required this.berat,
+    required this.mode,
+    this.hotStampCode,
+    this.pasangKunciCode,
+    this.bongkarSusunCode,
+    this.returCode,
+    this.spannerCode,
+    this.injectCode,
+  });
+}
 
 class FurnitureWipFormDialog extends StatefulWidget {
   final FurnitureWipHeader? header;
@@ -100,12 +132,19 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
   // Output panel
   List<FurnitureWipOutputItem> _furnitureWipOutputs = [];
   bool _loadingOutputs = false;
+  _PrintMode _printMode = _PrintMode.singleCreate;
+  late final TextEditingController _repeatCountCtrl;
+  _FurnitureWipCreateDraft? _lastDraft;
+
+  int get _repeatCount =>
+      (int.tryParse(_repeatCountCtrl.text.trim()) ?? 1).clamp(1, 99);
 
   bool get isEdit => widget.header != null;
 
   @override
   void initState() {
     super.initState();
+    _repeatCountCtrl = TextEditingController(text: '1');
 
     // 🔹 Untuk CREATE/EDIT: handle cache inject
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -198,6 +237,7 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
   @override
   void dispose() {
     pcsCtrl.removeListener(_onPcsChanged);
+    _repeatCountCtrl.dispose();
     noFurnitureWipCtrl.dispose();
     dateCreatedCtrl.dispose();
     pcsCtrl.dispose();
@@ -319,6 +359,97 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
     } finally {
       if (mounted) setState(() => _loadingOutputs = false);
     }
+  }
+
+  Future<void> _showAutoPrintDialog(List headers, int count) async {
+    final draft = _lastDraft;
+    if (draft == null) return;
+
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => BtAutoPrintDialog(
+        headers: headers,
+        count: count,
+        reportName: 'CrLabelFurnitureWIP',
+        baseUrl: 'http://192.168.10.100:3000',
+        onGenerateSame: () async {
+          final vm = context.read<FurnitureWipViewModel>();
+
+          final res = await vm.createFromForm(
+            idFurnitureWip: draft.idFurnitureWip,
+            dateCreate: draft.dateCreate,
+            pcs: draft.pcs,
+            berat: draft.berat,
+            isPartial: false,
+            idWarna: null,
+            blok: null,
+            idLokasi: null,
+            mode: draft.mode,
+            hotStampCode: draft.hotStampCode,
+            pasangKunciCode: draft.pasangKunciCode,
+            bongkarSusunCode: draft.bongkarSusunCode,
+            returCode: draft.returCode,
+            spannerCode: draft.spannerCode,
+            injectCode: draft.injectCode,
+            toDbDateString: toDbDateString,
+          );
+
+          final data = res['data'] as Map<String, dynamic>? ?? {};
+          final List<dynamic> newHeaders =
+              (data['headers'] as List?)?.cast<dynamic>() ?? [];
+          return newHeaders;
+        },
+        labelQueryKey: 'NoFurnitureWIP',
+        labelExtractor: (header) => header['NoFurnitureWIP']?.toString() ?? '-',
+        markAsPrinted: (code) async {
+          try {
+            await FurnitureWipRepository().markAsPrinted(code);
+          } catch (_) {}
+        },
+      ),
+    );
+  }
+
+  Future<void> _showAutoRepeatDialog(String firstNoFurnitureWip) async {
+    final draft = _lastDraft;
+    if (draft == null) return;
+
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => FurnitureWipAutoRepeatDialog(
+        totalRounds: _repeatCount,
+        firstNoLabel: firstNoFurnitureWip,
+        reportName: 'CrLabelFurnitureWIP',
+        baseUrl: 'http://192.168.10.100:3000',
+        onCreate: () async {
+          final vm = context.read<FurnitureWipViewModel>();
+          final res = await vm.createFromForm(
+            idFurnitureWip: draft.idFurnitureWip,
+            dateCreate: draft.dateCreate,
+            pcs: draft.pcs,
+            berat: draft.berat,
+            isPartial: false,
+            idWarna: null,
+            blok: null,
+            idLokasi: null,
+            mode: draft.mode,
+            hotStampCode: draft.hotStampCode,
+            pasangKunciCode: draft.pasangKunciCode,
+            bongkarSusunCode: draft.bongkarSusunCode,
+            returCode: draft.returCode,
+            spannerCode: draft.spannerCode,
+            injectCode: draft.injectCode,
+            toDbDateString: toDbDateString,
+          );
+          final data = res['data'] as Map<String, dynamic>? ?? {};
+          final List headers = data['headers'] as List? ?? [];
+          if (headers.isEmpty) return null;
+          return headers.first['NoFurnitureWIP']?.toString();
+        },
+      ),
+    );
   }
 
   Future<void> _submit() async {
@@ -552,93 +683,118 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
         final output = data['output'] as Map<String, dynamic>? ?? {};
         final int count = (output['count'] as int?) ?? headers.length;
 
-        Widget extraWidget;
+        _lastDraft = _FurnitureWipCreateDraft(
+          idFurnitureWip: idFurnitureVal,
+          dateCreate: _selectedDate,
+          pcs: pcsVal,
+          berat: beratVal,
+          mode: _selectedMode!,
+          hotStampCode: hotStampCode,
+          pasangKunciCode: pasangKunciCode,
+          bongkarSusunCode: bongkarSusunCode,
+          returCode: returCode,
+          spannerCode: spannerCode,
+          injectCode: injectCode,
+        );
 
-        if (headers.isEmpty) {
-          extraWidget = const SizedBox.shrink();
-        } else if (headers.length == 1) {
-          final no = headers.first['NoFurnitureWIP']?.toString() ?? '-';
-          extraWidget = Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 6),
-              const Text(
-                'Nomor Furniture WIP:',
-                style: TextStyle(color: Colors.black54),
-              ),
-              const SizedBox(height: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
+        if (_printMode == _PrintMode.autoRepeat && headers.isNotEmpty) {
+          final firstNo = (headers.first['NoFurnitureWIP']?.toString() ?? '')
+              .trim();
+          if (firstNo.isNotEmpty) {
+            await _showAutoRepeatDialog(firstNo);
+          }
+        } else if (_printMode == _PrintMode.autoPrintManual &&
+            headers.isNotEmpty) {
+          await _showAutoPrintDialog(headers, count);
+        } else {
+          Widget extraWidget;
+
+          if (headers.isEmpty) {
+            extraWidget = const SizedBox.shrink();
+          } else if (headers.length == 1) {
+            final no = headers.first['NoFurnitureWIP']?.toString() ?? '-';
+            extraWidget = Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 6),
+                const Text(
+                  'Nomor Furniture WIP:',
+                  style: TextStyle(color: Colors.black54),
                 ),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(.08),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green.withOpacity(.35)),
-                ),
-                child: Text(
-                  no,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: .3,
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green.withOpacity(.35)),
+                  ),
+                  child: Text(
+                    no,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: .3,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          );
-        } else {
-          // Multi-label (Inject multi, dsb.)
-          extraWidget = Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 6),
-              Text(
-                'Nomor Furniture WIP (${count} label):',
-                style: const TextStyle(color: Colors.black54),
-              ),
-              const SizedBox(height: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
+              ],
+            );
+          } else {
+            // Multi-label (Inject multi, dsb.)
+            extraWidget = Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 6),
+                Text(
+                  'Nomor Furniture WIP (${count} label):',
+                  style: const TextStyle(color: Colors.black54),
                 ),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(.08),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green.withOpacity(.35)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: headers.map((h) {
-                    final no = h['NoFurnitureWIP']?.toString() ?? '-';
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: Text(
-                        '• $no',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: .2,
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green.withOpacity(.35)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: headers.map((h) {
+                      final no = h['NoFurnitureWIP']?.toString() ?? '-';
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Text(
+                          '• $no',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: .2,
+                          ),
                         ),
-                      ),
-                    );
-                  }).toList(),
+                      );
+                    }).toList(),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            );
+          }
+
+          await DialogService.instance.showSuccess(
+            title: 'Berhasil',
+            message: count > 1
+                ? 'Label Furniture WIP berhasil dibuat (${count} label).'
+                : 'Label Furniture WIP berhasil dibuat.',
+            extra: extraWidget,
           );
         }
-
-        await DialogService.instance.showSuccess(
-          title: 'Berhasil',
-          message: count > 1
-              ? 'Label Furniture WIP berhasil dibuat (${count} label).'
-              : 'Label Furniture WIP berhasil dibuat.',
-          extra: extraWidget,
-        );
 
         if (mounted) Navigator.pop(context);
       }
@@ -675,6 +831,7 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
                 ],
               ),
             ),
+            if (!isEdit) ...[const SizedBox(height: 12), _buildModeCetak()],
             const SizedBox(height: 16),
             _buildActions(),
           ],
@@ -1299,6 +1456,155 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
       isLoading: _loadingOutputs,
       hasSource: sourceCode.isNotEmpty,
       noSourceMessage: noSourceMessage,
+    );
+  }
+
+  Widget _buildModeCetak() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.print, size: 18, color: Colors.blue.shade700),
+              const SizedBox(width: 6),
+              Text(
+                'Mode Cetak',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.blue.shade900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _buildModeChip(
+                label: 'Single',
+                mode: _PrintMode.singleCreate,
+                icon: Icons.add_circle_outline,
+              ),
+              const SizedBox(width: 6),
+              _buildModeChip(
+                label: 'Multiple',
+                mode: _PrintMode.autoPrintManual,
+                icon: Icons.touch_app_outlined,
+              ),
+              const SizedBox(width: 6),
+              _buildModeChip(
+                label: 'Quick',
+                mode: _PrintMode.autoRepeat,
+                icon: Icons.repeat,
+              ),
+            ],
+          ),
+          if (_printMode == _PrintMode.autoRepeat) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Text(
+                  'Jumlah label:',
+                  style: TextStyle(fontSize: 13, color: Colors.blue.shade800),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 60,
+                  child: TextField(
+                    controller: _repeatCountCtrl,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.blue.shade900,
+                    ),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 6,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: BorderSide(color: Colors.blue.shade300),
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Text(
+                    '×',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.blue.shade700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeChip({
+    required String label,
+    required _PrintMode mode,
+    required IconData icon,
+  }) {
+    final selected = _printMode == mode;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() {
+          _printMode = mode;
+          if (mode != _PrintMode.autoRepeat) {
+            _repeatCountCtrl.text = '1';
+          }
+        }),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          decoration: BoxDecoration(
+            color: selected ? Colors.blue.shade700 : Colors.white,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: selected ? Colors.blue.shade700 : Colors.blue.shade300,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: selected ? Colors.white : Colors.blue.shade600,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? Colors.white : Colors.blue.shade800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

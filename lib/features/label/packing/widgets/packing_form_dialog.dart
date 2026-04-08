@@ -649,6 +649,13 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
               (data['headers'] as List?)?.cast<dynamic>() ?? [];
           return newHeaders;
         },
+        labelQueryKey: 'NoBJ',
+        labelExtractor: (header) => header['NoBJ']?.toString() ?? '-',
+        markAsPrinted: (code) async {
+          try {
+            await PackingRepository(api: ApiClient()).markAsPrinted(code);
+          } catch (_) {}
+        },
       ),
     );
   }

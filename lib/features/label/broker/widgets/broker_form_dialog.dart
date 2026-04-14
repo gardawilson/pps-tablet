@@ -12,14 +12,14 @@ import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
 import '../../../bongkar_susun/widgets/bongkar_susun_dropdown.dart';
 import '../../../production/broker/widgets/broker_production_dropdown.dart';
+import '../../../broker_type/model/broker_type_model.dart';
+import '../../../broker_type/widgets/broker_type_dropdown.dart';
 import '../model/broker_header_model.dart';
 import '../model/broker_detail_model.dart';
 import '../repository/broker_repository.dart';
 import 'broker_text_field.dart';
 import 'package:provider/provider.dart';
 import '../view_model/broker_view_model.dart';
-import '../../../shared/plastic_type/jenis_plastik_model.dart';
-import '../../../shared/plastic_type/jenis_plastik_dropdown.dart';
 import '../../../shared/max_sak/max_sak_service.dart';
 
 class BrokerFormDialog extends StatefulWidget {
@@ -45,7 +45,7 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
 
   late List<BrokerDetail> detailList;
 
-  JenisPlastik? _selectedJenis;
+  BrokerType? _selectedJenis;
   InputMode? _selectedMode;
   DateTime _selectedDate = DateTime.now();
 
@@ -287,15 +287,15 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                   },
                 ),
                 const SizedBox(height: 16),
-                JenisPlastikDropdown(
+                BrokerTypeDropdown(
                   preselectId: widget.header?.idJenisPlastik,
-                  hintText: 'Pilih jenis plastik',
+                  hintText: 'Pilih jenis broker',
                   validator: (v) =>
-                      v == null ? 'Wajib pilih jenis plastik' : null,
+                      v == null ? 'Wajib pilih jenis broker' : null,
                   autovalidateMode: AutovalidateMode.onUserInteraction,
-                  onChanged: (jp) {
-                    _selectedJenis = jp;
-                    jenisCtrl.text = jp?.jenis ?? '';
+                  onChanged: (bt) {
+                    _selectedJenis = bt;
+                    jenisCtrl.text = bt?.nama ?? '';
                   },
                 ),
                 const SizedBox(height: 16),
@@ -1275,7 +1275,7 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
             if (selected == null) {
               await DialogService.instance.showError(
                 title: 'Validasi',
-                message: 'Pilih Jenis Plastik dulu.',
+                message: 'Pilih Jenis Broker dulu.',
               );
               return;
             }
@@ -1290,8 +1290,8 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
             final headerToSave = widget.header == null
                 ? BrokerHeader(
                     noBroker: noBrokerCtrl.text.trim(),
-                    idJenisPlastik: selected.idJenisPlastik,
-                    namaJenisPlastik: selected.jenis,
+                    idJenisPlastik: selected.idBroker,
+                    namaJenisPlastik: selected.nama,
                     idWarehouse: 5,
                     namaWarehouse: warehouseCtrl.text.trim(),
                     dateCreate: _selectedDate.toIso8601String(),
@@ -1311,8 +1311,8 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                         : null,
                   )
                 : widget.header!.copyWith(
-                    idJenisPlastik: selected.idJenisPlastik,
-                    namaJenisPlastik: selected.jenis,
+                    idJenisPlastik: selected.idBroker,
+                    namaJenisPlastik: selected.nama,
                     namaWarehouse: warehouseCtrl.text.trim(),
                     dateCreate: _selectedDate.toIso8601String(),
                     noProduksi: _selectedMode == InputMode.production

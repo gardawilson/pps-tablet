@@ -56,8 +56,8 @@ class SpannerProductionRowPopover extends StatelessWidget {
     final perm = context.watch<PermissionViewModel>();
 
     // ✅ ganti permission key sesuai sistem kamu
-    final canEdit = perm.can('label_crusher:update') && !row.isLocked;
-    final canDelete = perm.can('label_crusher:delete') && !row.isLocked;
+    final canEdit = perm.can('spanner:update') && !row.isLocked;
+    final canDelete = perm.can('spanner:delete') && !row.isLocked;
 
     final String? lockHint = row.isLocked ? row.lockStatusMessage : null;
 

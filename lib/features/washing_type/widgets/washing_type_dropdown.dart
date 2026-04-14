@@ -2,29 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../common/widgets/search_dropdown_field.dart';
-import '../model/crusher_type_model.dart';
-import '../view_model/crusher_type_view_model.dart';
+import '../model/washing_type_model.dart';
+import '../view_model/washing_type_view_model.dart';
 
-class CrusherTypeDropdown extends StatefulWidget {
+class WashingTypeDropdown extends StatefulWidget {
   final int? preselectId;
-  final ValueChanged<CrusherType?>? onChanged;
+  final ValueChanged<WashingType?>? onChanged;
 
-  // UI props
   final String label;
   final IconData icon;
   final String? hintText;
   final bool enabled;
 
-  // form validator (opsional)
-  final String? Function(CrusherType?)? validator;
+  final String? Function(WashingType?)? validator;
   final AutovalidateMode? autovalidateMode;
 
-  const CrusherTypeDropdown({
+  const WashingTypeDropdown({
     super.key,
     this.preselectId,
     this.onChanged,
-    this.label = 'Jenis Crusher',
-    this.icon = Icons.construction_outlined,
+    this.label = 'Jenis Washing',
+    this.icon = Icons.local_laundry_service_outlined,
     this.hintText,
     this.enabled = true,
     this.validator,
@@ -32,23 +30,23 @@ class CrusherTypeDropdown extends StatefulWidget {
   });
 
   @override
-  State<CrusherTypeDropdown> createState() => _CrusherTypeDropdownState();
+  State<WashingTypeDropdown> createState() => _WashingTypeDropdownState();
 }
 
-class _CrusherTypeDropdownState extends State<CrusherTypeDropdown> {
-  CrusherType? _value;
+class _WashingTypeDropdownState extends State<WashingTypeDropdown> {
+  WashingType? _value;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final vm = context.read<CrusherTypeViewModel>();
+      final vm = context.read<WashingTypeViewModel>();
       await vm.ensureLoaded();
       if (!mounted) return;
 
       if (widget.preselectId != null && vm.list.isNotEmpty) {
         final found = vm.list
-            .where((e) => e.idCrusher == widget.preselectId)
+            .where((e) => e.idWashing == widget.preselectId)
             .toList();
         if (found.isNotEmpty) {
           setState(() => _value = found.first);
@@ -60,52 +58,46 @@ class _CrusherTypeDropdownState extends State<CrusherTypeDropdown> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<CrusherTypeViewModel>(
+    return Consumer<WashingTypeViewModel>(
       builder: (context, vm, _) {
         final exists = vm.list.any((e) => e == _value);
         final safeValue = exists ? _value : null;
 
-        return SearchDropdownField<CrusherType>(
-          // DATA
+        return SearchDropdownField<WashingType>(
           items: vm.list,
           value: safeValue,
           onChanged: (val) {
             setState(() => _value = val);
             widget.onChanged?.call(val);
           },
-          itemAsString: (ct) => ct.namaCrusher,
-
-          // UI
+          itemAsString: (wt) {
+            final code = (wt.itemCode ?? '').trim();
+            if (code.isEmpty) return wt.nama;
+            return '${wt.nama} [$code]';
+          },
           label: widget.label,
           prefixIcon: widget.icon,
-          hint: widget.hintText ?? 'Pilih jenis crusher',
+          hint: widget.hintText ?? 'Pilih jenis washing',
           enabled: widget.enabled,
-
-          // STATE
           isLoading: vm.isLoading,
           fetchError: vm.error.isNotEmpty,
           fetchErrorText: vm.error.isEmpty ? null : vm.error,
           onRetry: () async {
-            await context.read<CrusherTypeViewModel>().ensureLoaded();
+            await context.read<WashingTypeViewModel>().ensureLoaded();
             if (!mounted) return;
-            setState(() {}); // refresh tampilan
+            setState(() {});
           },
-
-          // SEARCH POPUP
           showSearchBox: true,
-          searchHint: 'Cari nama / ID...',
+          searchHint: 'Cari nama / item code...',
           popupMaxHeight: 500,
-
-          // FORM
           validator: widget.validator,
           autovalidateMode: widget.autovalidateMode,
-
-          // COMPARE/FILTER
-          compareFn: (a, b) => a.idCrusher == b.idCrusher,
+          compareFn: (a, b) => a.idWashing == b.idWashing,
           filterFn: (item, filter) {
             final q = filter.toLowerCase();
-            return item.namaCrusher.toLowerCase().contains(q) ||
-                item.idCrusher.toString().contains(q);
+            return item.nama.toLowerCase().contains(q) ||
+                (item.itemCode ?? '').toLowerCase().contains(q) ||
+                item.idWashing.toString().contains(q);
           },
         );
       },

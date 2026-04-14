@@ -10,6 +10,8 @@ import 'package:pps_tablet/features/bj_jual/repository/bj_jual_input_repository.
 import 'package:pps_tablet/features/bj_jual/view_model/bj_jual_input_view_model.dart';
 import 'package:pps_tablet/features/bongkar_susun/repository/bongkar_susun_input_repository.dart';
 import 'package:pps_tablet/features/bongkar_susun/view_model/bongkar_susun_input_view_model.dart';
+import 'package:pps_tablet/features/broker_type/repository/broker_type_repository.dart';
+import 'package:pps_tablet/features/broker_type/view_model/broker_type_view_model.dart';
 import 'package:pps_tablet/features/crusher_type/repository/crusher_type_repository.dart';
 import 'package:pps_tablet/features/crusher_type/view_model/crusher_type_view_model.dart';
 import 'package:pps_tablet/features/furniture_wip_type/repository/furniture_wip_type_repository.dart';
@@ -51,6 +53,8 @@ import 'package:pps_tablet/features/regu/repository/regu_repository.dart';
 import 'package:pps_tablet/features/regu/view_model/regu_view_model.dart';
 import 'package:pps_tablet/features/packing_type/repository/packing_type_repository.dart';
 import 'package:pps_tablet/features/packing_type/view_model/packing_type_view_model.dart';
+import 'package:pps_tablet/features/washing_type/repository/washing_type_repository.dart';
+import 'package:pps_tablet/features/washing_type/view_model/washing_type_view_model.dart';
 import 'package:pps_tablet/features/pembeli/repository/pembeli_repository.dart';
 import 'package:pps_tablet/features/pembeli/view_model/pembeli_view_model.dart';
 import 'package:pps_tablet/features/production/broker/repository/broker_production_input_repository.dart';
@@ -285,6 +289,14 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) =>
               CrusherTypeViewModel(repository: CrusherTypeRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) =>
+              BrokerTypeViewModel(repository: BrokerTypeRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) =>
+              WashingTypeViewModel(repository: WashingTypeRepository()),
         ),
         ChangeNotifierProvider(
           create: (_) => MesinViewModel(repository: MesinRepository()),

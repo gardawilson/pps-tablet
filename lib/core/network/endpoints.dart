@@ -12,6 +12,8 @@ class ApiConstants {
   static String get listNyangkut => '$baseUrl/api/nyangkut-list';
   static String get mstLokasi => '$baseUrl/api/mst-lokasi';
   static String get mstPrinter => '$baseUrl/api/mst-printer';
+  static String get mstWashing => '$baseUrl/api/mst-washing';
+  static String get mstBroker => '$baseUrl/api/mst-broker';
 
   static String scanLabel(String noSO) =>
       '$baseUrl/api/no-stock-opname/$noSO/scan';

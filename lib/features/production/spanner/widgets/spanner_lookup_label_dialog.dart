@@ -25,8 +25,7 @@ class SpannerLookupLabelDialog extends StatefulWidget {
       _SpannerLookupLabelDialogState();
 }
 
-class _SpannerLookupLabelDialogState
-    extends State<SpannerLookupLabelDialog> {
+class _SpannerLookupLabelDialogState extends State<SpannerLookupLabelDialog> {
   final Set<int> _localPickedIndices = <int>{};
   final Set<int> _disabledAtOpen = <int>{};
   final Map<int, int> _editedPcs = {}; // ✅ Edit PCS instead of weight
@@ -101,10 +100,10 @@ class _SpannerLookupLabelDialogState
   }
 
   void _toggleRow(
-      SpannerProductionInputViewModel vm,
-      int index,
-      Map<String, dynamic> row,
-      ) {
+    SpannerProductionInputViewModel vm,
+    int index,
+    Map<String, dynamic> row,
+  ) {
     if (_isDisabled(index)) return;
     setState(() {
       if (_localPickedIndices.contains(index)) {
@@ -116,9 +115,9 @@ class _SpannerLookupLabelDialogState
   }
 
   void _selectAllNew(
-      SpannerProductionInputViewModel vm,
-      ProductionLabelLookupResult result,
-      ) {
+    SpannerProductionInputViewModel vm,
+    ProductionLabelLookupResult result,
+  ) {
     setState(() {
       _localPickedIndices.clear();
       for (int i = 0; i < result.data.length; i++) {
@@ -130,9 +129,9 @@ class _SpannerLookupLabelDialogState
   }
 
   void _commitSelection(
-      SpannerProductionInputViewModel vm,
-      ProductionLabelLookupResult result,
-      ) {
+    SpannerProductionInputViewModel vm,
+    ProductionLabelLookupResult result,
+  ) {
     if (_localPickedIndices.isEmpty) return;
 
     vm.clearPicks();
@@ -171,11 +170,11 @@ class _SpannerLookupLabelDialogState
   }
 
   _Presence _presenceForRow(
-      SpannerProductionInputViewModel vm,
-      Map<String, dynamic> row,
-      ProductionLabelLookupResult ctx,
-      String noProduksi,
-      ) {
+    SpannerProductionInputViewModel vm,
+    Map<String, dynamic> row,
+    ProductionLabelLookupResult ctx,
+    String noProduksi,
+  ) {
     final sk = ctx.simpleKey(row);
     if (vm.isInTempKeys(sk)) return _Presence.temp;
     return _Presence.none;
@@ -209,7 +208,9 @@ class _SpannerLookupLabelDialogState
 
         final dynamic sample = typedItems.isNotEmpty ? typedItems.first : null;
         final labelCode = sample == null ? '-' : _labelCodeOf(sample);
-        final namaJenis = sample == null ? prefixType.displayName : 'Furniture WIP';
+        final namaJenis = sample == null
+            ? prefixType.displayName
+            : 'Furniture WIP';
 
         int newCount = 0;
         for (int i = 0; i < result.data.length; i++) {
@@ -217,9 +218,14 @@ class _SpannerLookupLabelDialogState
         }
 
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           elevation: 8,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 24,
+          ),
           child: Container(
             constraints: const BoxConstraints(maxWidth: 720, maxHeight: 600),
             decoration: BoxDecoration(
@@ -234,10 +240,7 @@ class _SpannerLookupLabelDialogState
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [
-                        Colors.blue.shade600,
-                        Colors.blue.shade700,
-                      ],
+                      colors: [Colors.blue.shade600, Colors.blue.shade700],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -286,7 +289,10 @@ class _SpannerLookupLabelDialogState
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(20),
@@ -306,10 +312,15 @@ class _SpannerLookupLabelDialogState
 
                 // COLUMN HEADERS
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade50,
-                    border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+                    border: Border(
+                      bottom: BorderSide(color: Colors.grey.shade200),
+                    ),
                   ),
                   child: Row(
                     children: const [
@@ -366,8 +377,12 @@ class _SpannerLookupLabelDialogState
                       final item = typedItems[idx];
                       final rawRow = result.data[idx];
 
-                      final presence =
-                      _presenceForRow(vm, rawRow, result, widget.noProduksi);
+                      final presence = _presenceForRow(
+                        vm,
+                        rawRow,
+                        result,
+                        widget.noProduksi,
+                      );
                       final isDuplicate = _isDisabled(idx);
                       final picked = _localPickedIndices.contains(idx);
 
@@ -424,12 +439,14 @@ class _SpannerLookupLabelDialogState
                                     borderRadius: BorderRadius.circular(12),
                                     boxShadow: picked && !isDuplicate
                                         ? [
-                                      BoxShadow(
-                                        color: Colors.blue.withOpacity(0.1),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ]
+                                            BoxShadow(
+                                              color: Colors.blue.withOpacity(
+                                                0.1,
+                                              ),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ]
                                         : null,
                                   ),
                                   child: Row(
@@ -443,12 +460,15 @@ class _SpannerLookupLabelDialogState
                                           value: picked && !isDuplicate,
                                           onChanged: isDuplicate
                                               ? null
-                                              : (_) => _toggleRow(vm, idx, rawRow),
+                                              : (_) =>
+                                                    _toggleRow(vm, idx, rawRow),
                                           shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(6),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
                                           ),
                                           materialTapTargetSize:
-                                          MaterialTapTargetSize.shrinkWrap,
+                                              MaterialTapTargetSize.shrinkWrap,
                                         ),
                                       ),
 
@@ -459,10 +479,14 @@ class _SpannerLookupLabelDialogState
                                           children: [
                                             if (isPartial) ...[
                                               Container(
-                                                padding: const EdgeInsets.all(4),
+                                                padding: const EdgeInsets.all(
+                                                  4,
+                                                ),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.amber.withOpacity(0.2),
-                                                  borderRadius: BorderRadius.circular(6),
+                                                  color: Colors.amber
+                                                      .withOpacity(0.2),
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
                                                 ),
                                                 child: const Icon(
                                                   Icons.content_cut,
@@ -502,20 +526,24 @@ class _SpannerLookupLabelDialogState
                                               gradient: LinearGradient(
                                                 colors: isPcsEdited
                                                     ? [
-                                                  Colors.amber.shade300,
-                                                  Colors.amber.shade400,
-                                                ]
+                                                        Colors.amber.shade300,
+                                                        Colors.amber.shade400,
+                                                      ]
                                                     : statusText != null
                                                     ? [
-                                                  statusColor!.withOpacity(0.2),
-                                                  statusColor.withOpacity(0.3),
-                                                ]
+                                                        statusColor!
+                                                            .withOpacity(0.2),
+                                                        statusColor.withOpacity(
+                                                          0.3,
+                                                        ),
+                                                      ]
                                                     : [
-                                                  Colors.green.shade100,
-                                                  Colors.green.shade200,
-                                                ],
+                                                        Colors.green.shade100,
+                                                        Colors.green.shade200,
+                                                      ],
                                               ),
-                                              borderRadius: BorderRadius.circular(20),
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
                                             ),
                                             child: Text(
                                               '$beratTxt kg',
@@ -539,7 +567,8 @@ class _SpannerLookupLabelDialogState
                                       SizedBox(
                                         width: 220,
                                         child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.end,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.end,
                                           children: [
                                             // Edit PCS button (only for partial rows)
                                             if (isPartial && !isDuplicate)
@@ -547,41 +576,55 @@ class _SpannerLookupLabelDialogState
                                                 height: 32,
                                                 child: OutlinedButton.icon(
                                                   style: OutlinedButton.styleFrom(
-                                                    padding: const EdgeInsets.symmetric(
-                                                      horizontal: 10,
-                                                      vertical: 4,
-                                                    ),
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 10,
+                                                          vertical: 4,
+                                                        ),
                                                     side: BorderSide(
-                                                      color: Colors.amber.shade600,
+                                                      color:
+                                                          Colors.amber.shade600,
                                                       width: 1.5,
                                                     ),
                                                     shape: RoundedRectangleBorder(
-                                                      borderRadius: BorderRadius.circular(8),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            8,
+                                                          ),
                                                     ),
                                                   ),
                                                   icon: Icon(
                                                     Icons.edit_outlined,
                                                     size: 14,
-                                                    color: Colors.amber.shade700,
+                                                    color:
+                                                        Colors.amber.shade700,
                                                   ),
                                                   label: Text(
                                                     'Edit Pcs',
                                                     style: TextStyle(
                                                       fontSize: 11,
-                                                      fontWeight: FontWeight.w600,
-                                                      color: Colors.amber.shade700,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color:
+                                                          Colors.amber.shade700,
                                                     ),
                                                   ),
                                                   onPressed: () async {
                                                     if (originalPcs != null) {
                                                       final newPcs =
-                                                      await _showPcsInputDialog(
-                                                        context,
-                                                        maxPcs: originalPcs,
-                                                        currentPcs: _editedPcs[idx],
-                                                      );
-                                                      if (newPcs != null && mounted) {
-                                                        setState(() => _editedPcs[idx] = newPcs);
+                                                          await _showPcsInputDialog(
+                                                            context,
+                                                            maxPcs: originalPcs,
+                                                            currentPcs:
+                                                                _editedPcs[idx],
+                                                          );
+                                                      if (newPcs != null &&
+                                                          mounted) {
+                                                        setState(
+                                                          () =>
+                                                              _editedPcs[idx] =
+                                                                  newPcs,
+                                                        );
                                                       }
                                                     }
                                                   },
@@ -593,12 +636,20 @@ class _SpannerLookupLabelDialogState
 
                                             // BADGES
                                             if (isPartial)
-                                              _badge('PARTIAL', Colors.amber.shade700),
+                                              _badge(
+                                                'PARTIAL',
+                                                Colors.amber.shade700,
+                                              ),
 
                                             if (statusText != null)
                                               Padding(
-                                                padding: const EdgeInsets.only(left: 8),
-                                                child: _badge(statusText!, statusColor!),
+                                                padding: const EdgeInsets.only(
+                                                  left: 8,
+                                                ),
+                                                child: _badge(
+                                                  statusText!,
+                                                  statusColor!,
+                                                ),
                                               ),
                                           ],
                                         ),
@@ -620,7 +671,9 @@ class _SpannerLookupLabelDialogState
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade50,
-                    border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                    border: Border(
+                      top: BorderSide(color: Colors.grey.shade200),
+                    ),
                     borderRadius: const BorderRadius.only(
                       bottomLeft: Radius.circular(16),
                       bottomRight: Radius.circular(16),
@@ -655,7 +708,10 @@ class _SpannerLookupLabelDialogState
 
                       if (_localPickedIndices.isNotEmpty)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           margin: const EdgeInsets.only(right: 12),
                           decoration: BoxDecoration(
                             color: Colors.blue.shade100,
@@ -684,7 +740,10 @@ class _SpannerLookupLabelDialogState
                         style: FilledButton.styleFrom(
                           backgroundColor: Colors.blue.shade600,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
@@ -762,10 +821,10 @@ class _SpannerLookupLabelDialogState
   }
 
   Future<int?> _showPcsInputDialog(
-      BuildContext context, {
-        required int maxPcs,
-        int? currentPcs,
-      }) async {
+    BuildContext context, {
+    required int maxPcs,
+    int? currentPcs,
+  }) async {
     final controller = TextEditingController(
       text: currentPcs?.toString() ?? '',
     );

@@ -11,14 +11,14 @@ import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
 import '../../../bongkar_susun/widgets/bongkar_susun_dropdown.dart';
 import '../../../production/washing/widgets/washing_production_dropdown.dart';
+import '../../../washing_type/model/washing_type_model.dart';
+import '../../../washing_type/widgets/washing_type_dropdown.dart';
 import '../model/washing_header_model.dart';
 import '../model/washing_detail_model.dart';
 import '../repository/washing_repository.dart';
 import 'washing_text_field.dart';
 import 'package:provider/provider.dart';
 import '../view_model/washing_view_model.dart';
-import '../../../shared/plastic_type/jenis_plastik_model.dart';
-import '../../../shared/plastic_type/jenis_plastik_dropdown.dart';
 import '../../../shared/max_sak/max_sak_service.dart';
 
 class WashingFormDialog extends StatefulWidget {
@@ -44,7 +44,7 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
 
   late List<WashingDetail> detailList;
 
-  JenisPlastik? _selectedJenis; // <- simpan pilihan dropdown di sini
+  WashingType? _selectedJenis; // <- simpan pilihan dropdown di sini
 
   InputMode? _selectedMode; // menyimpan pilihan radio user
 
@@ -292,15 +292,15 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
                   },
                 ),
                 const SizedBox(height: 12),
-                JenisPlastikDropdown(
+                WashingTypeDropdown(
                   preselectId: widget.header?.idJenisPlastik,
-                  hintText: 'Pilih jenis plastik',
+                  hintText: 'Pilih jenis washing',
                   validator: (v) =>
-                      v == null ? 'Wajib pilih jenis plastik' : null,
+                      v == null ? 'Wajib pilih jenis washing' : null,
                   autovalidateMode: AutovalidateMode.onUserInteraction,
-                  onChanged: (jp) {
-                    _selectedJenis = jp;
-                    jenisCtrl.text = jp?.jenis ?? '';
+                  onChanged: (wt) {
+                    _selectedJenis = wt;
+                    jenisCtrl.text = wt?.nama ?? '';
                   },
                 ),
                 const SizedBox(height: 12),
@@ -1398,7 +1398,7 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
             if (selected == null) {
               await DialogService.instance.showError(
                 title: 'Validasi',
-                message: 'Pilih Jenis Plastik dulu.',
+                message: 'Pilih Jenis Washing dulu.',
               );
               return;
             }
@@ -1414,8 +1414,8 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
             final headerToSave = widget.header == null
                 ? WashingHeader(
                     noWashing: noWashingCtrl.text,
-                    idJenisPlastik: selected.idJenisPlastik,
-                    namaJenisPlastik: selected.jenis,
+                    idJenisPlastik: selected.idWashing,
+                    namaJenisPlastik: selected.nama,
                     idWarehouse: 5,
                     namaWarehouse: warehouseCtrl.text,
                     dateCreate: dateCreatedCtrl.text,
@@ -1434,8 +1434,8 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
                         : null,
                   )
                 : widget.header!.copyWith(
-                    idJenisPlastik: selected.idJenisPlastik,
-                    namaJenisPlastik: selected.jenis,
+                    idJenisPlastik: selected.idWashing,
+                    namaJenisPlastik: selected.nama,
                     namaWarehouse: warehouseCtrl.text,
                     dateCreate: dateCreatedCtrl.text,
                     noProduksi: noProduksiCtrl.text.trim().isEmpty

@@ -30,11 +30,7 @@ class SpannerProductionFormDialog extends StatefulWidget {
   final SpannerProduction? header;
   final Function(SpannerProduction)? onSave;
 
-  const SpannerProductionFormDialog({
-    super.key,
-    this.header,
-    this.onSave,
-  });
+  const SpannerProductionFormDialog({super.key, this.header, this.onSave});
 
   @override
   State<SpannerProductionFormDialog> createState() =>
@@ -90,7 +86,9 @@ class _SpannerProductionFormDialogState
     );
 
     mesinCtrl = TextEditingController(text: widget.header?.namaMesin ?? '');
-    operatorCtrl = TextEditingController(text: widget.header?.namaOperator ?? '');
+    operatorCtrl = TextEditingController(
+      text: widget.header?.namaOperator ?? '',
+    );
 
     jamCtrl = TextEditingController(
       text: widget.header?.jamKerja?.toString() ?? '',
@@ -170,26 +168,27 @@ class _SpannerProductionFormDialogState
 
     final mesinId = _selectedMesin?.idMesin ?? widget.header?.idMesin;
     if (mesinId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mesin wajib dipilih')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Mesin wajib dipilih')));
       return;
     }
 
-    final operatorId = _selectedOperator?.idOperator ??
+    final operatorId =
+        _selectedOperator?.idOperator ??
         _operatorPreselectId ??
         widget.header?.idOperator;
     if (operatorId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Operator wajib dipilih')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Operator wajib dipilih')));
       return;
     }
 
     if (_selectedShift == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Shift wajib dipilih')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Shift wajib dipilih')));
       return;
     }
 
@@ -201,8 +200,10 @@ class _SpannerProductionFormDialogState
     if (jamKerja == null &&
         hourStartCtrl.text.trim().isNotEmpty &&
         hourEndCtrl.text.trim().isNotEmpty) {
-      final duration =
-      durationBetweenHHmmWrap(hourStartCtrl.text, hourEndCtrl.text);
+      final duration = durationBetweenHHmmWrap(
+        hourStartCtrl.text,
+        hourEndCtrl.text,
+      );
       if (duration != null) jamKerja = duration.inHours;
     }
 
@@ -302,9 +303,7 @@ class _SpannerProductionFormDialogState
               Expanded(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(flex: 4, child: _buildLeftColumn()),
-                  ],
+                  children: [Expanded(flex: 4, child: _buildLeftColumn())],
                 ),
               ),
               const SizedBox(height: 16),
@@ -349,7 +348,8 @@ class _SpannerProductionFormDialogState
     final hasDurationError = startFilled && endFilled && dur == null;
 
     final hasOverlap = ovm.hasOverlap;
-    final overlapMsg = ovm.overlapMessage ?? 'Jam ini bentrok dengan dokumen lain';
+    final overlapMsg =
+        ovm.overlapMessage ?? 'Jam ini bentrok dengan dokumen lain';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -365,7 +365,11 @@ class _SpannerProductionFormDialogState
             children: [
               Row(
                 children: [
-                  Icon(Icons.description, color: Colors.blue.shade700, size: 20),
+                  Icon(
+                    Icons.description,
+                    color: Colors.blue.shade700,
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   const Text(
                     'Header',
@@ -394,8 +398,10 @@ class _SpannerProductionFormDialogState
                   if (d != null) {
                     setState(() {
                       _selectedDate = d;
-                      dateCreatedCtrl.text =
-                          DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(d);
+                      dateCreatedCtrl.text = DateFormat(
+                        'EEEE, dd MMM yyyy',
+                        'id_ID',
+                      ).format(d);
                     });
                     await _checkOverlapIfReadyVM();
                   }
@@ -422,8 +428,12 @@ class _SpannerProductionFormDialogState
               const SizedBox(height: 16),
 
               OperatorDropdown(
-                key: ValueKey(_operatorPreselectId ?? widget.header?.idOperator),
-                preselectId: isEdit ? widget.header?.idOperator : _operatorPreselectId,
+                key: ValueKey(
+                  _operatorPreselectId ?? widget.header?.idOperator,
+                ),
+                preselectId: isEdit
+                    ? widget.header?.idOperator
+                    : _operatorPreselectId,
                 label: 'Operator',
                 hint: 'Pilih operator',
                 autovalidateMode: AutovalidateMode.onUserInteraction,
@@ -445,8 +455,10 @@ class _SpannerProductionFormDialogState
                       label: 'Jam Mulai',
                       hintText: 'HH:mm',
                       onPick: () async {
-                        final picked =
-                        await pickTime24h(context, initial: _startTime);
+                        final picked = await pickTime24h(
+                          context,
+                          initial: _startTime,
+                        );
                         if (picked != null) {
                           setState(() {
                             _startTime = picked;
@@ -460,8 +472,11 @@ class _SpannerProductionFormDialogState
                         final s = parseHHmm(hourStartCtrl.text);
                         if (s == null) return 'Wajib isi jam mulai (HH:mm)';
                         final diff = durationBetweenHHmmWrap(
-                            hourStartCtrl.text, hourEndCtrl.text);
-                        if (diff == null && parseHHmm(hourEndCtrl.text) != null) {
+                          hourStartCtrl.text,
+                          hourEndCtrl.text,
+                        );
+                        if (diff == null &&
+                            parseHHmm(hourEndCtrl.text) != null) {
                           return 'Durasi tidak boleh 0 menit';
                         }
                         return null;
@@ -494,7 +509,9 @@ class _SpannerProductionFormDialogState
                         final s = parseHHmm(hourStartCtrl.text);
                         if (s != null) {
                           final diff = durationBetweenHHmmWrap(
-                              hourStartCtrl.text, hourEndCtrl.text);
+                            hourStartCtrl.text,
+                            hourEndCtrl.text,
+                          );
                           if (diff == null) return 'Durasi tidak boleh 0 menit';
                         }
                         return null;
@@ -505,7 +522,9 @@ class _SpannerProductionFormDialogState
                   TotalHoursPill(
                     duration: dur,
                     isError: hasOverlap || hasDurationError,
-                    errorText: hasOverlap ? overlapMsg : 'Durasi tidak boleh 0 menit',
+                    errorText: hasOverlap
+                        ? overlapMsg
+                        : 'Durasi tidak boleh 0 menit',
                   ),
                 ],
               ),
@@ -536,7 +555,7 @@ class _SpannerProductionFormDialogState
                       allowNegative: false,
                       hintText: '0',
                       validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Wajib diisi' : null,
+                          (v == null || v.isEmpty) ? 'Wajib diisi' : null,
                     ),
                   ),
                 ],
@@ -568,7 +587,9 @@ class _SpannerProductionFormDialogState
         ElevatedButton(
           onPressed: (hasOverlap || isSaving) ? null : _submit,
           style: ElevatedButton.styleFrom(
-            backgroundColor: isEdit ? const Color(0xFFF57C00) : const Color(0xFF3F51B5),
+            backgroundColor: isEdit
+                ? const Color(0xFFF57C00)
+                : const Color(0xFF3F51B5),
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
           ),

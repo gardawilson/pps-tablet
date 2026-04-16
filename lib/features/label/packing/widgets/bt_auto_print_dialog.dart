@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 
 import '../../../../common/widgets/info_box.dart';
 import '../../../../common/widgets/master_printer_selector.dart';
+import '../../../../common/widgets/printer_selector_tile.dart';
 import '../../../../core/utils/bt_print_service.dart';
+import '../../../../core/utils/device_printer_service.dart';
 
 typedef GenerateSameCallback = Future<List<dynamic>> Function();
 
@@ -50,6 +52,7 @@ class _BtAutoPrintDialogState extends State<BtAutoPrintDialog> {
   late int _count;
 
   // Printer yang tersimpan / dipilih
+  String? _printerId;
   String? _printerMac;
   String? _printerName;
 
@@ -66,12 +69,22 @@ class _BtAutoPrintDialogState extends State<BtAutoPrintDialog> {
   }
 
   Future<void> _loadSavedPrinter() async {
-    final saved = await BtPrintService.loadSavedPrinter();
+    final saved = await DevicePrinterService.loadDefaultPrinter();
     if (saved != null && mounted) {
       setState(() {
+        _printerId = saved.id;
         _printerMac = saved.mac;
         _printerName = saved.name;
         _status = 'Siap mencetak ke ${saved.name}.';
+      });
+      return;
+    }
+    final legacy = await BtPrintService.loadSavedPrinter();
+    if (legacy != null && mounted) {
+      setState(() {
+        _printerMac = legacy.mac;
+        _printerName = legacy.name;
+        _status = 'Siap mencetak ke ${legacy.name}.';
       });
     }
   }
@@ -292,56 +305,14 @@ class _BtAutoPrintDialogState extends State<BtAutoPrintDialog> {
     );
   }
 
-  /// Row info printer terpilih + tombol GANTI
   Widget _buildPrinterRow() {
-    final hasPrinter = _printerMac != null;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: hasPrinter ? Colors.green.shade50 : Colors.orange.shade50,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: hasPrinter ? Colors.green.shade200 : Colors.orange.shade300,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.bluetooth,
-            size: 18,
-            color: hasPrinter ? Colors.green.shade700 : Colors.orange.shade700,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              hasPrinter
-                  ? (_printerName ?? _printerMac!)
-                  : 'Belum ada printer dipilih',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: hasPrinter
-                    ? Colors.green.shade800
-                    : Colors.orange.shade800,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(width: 6),
-          TextButton(
-            onPressed: _busy ? null : _selectPrinter,
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: Text(
-              hasPrinter ? 'GANTI' : 'PILIH',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
+    return PrinterSelectorTile(
+      printerName: _printerName,
+      printerMac: _printerMac,
+      printerId: _printerId,
+      onSelect: _selectPrinter,
+      disabled: _busy,
+      compact: true,
     );
   }
 
@@ -381,6 +352,7 @@ class _BtAutoPrintDialogState extends State<BtAutoPrintDialog> {
     if (outcome == null) return;
 
     setState(() {
+      _printerId = outcome.id;
       _printerMac = outcome.mac;
       _printerName = outcome.printerName;
       _error = null;
@@ -420,6 +392,12 @@ class _BtAutoPrintDialogState extends State<BtAutoPrintDialog> {
     setState(() => _busy = false);
 
     if (ok) {
+      // Log print ke microservice (fire-and-forget)
+      final printBy = await DevicePrinterService.getLoggedUsername();
+      DevicePrinterService.logPrint(
+        printerId: _printerMac!,
+        printBy: printBy,
+      );
       setState(() {
         _lastPrintSuccess = true;
         _status = 'Label $labelCode berhasil dicetak.';

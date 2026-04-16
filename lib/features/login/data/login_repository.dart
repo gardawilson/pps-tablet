@@ -92,6 +92,11 @@ class LoginRepository {
 
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('token', token);
+        // Simpan username agar bisa digunakan di fitur lain (mis. print log)
+        final savedUsername = (userData is Map<String, dynamic>)
+            ? (userData['username'] ?? userData['name'] ?? user.username).toString()
+            : user.username;
+        await prefs.setString('logged_username', savedUsername);
         await PermissionStorage.savePermissions(permissions);
 
         print('✅ Token disimpan: ${token.substring(0, token.length > 12 ? 12 : token.length)}...');

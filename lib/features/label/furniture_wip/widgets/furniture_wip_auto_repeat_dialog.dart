@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../../../common/widgets/info_box.dart';
+import '../../../../common/widgets/master_printer_selector.dart';
+import '../../../../common/widgets/printer_selector_tile.dart';
 import '../../../../core/utils/bt_print_service.dart';
+import '../../../../core/utils/device_printer_service.dart';
 import '../repository/furniture_wip_repository.dart';
 
 /// Dialog auto-repeat: create → print → markAsPrinted, berulang sebanyak [totalRounds].
@@ -34,6 +37,7 @@ class FurnitureWipAutoRepeatDialog extends StatefulWidget {
 class _FurnitureWipAutoRepeatDialogState
     extends State<FurnitureWipAutoRepeatDialog> {
   // ── Printer ───────────────────────────────────────────────────────────────
+  String? _printerId;
   String? _printerMac;
   String? _printerName;
   late final BtPrintService _btService;
@@ -56,12 +60,22 @@ class _FurnitureWipAutoRepeatDialogState
   }
 
   Future<void> _loadSavedPrinter() async {
-    final saved = await BtPrintService.loadSavedPrinter();
+    final saved = await DevicePrinterService.loadDefaultPrinter();
     if (saved != null && mounted) {
       setState(() {
+        _printerId = saved.id;
         _printerMac = saved.mac;
         _printerName = saved.name;
         _statusMsg = 'Printer: ${saved.name}. Tekan MULAI untuk memulai.';
+      });
+      return;
+    }
+    final legacy = await BtPrintService.loadSavedPrinter();
+    if (legacy != null && mounted) {
+      setState(() {
+        _printerMac = legacy.mac;
+        _printerName = legacy.name;
+        _statusMsg = 'Printer: ${legacy.name}. Tekan MULAI untuk memulai.';
       });
     }
   }
@@ -139,6 +153,11 @@ class _FurnitureWipAutoRepeatDialogState
         printError = e.toString();
       }
 
+      if (printOk) {
+        final printBy = await DevicePrinterService.getLoggedUsername();
+        DevicePrinterService.logPrint(printerId: _printerMac!, printBy: printBy);
+      }
+
       if (!printOk) {
         _stopWithError(round, labelCode, 'Cetak gagal: ${printError ?? "error"}');
         return;
@@ -212,24 +231,18 @@ class _FurnitureWipAutoRepeatDialogState
   // ── Printer selector ───────────────────────────────────────────────────────
 
   Future<void> _selectPrinter() async {
-    await showModalBottomSheet<void>(
+    final outcome = await MasterPrinterSelector.show(
       context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (_) => _PrinterSheet(
-        currentMac: _printerMac,
-        onSelected: (mac, name) {
-          setState(() {
-            _printerMac = mac;
-            _printerName = name;
-            _errorMsg = null;
-            _statusMsg = 'Printer: $name. Tekan MULAI untuk memulai.';
-          });
-        },
-      ),
+      currentMac: _printerMac,
     );
+    if (outcome == null || !mounted) return;
+    setState(() {
+      _printerId = outcome.id;
+      _printerMac = outcome.mac;
+      _printerName = outcome.printerName;
+      _errorMsg = null;
+      _statusMsg = 'Printer: ${outcome.printerName}. Tekan MULAI untuk memulai.';
+    });
   }
 
   // ── Build ──────────────────────────────────────────────────────────────────
@@ -422,52 +435,13 @@ class _FurnitureWipAutoRepeatDialogState
   }
 
   Widget _buildPrinterRow(bool hasPrinter) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: hasPrinter ? Colors.green.shade50 : Colors.orange.shade50,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: hasPrinter ? Colors.green.shade200 : Colors.orange.shade300,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.bluetooth,
-            size: 18,
-            color: hasPrinter ? Colors.green.shade700 : Colors.orange.shade700,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              hasPrinter
-                  ? (_printerName ?? _printerMac!)
-                  : 'Belum ada printer dipilih',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: hasPrinter
-                    ? Colors.green.shade800
-                    : Colors.orange.shade800,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          TextButton(
-            onPressed: _running ? null : _selectPrinter,
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: Text(
-              hasPrinter ? 'GANTI' : 'PILIH',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
+    return PrinterSelectorTile(
+      printerName: _printerName,
+      printerMac: _printerMac,
+      printerId: _printerId,
+      onSelect: _selectPrinter,
+      disabled: _running,
+      compact: true,
     );
   }
 }
@@ -488,187 +462,3 @@ class _RoundResult {
   });
 }
 
-// ── Printer Selector Sheet ─────────────────────────────────────────────────────
-
-class _PrinterSheet extends StatefulWidget {
-  final String? currentMac;
-  final void Function(String mac, String name) onSelected;
-
-  const _PrinterSheet({required this.currentMac, required this.onSelected});
-
-  @override
-  State<_PrinterSheet> createState() => _PrinterSheetState();
-}
-
-class _PrinterSheetState extends State<_PrinterSheet> {
-  List<dynamic> _devices = [];
-  bool _loading = true;
-  String? _errorMsg;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _errorMsg = null;
-    });
-    try {
-      final granted = await BtPrintService.ensurePermissions();
-      if (!mounted) return;
-      if (!granted) {
-        setState(() {
-          _loading = false;
-          _errorMsg =
-              'Permission "Perangkat Terdekat" belum diizinkan.\n'
-              'Buka Settings → Aplikasi → PPS Tablet → Izin → aktifkan, lalu kembali.';
-        });
-        return;
-      }
-      final devices = await BtPrintService.getPairedDevices();
-      if (mounted) {
-        setState(() {
-          _devices = devices;
-          _loading = false;
-          if (devices.isEmpty) {
-            _errorMsg =
-                'Tidak ada perangkat Bluetooth yang sudah di-pair.\n'
-                'Pair printer di Settings > Bluetooth Android terlebih dahulu.';
-          }
-        });
-      }
-    } catch (e) {
-      if (mounted)
-        setState(() {
-          _loading = false;
-          _errorMsg = 'Error: $e';
-        });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                const Icon(Icons.bluetooth_searching),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'Pilih Printer Bluetooth',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-                  ),
-                ),
-                IconButton(
-                  onPressed: _loading ? null : _load,
-                  icon: const Icon(Icons.refresh),
-                ),
-              ],
-            ),
-            const Divider(height: 20),
-            if (_loading)
-              const Padding(
-                padding: EdgeInsets.all(24),
-                child: CircularProgressIndicator(),
-              )
-            else if (_errorMsg != null)
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.bluetooth_disabled,
-                      size: 48,
-                      color: Colors.grey.shade400,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      _errorMsg!,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey.shade700),
-                    ),
-                    const SizedBox(height: 12),
-                    ElevatedButton.icon(
-                      onPressed: _load,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Coba Lagi'),
-                    ),
-                  ],
-                ),
-              )
-            else
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 280),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: _devices.length,
-                  separatorBuilder: (_, __) =>
-                      Divider(height: 1, color: Colors.grey.shade200),
-                  itemBuilder: (_, i) {
-                    final d = _devices[i];
-                    final mac = d.macAdress as String;
-                    final name = (d.name as String).isNotEmpty
-                        ? d.name as String
-                        : '(Tanpa nama)';
-                    final isSelected = mac == widget.currentMac;
-                    return ListTile(
-                      leading: Icon(
-                        Icons.print,
-                        color: isSelected
-                            ? Colors.blue.shade700
-                            : Colors.grey.shade500,
-                      ),
-                      title: Text(
-                        name,
-                        style: TextStyle(
-                          fontWeight: isSelected
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                        ),
-                      ),
-                      subtitle: Text(
-                        mac,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade500,
-                        ),
-                      ),
-                      trailing: isSelected
-                          ? Icon(
-                              Icons.check_circle,
-                              color: Colors.blue.shade700,
-                            )
-                          : null,
-                      onTap: () async {
-                        await BtPrintService.savePrinter(mac: mac, name: name);
-                        if (!context.mounted) return;
-                        widget.onSelected(mac, name);
-                        Navigator.pop(context);
-                      },
-                    );
-                  },
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}

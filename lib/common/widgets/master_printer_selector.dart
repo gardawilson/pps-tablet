@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
-import '../../core/network/api_client.dart';
 import '../../core/utils/bt_print_service.dart';
-import '../../core/utils/master_printer_repository.dart';
+import '../../core/utils/device_printer_service.dart';
 
 class PrintOutcome {
+  final String id; // microservice printer id
   final String mac;
   final String printerName;
 
   const PrintOutcome({
+    required this.id,
     required this.mac,
     required this.printerName,
   });
@@ -24,22 +25,17 @@ class MasterPrinterSelector {
   }) {
     return showDialog<PrintOutcome>(
       context: context,
-      builder: (_) => _PrinterSelectionDialog(
-        currentMac: currentMac,
-        repository: MasterPrinterRepository(api: ApiClient()),
-      ),
+      builder: (_) => _PrinterSelectionDialog(currentMac: currentMac),
     );
   }
 }
 
+// ── Dialog ─────────────────────────────────────────────────────────────────────
+
 class _PrinterSelectionDialog extends StatefulWidget {
   final String? currentMac;
-  final MasterPrinterRepository repository;
 
-  const _PrinterSelectionDialog({
-    required this.currentMac,
-    required this.repository,
-  });
+  const _PrinterSelectionDialog({this.currentMac});
 
   @override
   State<_PrinterSelectionDialog> createState() =>
@@ -48,88 +44,104 @@ class _PrinterSelectionDialog extends StatefulWidget {
 
 class _PrinterSelectionDialogState extends State<_PrinterSelectionDialog> {
   bool _loading = true;
-  List<BluetoothInfo> _devices = [];
-  Map<String, String> _aliases = {};
+  // Printer dari microservice
+  List<DevicePrinter> _registered = [];
+  // Printer paired via BT tapi belum terdaftar
+  List<BluetoothInfo> _paired = [];
   String? _errorMsg;
 
   @override
   void initState() {
     super.initState();
-    _loadDevices();
+    _load();
   }
 
-  Future<void> _loadDevices() async {
+  Future<void> _load() async {
     setState(() {
       _loading = true;
       _errorMsg = null;
     });
 
     try {
-      final granted = await BtPrintService.ensurePermissions();
-      if (!granted) {
-        setState(() {
-          _loading = false;
-          _errorMsg =
-              'Permission "Perangkat Terdekat" belum diizinkan.\nBuka Settings → PPS Tablet → Izin → Perangkat Terdekat.';
-        });
-        return;
-      }
+      // Minta permission BT agar bisa lihat paired devices
+      await BtPrintService.ensurePermissions();
 
       final results = await Future.wait([
+        DevicePrinterService.fetchPrinters(),
         BtPrintService.getPairedDevices(),
-        widget.repository.fetchAliases(),
       ]);
 
       if (!mounted) return;
 
+      final registered = results[0] as List<DevicePrinter>;
+      final paired = results[1] as List<BluetoothInfo>;
+
+      // Pisahkan paired yang belum terdaftar di microservice
+      final registeredMacs = registered
+          .map((p) => p.identifier.toUpperCase())
+          .toSet();
+      final unregistered = paired
+          .where((d) => !registeredMacs.contains(d.macAdress.toUpperCase()))
+          .toList();
+
       setState(() {
-        _devices = results[0] as List<BluetoothInfo>;
-        _aliases = results[1] as Map<String, String>;
+        _registered = registered;
+        _paired = unregistered;
         _loading = false;
-        if (_devices.isEmpty) {
-          _errorMsg =
-              'Tidak ada perangkat Bluetooth yang sudah di-pair. Pair printer di Settings > Bluetooth Android terlebih dahulu.';
-        }
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _errorMsg = 'Gagal mengambil daftar perangkat: $e';
+        _errorMsg = 'Gagal mengambil daftar printer: $e';
       });
     }
   }
 
-  Future<void> _editAlias(BluetoothInfo device) async {
-    final mac = device.macAdress;
-    final currentAlias = _aliases[mac] ?? '';
-
-    final result = await showDialog<String>(
+  Future<void> _register(BluetoothInfo device) async {
+    // Tanya nama alias untuk printer baru
+    final name = await showDialog<String>(
       context: context,
-      builder: (_) => _AliasEditDialog(
-        mac: mac,
-        btName: device.name,
-        currentAlias: currentAlias,
-      ),
+      builder: (_) =>
+          _RegisterDialog(mac: device.macAdress, btName: device.name),
     );
+    if (name == null || !mounted) return;
 
-    if (result == null || !mounted) return;
-
-    if (result.isEmpty) {
-      await widget.repository.remove(mac);
-    } else {
-      await widget.repository.upsert(mac, result);
+    try {
+      final printer = await DevicePrinterService.registerPrinter(
+        mac: device.macAdress,
+        name: name,
+      );
+      if (!mounted) return;
+      // Langsung pilih printer yang baru didaftarkan
+      await _selectAndPop(printer);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal mendaftarkan printer: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
-
-    if (!mounted) return;
-    final updated = await widget.repository.fetchAliases();
-    if (!mounted) return;
-    setState(() => _aliases = updated);
   }
 
-  String _displayName(BluetoothInfo device) {
-    return _aliases[device.macAdress] ??
-        (device.name.isNotEmpty ? device.name : device.macAdress);
+  Future<void> _selectAndPop(DevicePrinter printer) async {
+    await DevicePrinterService.saveDefaultPrinter(printer);
+    // Juga simpan ke BtPrintService agar kompatibel dengan alur print lama
+    await BtPrintService.savePrinter(
+      mac: printer.identifier,
+      name: printer.name,
+    );
+    if (!mounted) return;
+    Navigator.pop(
+      context,
+      PrintOutcome(
+        id: printer.id,
+        mac: printer.identifier,
+        printerName: printer.name,
+      ),
+    );
   }
 
   @override
@@ -138,10 +150,11 @@ class _PrinterSelectionDialogState extends State<_PrinterSelectionDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 48, vertical: 32),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
+        constraints: const BoxConstraints(maxWidth: 520),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // ── Header ─────────────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 8, 0),
               child: Row(
@@ -154,7 +167,7 @@ class _PrinterSelectionDialogState extends State<_PrinterSelectionDialog> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
-                      Icons.bluetooth_searching_rounded,
+                      Icons.print_rounded,
                       size: 20,
                       color: Colors.blue.shade600,
                     ),
@@ -165,21 +178,21 @@ class _PrinterSelectionDialogState extends State<_PrinterSelectionDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Pilih Printer Bluetooth',
+                          'Pilih Printer',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
                         Text(
-                          'Menampilkan perangkat yang sudah di-pair',
+                          'Printer terdaftar di sistem',
                           style: TextStyle(fontSize: 12, color: Colors.grey),
                         ),
                       ],
                     ),
                   ),
                   IconButton(
-                    onPressed: _loading ? null : _loadDevices,
+                    onPressed: _loading ? null : _load,
                     icon: const Icon(Icons.refresh_rounded),
                     tooltip: 'Refresh',
                     style: IconButton.styleFrom(
@@ -196,6 +209,8 @@ class _PrinterSelectionDialogState extends State<_PrinterSelectionDialog> {
             ),
             const SizedBox(height: 12),
             Divider(color: Colors.grey.shade200, height: 1),
+
+            // ── Body ───────────────────────────────────────────────────────
             if (_loading)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 40),
@@ -204,201 +219,305 @@ class _PrinterSelectionDialogState extends State<_PrinterSelectionDialog> {
                     CircularProgressIndicator(),
                     SizedBox(height: 12),
                     Text(
-                      'Mengambil daftar perangkat…',
+                      'Memuat daftar printer…',
                       style: TextStyle(color: Colors.grey),
                     ),
                   ],
                 ),
               )
             else if (_errorMsg != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.bluetooth_disabled_rounded,
-                        size: 28,
-                        color: Colors.grey.shade400,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      _errorMsg!,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.grey.shade700,
-                        fontSize: 13,
-                        height: 1.45,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: _loadDevices,
-                      icon: const Icon(Icons.refresh_rounded),
-                      label: const Text('Coba Lagi'),
-                      style: ElevatedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              )
+              _buildError()
             else
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 360),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  itemCount: _devices.length,
-                  separatorBuilder: (_, __) =>
-                      Divider(height: 1, color: Colors.grey.shade100),
-                  itemBuilder: (_, i) {
-                    final device = _devices[i];
-                    final isSelected =
-                        device.macAdress == widget.currentMac;
-                    final displayName = _displayName(device);
-                    final hasAlias = _aliases.containsKey(device.macAdress);
-                    return ListTile(
-                      contentPadding: const EdgeInsets.only(
-                        left: 4,
-                        right: 0,
-                        top: 2,
-                        bottom: 2,
-                      ),
-                      leading: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? Colors.blue.shade50
-                              : Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(
-                          Icons.print_rounded,
-                          size: 20,
-                          color: isSelected
-                              ? Colors.blue.shade600
-                              : Colors.grey.shade500,
-                        ),
-                      ),
-                      title: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              displayName,
-                              style: TextStyle(
-                                fontWeight: isSelected
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                          if (hasAlias)
-                            Padding(
-                              padding: const EdgeInsets.only(left: 4),
-                              child: Tooltip(
-                                message: 'Sudah diberi nama',
-                                child: Icon(
-                                  Icons.label_rounded,
-                                  size: 14,
-                                  color: Colors.blue.shade300,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      subtitle: Text(
-                        hasAlias && device.name.isNotEmpty
-                            ? '${device.name} · ${device.macAdress}'
-                            : device.macAdress,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade500,
-                        ),
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            onPressed: () => _editAlias(device),
-                            icon: Icon(
-                              Icons.edit_rounded,
-                              size: 16,
-                              color: Colors.grey.shade400,
-                            ),
-                            tooltip: 'Beri nama',
-                            visualDensity: VisualDensity.compact,
-                            padding: const EdgeInsets.all(8),
-                          ),
-                          if (isSelected)
-                            Icon(Icons.check_circle_rounded,
-                                color: Colors.blue.shade600)
-                          else
-                            Icon(Icons.chevron_right_rounded,
-                                color: Colors.grey.shade300),
-                        ],
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      onTap: () async {
-                        final mac = device.macAdress;
-                        final name = displayName;
-                        await BtPrintService.savePrinter(mac: mac, name: name);
-                        if (!mounted) return;
-                        Navigator.pop(
-                          context,
-                          PrintOutcome(mac: mac, printerName: name),
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
+              _buildList(),
+
             const SizedBox(height: 8),
           ],
         ),
       ),
     );
   }
+
+  Widget _buildError() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+      child: Column(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.wifi_off_rounded,
+              size: 28,
+              color: Colors.grey.shade400,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            _errorMsg!,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.grey.shade700,
+              fontSize: 13,
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: _load,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Coba Lagi'),
+            style: ElevatedButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildList() {
+    final hasRegistered = _registered.isNotEmpty;
+    final hasPaired = _paired.isNotEmpty;
+
+    if (!hasRegistered && !hasPaired) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+        child: Text(
+          'Tidak ada printer ditemukan.\nPair printer di Settings > Bluetooth Android terlebih dahulu.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.grey.shade600, height: 1.5),
+        ),
+      );
+    }
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 420),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Registered printers ─────────────────────────────────────
+            if (hasRegistered) ...[
+              _sectionHeader(
+                'PRINTER TERDAFTAR',
+                Icons.check_circle_outline_rounded,
+                Colors.green.shade600,
+              ),
+              ...List.generate(_registered.length, (i) {
+                return _RegisteredTile(
+                  printer: _registered[i],
+                  isSelected:
+                      _registered[i].identifier.toUpperCase() ==
+                      (widget.currentMac?.toUpperCase() ?? ''),
+                  onTap: () => _selectAndPop(_registered[i]),
+                );
+              }),
+            ],
+
+            // ── Unregistered BT devices ─────────────────────────────────
+            if (hasPaired) ...[
+              _sectionHeader(
+                'PERANGKAT BLUETOOTH (BELUM TERDAFTAR)',
+                Icons.bluetooth_rounded,
+                Colors.orange.shade600,
+              ),
+              ...List.generate(_paired.length, (i) {
+                return _UnregisteredTile(
+                  device: _paired[i],
+                  onRegister: () => _register(_paired[i]),
+                );
+              }),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionHeader(String label, IconData icon, Color color) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: color,
+              letterSpacing: 0.8,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Divider(color: Colors.grey.shade200, height: 1)),
+        ],
+      ),
+    );
+  }
 }
 
-class _AliasEditDialog extends StatefulWidget {
-  final String mac;
-  final String btName;
-  final String currentAlias;
+// ── Tile: registered printer ───────────────────────────────────────────────────
 
-  const _AliasEditDialog({
-    required this.mac,
-    required this.btName,
-    required this.currentAlias,
+class _RegisteredTile extends StatelessWidget {
+  final DevicePrinter printer;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _RegisteredTile({
+    required this.printer,
+    required this.isSelected,
+    required this.onTap,
   });
 
   @override
-  State<_AliasEditDialog> createState() => _AliasEditDialogState();
+  Widget build(BuildContext context) {
+    final isNormal = printer.status.toUpperCase() == 'NORMAL';
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      leading: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.blue.shade50 : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(
+          Icons.print_rounded,
+          size: 20,
+          color: isSelected ? Colors.blue.shade600 : Colors.grey.shade500,
+        ),
+      ),
+      title: Text(
+        printer.name,
+        style: TextStyle(
+          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+          fontSize: 14,
+        ),
+      ),
+      subtitle: Row(
+        children: [
+          Text(
+            printer.identifier,
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+            decoration: BoxDecoration(
+              color: isNormal ? Colors.green.shade50 : Colors.red.shade50,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              printer.status,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: isNormal ? Colors.green.shade700 : Colors.red.shade700,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Icon(Icons.print_outlined, size: 11, color: Colors.grey.shade400),
+          const SizedBox(width: 2),
+          Text(
+            printer.printUsage,
+            style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+          ),
+        ],
+      ),
+      trailing: isSelected
+          ? Icon(Icons.check_circle_rounded, color: Colors.blue.shade600)
+          : Icon(Icons.chevron_right_rounded, color: Colors.grey.shade300),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      onTap: onTap,
+    );
+  }
 }
 
-class _AliasEditDialogState extends State<_AliasEditDialog> {
+// ── Tile: unregistered BT device ──────────────────────────────────────────────
+
+class _UnregisteredTile extends StatelessWidget {
+  final BluetoothInfo device;
+  final VoidCallback onRegister;
+
+  const _UnregisteredTile({required this.device, required this.onRegister});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      leading: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: Colors.orange.shade50,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(
+          Icons.bluetooth_rounded,
+          size: 20,
+          color: Colors.orange.shade600,
+        ),
+      ),
+      title: Text(
+        device.name.isNotEmpty ? device.name : device.macAdress,
+        style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+      ),
+      subtitle: Text(
+        device.macAdress,
+        style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+      ),
+      trailing: TextButton(
+        onPressed: onRegister,
+        style: TextButton.styleFrom(
+          backgroundColor: Colors.orange.shade50,
+          foregroundColor: Colors.orange.shade800,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        child: const Text(
+          'DAFTAR',
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Register dialog ────────────────────────────────────────────────────────────
+
+class _RegisterDialog extends StatefulWidget {
+  final String mac;
+  final String btName;
+
+  const _RegisterDialog({required this.mac, required this.btName});
+
+  @override
+  State<_RegisterDialog> createState() => _RegisterDialogState();
+}
+
+class _RegisterDialogState extends State<_RegisterDialog> {
   late final TextEditingController _controller;
+  bool _isEmpty = true;
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.currentAlias);
+    _controller = TextEditingController();
+    _controller.addListener(() {
+      final empty = _controller.text.trim().isEmpty;
+      if (empty != _isEmpty) setState(() => _isEmpty = empty);
+    });
   }
 
   @override
@@ -409,51 +528,137 @@ class _AliasEditDialogState extends State<_AliasEditDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Beri Nama Printer'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'MAC: ${widget.mac}',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+    final mq = MediaQuery.of(context);
+    // Batasi tinggi dialog agar tidak tertutup keyboard (landscape tablet safe)
+    final availableHeight = mq.size.height - mq.viewInsets.bottom - 48;
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: 420, maxHeight: availableHeight),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Title ───────────────────────────────────────────────
+                const Text(
+                  'Daftarkan Printer',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 4),
+
+                // ── Info MAC ─────────────────────────────────────────────
+                Row(
+                  children: [
+                    Icon(
+                      Icons.bluetooth_rounded,
+                      size: 13,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      widget.mac,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // ── Petunjuk penamaan ────────────────────────────────────
+                Container(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.blue.shade100),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.info_outline_rounded,
+                        size: 16,
+                        color: Colors.blue.shade600,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: RichText(
+                          text: TextSpan(
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.blue.shade800,
+                              height: 1.45,
+                            ),
+                            children: const [
+                              TextSpan(
+                                text:
+                                    'Ketik nama sesuai label yang tertera di printer, contoh: ',
+                              ),
+                              TextSpan(
+                                text: 'PANDA 1',
+                                style: TextStyle(fontWeight: FontWeight.w800),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // ── Input nama ───────────────────────────────────────────
+                TextField(
+                  controller: _controller,
+                  decoration: InputDecoration(
+                    labelText: 'Nama printer',
+                    hintText: 'mis. PANDA 1',
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                    prefixIcon: Icon(
+                      Icons.label_outline_rounded,
+                      size: 18,
+                      color: Colors.grey.shade500,
+                    ),
+                  ),
+                  textCapitalization: TextCapitalization.characters,
+                  autofocus: true,
+                  onSubmitted: _isEmpty
+                      ? null
+                      : (_) => Navigator.pop(context, _controller.text.trim()),
+                ),
+                const SizedBox(height: 20),
+
+                // ── Actions ──────────────────────────────────────────────
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('BATAL'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: _isEmpty
+                          ? null
+                          : () =>
+                                Navigator.pop(context, _controller.text.trim()),
+                      child: const Text('DAFTAR'),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            if (widget.btName.isNotEmpty)
-              Text(
-                'Nama BT: ${widget.btName}',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-              ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _controller,
-              decoration: const InputDecoration(
-                labelText: 'Nama kustom (mis. Printer 1)',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              textCapitalization: TextCapitalization.words,
-            ),
-          ],
+          ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('BATAL'),
-        ),
-        if (widget.currentAlias.isNotEmpty)
-          TextButton(
-            onPressed: () => Navigator.pop(context, ''),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('HAPUS ALIAS'),
-          ),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, _controller.text.trim()),
-          child: const Text('SIMPAN'),
-        ),
-      ],
     );
   }
 }

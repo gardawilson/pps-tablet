@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import 'package:printing/printing.dart';
 import '../../common/widgets/master_printer_selector.dart';
+import '../../common/widgets/printer_selector_tile.dart';
 import '../../core/utils/bt_print_service.dart';
+import '../../core/utils/device_printer_service.dart';
 
 /// In-app PDF viewer + panel Bluetooth print.
 ///
@@ -40,8 +42,10 @@ class PdfViewerScreen extends StatefulWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _PdfViewerScreenState extends State<PdfViewerScreen> {
+  String? _printerId; // id dari microservice
   String? _printerMac;
   String? _printerName;
+  bool _printing = false;
 
   // ── Palette ──────────────────────────────────────────────────────────────
   static const _kDark = Color(0xFF0F172A); // preview bg
@@ -58,11 +62,22 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   // ── Printer ───────────────────────────────────────────────────────────────
 
   Future<void> _loadSavedPrinter() async {
-    final saved = await BtPrintService.loadSavedPrinter();
+    // Prioritaskan printer dari microservice (ada id-nya)
+    final saved = await DevicePrinterService.loadDefaultPrinter();
     if (saved != null && mounted) {
       setState(() {
+        _printerId = saved.id;
         _printerMac = saved.mac;
         _printerName = saved.name;
+      });
+      return;
+    }
+    // Fallback ke BtPrintService lama (tanpa id microservice)
+    final legacy = await BtPrintService.loadSavedPrinter();
+    if (legacy != null && mounted) {
+      setState(() {
+        _printerMac = legacy.mac;
+        _printerName = legacy.name;
       });
     }
   }
@@ -74,6 +89,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     );
     if (selection == null || !mounted) return;
     setState(() {
+      _printerId = selection.id;
       _printerMac = selection.mac;
       _printerName = selection.printerName;
     });
@@ -81,14 +97,38 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
   // ── Print ─────────────────────────────────────────────────────────────────
 
-  void _doPrint() {
-    if (_printerMac == null) return;
-    Navigator.of(context).pop(
-      PrintOutcome(
-        mac: _printerMac!,
-        printerName: _printerName ?? _printerMac!,
-      ),
-    );
+  Future<void> _doPrint() async {
+    if (_printerMac == null || _printing) return;
+
+    setState(() => _printing = true);
+
+    try {
+      // Cek status & printUsage terkini dari microservice (jika ada id)
+      if (_printerId != null && _printerId!.isNotEmpty) {
+        try {
+          final info = await DevicePrinterService.getPrinter(_printerId!);
+          debugPrint(
+            '🖨️ Printer status: ${info.status}, usage: ${info.printUsage}',
+          );
+        } catch (e) {
+          debugPrint('⚠️ Gagal cek status printer dari microservice: $e');
+          // Lanjutkan meski cek status gagal
+        }
+      }
+
+      if (!mounted) return;
+
+      // Pop dan kembalikan PrintOutcome — proses BT print dilakukan oleh caller
+      Navigator.of(context).pop(
+        PrintOutcome(
+          id: _printerId ?? '',
+          mac: _printerMac!,
+          printerName: _printerName ?? _printerMac!,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
   }
 
   // ── Root build ────────────────────────────────────────────────────────────
@@ -512,89 +552,12 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   // ── Shared sub-widgets ────────────────────────────────────────────────────
 
   Widget _buildPrinterTile(bool hasPrinter) {
-    final bg = hasPrinter ? Colors.green.shade50 : Colors.amber.shade50;
-    final border = hasPrinter ? Colors.green.shade200 : Colors.amber.shade300;
-    final iconBg = hasPrinter ? Colors.green.shade100 : Colors.amber.shade100;
-    final iconColor = hasPrinter
-        ? Colors.green.shade700
-        : Colors.amber.shade700;
-    final labelColor = hasPrinter
-        ? Colors.green.shade600
-        : Colors.amber.shade700;
-    final nameColor = hasPrinter
-        ? Colors.green.shade900
-        : Colors.amber.shade900;
-    final btnBg = hasPrinter ? Colors.green.shade100 : Colors.amber.shade100;
-    final btnFg = hasPrinter ? Colors.green.shade800 : Colors.amber.shade800;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: border),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: iconBg,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(Icons.bluetooth_rounded, size: 18, color: iconColor),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  hasPrinter ? 'PRINTER TERPILIH' : 'BELUM ADA PRINTER',
-                  style: TextStyle(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w700,
-                    color: labelColor,
-                    letterSpacing: 0.6,
-                  ),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  hasPrinter
-                      ? (_printerName ?? _printerMac!)
-                      : 'Tap PILIH untuk memilih printer',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: nameColor,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          TextButton(
-            onPressed: _selectPrinter,
-            style: TextButton.styleFrom(
-              backgroundColor: btnBg,
-              foregroundColor: btnFg,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(9),
-              ),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: Text(
-              hasPrinter ? 'GANTI' : 'PILIH',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
-            ),
-          ),
-        ],
-      ),
+    return PrinterSelectorTile(
+      printerName: _printerName,
+      printerMac: _printerMac,
+      printerId: _printerId,
+      onSelect: _selectPrinter,
+      disabled: _printing,
     );
   }
 
@@ -602,7 +565,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: hasPrinter ? _doPrint : null,
+        onPressed: (hasPrinter && !_printing) ? _doPrint : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: _kBlue,
           foregroundColor: Colors.white,
@@ -615,21 +578,30 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             borderRadius: BorderRadius.circular(14),
           ),
         ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.print_rounded, size: 20),
-            SizedBox(width: 10),
-            Text(
-              'CETAK LABEL',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.6,
+        child: _printing
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: Colors.white,
+                ),
+              )
+            : const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.print_rounded, size: 20),
+                  SizedBox(width: 10),
+                  Text(
+                    'CETAK LABEL',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -666,4 +638,3 @@ class _CloseButton extends StatelessWidget {
 }
 
 // ── Bluetooth Printer Selector Sheet ──────────────────────────────────────────
-

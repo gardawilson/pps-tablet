@@ -10,6 +10,7 @@ import 'dart:async';
 import '../../common/widgets/loading_dialog.dart';
 import '../../common/widgets/pdf_viewer_screen.dart';
 import 'bt_print_service.dart';
+import 'device_printer_service.dart';
 
 class PdfPrintService {
   /// URL default Crystal Report server. Ganti di sini jika server pindah.
@@ -256,6 +257,12 @@ class PdfPrintService {
     if (ok) {
       onPrinted?.call();
       _showPrintSuccessSnack(context, outcome.printerName);
+      // Kirim log print ke microservice (fire-and-forget, tidak blok UI)
+      final printBy = await DevicePrinterService.getLoggedUsername();
+      DevicePrinterService.logPrint(
+        printerId: outcome.mac,
+        printBy: printBy,
+      );
     } else {
       _showPrintErrorSnack(context, errorMsg ?? 'Print gagal. Coba lagi.');
     }

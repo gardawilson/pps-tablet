@@ -111,13 +111,19 @@ echo "      Done: $CURRENT_VERSION → $NEXT_VERSION+$NEXT_BUILD"
 # --- Step 2: Set .env ---
 echo ""
 echo "[2/5] Setting .env ($MODE)..."
+if [ "$MODE" == "dev" ]; then
+  DEVICE_API_URL="http://192.168.11.153:3000"
+else
+  DEVICE_API_URL="http://192.168.11.79:3000"
+fi
 cat > .env << EOF
 API_BASE_URL=$API_BASE_URL
 SOCKET_BASE_URL=$API_BASE_URL
 UPDATE_BASE_URL=$API_BASE_URL
+DEVICE_API_URL=$DEVICE_API_URL
 APP_ID=tablet
 EOF
-echo "      Done: .env → $API_BASE_URL"
+echo "      Done: .env → $API_BASE_URL | device → $DEVICE_API_URL"
 
 # --- Step 3: Build APK release ---
 echo ""

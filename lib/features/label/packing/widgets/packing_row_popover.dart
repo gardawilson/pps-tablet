@@ -5,10 +5,11 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/label_popover_widgets.dart';
+import '../../../../core/network/api_client.dart';
+import '../../../../core/network/endpoints.dart';
 import '../../../../core/network/label_print_lock_api.dart';
 import '../../../../core/services/label_print_sync_queue.dart';
 import '../../../../core/utils/pdf_print_service.dart';
-import '../../../../core/network/api_client.dart';
 import '../../../../core/view_model/label_print_lock_socket_manager.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../model/packing_header_model.dart';
@@ -221,12 +222,9 @@ class _PackingRowPopoverState extends State<PackingRowPopover> {
                     await lockApi.acquire(noBJ);
                     isLockAcquired = true;
 
-                    await PdfPrintService(
-                      defaultSystem: 'pps',
-                    ).previewReport80mm(
+                    await PdfPrintService(defaultSystem: 'pps').previewFromUrl(
                       context: rootCtx,
-                      reportName: 'CrLabelBarangJadi',
-                      query: {'NoBJ': noBJ},
+                      pdfUrl: Uri.parse(ApiConstants.packingLabelPdf(noBJ)),
                       title: noBJ,
                       onPrinted: () {
                         isPrinted = true;

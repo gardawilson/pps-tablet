@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/label_popover_widgets.dart';
+import '../../../../core/network/endpoints.dart';
 import '../../../../core/network/label_print_lock_api.dart';
 import '../../../../core/services/label_print_sync_queue.dart';
 import '../../../../core/utils/pdf_print_service.dart';
@@ -222,12 +223,11 @@ class _CrusherRowPopoverState extends State<CrusherRowPopover> {
                     await lockApi.acquire(noCrusher);
                     isLockAcquired = true;
 
-                    await PdfPrintService(
-                      defaultSystem: 'pps',
-                    ).previewReport80mm(
+                    await PdfPrintService(defaultSystem: 'pps').previewFromUrl(
                       context: rootCtx,
-                      reportName: 'CrLabelCrusher',
-                      query: {'NoCrusher': noCrusher},
+                      pdfUrl: Uri.parse(
+                        ApiConstants.crusherLabelPdf(noCrusher),
+                      ),
                       title: noCrusher,
                       onPrinted: () {
                         isPrinted = true;

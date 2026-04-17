@@ -9,6 +9,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/token_storage.dart';
 
 /// Key untuk SharedPreferences
 const _kPrinterMac = 'bt_printer_mac';
@@ -140,6 +141,90 @@ class BtPrintService {
   /// [onError]    callback error untuk UI
   ///
   /// Returns true jika berhasil, false jika gagal.
+  /// Print langsung dari URL (tidak melalui Crystal Report URL builder)
+  Future<bool> printLabelFromUrl({
+    required Uri url,
+    required String mac,
+    Function(String)? onStatus,
+    Function(String)? onError,
+  }) async {
+    try {
+      final granted = await ensurePermissions();
+      if (!granted) {
+        onError?.call(
+          'Permission Bluetooth ditolak.\n'
+          'Buka Settings > Izin Aplikasi > lalu aktifkan "Perangkat Terdekat".',
+        );
+        return false;
+      }
+
+      onStatus?.call('Mengunduh PDF dari server...');
+      final token = await TokenStorage.getToken();
+      final client = httpClient ?? http.Client();
+      final resp = await client.get(
+        url,
+        headers: {
+          if (token != null && token.isNotEmpty)
+            'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 30));
+      if (resp.statusCode != 200 || resp.bodyBytes.isEmpty) {
+        throw Exception('HTTP ${resp.statusCode} — tidak ada data PDF.');
+      }
+      final pdfBytes = resp.bodyBytes;
+      debugPrint('📄 PDF: ${pdfBytes.length} bytes');
+
+      onStatus?.call('Memproses PDF...');
+      final escBytes = await _pdfToEscPos(pdfBytes);
+      debugPrint('🖨️ ESC/POS bytes: ${escBytes.length}');
+
+      onStatus?.call('Mengecek Bluetooth...');
+      final btOn = await PrintBluetoothThermal.bluetoothEnabled;
+      if (!btOn) {
+        onError?.call('Bluetooth tidak aktif. Aktifkan Bluetooth lalu coba lagi.');
+        return false;
+      }
+
+      debugPrint('🔄 Disconnect sesi BT sebelumnya (unconditional)...');
+      await PrintBluetoothThermal.disconnect;
+      await Future.delayed(const Duration(milliseconds: 2500));
+
+      onStatus?.call('Menghubungkan ke printer...');
+      bool connected = await PrintBluetoothThermal.connect(macPrinterAddress: mac);
+      if (!connected) {
+        debugPrint('⚠️ Connect pertama gagal, coba lagi setelah 2s...');
+        await Future.delayed(const Duration(milliseconds: 2000));
+        connected = await PrintBluetoothThermal.connect(macPrinterAddress: mac);
+      }
+      if (!connected) {
+        onError?.call(
+          'Gagal terhubung ke printer.\n'
+          'Pastikan:\n'
+          '• Bluetooth aktif\n'
+          '• Printer menyala & dalam jangkauan\n'
+          '• Printer sudah di-pair di Settings Android\n'
+          '• MAC: $mac',
+        );
+        return false;
+      }
+
+      onStatus?.call('Mencetak...');
+      final ok = await PrintBluetoothThermal.writeBytes(escBytes);
+      debugPrint('🖨️ Write bytes result: $ok');
+
+      if (ok) {
+        onStatus?.call('✅ Berhasil dicetak!');
+        return true;
+      } else {
+        onError?.call('Gagal mengirim data ke printer.');
+        return false;
+      }
+    } catch (e) {
+      onError?.call('Error: $e');
+      return false;
+    }
+  }
+
   Future<bool> printLabel({
     required String reportName,
     required Map<String, String> query,
@@ -268,8 +353,8 @@ class BtPrintService {
     final generator = Generator(PaperSize.mm80, profile);
     final List<int> bytes = [];
 
-    // 406 DPI = 2× resolusi fisik printer (203 DPI).
-    final pages = Printing.raster(pdfBytes, dpi: 406);
+    // 203 DPI = resolusi fisik printer thermal 80mm (576 dot/line).
+    final pages = Printing.raster(pdfBytes, dpi: 203);
     await for (final page in pages) {
       final pngBytes = await page.toPng();
 
@@ -320,37 +405,59 @@ class BtPrintService {
     img.compositeImage(whiteBg, decoded);
     decoded = whiteBg;
 
-    // Grayscale → trim bawah → resize 576px cubic → Floyd-Steinberg dither
+    // Grayscale → trim near-white borders → resize 576px → dither
+    // Dithering diperlukan agar grayscale (mis. watermark 0.3 opacity)
+    // tampil sebagai pola titik pada printer 1-bit, bukan hilang.
     final gray = img.grayscale(decoded);
-    final trimmed = img.trim(
-      gray,
-      mode: img.TrimMode.bottomRightColor,
-      sides: img.Trim.bottom,
-    );
+    final trimmed = _trimNearWhite(gray);
     final resized = img.copyResize(
       trimmed,
       width: 576,
-      interpolation: img.Interpolation.cubic,
+      interpolation: img.Interpolation.linear,
     );
     final dithered = _floydSteinbergDither(resized);
 
     return (dithered.width, dithered.height, dithered.getBytes());
   }
 
-  /// Floyd-Steinberg error diffusion dithering.
-  ///
-  /// Mengkonversi grayscale image → 1-bit melalui error diffusion, bukan simple threshold.
-  /// Watermark abu-abu terpreservasi sebagai pola halftone dots (mirip output RawBT).
-  ///
-  /// Distribusi error:
-  ///        X    7/16
-  ///   3/16 5/16 1/16
+  /// Trim semua sisi yang mengandung hanya pixel near-white (luminance >= 250).
+  /// Lebih robust dari [img.trim] karena tidak bergantung pada warna pojok tertentu.
+  static img.Image _trimNearWhite(img.Image src, {int threshold = 250}) {
+    final w = src.width;
+    final h = src.height;
+
+    bool isNearWhiteRow(int y) {
+      for (var x = 0; x < w; x++) {
+        if (src.getPixel(x, y).r < threshold) return false;
+      }
+      return true;
+    }
+
+    bool isNearWhiteCol(int x) {
+      for (var y = 0; y < h; y++) {
+        if (src.getPixel(x, y).r < threshold) return false;
+      }
+      return true;
+    }
+
+    var top = 0;
+    var bottom = h - 1;
+    var left = 0;
+    var right = w - 1;
+
+    while (top <= bottom && isNearWhiteRow(top)) { top++; }
+    while (bottom >= top && isNearWhiteRow(bottom)) { bottom--; }
+    while (left <= right && isNearWhiteCol(left)) { left++; }
+    while (right >= left && isNearWhiteCol(right)) { right--; }
+
+    if (top > bottom || left > right) return src;
+    return img.copyCrop(src, x: left, y: top, width: right - left + 1, height: bottom - top + 1);
+  }
+
   static img.Image _floydSteinbergDither(img.Image src) {
     final w = src.width;
     final h = src.height;
 
-    // Salin nilai luminance channel R (image sudah grayscale, semua channel sama)
-    // ke buffer float untuk error diffusion
     final buf = List<double>.filled(w * h, 0.0);
     for (var y = 0; y < h; y++) {
       for (var x = 0; x < w; x++) {
@@ -358,7 +465,6 @@ class BtPrintService {
       }
     }
 
-    // Error diffusion pass
     for (var y = 0; y < h; y++) {
       for (var x = 0; x < w; x++) {
         final idx = y * w + x;
@@ -376,7 +482,6 @@ class BtPrintService {
       }
     }
 
-    // Tulis ke image baru — hanya piksel hitam (0) atau putih (255)
     final out = img.Image(width: w, height: h, numChannels: 3);
     for (var y = 0; y < h; y++) {
       for (var x = 0; x < w; x++) {

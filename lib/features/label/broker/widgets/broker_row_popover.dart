@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/label_popover_widgets.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/network/endpoints.dart';
 import '../../../../core/network/label_print_lock_api.dart';
 import '../../../../core/services/label_print_sync_queue.dart';
 import '../../../../core/utils/pdf_print_service.dart';
@@ -230,12 +231,9 @@ class _BrokerRowPopoverState extends State<BrokerRowPopover> {
                     await lockApi.acquire(noBroker);
                     isLockAcquired = true;
 
-                    await PdfPrintService(
-                      defaultSystem: 'pps',
-                    ).previewReport80mm(
+                    await PdfPrintService(defaultSystem: 'pps').previewFromUrl(
                       context: rootCtx,
-                      reportName: 'CrLabelPalletBroker',
-                      query: {'NoBroker': noBroker},
+                      pdfUrl: Uri.parse(ApiConstants.brokerLabelPdf(noBroker)),
                       title: noBroker,
                       onPrinted: () {
                         isPrinted = true;

@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/label_popover_widgets.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/network/endpoints.dart';
 import '../../../../core/network/label_print_lock_api.dart';
 import '../../../../core/services/label_print_sync_queue.dart';
 import '../../../../core/utils/pdf_print_service.dart';
@@ -208,12 +209,14 @@ class _BahanBakuPalletPopoverState extends State<BahanBakuPalletPopover> {
                     await lockApi.acquire(noPallet);
                     isLockAcquired = true;
 
-                    await PdfPrintService(
-                      defaultSystem: 'pps',
-                    ).previewReport80mm(
+                    await PdfPrintService(defaultSystem: 'pps').previewFromUrl(
                       context: rootCtx,
-                      reportName: 'LabelPalletBB',
-                      query: {'NoBahanBaku': noBahanBaku, 'NoPallet': noPallet},
+                      pdfUrl: Uri.parse(
+                        ApiConstants.bahanBakuPalletLabelPdf(
+                          noBahanBaku,
+                          noPallet,
+                        ),
+                      ),
                       title: '$noBahanBaku-$noPallet',
                       onPrinted: () {
                         isPrinted = true;

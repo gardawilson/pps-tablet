@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/label_popover_widgets.dart';
+import '../../../../core/network/endpoints.dart';
 import '../../../../core/network/label_print_lock_api.dart';
 import '../../../../core/services/label_print_sync_queue.dart';
 import '../../../../core/utils/pdf_print_service.dart';
@@ -223,12 +224,11 @@ class _FurnitureWipRowPopoverState extends State<FurnitureWipRowPopover> {
                     await lockApi.acquire(noFurnitureWip);
                     isLockAcquired = true;
 
-                    await PdfPrintService(
-                      defaultSystem: 'pps',
-                    ).previewReport80mm(
+                    await PdfPrintService(defaultSystem: 'pps').previewFromUrl(
                       context: rootCtx,
-                      reportName: 'CrLabelFurnitureWIP',
-                      query: {'NoFurnitureWIP': noFurnitureWip},
+                      pdfUrl: Uri.parse(
+                        ApiConstants.furnitureWipLabelPdf(noFurnitureWip),
+                      ),
                       title: noFurnitureWip,
                       onPrinted: () {
                         isPrinted = true;

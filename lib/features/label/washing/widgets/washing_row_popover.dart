@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/label_popover_widgets.dart';
+import '../../../../core/network/endpoints.dart';
 import '../../../../core/network/label_print_lock_api.dart';
 import '../../../../core/view_model/label_print_lock_socket_manager.dart';
 import '../../../../core/services/label_print_sync_queue.dart';
@@ -226,12 +227,11 @@ class _WashingRowPopoverState extends State<WashingRowPopover> {
                     await lockApi.acquire(noWashing);
                     isLockAcquired = true;
 
-                    await PdfPrintService(
-                      defaultSystem: 'pps',
-                    ).previewReport80mm(
+                    await PdfPrintService(defaultSystem: 'pps').previewFromUrl(
                       context: rootCtx,
-                      reportName: 'CrLabelPalletWashing',
-                      query: {'NoWashing': noWashing},
+                      pdfUrl: Uri.parse(
+                        ApiConstants.washingLabelPdf(noWashing),
+                      ),
                       title: 'Label $noWashing',
                       onPrinted: () {
                         isPrinted = true;

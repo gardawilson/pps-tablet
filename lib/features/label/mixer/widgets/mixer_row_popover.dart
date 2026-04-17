@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/label_popover_widgets.dart';
+import '../../../../core/network/endpoints.dart';
 import '../../../../core/network/label_print_lock_api.dart';
 import '../../../../core/services/label_print_sync_queue.dart';
 import '../../../../core/utils/pdf_print_service.dart';
@@ -241,12 +242,9 @@ class _MixerRowPopoverState extends State<MixerRowPopover> {
                     await lockApi.acquire(noMixer);
                     isLockAcquired = true;
 
-                    await PdfPrintService(
-                      defaultSystem: 'pps',
-                    ).previewReport80mm(
+                    await PdfPrintService(defaultSystem: 'pps').previewFromUrl(
                       context: rootCtx,
-                      reportName: 'CrLabelPalletMixer',
-                      query: {'noMixer': noMixer},
+                      pdfUrl: Uri.parse(ApiConstants.mixerLabelPdf(noMixer)),
                       title: noMixer,
                       onPrinted: () {
                         isPrinted = true;

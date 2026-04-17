@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'dart:async';
 import '../../common/widgets/loading_dialog.dart';
 import '../../common/widgets/pdf_viewer_screen.dart';
+import '../services/token_storage.dart';
 import 'bt_print_service.dart';
 import 'device_printer_service.dart';
 
@@ -259,10 +260,83 @@ class PdfPrintService {
       _showPrintSuccessSnack(context, outcome.printerName);
       // Kirim log print ke microservice (fire-and-forget, tidak blok UI)
       final printBy = await DevicePrinterService.getLoggedUsername();
-      DevicePrinterService.logPrint(
-        printerId: outcome.mac,
-        printBy: printBy,
+      DevicePrinterService.logPrint(printerId: outcome.mac, printBy: printBy);
+    } else {
+      _showPrintErrorSnack(context, errorMsg ?? 'Print gagal. Coba lagi.');
+    }
+  }
+
+  /// Variant [previewReport80mm] yang menerima URL langsung (tidak melalui
+  /// Crystal Report URL builder). Digunakan untuk endpoint PDF baru.
+  Future<void> previewFromUrl({
+    required BuildContext context,
+    required Uri pdfUrl,
+    String? title,
+    VoidCallback? onPrinted,
+  }) async {
+    Uint8List pdfBytes;
+    try {
+      pdfBytes = await _withLoading<Uint8List>(
+        context: context,
+        enabled: true,
+        message: 'Menyiapkan PDF…',
+        run: () async {
+          final token = await TokenStorage.getToken();
+          final client = httpClient ?? http.Client();
+          final resp = await client
+              .get(
+                pdfUrl,
+                headers: {
+                  if (token != null && token.isNotEmpty)
+                    'Authorization': 'Bearer $token',
+                },
+              )
+              .timeout(const Duration(seconds: 30));
+          debugPrint(
+            '📥 PDF status: ${resp.statusCode}, bytes: ${resp.bodyBytes.length} from $pdfUrl',
+          );
+          if (resp.statusCode != 200 || resp.bodyBytes.isEmpty) {
+            throw Exception('HTTP ${resp.statusCode} — tidak ada data.');
+          }
+          // PDF dari endpoint sudah berformat thermal — tidak perlu di-remap
+          return resp.bodyBytes;
+        },
       );
+    } catch (_) {
+      return;
+    }
+
+    if (!context.mounted) return;
+
+    final outcome = await PdfViewerScreen.push(
+      context: context,
+      title: title ?? 'Label',
+      pdfBytes: pdfBytes,
+    );
+
+    if (outcome == null || !context.mounted) return;
+
+    _showPrintingSnack(context, outcome.printerName);
+
+    final btService = BtPrintService(
+      baseUrl: baseUrl,
+      defaultSystem: defaultSystem,
+    );
+
+    String? errorMsg;
+    final ok = await btService.printLabelFromUrl(
+      url: pdfUrl,
+      mac: outcome.mac,
+      onStatus: (_) {},
+      onError: (e) => errorMsg = e,
+    );
+
+    if (!context.mounted) return;
+    if (ok) {
+      onPrinted?.call();
+      _showPrintSuccessSnack(context, outcome.printerName);
+      final printBy = await DevicePrinterService.getLoggedUsername();
+      DevicePrinterService.logPrint(printerId: outcome.mac, printBy: printBy);
     } else {
       _showPrintErrorSnack(context, errorMsg ?? 'Print gagal. Coba lagi.');
     }

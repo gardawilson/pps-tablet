@@ -169,10 +169,7 @@ class _BongkarSusunScreenState extends State<BongkarSusunScreen> {
     }
   }
 
-  Future<void> _openEditDialog(
-    BuildContext ctx,
-    BongkarSusun row,
-  ) async {
+  Future<void> _openEditDialog(BuildContext ctx, BongkarSusun row) async {
     final updated = await showDialog<BongkarSusun>(
       context: ctx,
       barrierDismissible: false,

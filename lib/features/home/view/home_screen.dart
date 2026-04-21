@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pps_tablet/features/audit/view/audit_screen.dart';
 import 'package:pps_tablet/features/bj_jual/view/bj_jual_screen.dart';
+import 'package:pps_tablet/features/bongkar_susun_v2/view/bs_v2_list_screen.dart';
 import 'package:pps_tablet/features/report/view/report_list_screen.dart';
 import '../../../core/services/permission_storage.dart';
 import '../../bongkar_susun/view/bongkar_susun_screen.dart';
@@ -210,14 +211,14 @@ class HomeScreen extends StatelessWidget {
         const SizedBox(height: 16),
         _buildMenuCard(
           context,
-          title: 'Bongkar Susun',
-          subtitle: 'Input data Bongkar Susun',
+          title: 'Bongkar Susun V2',
+          subtitle: 'Input data Bongkar Susun V2',
           icon: Icons.production_quantity_limits_outlined,
           color: const Color(0xFF0D47A1),
           onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const BongkarSusunScreen()),
-            );
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const BsV2ListScreen()));
           },
         ),
         const SizedBox(height: 16),

@@ -171,7 +171,9 @@ class _BahanBakuActionBarState extends State<BahanBakuActionBar> {
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: widget.includeUsed
-                                ? const Color(0xFF1565C0).withValues(alpha: 0.35)
+                                ? const Color(
+                                    0xFF1565C0,
+                                  ).withValues(alpha: 0.35)
                                 : Colors.grey.shade300,
                           ),
                         ),
@@ -205,7 +207,6 @@ class _BahanBakuActionBarState extends State<BahanBakuActionBar> {
                       ),
                     ),
                   ),
-
                 ],
               );
             },

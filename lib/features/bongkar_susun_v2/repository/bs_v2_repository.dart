@@ -28,12 +28,20 @@ class BsV2Repository {
     final body = await _api.getJson('/api/bongkar-susun-v2', query: qp);
     final dataList = (body['data'] ?? []) as List;
     final items = dataList
-        .map((e) => BsV2Transaction.fromJson(Map<String, dynamic>.from(e as Map)))
+        .map(
+          (e) => BsV2Transaction.fromJson(Map<String, dynamic>.from(e as Map)),
+        )
         .toList();
 
-    final totalData = body['total'] is int ? body['total'] as int : int.tryParse(body['total']?.toString() ?? '0') ?? 0;
-    final pageSize_ = body['pageSize'] is int ? body['pageSize'] as int : pageSize;
-    final totalPages = pageSize_ > 0 ? ((totalData + pageSize_ - 1) ~/ pageSize_) : 1;
+    final totalData = body['total'] is int
+        ? body['total'] as int
+        : int.tryParse(body['total']?.toString() ?? '0') ?? 0;
+    final pageSize_ = body['pageSize'] is int
+        ? body['pageSize'] as int
+        : pageSize;
+    final totalPages = pageSize_ > 0
+        ? ((totalData + pageSize_ - 1) ~/ pageSize_)
+        : 1;
 
     return {
       'items': items,
@@ -46,7 +54,8 @@ class BsV2Repository {
   Future<BsV2Transaction> fetchDetail(String noBongkarSusun) async {
     final body = await _api.getJson('/api/bongkar-susun-v2/$noBongkarSusun');
     final data = body['data'] as Map<String, dynamic>?;
-    if (data == null) throw Exception('Response tidak mengandung data transaksi');
+    if (data == null)
+      throw Exception('Response tidak mengandung data transaksi');
     return BsV2Transaction.fromJson(data);
   }
 
@@ -61,7 +70,10 @@ class BsV2Repository {
       'outputs': outputs,
     };
 
-    final jsonResp = await _api.postJson('/api/bongkar-susun-v2', body: reqBody);
+    final jsonResp = await _api.postJson(
+      '/api/bongkar-susun-v2',
+      body: reqBody,
+    );
     final data = jsonResp['data'] as Map<String, dynamic>?;
     if (data == null) throw Exception('Response tidak mengandung data');
     return BsV2Transaction.fromJson(data);

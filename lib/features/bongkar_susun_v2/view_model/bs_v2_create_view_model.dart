@@ -40,7 +40,7 @@ class BsV2CreateViewModel extends ChangeNotifier {
   final BsV2Repository repository;
 
   BsV2CreateViewModel({BsV2Repository? repository})
-      : repository = repository ?? BsV2Repository();
+    : repository = repository ?? BsV2Repository();
 
   // === Input state ===
   final List<BsV2LabelInfo> inputs = [];
@@ -59,7 +59,19 @@ class BsV2CreateViewModel extends ChangeNotifier {
   // === Derived ===
   String? get category => inputs.isEmpty ? null : inputs.first.category;
   bool get isWashing => category == 'washing';
+  bool get isBroker => category == 'broker';
   bool get isBonggolan => category == 'bonggolan';
+  bool get isCrusher => category == 'crusher';
+  bool get isGilingan => category == 'gilingan';
+  bool get isMixer => category == 'mixer';
+  bool get isFurnitureWip => category == 'furnitureWip';
+  bool get isBarangJadi => category == 'barangJadi';
+  bool get isBahanBaku => category == 'bahanBaku';
+  bool get isPcsCategory => isFurnitureWip || isBarangJadi;
+  String get quantityUnit => isPcsCategory ? 'pcs' : 'kg';
+
+  /// Categories that use saks structure (washing, broker, mixer, bahanBaku)
+  bool get hasSaks => isWashing || isBroker || isMixer || isBahanBaku;
 
   /// Unique jenis options derived from scanned inputs
   List<({int idJenis, String namaJenis})> get jenisOptions {
@@ -101,13 +113,15 @@ class BsV2CreateViewModel extends ChangeNotifier {
     return m;
   }
 
-  /// True if an output entry has ≥1 sak with berat > 0 (washing) or berat > 0 (bonggolan)
+  /// True if an output entry has ≥1 sak with berat > 0 (saks-based) or berat > 0 (bonggolan)
   bool outputIsValid(OutputEntry out) {
-    if (isWashing) return out.saks.isNotEmpty && out.saks.every((s) => s.berat > 0);
+    if (hasSaks)
+      return out.saks.isNotEmpty && out.saks.every((s) => s.berat > 0);
     return out.berat > 0;
   }
 
-  bool get allOutputsValid => outputs.isNotEmpty && outputs.every(outputIsValid);
+  bool get allOutputsValid =>
+      outputs.isNotEmpty && outputs.every(outputIsValid);
 
   /// True when all jenis are fully allocated (remaining == 0) and every output is valid
   bool get isBalanced {
@@ -142,9 +156,23 @@ class BsV2CreateViewModel extends ChangeNotifier {
 
       // Category consistency check
       if (inputs.isNotEmpty && info.category != category) {
-        lookupError = 'Semua label harus kategori sama '
+        lookupError =
+            'Semua label harus kategori sama '
             '(${_categoryLabel(category!)} vs ${_categoryLabel(info.category)})';
         return;
+      }
+
+      // Bahan Baku: semua label harus memiliki noBahanBaku yang sama
+      if (info.isBahanBaku && inputs.isNotEmpty) {
+        final existingNo = inputs.first.noBahanBaku;
+        if (existingNo != null &&
+            info.noBahanBaku != null &&
+            info.noBahanBaku != existingNo) {
+          lookupError =
+              'Label bahan baku harus dari nomor yang sama '
+              '($existingNo). Label ${info.labelCode} tidak diizinkan.';
+          return;
+        }
       }
 
       inputs.add(info);
@@ -171,7 +199,7 @@ class BsV2CreateViewModel extends ChangeNotifier {
       idJenis: first.idJenis,
       namaJenis: first.namaJenis,
     );
-    if (isWashing) {
+    if (hasSaks) {
       entry.saks.add(SakEntry(id: '${id}_sak_0', noSak: 1, berat: 0.0));
     }
     outputs.add(entry);
@@ -184,34 +212,85 @@ class BsV2CreateViewModel extends ChangeNotifier {
   }
 
   void updateOutputJenis(String outputId, int idJenis, String namaJenis) {
-    final out = outputs.firstWhere((o) => o.id == outputId, orElse: () => throw StateError('not found'));
+    final out = outputs.firstWhere(
+      (o) => o.id == outputId,
+      orElse: () => throw StateError('not found'),
+    );
     out.idJenis = idJenis;
     out.namaJenis = namaJenis;
     notifyListeners();
   }
 
   void updateOutputBerat(String outputId, double berat) {
-    final out = outputs.firstWhere((o) => o.id == outputId, orElse: () => throw StateError('not found'));
+    final out = outputs.firstWhere(
+      (o) => o.id == outputId,
+      orElse: () => throw StateError('not found'),
+    );
     out.berat = berat;
     notifyListeners();
   }
 
   void addSak(String outputId) {
-    final out = outputs.firstWhere((o) => o.id == outputId, orElse: () => throw StateError('not found'));
-    final nextNo = out.saks.isEmpty ? 1 : out.saks.map((s) => s.noSak).reduce((a, b) => a > b ? a : b) + 1;
-    out.saks.add(SakEntry(id: '${outputId}_sak_${out.saks.length}', noSak: nextNo, berat: 0.0));
+    final out = outputs.firstWhere(
+      (o) => o.id == outputId,
+      orElse: () => throw StateError('not found'),
+    );
+    final nextNo = out.saks.isEmpty
+        ? 1
+        : out.saks.map((s) => s.noSak).reduce((a, b) => a > b ? a : b) + 1;
+    out.saks.add(
+      SakEntry(
+        id: '${outputId}_sak_${out.saks.length}',
+        noSak: nextNo,
+        berat: 0.0,
+      ),
+    );
+    notifyListeners();
+  }
+
+  void addSakBulk(String outputId, int count, double beratPerSak) {
+    if (count <= 0) return;
+    final out = outputs.firstWhere(
+      (o) => o.id == outputId,
+      orElse: () => throw StateError('not found'),
+    );
+    final nextNo = out.saks.isEmpty
+        ? 1
+        : out.saks.map((s) => s.noSak).reduce((a, b) => a > b ? a : b) + 1;
+    final base = DateTime.now().millisecondsSinceEpoch;
+    for (int i = 0; i < count; i++) {
+      out.saks.add(
+        SakEntry(
+          id: '${outputId}_sak_bulk_${base}_$i',
+          noSak: nextNo + i,
+          berat: beratPerSak,
+        ),
+      );
+    }
     notifyListeners();
   }
 
   void removeSak(String outputId, String sakId) {
-    final out = outputs.firstWhere((o) => o.id == outputId, orElse: () => throw StateError('not found'));
+    final out = outputs.firstWhere(
+      (o) => o.id == outputId,
+      orElse: () => throw StateError('not found'),
+    );
     out.saks.removeWhere((s) => s.id == sakId);
+    for (int i = 0; i < out.saks.length; i++) {
+      out.saks[i].noSak = i + 1;
+    }
     notifyListeners();
   }
 
   void updateSak(String outputId, String sakId, {int? noSak, double? berat}) {
-    final out = outputs.firstWhere((o) => o.id == outputId, orElse: () => throw StateError('not found'));
-    final sak = out.saks.firstWhere((s) => s.id == sakId, orElse: () => throw StateError('not found'));
+    final out = outputs.firstWhere(
+      (o) => o.id == outputId,
+      orElse: () => throw StateError('not found'),
+    );
+    final sak = out.saks.firstWhere(
+      (s) => s.id == sakId,
+      orElse: () => throw StateError('not found'),
+    );
     if (noSak != null) sak.noSak = noSak;
     if (berat != null) sak.berat = berat;
     notifyListeners();
@@ -230,16 +309,25 @@ class BsV2CreateViewModel extends ChangeNotifier {
     try {
       final inputCodes = inputs.map((l) => l.labelCode).toList();
       final outputsJson = outputs.map((out) {
-        if (isWashing) {
+        if (hasSaks) {
           return <String, dynamic>{
             'idJenis': out.idJenis,
-            'saks': out.saks.map((s) => {'noSak': s.noSak, 'berat': s.berat}).toList(),
+            'saks': out.saks
+                .map((s) => {'noSak': s.noSak, 'berat': s.berat})
+                .toList(),
           };
-        } else {
+        } else if (isGilingan) {
           return <String, dynamic>{
-            'idJenis': out.idJenis,
+            'idGilingan': out.idJenis,
             'berat': out.berat,
           };
+        } else if (isPcsCategory) {
+          return <String, dynamic>{
+            'idJenis': out.idJenis,
+            'pcs': out.berat.toInt(),
+          };
+        } else {
+          return <String, dynamic>{'idJenis': out.idJenis, 'berat': out.berat};
         }
       }).toList();
 
@@ -273,5 +361,26 @@ class BsV2CreateViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  String _categoryLabel(String cat) => cat == 'washing' ? 'Washing (B.)' : 'Bonggolan (M.)';
+  String _categoryLabel(String cat) {
+    switch (cat) {
+      case 'washing':
+        return 'Washing (B.)';
+      case 'broker':
+        return 'Broker (D.)';
+      case 'crusher':
+        return 'Crusher (F.)';
+      case 'gilingan':
+        return 'Gilingan (V.)';
+      case 'mixer':
+        return 'Mixer (H.)';
+      case 'furnitureWip':
+        return 'Furniture WIP (BB.)';
+      case 'barangJadi':
+        return 'Barang Jadi (BA.)';
+      case 'bahanBaku':
+        return 'Bahan Baku (A.)';
+      default:
+        return 'Bonggolan (M.)';
+    }
+  }
 }

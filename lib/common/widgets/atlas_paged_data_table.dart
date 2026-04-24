@@ -21,6 +21,7 @@ class AtlasPagedDataTable<T> extends StatefulWidget {
   final void Function(T row)? onRowTap;
   final void Function(T row, Offset globalPosition)? onRowTapWithPosition;
   final void Function(T row, Offset globalPosition)? onRowLongPress;
+  final Color? Function(T row)? rowColorBuilder;
   final WidgetBuilder? firstPageProgress;
   final WidgetBuilder? newPageProgress;
   final WidgetBuilder? firstPageError;
@@ -37,6 +38,7 @@ class AtlasPagedDataTable<T> extends StatefulWidget {
     this.onRowTap,
     this.onRowTapWithPosition,
     this.onRowLongPress,
+    this.rowColorBuilder,
     this.firstPageProgress,
     this.newPageProgress,
     this.firstPageError,
@@ -136,7 +138,9 @@ class _AtlasPagedDataTableState<T> extends State<AtlasPagedDataTable<T>> {
                               final isHighlighted =
                                   widget.highlightPredicate?.call(item) ??
                                   false;
-                              final bgColor = selected
+                              final customColor = widget.rowColorBuilder?.call(item);
+                              final bgColor = customColor ??
+                                  (selected
                                   ? AtlasPagedDataTable._selectedBg
                                   : isHighlighted
                                   ? (isEven
@@ -144,7 +148,7 @@ class _AtlasPagedDataTableState<T> extends State<AtlasPagedDataTable<T>> {
                                         : AtlasPagedDataTable._highlightOdd)
                                   : (isEven
                                         ? Colors.white
-                                        : const Color(0xFFFAFBFC));
+                                        : const Color(0xFFFAFBFC)));
 
                               final rowState = AtlasRowState(
                                 isSelected: selected,

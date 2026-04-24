@@ -1,12 +1,152 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
 import '../model/bs_v2_label_info.dart';
 import '../view_model/bs_v2_create_view_model.dart';
+import 'bs_v2_sak_detail_dialog.dart';
+
+part 'bs_v2_create_dialogs.dart';
+part 'bs_v2_create_output_panel.dart';
+
+// ─── Theme constants ───────────────────────────────────────────────────────
+const _kPrimary = Color(0xFF1E6FD9);
+const _kSurface = Color(0xFFF8F9FB);
+const _kBorder = Color(0xFFE2E6EA);
+const _kRadius = 12.0;
+
+String _categoryLabel(String? category) {
+  switch (category) {
+    case 'washing':
+      return 'Washing';
+    case 'broker':
+      return 'Broker';
+    case 'crusher':
+      return 'Crusher';
+    case 'gilingan':
+      return 'Gilingan';
+    case 'mixer':
+      return 'Mixer';
+    case 'furnitureWip':
+      return 'Furniture WIP';
+    case 'barangJadi':
+      return 'Barang Jadi';
+    case 'bahanBaku':
+      return 'Bahan Baku';
+    default:
+      return category != null ? 'Unknown' : '-';
+  }
+}
+
+Color _categoryFg(String? category) {
+  switch (category) {
+    case 'washing':
+      return const Color(0xFF1565C0);
+    case 'broker':
+      return const Color(0xFF6A1B9A);
+    case 'crusher':
+      return const Color(0xFF4E342E);
+    case 'gilingan':
+      return const Color(0xFF1B5E20);
+    case 'mixer':
+      return const Color(0xFF512DA8);
+    case 'furnitureWip':
+      return const Color(0xFF4527A0);
+    case 'barangJadi':
+      return const Color(0xFF00695C);
+    case 'bahanBaku':
+      return const Color(0xFF37474F);
+    default:
+      return const Color(0xFFE65100);
+  }
+}
+
+Color _categoryBg(String? category) {
+  switch (category) {
+    case 'washing':
+      return const Color(0xFFE3F2FD);
+    case 'broker':
+      return const Color(0xFFF3E5F5);
+    case 'crusher':
+      return const Color(0xFFEFEBE9);
+    case 'gilingan':
+      return const Color(0xFFE8F5E9);
+    case 'mixer':
+      return const Color(0xFFF3E5F5);
+    case 'furnitureWip':
+      return const Color(0xFFEDE7F6);
+    case 'barangJadi':
+      return const Color(0xFFE0F2F1);
+    case 'bahanBaku':
+      return const Color(0xFFECEFF1);
+    default:
+      return const Color(0xFFFFF3E0);
+  }
+}
+
+// ─── Shared helpers ────────────────────────────────────────────────────────
+
+BoxDecoration _cardDecoration({Color? borderColor}) => BoxDecoration(
+  color: Colors.white,
+  borderRadius: BorderRadius.circular(_kRadius),
+  border: Border.all(color: borderColor ?? _kBorder),
+  boxShadow: [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.04),
+      blurRadius: 8,
+      offset: const Offset(0, 2),
+    ),
+  ],
+);
+
+Widget _sectionHeader(IconData icon, String title, {Color? iconColor}) {
+  return Row(
+    children: [
+      Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: (iconColor ?? _kPrimary).withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, size: 16, color: iconColor ?? _kPrimary),
+      ),
+      const SizedBox(width: 10),
+      Text(
+        title,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF1A1D23),
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _categoryBadge(String? category) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    decoration: BoxDecoration(
+      color: _categoryBg(category),
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Text(
+      _categoryLabel(category),
+      style: TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        color: _categoryFg(category),
+        letterSpacing: 0.3,
+      ),
+    ),
+  );
+}
+
+// ─── Screen ────────────────────────────────────────────────────────────────
 
 class BsV2CreateScreen extends StatefulWidget {
   final VoidCallback? onSubmitted;
@@ -18,44 +158,30 @@ class BsV2CreateScreen extends StatefulWidget {
 }
 
 class _BsV2CreateScreenState extends State<BsV2CreateScreen> {
-  final TextEditingController _labelCtl = TextEditingController();
-  final TextEditingController _noteCtl = TextEditingController();
-  final FocusNode _labelFocus = FocusNode();
-
-  // Controllers keyed by entry id for bonggolan berat fields
   final Map<String, TextEditingController> _beratCtls = {};
-  // Controllers keyed by "outputId_sakId" for sak berat fields
   final Map<String, TextEditingController> _sakBeratCtls = {};
-
-  final NumberFormat _nf = NumberFormat('#,##0.##', 'id_ID');
+  final NumberFormat _nf = NumberFormat('#,##0.###', 'id_ID');
 
   @override
   void dispose() {
-    _labelCtl.dispose();
-    _noteCtl.dispose();
-    _labelFocus.dispose();
-    for (final c in _beratCtls.values) {
-      c.dispose();
-    }
-    for (final c in _sakBeratCtls.values) {
-      c.dispose();
-    }
+    for (final c in _beratCtls.values) c.dispose();
+    for (final c in _sakBeratCtls.values) c.dispose();
     super.dispose();
   }
 
-  TextEditingController _beratCtl(String outputId, double current) {
-    return _beratCtls.putIfAbsent(
-      outputId,
-      () => TextEditingController(text: current > 0 ? current.toString() : ''),
-    );
-  }
+  TextEditingController _beratCtl(String outputId, double current) =>
+      _beratCtls.putIfAbsent(
+        outputId,
+        () =>
+            TextEditingController(text: current > 0 ? current.toString() : ''),
+      );
 
-  TextEditingController _getSakBeratCtl(String key, double current) {
-    return _sakBeratCtls.putIfAbsent(
-      key,
-      () => TextEditingController(text: current > 0 ? current.toString() : ''),
-    );
-  }
+  TextEditingController _getSakBeratCtl(String key, double current) =>
+      _sakBeratCtls.putIfAbsent(
+        key,
+        () =>
+            TextEditingController(text: current > 0 ? current.toString() : ''),
+      );
 
   void _cleanupCtls(BsV2CreateViewModel vm) {
     final validOutputIds = vm.outputs.map((o) => o.id).toSet();
@@ -66,12 +192,9 @@ class _BsV2CreateScreenState extends State<BsV2CreateScreen> {
       }
       return false;
     });
-
     final validSakKeys = <String>{};
     for (final o in vm.outputs) {
-      for (final s in o.saks) {
-        validSakKeys.add('${o.id}_${s.id}');
-      }
+      for (final s in o.saks) validSakKeys.add('${o.id}_${s.id}');
     }
     _sakBeratCtls.removeWhere((k, v) {
       if (!validSakKeys.contains(k)) {
@@ -82,18 +205,23 @@ class _BsV2CreateScreenState extends State<BsV2CreateScreen> {
     });
   }
 
-  Future<void> _addLabel(BsV2CreateViewModel vm) async {
-    final code = _labelCtl.text.trim();
-    if (code.isEmpty) return;
-    await vm.lookupLabel(code);
-    if (vm.lookupError == null) {
-      _labelCtl.clear();
-    }
-    _labelFocus.requestFocus();
+  Future<void> _openScanDialog(
+    BuildContext context,
+    BsV2CreateViewModel vm,
+  ) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _ScanInputDialog(vm: vm),
+    );
   }
 
   Future<void> _submit(BuildContext context, BsV2CreateViewModel vm) async {
-    vm.setNote(_noteCtl.text.trim());
+    final note = await showDialog<String>(
+      context: context,
+      builder: (_) => const _NoteDialog(),
+    );
+    if (note == null || !context.mounted) return;
+    vm.setNote(note);
     final result = await vm.submit();
     if (!context.mounted) return;
 
@@ -124,58 +252,87 @@ class _BsV2CreateScreenState extends State<BsV2CreateScreen> {
       builder: (context, vm, _) {
         _cleanupCtls(vm);
         return Scaffold(
-          appBar: AppBar(title: const Text('Buat Transaksi Bongkar/Susun')),
+          backgroundColor: _kSurface,
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            surfaceTintColor: Colors.transparent,
+            titleSpacing: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            title: Row(
+              children: [
+                const Text(
+                  'Buat Bongkar Susun',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                ),
+                if (vm.category != null) ...[
+                  const SizedBox(width: 12),
+                  _categoryBadge(vm.category),
+                ],
+              ],
+            ),
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(1),
+              child: Container(height: 1, color: _kBorder),
+            ),
+          ),
           body: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(16),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // === LEFT PANEL ===
+                // ── LEFT PANEL: Label Input ────────────────────────────────
                 SizedBox(
-                  width: 400,
-                  child: Column(
-                    children: [
-                      _ScanCard(
-                        controller: _labelCtl,
-                        focusNode: _labelFocus,
-                        isLoading: vm.isLookingUp,
-                        error: vm.lookupError,
-                        category: vm.category,
-                        onAdd: () => _addLabel(vm),
-                      ),
-                      const SizedBox(height: 10),
-                      Expanded(
-                        child: _InputsCard(
-                          inputs: vm.inputs,
-                          onRemove: vm.removeInput,
-                          nf: _nf,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      _BeratSummaryCard(
-                        inputByJenis: vm.inputBeratByJenis,
-                        remainingByJenis: vm.remainingByJenis,
-                        nf: _nf,
-                      ),
-                      const SizedBox(height: 10),
-                      _NoteAndSubmitCard(
-                        noteCtl: _noteCtl,
-                        isSubmitting: vm.isSubmitting,
-                        isBalanced: vm.isBalanced,
-                        allOutputsValid: vm.allOutputsValid,
-                        onSubmit: () => _submit(context, vm),
-                      ),
-                    ],
+                  width: 320,
+                  child: _InputsCard(
+                    inputs: vm.inputs,
+                    onRemove: vm.removeInput,
+                    onScan: () => _openScanDialog(context, vm),
+                    nf: _nf,
                   ),
                 ),
-                const SizedBox(width: 12),
-                // === RIGHT PANEL ===
+                const SizedBox(width: 16),
+                // ── CENTER PANEL: Label Output ─────────────────────────────
                 Expanded(
                   child: _OutputsPanel(
                     vm: vm,
                     nf: _nf,
                     beratCtlOf: _beratCtl,
                     sakBeratCtlOf: _getSakBeratCtl,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // ── RIGHT PANEL: Alokasi Berat + Submit ────────────────────
+                SizedBox(
+                  width: 300,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (vm.inputBeratByJenis.isNotEmpty) ...[
+                        _BeratSummaryCard(
+                          inputByJenis: vm.inputBeratByJenis,
+                          remainingByJenis: vm.remainingByJenis,
+                          jenisNames: {
+                            for (final j in vm.jenisOptions)
+                              j.idJenis: j.namaJenis,
+                          },
+                          nf: _nf,
+                          unit: vm.quantityUnit,
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      _SubmitCard(
+                        isSubmitting: vm.isSubmitting,
+                        isBalanced: vm.isBalanced,
+                        allOutputsValid: vm.allOutputsValid,
+                        inputCount: vm.inputs.length,
+                        outputCount: vm.outputs.length,
+                        onSubmit: () => _submit(context, vm),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -187,160 +344,130 @@ class _BsV2CreateScreenState extends State<BsV2CreateScreen> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// LEFT PANEL WIDGETS
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _ScanCard extends StatelessWidget {
-  final TextEditingController controller;
-  final FocusNode focusNode;
-  final bool isLoading;
-  final String? error;
-  final String? category;
-  final VoidCallback onAdd;
-
-  const _ScanCard({
-    required this.controller,
-    required this.focusNode,
-    required this.isLoading,
-    required this.error,
-    required this.category,
-    required this.onAdd,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.qr_code_scanner, size: 18),
-                const SizedBox(width: 6),
-                const Text(
-                  'Scan / Input Label',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const Spacer(),
-                if (category != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: category == 'washing'
-                          ? Colors.blue.shade50
-                          : Colors.orange.shade50,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      category == 'washing' ? 'Washing (B.)' : 'Bonggolan (M.)',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: category == 'washing'
-                            ? Colors.blue.shade700
-                            : Colors.orange.shade700,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: controller,
-                    focusNode: focusNode,
-                    autofocus: true,
-                    decoration: InputDecoration(
-                      hintText: 'B.0000000001 / M.0000000001',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      errorText: error,
-                    ),
-                    onSubmitted: (_) => onAdd(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton.icon(
-                  onPressed: isLoading ? null : onAdd,
-                  icon: isLoading
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.add, size: 18),
-                  label: const Text('Tambah'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+// ─── Inputs Card ───────────────────────────────────────────────────────────
 
 class _InputsCard extends StatelessWidget {
   final List<BsV2LabelInfo> inputs;
   final void Function(String) onRemove;
+  final VoidCallback onScan;
   final NumberFormat nf;
 
   const _InputsCard({
     required this.inputs,
     required this.onRemove,
+    required this.onScan,
     required this.nf,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Label Input (${inputs.length})',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: inputs.isEmpty
-                  ? Center(
-                      child: Text(
-                        'Belum ada label di-scan',
-                        style: TextStyle(color: Colors.grey.shade500),
-                      ),
-                    )
-                  : ListView.separated(
-                      itemCount: inputs.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
-                      itemBuilder: (_, i) {
-                        final lbl = inputs[i];
-                        return _InputLabelTile(
-                          lbl: lbl,
-                          nf: nf,
-                          onRemove: onRemove,
-                        );
-                      },
+    return Container(
+      decoration: _cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+            child: Row(
+              children: [
+                _sectionHeader(Icons.input_rounded, 'Label Input'),
+                const Spacer(),
+                if (inputs.isNotEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
                     ),
+                    decoration: BoxDecoration(
+                      color: _kPrimary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${inputs.length} label',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: _kPrimary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                Material(
+                  color: _kPrimary,
+                  borderRadius: BorderRadius.circular(10),
+                  child: InkWell(
+                    onTap: onScan,
+                    borderRadius: BorderRadius.circular(10),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 7,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.qr_code_scanner,
+                            size: 15,
+                            color: Colors.white,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            'Scan',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          const Divider(height: 1, color: _kBorder),
+          Expanded(
+            child: inputs.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.inbox_outlined,
+                          size: 40,
+                          color: Colors.grey.shade300,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Belum ada label di-scan',
+                          style: TextStyle(
+                            color: Colors.grey.shade400,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    itemCount: inputs.length,
+                    separatorBuilder: (_, __) => const Divider(
+                      height: 1,
+                      indent: 16,
+                      endIndent: 16,
+                      color: _kBorder,
+                    ),
+                    itemBuilder: (_, i) => _InputLabelTile(
+                      lbl: inputs[i],
+                      nf: nf,
+                      onRemove: onRemove,
+                    ),
+                  ),
+          ),
+        ],
       ),
     );
   }
@@ -357,13 +484,20 @@ class _InputLabelTile extends StatelessWidget {
     required this.onRemove,
   });
 
+  void _showSakDetail(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => BsV2SakDetailDialog(lbl: lbl, nf: nf),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final hasSaks = lbl.saks.isNotEmpty;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
             child: Column(
@@ -373,72 +507,97 @@ class _InputLabelTile extends StatelessWidget {
                   lbl.labelCode,
                   style: const TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1A1D23),
                   ),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   lbl.namaJenis,
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                 ),
                 if (hasSaks) ...[
-                  const SizedBox(height: 3),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 2,
-                    children: lbl.saks
-                        .map(
-                          (s) => Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.shade50,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              'Sak ${s.noSak}: ${nf.format(s.berat)} kg',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.blue.shade700,
-                              ),
-                            ),
+                  const SizedBox(height: 5),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE3F2FD),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '${lbl.jumlahSak} sak  •  ${nf.format(lbl.totalBerat)} kg',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Color(0xFF1565C0),
+                            fontWeight: FontWeight.w600,
                           ),
-                        )
-                        .toList(),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      GestureDetector(
+                        onTap: () => _showSakDetail(context),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _kPrimary.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.list_alt_rounded,
+                                size: 11,
+                                color: _kPrimary,
+                              ),
+                              SizedBox(width: 3),
+                              Text(
+                                'Detail',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: _kPrimary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ],
             ),
           ),
-          const SizedBox(width: 6),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '${nf.format(lbl.totalBerat)} kg',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
+          const SizedBox(width: 8),
+          if (!hasSaks)
+            Text(
+              '${lbl.isPcsCategory ? lbl.totalBerat.toInt() : nf.format(lbl.totalBerat)} ${lbl.isPcsCategory ? 'pcs' : 'kg'}',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1A1D23),
               ),
-              if (hasSaks)
-                Text(
-                  '${lbl.jumlahSak} sak',
-                  style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
-                ),
-            ],
-          ),
-          const SizedBox(width: 4),
-          IconButton(
-            icon: const Icon(
-              Icons.remove_circle_outline,
-              size: 18,
-              color: Colors.red,
             ),
-            onPressed: () => onRemove(lbl.labelCode),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
+          const SizedBox(width: 6),
+          GestureDetector(
+            onTap: () => onRemove(lbl.labelCode),
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(Icons.close, size: 14, color: Colors.red.shade400),
+            ),
           ),
         ],
       ),
@@ -446,495 +605,288 @@ class _InputLabelTile extends StatelessWidget {
   }
 }
 
+// ─── Berat Summary ─────────────────────────────────────────────────────────
+
 class _BeratSummaryCard extends StatelessWidget {
   final Map<int, double> inputByJenis;
   final Map<int, double> remainingByJenis;
+  final Map<int, String> jenisNames;
   final NumberFormat nf;
+  final String unit;
 
   const _BeratSummaryCard({
     required this.inputByJenis,
     required this.remainingByJenis,
+    required this.jenisNames,
     required this.nf,
+    this.unit = 'kg',
   });
 
   @override
   Widget build(BuildContext context) {
-    if (inputByJenis.isEmpty) return const SizedBox.shrink();
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Sisa Berat per Jenis',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            ...inputByJenis.entries.map((e) {
-              final rem = remainingByJenis[e.key] ?? e.value;
-              final isBalanced = rem.abs() < 0.001;
-              final isOver = rem < -0.001;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'ID Jenis ${e.key}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          LinearProgressIndicator(
-                            value: e.value > 0
-                                ? ((e.value - rem.clamp(0.0, e.value)) /
-                                          e.value)
-                                      .clamp(0.0, 1.0)
-                                : 0.0,
-                            backgroundColor: Colors.grey.shade200,
-                            valueColor: AlwaysStoppedAnimation(
-                              isOver
-                                  ? Colors.red
-                                  : (isBalanced ? Colors.green : Colors.blue),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          '${nf.format(e.value)} kg',
+    return Container(
+      decoration: _cardDecoration(),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionHeader(
+            Icons.balance_rounded,
+            'Alokasi Berat',
+            iconColor: const Color(0xFF0A7349),
+          ),
+          const SizedBox(height: 12),
+          ...inputByJenis.entries.map((e) {
+            final rem = remainingByJenis[e.key] ?? e.value;
+            final balanced = rem.abs() < 0.001;
+            final over = rem < -0.001;
+            final progress = e.value > 0
+                ? ((e.value - rem.clamp(0.0, e.value)) / e.value).clamp(
+                    0.0,
+                    1.0,
+                  )
+                : 0.0;
+            final barColor = over
+                ? Colors.red
+                : (balanced ? const Color(0xFF0A7349) : _kPrimary);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          jenisNames[e.key] ?? 'Jenis ${e.key}',
                           style: const TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey,
-                          ),
-                        ),
-                        Text(
-                          isBalanced
-                              ? '✓ Seimbang'
-                              : (isOver
-                                    ? '⚠ Lebih ${nf.format(-rem)} kg'
-                                    : 'Sisa ${nf.format(rem)} kg'),
-                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: isBalanced
-                                ? Colors.green
-                                : (isOver
-                                      ? Colors.red
-                                      : Colors.orange.shade700),
+                            color: Color(0xFF1A1D23),
                           ),
                         ),
-                      ],
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        balanced
+                            ? '✓ Seimbang'
+                            : over
+                            ? '⚠ Lebih ${nf.format(-rem)} $unit'
+                            : 'Sisa ${nf.format(rem)} $unit',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: balanced
+                              ? const Color(0xFF0A7349)
+                              : (over ? Colors.red : Colors.orange.shade700),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 6,
+                      backgroundColor: Colors.grey.shade100,
+                      valueColor: AlwaysStoppedAnimation(barColor),
                     ),
-                  ],
-                ),
-              );
-            }),
-          ],
-        ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Total input: ${nf.format(e.value)} $unit',
+                    style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
       ),
     );
   }
 }
 
-class _NoteAndSubmitCard extends StatelessWidget {
-  final TextEditingController noteCtl;
+// ─── Submit Card ───────────────────────────────────────────────────────────
+
+class _SubmitCard extends StatelessWidget {
   final bool isSubmitting;
   final bool isBalanced;
   final bool allOutputsValid;
+  final int inputCount;
+  final int outputCount;
   final VoidCallback onSubmit;
 
-  const _NoteAndSubmitCard({
-    required this.noteCtl,
+  const _SubmitCard({
     required this.isSubmitting,
     required this.isBalanced,
     required this.allOutputsValid,
+    required this.inputCount,
+    required this.outputCount,
     required this.onSubmit,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextField(
-              controller: noteCtl,
-              maxLines: 2,
-              decoration: InputDecoration(
-                labelText: 'Catatan (opsional)',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
+    final canSubmit = isBalanced && !isSubmitting;
+    return Container(
+      decoration: _cardDecoration(),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Stats row
+          Row(
+            children: [
+              _stat(
+                Icons.input_rounded,
+                '$inputCount',
+                'Input',
+                const Color(0xFF1565C0),
               ),
-            ),
-            const SizedBox(height: 10),
-            ElevatedButton.icon(
-              onPressed: (!isBalanced || isSubmitting) ? null : onSubmit,
-              icon: isSubmitting
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
+              const SizedBox(width: 8),
+              _stat(
+                Icons.output_rounded,
+                '$outputCount',
+                'Output',
+                const Color(0xFF0A7349),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Submit button
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            decoration: BoxDecoration(
+              color: canSubmit ? const Color(0xFF0A7349) : Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(_kRadius),
+              boxShadow: canSubmit
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFF0A7349).withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
                       ),
-                    )
-                  : const Icon(Icons.check_circle_outline),
-              label: Text(isSubmitting ? 'Menyimpan...' : 'Submit Transaksi'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                backgroundColor: isBalanced ? Colors.green : null,
-                foregroundColor: isBalanced ? Colors.white : null,
-              ),
+                    ]
+                  : [],
             ),
-            if (!isBalanced)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text(
-                  !allOutputsValid
-                      ? 'Setiap output wajib memiliki minimal 1 sak dengan berat > 0'
-                      : 'Berat output belum seimbang dengan input',
-                  style: TextStyle(color: Colors.orange.shade700, fontSize: 12),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// RIGHT PANEL
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _OutputsPanel extends StatelessWidget {
-  final BsV2CreateViewModel vm;
-  final NumberFormat nf;
-  final TextEditingController Function(String outputId, double current)
-  beratCtlOf;
-  final TextEditingController Function(String key, double current)
-  sakBeratCtlOf;
-
-  const _OutputsPanel({
-    required this.vm,
-    required this.nf,
-    required this.beratCtlOf,
-    required this.sakBeratCtlOf,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            const Text(
-              'Label Output',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const Spacer(),
-            ElevatedButton.icon(
-              onPressed: vm.inputs.isEmpty ? null : vm.addOutput,
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('Tambah Output'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Expanded(
-          child: vm.outputs.isEmpty
-              ? Center(
-                  child: Text(
-                    vm.inputs.isEmpty
-                        ? 'Scan label input terlebih dahulu'
-                        : 'Tekan "Tambah Output" untuk mendefinisikan label baru',
-                    style: TextStyle(color: Colors.grey.shade500),
-                    textAlign: TextAlign.center,
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(_kRadius),
+              child: InkWell(
+                onTap: canSubmit ? onSubmit : null,
+                borderRadius: BorderRadius.circular(_kRadius),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (isSubmitting)
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      else
+                        Icon(
+                          Icons.check_circle_outline_rounded,
+                          size: 18,
+                          color: canSubmit
+                              ? Colors.white
+                              : Colors.grey.shade400,
+                        ),
+                      const SizedBox(width: 8),
+                      Text(
+                        isSubmitting ? 'Menyimpan...' : 'Submit Transaksi',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: canSubmit
+                              ? Colors.white
+                              : Colors.grey.shade400,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ],
                   ),
-                )
-              : ListView.builder(
-                  itemCount: vm.outputs.length,
-                  itemBuilder: (_, i) {
-                    final out = vm.outputs[i];
-                    return _OutputCard(
-                      key: ValueKey(out.id),
-                      entry: out,
-                      index: i,
-                      vm: vm,
-                      nf: nf,
-                      beratCtlOf: beratCtlOf,
-                      sakBeratCtlOf: sakBeratCtlOf,
-                    );
-                  },
                 ),
-        ),
-      ],
+              ),
+            ),
+          ),
+          if (!isBalanced && inputCount > 0) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 14,
+                    color: Colors.orange.shade700,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      !allOutputsValid
+                          ? 'Setiap output wajib memiliki minimal 1 sak dengan berat > 0'
+                          : 'Berat output belum seimbang dengan input',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.orange.shade800,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
-}
 
-class _OutputCard extends StatelessWidget {
-  final OutputEntry entry;
-  final int index;
-  final BsV2CreateViewModel vm;
-  final NumberFormat nf;
-  final TextEditingController Function(String, double) beratCtlOf;
-  final TextEditingController Function(String, double) sakBeratCtlOf;
-
-  const _OutputCard({
-    super.key,
-    required this.entry,
-    required this.index,
-    required this.vm,
-    required this.nf,
-    required this.beratCtlOf,
-    required this.sakBeratCtlOf,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final jenisOptions = vm.jenisOptions;
-    final isValid = vm.outputIsValid(entry);
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: isValid
-            ? BorderSide.none
-            : BorderSide(color: Colors.red.shade300, width: 1.5),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _stat(IconData icon, String value, String label, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
           children: [
-            // Header row
-            Row(
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 6),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Output #${index + 1}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '${nf.format(entry.totalBerat)} kg',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(
-                    Icons.delete_outline,
-                    color: Colors.red,
-                    size: 20,
+                  value,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: color,
                   ),
-                  onPressed: () => vm.removeOutput(entry.id),
-                  tooltip: 'Hapus output',
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
+                ),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: color.withValues(alpha: 0.7),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-
-            // Jenis dropdown
-            InputDecorator(
-              decoration: InputDecoration(
-                labelText: 'Jenis',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-              ),
-              child: DropdownButton<int>(
-                value: entry.idJenis,
-                isExpanded: true,
-                underline: const SizedBox.shrink(),
-                isDense: true,
-                items: jenisOptions
-                    .map(
-                      (j) => DropdownMenuItem(
-                        value: j.idJenis,
-                        child: Text('${j.namaJenis} (ID: ${j.idJenis})'),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (val) {
-                  if (val == null) return;
-                  final jenis = jenisOptions.firstWhere(
-                    (j) => j.idJenis == val,
-                  );
-                  vm.updateOutputJenis(entry.id, val, jenis.namaJenis);
-                },
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            // Washing: list of saks
-            if (vm.isWashing) ...[
-              Row(
-                children: [
-                  const Text(
-                    'Sak',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                  ),
-                  const Spacer(),
-                  TextButton.icon(
-                    onPressed: () => vm.addSak(entry.id),
-                    icon: const Icon(Icons.add, size: 16),
-                    label: const Text(
-                      'Tambah Sak',
-                      style: TextStyle(fontSize: 13),
-                    ),
-                    style: TextButton.styleFrom(padding: EdgeInsets.zero),
-                  ),
-                ],
-              ),
-              ...entry.saks.map((sak) {
-                final beratKey = '${entry.id}_${sak.id}';
-                final beratCtl = sakBeratCtlOf(beratKey, sak.berat);
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 64,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: Text(
-                          'Sak ${sak.noSak}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: beratCtl,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(
-                              RegExp(r'[0-9.]'),
-                            ),
-                          ],
-                          decoration: InputDecoration(
-                            labelText: 'Berat (kg)',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 8,
-                            ),
-                          ),
-                          onChanged: (v) {
-                            final d = double.tryParse(v);
-                            if (d != null)
-                              vm.updateSak(entry.id, sak.id, berat: d);
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.remove_circle_outline,
-                          color: Colors.red,
-                          size: 18,
-                        ),
-                        onPressed: () => vm.removeSak(entry.id, sak.id),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-              if (entry.saks.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.warning_amber_rounded,
-                        size: 14,
-                        color: Colors.red.shade400,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Wajib minimal 1 sak. Tekan "Tambah Sak".',
-                        style: TextStyle(
-                          color: Colors.red.shade400,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-
-            // Bonggolan: single berat field
-            if (vm.isBonggolan)
-              TextField(
-                controller: beratCtlOf(entry.id, entry.berat),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                ],
-                decoration: InputDecoration(
-                  labelText: 'Berat (kg)',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                ),
-                onChanged: (v) {
-                  final d = double.tryParse(v);
-                  if (d != null) vm.updateOutputBerat(entry.id, d);
-                },
-              ),
           ],
         ),
       ),

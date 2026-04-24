@@ -17,7 +17,9 @@ class BsV2SakItem {
 
   factory BsV2SakItem.fromJson(Map<String, dynamic> j) {
     return BsV2SakItem(
-      noSak: (j['noSak'] is int) ? j['noSak'] as int : int.tryParse(j['noSak']?.toString() ?? '0') ?? 0,
+      noSak: (j['noSak'] is int)
+          ? j['noSak'] as int
+          : int.tryParse(j['noSak']?.toString() ?? '0') ?? 0,
       berat: _d(j['berat']),
     );
   }
@@ -31,6 +33,7 @@ class BsV2OutputLabel {
   final String namaJenis;
   final double totalBerat;
   final String category;
+  final int jumlahSak;
   final List<BsV2SakItem> saks;
   final double? berat;
 
@@ -40,11 +43,17 @@ class BsV2OutputLabel {
     required this.namaJenis,
     required this.totalBerat,
     required this.category,
+    this.jumlahSak = 0,
     this.saks = const [],
     this.berat,
   });
 
   bool get isWashing => category == 'washing';
+  bool get isMixer => category == 'mixer';
+  bool get isFurnitureWip => category == 'furnitureWip';
+  bool get isBarangJadi => category == 'barangJadi';
+  bool get isBahanBaku => category == 'bahanBaku';
+  bool get isPcsCategory => isFurnitureWip || isBarangJadi;
 
   static String _s(dynamic v) => v?.toString() ?? '';
   static double _d(dynamic v) {
@@ -55,19 +64,52 @@ class BsV2OutputLabel {
     return 0.0;
   }
 
+  static int _i(dynamic v) {
+    if (v == null) return 0;
+    if (v is int) return v;
+    if (v is double) return v.toInt();
+    if (v is String) return int.tryParse(v) ?? 0;
+    return 0;
+  }
+
   factory BsV2OutputLabel.fromJson(Map<String, dynamic> j) {
     final saksRaw = (j['saks'] ?? []) as List;
-    // Submit response: labelCode is noWashing (washing) or noBonggolan (bonggolan)
-    final labelCode = j['labelCode'] ?? j['noWashing'] ?? j['noBonggolan'];
-    // totalBerat can be totalBerat (washing) or berat (bonggolan)
-    final totalBerat = _d(j['totalBerat'] ?? j['berat']);
+    final category = _s(j['category']);
+    final isGilingan = category == 'gilingan';
+    final isFurnitureWip = category == 'furnitureWip';
+    final isBarangJadi = category == 'barangJadi';
+    final isPcsCategory = isFurnitureWip || isBarangJadi;
+    // labelCode: noWashing, noBonggolan, noBroker, noCrusher, noGilingan, noMixer, noFurnitureWIP, noBJ, or labelCode
+    final labelCode =
+        j['labelCode'] ??
+        j['noWashing'] ??
+        j['noBonggolan'] ??
+        j['noBroker'] ??
+        j['noCrusher'] ??
+        j['noGilingan'] ??
+        j['noMixer'] ??
+        j['noFurnitureWIP'] ??
+        j['noBJ'] ??
+        j['noBahanBaku'];
+    final totalBerat = isPcsCategory
+        ? _d(j['pcs'] ?? j['totalPcs'])
+        : _d(j['totalBerat'] ?? j['berat']);
     return BsV2OutputLabel(
       labelCode: labelCode == null ? null : _s(labelCode),
-      idJenis: (j['idJenis'] is int) ? j['idJenis'] as int : int.tryParse(j['idJenis']?.toString() ?? '0') ?? 0,
+      idJenis: isGilingan
+          ? ((j['idGilingan'] is int)
+                ? j['idGilingan'] as int
+                : int.tryParse(j['idGilingan']?.toString() ?? '0') ?? 0)
+          : ((j['idJenis'] is int)
+                ? j['idJenis'] as int
+                : int.tryParse(j['idJenis']?.toString() ?? '0') ?? 0),
       namaJenis: _s(j['namaJenis']),
       totalBerat: totalBerat,
-      category: _s(j['category']),
-      saks: saksRaw.map((e) => BsV2SakItem.fromJson(Map<String, dynamic>.from(e as Map))).toList(),
+      category: category,
+      jumlahSak: _i(j['jumlahSak']),
+      saks: saksRaw
+          .map((e) => BsV2SakItem.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList(),
       berat: j['berat'] == null ? null : _d(j['berat']),
     );
   }
@@ -78,18 +120,27 @@ class BsV2Transaction {
   final DateTime? tanggal;
   final String? note;
   final String? username;
+  final int? idUsername;
   final String? category;
   final List<BsV2LabelInfo> inputs;
   final List<BsV2OutputLabel> outputs;
+  // List-response only (not populated in detail response)
+  final int? inputLabelCount;
+  final int? outputLabelCount;
+  final bool? balance;
 
   const BsV2Transaction({
     required this.noBongkarSusun,
     this.tanggal,
     this.note,
     this.username,
+    this.idUsername,
     this.category,
     this.inputs = const [],
     this.outputs = const [],
+    this.inputLabelCount,
+    this.outputLabelCount,
+    this.balance,
   });
 
   static String _s(dynamic v) => v?.toString() ?? '';
@@ -101,10 +152,19 @@ class BsV2Transaction {
   }
 
   factory BsV2Transaction.fromJson(Map<String, dynamic> j) {
+    // Detail response wraps header fields under 'header' key; list/submit response is flat.
+    final header = j['header'] as Map<String, dynamic>?;
+    final src = header ?? j;
+
     final inputsRaw = (j['inputs'] ?? j['Inputs'] ?? []) as List;
     final outputsRaw = (j['outputs'] ?? j['Outputs'] ?? []) as List;
-    final noteRaw = j['note'] ?? j['Note'];
-    final categoryRaw = _s(j['category'] ?? j['Category']);
+    final noteRaw = src['note'] ?? src['Note'];
+
+    // Derive category from explicit field or first input object
+    String categoryRaw = _s(src['category'] ?? src['Category']);
+    if (categoryRaw.isEmpty && inputsRaw.isNotEmpty && inputsRaw.first is Map) {
+      categoryRaw = _s((inputsRaw.first as Map)['category']);
+    }
 
     // inputs can be List<String> (submit response) or List<Map> (detail response)
     final inputs = inputsRaw.map<BsV2LabelInfo>((e) {
@@ -121,13 +181,40 @@ class BsV2Transaction {
     }).toList();
 
     return BsV2Transaction(
-      noBongkarSusun: _s(j['noBongkarSusun'] ?? j['NoBongkarSusun']),
-      tanggal: _dt(j['tanggal'] ?? j['Tanggal']),
-      note: noteRaw == null || noteRaw.toString().trim().isEmpty ? null : _s(noteRaw),
-      username: j['username'] != null ? _s(j['username']) : (j['Username'] != null ? _s(j['Username']) : null),
+      noBongkarSusun: _s(src['noBongkarSusun'] ?? src['NoBongkarSusun']),
+      tanggal: _dt(src['tanggal'] ?? src['Tanggal']),
+      note: noteRaw == null || noteRaw.toString().trim().isEmpty
+          ? null
+          : _s(noteRaw),
+      username: src['username'] != null
+          ? _s(src['username'])
+          : (src['Username'] != null ? _s(src['Username']) : null),
+      idUsername: src['IdUsername'] is int
+          ? src['IdUsername'] as int
+          : int.tryParse(src['IdUsername']?.toString() ?? ''),
       category: categoryRaw.isEmpty ? null : categoryRaw,
       inputs: inputs,
-      outputs: outputsRaw.map((e) => BsV2OutputLabel.fromJson(Map<String, dynamic>.from(e as Map))).toList(),
+      outputs: outputsRaw
+          .map(
+            (e) =>
+                BsV2OutputLabel.fromJson(Map<String, dynamic>.from(e as Map)),
+          )
+          .toList(),
+      inputLabelCount: j['inputLabelCount'] == null
+          ? null
+          : (j['inputLabelCount'] is int
+                ? j['inputLabelCount'] as int
+                : int.tryParse(j['inputLabelCount'].toString())),
+      outputLabelCount: j['outputLabelCount'] == null
+          ? null
+          : (j['outputLabelCount'] is int
+                ? j['outputLabelCount'] as int
+                : int.tryParse(j['outputLabelCount'].toString())),
+      balance: j['balance'] == null
+          ? null
+          : (j['balance'] is bool
+                ? j['balance'] as bool
+                : j['balance'].toString().toLowerCase() == 'true'),
     );
   }
 
@@ -139,8 +226,26 @@ class BsV2Transaction {
   bool get isWashing => category == 'washing';
 
   String get categoryLabel {
-    if (category != null) return isWashing ? 'Washing' : 'Bonggolan';
-    if (inputs.isEmpty) return '-';
-    return inputs.first.isWashing ? 'Washing' : 'Bonggolan';
+    final cat = category ?? (inputs.isNotEmpty ? inputs.first.category : null);
+    switch (cat) {
+      case 'washing':
+        return 'Washing';
+      case 'broker':
+        return 'Broker';
+      case 'crusher':
+        return 'Crusher';
+      case 'gilingan':
+        return 'Gilingan';
+      case 'mixer':
+        return 'Mixer';
+      case 'furnitureWip':
+        return 'Furniture WIP';
+      case 'barangJadi':
+        return 'Barang Jadi';
+      case 'bahanBaku':
+        return 'Bahan Baku';
+      default:
+        return cat != null ? 'Bonggolan' : '-';
+    }
   }
 }

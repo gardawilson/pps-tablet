@@ -8,6 +8,7 @@ import '../../../../common/widgets/success_status_dialog.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../model/bs_v2_transaction.dart';
 import '../repository/bs_v2_repository.dart';
+import '../utils/bs_v2_category_label.dart';
 import '../view_model/bs_v2_list_view_model.dart';
 import '../view_model/bs_v2_create_view_model.dart';
 import 'bs_v2_create_screen.dart';
@@ -18,29 +19,6 @@ import 'bs_v2_detail_screen.dart';
 const _kPrimary = Color(0xFF1E6FD9);
 const _kSurface = Color(0xFFF8F9FB);
 const _kBorder = Color(0xFFE2E6EA);
-
-String _categoryText(String? cat) {
-  switch (cat) {
-    case 'washing':
-      return 'Washing';
-    case 'broker':
-      return 'Broker';
-    case 'crusher':
-      return 'Crusher';
-    case 'gilingan':
-      return 'Gilingan';
-    case 'mixer':
-      return 'Mixer';
-    case 'furnitureWip':
-      return 'Furniture WIP';
-    case 'barangJadi':
-      return 'Barang Jadi';
-    case 'bahanBaku':
-      return 'Bahan Baku';
-    default:
-      return cat != null ? 'Unknown' : '-';
-  }
-}
 
 // ─── Screen ────────────────────────────────────────────────────────────────
 
@@ -379,7 +357,7 @@ class _BsV2ListScreenState extends State<BsV2ListScreen> {
               item.category ??
               (item.inputs.isNotEmpty ? item.inputs.first.category : null);
           return Text(
-            _categoryText(cat),
+            bsV2CategoryLabel(cat),
             style: TextStyle(
               fontSize: 13,
               color: state.isSelected

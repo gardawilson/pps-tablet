@@ -178,7 +178,13 @@ class _ScanInputDialogState extends State<_ScanInputDialog>
                               ),
                               const Spacer(),
                               if (vm.category != null)
-                                _categoryBadge(vm.category),
+                                Text(
+                                  bsV2CategoryLabel(vm.category),
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.7),
+                                    fontSize: 12,
+                                  ),
+                                ),
                               const SizedBox(width: 8),
                               GestureDetector(
                                 onTap: () => Navigator.of(ctx).pop(),

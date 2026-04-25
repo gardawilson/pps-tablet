@@ -56,43 +56,54 @@ class _OutputsPanel extends StatelessWidget {
                     ),
                   ),
                 const SizedBox(width: 8),
-                Material(
-                  color: vm.inputs.isEmpty
-                      ? Colors.grey.shade100
-                      : const Color(0xFF0A7349),
-                  borderRadius: BorderRadius.circular(10),
-                  child: InkWell(
-                    onTap: vm.inputs.isEmpty ? null : vm.addOutput,
-                    borderRadius: BorderRadius.circular(10),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 7,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.add,
-                            size: 15,
-                            color: vm.inputs.isEmpty
-                                ? Colors.grey.shade400
-                                : Colors.white,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Tambah Output',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: vm.inputs.isEmpty
-                                  ? Colors.grey.shade400
-                                  : Colors.white,
+                Builder(
+                  builder: (_) {
+                    final canAdd =
+                        vm.inputs.isNotEmpty && !vm.allJenisAllocated;
+                    return Tooltip(
+                      message: vm.inputs.isNotEmpty && vm.allJenisAllocated
+                          ? 'Semua jenis sudah terpenuhi'
+                          : '',
+                      child: Material(
+                        color: canAdd
+                            ? const Color(0xFF0A7349)
+                            : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(10),
+                        child: InkWell(
+                          onTap: canAdd ? vm.addOutput : null,
+                          borderRadius: BorderRadius.circular(10),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 7,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.add,
+                                  size: 15,
+                                  color: canAdd
+                                      ? Colors.white
+                                      : Colors.grey.shade400,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Tambah Output',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: canAdd
+                                        ? Colors.white
+                                        : Colors.grey.shade400,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -297,16 +308,30 @@ class _OutputCard extends StatelessWidget {
                       fontSize: 13,
                       color: Color(0xFF1A1D23),
                     ),
-                    items: jenisOptions
-                        .map(
-                          (j) => DropdownMenuItem(
+                    items: () {
+                      final result = <DropdownMenuItem<int>>[];
+                      for (int i = 0; i < jenisOptions.length; i++) {
+                        final j = jenisOptions[i];
+                        result.add(
+                          DropdownMenuItem(
                             value: j.idJenis,
-                            child: Text('${j.namaJenis} (ID: ${j.idJenis})'),
+                            child: Text(j.namaJenis),
                           ),
-                        )
-                        .toList(),
+                        );
+                        if (i < jenisOptions.length - 1) {
+                          result.add(
+                            DropdownMenuItem(
+                              enabled: false,
+                              value: -(i + 1),
+                              child: const Divider(height: 1, thickness: 1),
+                            ),
+                          );
+                        }
+                      }
+                      return result;
+                    }(),
                     onChanged: (val) {
-                      if (val == null) return;
+                      if (val == null || val < 0) return;
                       final jenis = jenisOptions.firstWhere(
                         (j) => j.idJenis == val,
                       );
@@ -435,6 +460,11 @@ class _OutputCard extends StatelessWidget {
                   else
                     ...entry.saks.map((sak) {
                       final key = '${entry.id}_${sak.id}';
+                      // Max = remaining for this jenis + this sak's current berat
+                      final sakMax =
+                          (vm.remainingByJenis[entry.idJenis] ?? 0.0) +
+                          sak.berat;
+                      final ctl = sakBeratCtlOf(key, sak.berat);
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Row(
@@ -462,7 +492,7 @@ class _OutputCard extends StatelessWidget {
                             const SizedBox(width: 8),
                             Expanded(
                               child: TextField(
-                                controller: sakBeratCtlOf(key, sak.berat),
+                                controller: ctl,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(
                                       decimal: true,
@@ -472,7 +502,27 @@ class _OutputCard extends StatelessWidget {
                                     RegExp(r'[0-9.]'),
                                   ),
                                 ],
-                                decoration: _fieldDecoration('Berat (kg)'),
+                                decoration: _fieldDecoration('Berat (kg)')
+                                    .copyWith(
+                                      suffixIcon: sakMax > 0
+                                          ? _MaxButton(
+                                              onTap: () {
+                                                final v = sakMax
+                                                    .toStringAsFixed(3)
+                                                    .replaceAll(
+                                                      RegExp(r'\.?0+$'),
+                                                      '',
+                                                    );
+                                                ctl.text = v;
+                                                vm.updateSak(
+                                                  entry.id,
+                                                  sak.id,
+                                                  berat: sakMax,
+                                                );
+                                              },
+                                            )
+                                          : null,
+                                    ),
                                 onChanged: (v) {
                                   final d = double.tryParse(v);
                                   if (d != null) {
@@ -505,30 +555,94 @@ class _OutputCard extends StatelessWidget {
 
                 // Single quantity field (bonggolan / crusher / gilingan / furnitureWip)
                 if (!vm.hasSaks)
-                  TextField(
-                    controller: beratCtlOf(entry.id, entry.berat),
-                    keyboardType: vm.isPcsCategory
-                        ? TextInputType.number
-                        : const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [
-                      vm.isPcsCategory
-                          ? FilteringTextInputFormatter.digitsOnly
-                          : FilteringTextInputFormatter.allow(
-                              RegExp(r'[0-9.]'),
+                  Builder(
+                    builder: (_) {
+                      final ctl = beratCtlOf(entry.id, entry.berat);
+                      final maxVal =
+                          (vm.remainingByJenis[entry.idJenis] ?? 0.0) +
+                          entry.berat;
+                      return TextField(
+                        controller: ctl,
+                        keyboardType: vm.isPcsCategory
+                            ? TextInputType.number
+                            : const TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                        inputFormatters: [
+                          vm.isPcsCategory
+                              ? FilteringTextInputFormatter.digitsOnly
+                              : FilteringTextInputFormatter.allow(
+                                  RegExp(r'[0-9.]'),
+                                ),
+                        ],
+                        decoration:
+                            _fieldDecoration(
+                              vm.isPcsCategory ? 'Pcs' : 'Berat (kg)',
+                            ).copyWith(
+                              suffixIcon: maxVal > 0
+                                  ? _MaxButton(
+                                      onTap: () {
+                                        final v = vm.isPcsCategory
+                                            ? maxVal.toInt().toString()
+                                            : maxVal
+                                                  .toStringAsFixed(3)
+                                                  .replaceAll(
+                                                    RegExp(r'\.?0+$'),
+                                                    '',
+                                                  );
+                                        ctl.text = v;
+                                        vm.updateOutputBerat(
+                                          entry.id,
+                                          vm.isPcsCategory
+                                              ? maxVal.toInt().toDouble()
+                                              : maxVal,
+                                        );
+                                      },
+                                    )
+                                  : null,
                             ),
-                    ],
-                    decoration: _fieldDecoration(
-                      vm.isPcsCategory ? 'Pcs' : 'Berat (kg)',
-                    ),
-                    onChanged: (v) {
-                      final d = double.tryParse(v);
-                      if (d != null) vm.updateOutputBerat(entry.id, d);
+                        onChanged: (v) {
+                          final d = double.tryParse(v);
+                          if (d != null) vm.updateOutputBerat(entry.id, d);
+                        },
+                      );
                     },
                   ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Max Button ────────────────────────────────────────────────────────────
+
+class _MaxButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _MaxButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: _kPrimary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: const Text(
+          'Max',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: _kPrimary,
+            height: 3,
+          ),
+        ),
       ),
     );
   }

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../model/bs_v2_label_info.dart';
 import '../model/bs_v2_transaction.dart';
 import '../repository/bs_v2_repository.dart';
+import '../utils/bs_v2_category_label.dart';
 import 'bs_v2_sak_detail_dialog.dart';
 
 // ─── Theme constants (mirroring create screen) ─────────────────────────────
@@ -24,70 +25,6 @@ BoxDecoration _cardDecoration({Color? borderColor}) => BoxDecoration(
       offset: const Offset(0, 2),
     ),
   ],
-);
-
-String _categoryLabel(String? cat) {
-  switch (cat) {
-    case 'washing':
-      return 'Washing';
-    case 'broker':
-      return 'Broker';
-    case 'bonggolan':
-      return 'Bonggolan';
-    case 'crusher':
-      return 'Crusher';
-    case 'gilingan':
-      return 'Gilingan';
-    case 'mixer':
-      return 'Mixer';
-    case 'furnitureWip':
-      return 'Furniture WIP';
-    case 'barangJadi':
-      return 'Barang Jadi';
-    case 'bahanBaku':
-      return 'Bahan Baku';
-    default:
-      return 'Unknown Category';
-  }
-}
-
-Color _categoryBg(String? cat) {
-  switch (cat) {
-    case 'washing':
-      return const Color(0xFFE3F2FD);
-    case 'broker':
-      return const Color(0xFFF3E5F5);
-    case 'crusher':
-      return const Color(0xFFEFEBE9);
-    case 'gilingan':
-      return const Color(0xFFE8F5E9);
-    case 'mixer':
-      return const Color(0xFFF3E5F5);
-    case 'furnitureWip':
-      return const Color(0xFFEDE7F6);
-    case 'barangJadi':
-      return const Color(0xFFE0F2F1);
-    case 'bahanBaku':
-      return const Color(0xFFECEFF1);
-    default:
-      return const Color(0xFFFFF3E0);
-  }
-}
-
-Widget _categoryBadge(String? category) => Container(
-  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-  decoration: BoxDecoration(
-    color: _categoryBg(category),
-    borderRadius: BorderRadius.circular(20),
-  ),
-  child: Text(
-    _categoryLabel(category),
-    style: TextStyle(
-      fontSize: 11,
-      fontWeight: FontWeight.w700,
-      letterSpacing: 0.3,
-    ),
-  ),
 );
 
 // ─── Screen ────────────────────────────────────────────────────────────────
@@ -151,23 +88,11 @@ class _BsV2DetailScreenState extends State<BsV2DetailScreen> {
         title: Row(
           children: [
             Text(
-              'Detail • ${widget.noBongkarSusun}',
+              'Detail - ${widget.noBongkarSusun}',
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
             ),
-            if (category != null) ...[
-              const SizedBox(width: 10),
-              _categoryBadge(category),
-            ],
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: _load,
-            tooltip: 'Refresh',
-          ),
-          const SizedBox(width: 8),
-        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(height: 1, color: _kBorder),
@@ -319,7 +244,7 @@ class _HeaderCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                _categoryBadge(category),
+                bsV2CategoryBadge(category),
               ],
             ),
           ),

@@ -4,6 +4,7 @@ import '../../../core/network/api_error.dart';
 import '../model/bs_v2_label_info.dart';
 import '../model/bs_v2_transaction.dart';
 import '../repository/bs_v2_repository.dart';
+import '../utils/bs_v2_category_label.dart';
 
 class SakEntry {
   final String id;
@@ -123,6 +124,12 @@ class BsV2CreateViewModel extends ChangeNotifier {
   bool get allOutputsValid =>
       outputs.isNotEmpty && outputs.every(outputIsValid);
 
+  /// True when every jenis from inputs has been fully allocated (remaining ≈ 0)
+  bool get allJenisAllocated =>
+      inputs.isNotEmpty &&
+      remainingByJenis.isNotEmpty &&
+      remainingByJenis.values.every((r) => r.abs() < 0.001);
+
   /// True when all jenis are fully allocated (remaining == 0) and every output is valid
   bool get isBalanced {
     if (inputs.isEmpty) return false;
@@ -158,7 +165,7 @@ class BsV2CreateViewModel extends ChangeNotifier {
       if (inputs.isNotEmpty && info.category != category) {
         lookupError =
             'Semua label harus kategori sama '
-            '(${_categoryLabel(category!)} vs ${_categoryLabel(info.category)})';
+            '(${bsV2CategoryLabelWithCode(category!)} vs ${bsV2CategoryLabelWithCode(info.category)})';
         return;
       }
 
@@ -192,7 +199,11 @@ class BsV2CreateViewModel extends ChangeNotifier {
 
   void addOutput() {
     if (jenisOptions.isEmpty) return;
-    final first = jenisOptions.first;
+    // Default to first jenis that still has unallocated berat
+    final first = jenisOptions.firstWhere(
+      (j) => (remainingByJenis[j.idJenis] ?? 0.0).abs() > 0.001,
+      orElse: () => jenisOptions.first,
+    );
     final id = '${DateTime.now().millisecondsSinceEpoch}_${outputs.length}';
     final entry = OutputEntry(
       id: id,
@@ -361,26 +372,4 @@ class BsV2CreateViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  String _categoryLabel(String cat) {
-    switch (cat) {
-      case 'washing':
-        return 'Washing (B.)';
-      case 'broker':
-        return 'Broker (D.)';
-      case 'crusher':
-        return 'Crusher (F.)';
-      case 'gilingan':
-        return 'Gilingan (V.)';
-      case 'mixer':
-        return 'Mixer (H.)';
-      case 'furnitureWip':
-        return 'Furniture WIP (BB.)';
-      case 'barangJadi':
-        return 'Barang Jadi (BA.)';
-      case 'bahanBaku':
-        return 'Bahan Baku (A.)';
-      default:
-        return 'Bonggolan (M.)';
-    }
-  }
 }

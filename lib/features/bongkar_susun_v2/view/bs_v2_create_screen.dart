@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
 import '../model/bs_v2_label_info.dart';
+import '../utils/bs_v2_category_label.dart';
 import '../view_model/bs_v2_create_view_model.dart';
 import 'bs_v2_sak_detail_dialog.dart';
 
@@ -18,75 +19,6 @@ const _kPrimary = Color(0xFF1E6FD9);
 const _kSurface = Color(0xFFF8F9FB);
 const _kBorder = Color(0xFFE2E6EA);
 const _kRadius = 12.0;
-
-String _categoryLabel(String? category) {
-  switch (category) {
-    case 'washing':
-      return 'Washing';
-    case 'broker':
-      return 'Broker';
-    case 'crusher':
-      return 'Crusher';
-    case 'gilingan':
-      return 'Gilingan';
-    case 'mixer':
-      return 'Mixer';
-    case 'furnitureWip':
-      return 'Furniture WIP';
-    case 'barangJadi':
-      return 'Barang Jadi';
-    case 'bahanBaku':
-      return 'Bahan Baku';
-    default:
-      return category != null ? 'Unknown' : '-';
-  }
-}
-
-Color _categoryFg(String? category) {
-  switch (category) {
-    case 'washing':
-      return const Color(0xFF1565C0);
-    case 'broker':
-      return const Color(0xFF6A1B9A);
-    case 'crusher':
-      return const Color(0xFF4E342E);
-    case 'gilingan':
-      return const Color(0xFF1B5E20);
-    case 'mixer':
-      return const Color(0xFF512DA8);
-    case 'furnitureWip':
-      return const Color(0xFF4527A0);
-    case 'barangJadi':
-      return const Color(0xFF00695C);
-    case 'bahanBaku':
-      return const Color(0xFF37474F);
-    default:
-      return const Color(0xFFE65100);
-  }
-}
-
-Color _categoryBg(String? category) {
-  switch (category) {
-    case 'washing':
-      return const Color(0xFFE3F2FD);
-    case 'broker':
-      return const Color(0xFFF3E5F5);
-    case 'crusher':
-      return const Color(0xFFEFEBE9);
-    case 'gilingan':
-      return const Color(0xFFE8F5E9);
-    case 'mixer':
-      return const Color(0xFFF3E5F5);
-    case 'furnitureWip':
-      return const Color(0xFFEDE7F6);
-    case 'barangJadi':
-      return const Color(0xFFE0F2F1);
-    case 'bahanBaku':
-      return const Color(0xFFECEFF1);
-    default:
-      return const Color(0xFFFFF3E0);
-  }
-}
 
 // ─── Shared helpers ────────────────────────────────────────────────────────
 
@@ -124,25 +56,6 @@ Widget _sectionHeader(IconData icon, String title, {Color? iconColor}) {
         ),
       ),
     ],
-  );
-}
-
-Widget _categoryBadge(String? category) {
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-    decoration: BoxDecoration(
-      color: _categoryBg(category),
-      borderRadius: BorderRadius.circular(20),
-    ),
-    child: Text(
-      _categoryLabel(category),
-      style: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-        color: _categoryFg(category),
-        letterSpacing: 0.3,
-      ),
-    ),
   );
 }
 
@@ -270,7 +183,15 @@ class _BsV2CreateScreenState extends State<BsV2CreateScreen> {
                 ),
                 if (vm.category != null) ...[
                   const SizedBox(width: 12),
-                  _categoryBadge(vm.category),
+                  bsV2CategoryBadge(
+                    vm.category,
+                    textStyle: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.grey.shade800,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
                 ],
               ],
             ),
@@ -632,7 +553,7 @@ class _BeratSummaryCard extends StatelessWidget {
         children: [
           _sectionHeader(
             Icons.balance_rounded,
-            'Alokasi Berat',
+            unit == 'pcs' ? 'Alokasi Pcs' : 'Alokasi Berat',
             iconColor: const Color(0xFF0A7349),
           ),
           const SizedBox(height: 12),

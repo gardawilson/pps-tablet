@@ -1,28 +1,20 @@
-// lib/features/warehouse/widgets/warehouse_dropdown.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../common/widgets/search_dropdown_field.dart';
-import '../model/warehouse_model.dart';
-import '../view_model/warehouse_view_model.dart';
+import '../model/mst_barang_jadi_model.dart';
+import '../view_model/mst_barang_jadi_view_model.dart';
 
-class WarehouseDropdown extends StatefulWidget {
+class BarangJadiDropdown extends StatefulWidget {
   final int? preselectId;
-  final ValueChanged<MstWarehouse?>? onChanged;
+  final ValueChanged<MstBarangJadi?>? onChanged;
 
-  // filtering (server)
-  final bool includeDisabled;
-  final String? q;
-  final String orderBy;
-  final String orderDir;
-
-  // UI & form
   final String label;
   final String hint;
   final bool enabled;
   final bool isExpanded;
   final double fieldHeight;
-  final String? Function(MstWarehouse?)? validator;
+  final String? Function(MstBarangJadi?)? validator;
   final AutovalidateMode? autovalidateMode;
   final String? helperText;
   final String? errorText;
@@ -30,23 +22,15 @@ class WarehouseDropdown extends StatefulWidget {
   final double popupMaxHeight;
   final EdgeInsetsGeometry contentPadding;
 
-  // search UI (client)
   final bool showSearchBox;
   final String searchHint;
 
-  const WarehouseDropdown({
+  const BarangJadiDropdown({
     super.key,
     this.preselectId,
     this.onChanged,
-
-    this.includeDisabled = false,
-    this.q,
-    this.orderBy = 'NamaWarehouse',
-    this.orderDir = 'ASC',
-
-    // UI
-    this.label = 'Warehouse',
-    this.hint = 'PILIH WAREHOUSE',
+    this.label = 'Jenis Barang Jadi',
+    this.hint = 'PILIH JENIS',
     this.enabled = true,
     this.isExpanded = true,
     this.fieldHeight = 40,
@@ -54,24 +38,22 @@ class WarehouseDropdown extends StatefulWidget {
     this.autovalidateMode,
     this.helperText,
     this.errorText,
-    this.prefixIcon = Icons.warehouse_outlined,
+    this.prefixIcon = Icons.category_outlined,
     this.popupMaxHeight = 500,
     this.contentPadding = const EdgeInsets.symmetric(
       horizontal: 16,
       vertical: 0,
     ),
-
-    // search UI
     this.showSearchBox = true,
-    this.searchHint = 'Cari warehouse…',
+    this.searchHint = 'Cari jenis barang jadi…',
   });
 
   @override
-  State<WarehouseDropdown> createState() => _WarehouseDropdownState();
+  State<BarangJadiDropdown> createState() => _BarangJadiDropdownState();
 }
 
-class _WarehouseDropdownState extends State<WarehouseDropdown> {
-  MstWarehouse? _selected;
+class _BarangJadiDropdownState extends State<BarangJadiDropdown> {
+  MstBarangJadi? _selected;
 
   @override
   void initState() {
@@ -79,34 +61,16 @@ class _WarehouseDropdownState extends State<WarehouseDropdown> {
     _load();
   }
 
-  @override
-  void didUpdateWidget(covariant WarehouseDropdown oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.includeDisabled != widget.includeDisabled ||
-        oldWidget.q != widget.q ||
-        oldWidget.orderBy != widget.orderBy ||
-        oldWidget.orderDir != widget.orderDir) {
-      _selected = null;
-      _load();
-    }
-  }
-
   void _load() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final vm = context.read<WarehouseViewModel>();
-      vm.loadAll(
-        includeDisabled: widget.includeDisabled,
-        q: widget.q,
-        orderBy: widget.orderBy,
-        orderDir: widget.orderDir,
-      );
+      context.read<MstBarangJadiViewModel>().loadAll();
     });
   }
 
-  MstWarehouse? _findById(List<MstWarehouse> items, int? id) {
+  MstBarangJadi? _findById(List<MstBarangJadi> items, int? id) {
     if (id == null) return null;
     try {
-      return items.firstWhere((e) => e.idWarehouse == id);
+      return items.firstWhere((e) => e.idJenis == id);
     } catch (_) {
       return null;
     }
@@ -114,24 +78,21 @@ class _WarehouseDropdownState extends State<WarehouseDropdown> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<WarehouseViewModel>(
+    return Consumer<MstBarangJadiViewModel>(
       builder: (context, vm, _) {
         if (_selected == null && vm.items.isNotEmpty) {
           _selected = _findById(vm.items, widget.preselectId);
         }
 
-        return SearchDropdownField<MstWarehouse>(
+        return SearchDropdownField<MstBarangJadi>(
           items: vm.items,
           value: _selected,
           onChanged: (val) {
             setState(() => _selected = val);
             widget.onChanged?.call(val);
           },
-          itemAsString: (w) => w.displayName,
-
-          compareFn: (a, b) => a.idWarehouse == b.idWarehouse,
-
-          // UI & form
+          itemAsString: (b) => b.displayName,
+          compareFn: (a, b) => a.idJenis == b.idJenis,
           label: widget.label,
           hint: widget.hint,
           prefixIcon: widget.prefixIcon,
@@ -144,24 +105,12 @@ class _WarehouseDropdownState extends State<WarehouseDropdown> {
           errorText: widget.errorText,
           popupMaxHeight: widget.popupMaxHeight,
           contentPadding: widget.contentPadding,
-
-          // search popup UI
           showSearchBox: widget.showSearchBox,
           searchHint: widget.searchHint,
-
-          // states
           isLoading: vm.isLoading,
           fetchError: vm.error.isNotEmpty,
           fetchErrorText: vm.error.isNotEmpty ? vm.error : null,
-          onRetry: () {
-            final r = context.read<WarehouseViewModel>();
-            r.loadAll(
-              includeDisabled: widget.includeDisabled,
-              q: widget.q,
-              orderBy: widget.orderBy,
-              orderDir: widget.orderDir,
-            );
-          },
+          onRetry: () => context.read<MstBarangJadiViewModel>().loadAll(),
         );
       },
     );

@@ -3,6 +3,7 @@ import 'package:pps_tablet/features/audit/view/audit_screen.dart';
 import 'package:pps_tablet/features/bj_jual/view/bj_jual_screen.dart';
 import 'package:pps_tablet/features/bongkar_susun_v2/view/bs_v2_list_screen.dart';
 import 'package:pps_tablet/features/report/view/report_list_screen.dart';
+import 'package:pps_tablet/features/sortir_reject_v2/view/sr_v2_list_screen.dart';
 import '../../../core/services/permission_storage.dart';
 import '../../bongkar_susun/view/bongkar_susun_screen.dart';
 import 'package:provider/provider.dart'; // ⬅️ wajib agar context.read bisa digunakan
@@ -219,6 +220,19 @@ class HomeScreen extends StatelessWidget {
             Navigator.of(
               context,
             ).push(MaterialPageRoute(builder: (_) => const BsV2ListScreen()));
+          },
+        ),
+        const SizedBox(height: 16),
+        _buildMenuCard(
+          context,
+          title: 'Sortir Reject',
+          subtitle: 'Input data Sortir Reject',
+          icon: Icons.production_quantity_limits_outlined,
+          color: const Color(0xFF0D47A1),
+          onTap: () {
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const SrV2ListScreen()));
           },
         ),
         const SizedBox(height: 16),

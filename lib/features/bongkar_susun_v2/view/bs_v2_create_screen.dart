@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
+import '../../../../common/widgets/scan_label_dialog.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
 import '../model/bs_v2_label_info.dart';
 import '../utils/bs_v2_category_label.dart';
@@ -124,7 +124,23 @@ class _BsV2CreateScreenState extends State<BsV2CreateScreen> {
   ) async {
     await showDialog<void>(
       context: context,
-      builder: (_) => _ScanInputDialog(vm: vm),
+      builder: (_) => ScanLabelDialog(
+        onLookup: (code) async {
+          await vm.lookupLabel(code);
+          return vm.lookupError;
+        },
+        manualHint: 'B.0000000001',
+        acceptedLabels: const [
+          (prefix: 'A', label: 'Bahan Baku'),
+          (prefix: 'B', label: 'Washing'),
+          (prefix: 'D', label: 'Broker'),
+          (prefix: 'M', label: 'Bonggolan'),
+          (prefix: 'V', label: 'Gilingan'),
+          (prefix: 'F', label: 'Crusher'),
+          (prefix: 'BB', label: 'Furniture WIP'),
+          (prefix: 'BA', label: 'Barang Jadi'),
+        ],
+      ),
     );
   }
 

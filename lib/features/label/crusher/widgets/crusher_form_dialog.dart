@@ -7,7 +7,6 @@ import 'package:pps_tablet/features/crusher_type/widgets/crusher_type_dropdown.d
 import 'package:pps_tablet/features/production/crusher/widgets/crusher_production_dropdown.dart';
 import 'package:provider/provider.dart';
 
-import '../../../bongkar_susun/widgets/bongkar_susun_dropdown.dart';
 import '../../../crusher_type/model/crusher_type_model.dart';
 import 'crusher_text_field.dart';
 import '../../../../core/services/dialog_service.dart';
@@ -38,7 +37,6 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
   late final TextEditingController jenisCtrl;
   late final TextEditingController warehouseCtrl;
   late final TextEditingController noCrusherProduksiCtrl;
-  late final TextEditingController noBongkarSusunCtrl;
   late final TextEditingController beratCtrl;
 
   // State
@@ -52,7 +50,6 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
 
   // Inline error text under process dropdowns
   String? _crusherProductionError;
-  String? _bongkarSusunError;
 
   @override
   void initState() {
@@ -76,9 +73,6 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
     noCrusherProduksiCtrl = TextEditingController(
       text: widget.header?.crusherNoProduksi ?? '',
     );
-    noBongkarSusunCtrl = TextEditingController(
-      text: widget.header?.noBongkarSusun ?? '',
-    );
 
     beratCtrl = TextEditingController(
       text: (widget.header?.berat != null)
@@ -88,25 +82,19 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
           : '',
     );
 
-    // Auto pick mode on edit (priority: broker → inject → bongkar)
+    // Auto pick mode on edit
     if ((noCrusherProduksiCtrl.text).trim().isNotEmpty) {
       _selectedMode = InputMode.crusherProduction;
-    } else if ((noBongkarSusunCtrl.text).trim().isNotEmpty) {
-      _selectedMode = InputMode.bongkarSusun;
     } else {
       _selectedMode = null;
     }
 
     // Auto-fetch outputs on edit mode
-    if (isEdit) {
+    if (isEdit &&
+        _selectedMode == InputMode.crusherProduction &&
+        noCrusherProduksiCtrl.text.trim().isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_selectedMode == InputMode.crusherProduction &&
-            noCrusherProduksiCtrl.text.trim().isNotEmpty) {
-          _fetchOutputs(noCrusherProduksiCtrl.text.trim());
-        } else if (_selectedMode == InputMode.bongkarSusun &&
-            noBongkarSusunCtrl.text.trim().isNotEmpty) {
-          _fetchOutputs(noBongkarSusunCtrl.text.trim());
-        }
+        _fetchOutputs(noCrusherProduksiCtrl.text.trim());
       });
     }
 
@@ -114,10 +102,6 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
     noCrusherProduksiCtrl.addListener(() {
       if (_crusherProductionError != null && mounted)
         setState(() => _crusherProductionError = null);
-    });
-    noBongkarSusunCtrl.addListener(() {
-      if (_bongkarSusunError != null && mounted)
-        setState(() => _bongkarSusunError = null);
     });
   }
 
@@ -128,7 +112,6 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
     jenisCtrl.dispose();
     warehouseCtrl.dispose();
     noCrusherProduksiCtrl.dispose();
-    noBongkarSusunCtrl.dispose();
     beratCtrl.dispose();
     super.dispose();
   }
@@ -140,7 +123,6 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
       _selectedMode = m;
       _crusherOutputs = [];
       _crusherProductionError = null;
-      _bongkarSusunError = null;
     });
   }
 
@@ -150,13 +132,10 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
     try {
       final repo = CrusherRepository();
       List<CrusherOutputItem> results;
-      switch (_selectedMode!) {
-        case InputMode.crusherProduction:
-          results = await repo.fetchOutputsByCrusherNoProduksi(code.trim());
-          break;
-        case InputMode.bongkarSusun:
-          results = await repo.fetchOutputsByNoBongkarSusun(code.trim());
-          break;
+      if (_selectedMode == InputMode.crusherProduction) {
+        results = await repo.fetchOutputsByCrusherNoProduksi(code.trim());
+      } else {
+        results = [];
       }
       if (mounted) setState(() => _crusherOutputs = results);
     } catch (_) {
@@ -174,7 +153,7 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
     if (!isEdit && _selectedMode == null) {
       await DialogService.instance.showError(
         title: 'PILIH PROSES',
-        message: 'Pilih salah satu dari Proses Crusher atau Bongkar Susun',
+        message: 'Pilih Proses Crusher',
       );
       return;
     }
@@ -182,21 +161,13 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
     // 3) In CREATE, validate process number for the chosen mode
     if (!isEdit && _selectedMode != null) {
       bool hasProcessError = false;
-      switch (_selectedMode!) {
-        case InputMode.crusherProduction:
-          if (noCrusherProduksiCtrl.text.trim().isEmpty) {
-            setState(
-              () => _crusherProductionError = 'Pilih Nomor Proses Crusher',
-            );
-            hasProcessError = true;
-          }
-          break;
-        case InputMode.bongkarSusun:
-          if (noBongkarSusunCtrl.text.trim().isEmpty) {
-            setState(() => _bongkarSusunError = 'Pilih Nomor Bongkar Susun');
-            hasProcessError = true;
-          }
-          break;
+      if (_selectedMode == InputMode.crusherProduction) {
+        if (noCrusherProduksiCtrl.text.trim().isEmpty) {
+          setState(
+            () => _crusherProductionError = 'Pilih Nomor Proses Crusher',
+          );
+          hasProcessError = true;
+        }
       }
       if (hasProcessError) return;
     }
@@ -249,9 +220,7 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
           noCrusherProduksi: noCrusherProduksiCtrl.text.trim().isEmpty
               ? null
               : noCrusherProduksiCtrl.text.trim(), // must start with "G."
-          noBongkarSusun: noBongkarSusunCtrl.text.trim().isEmpty
-              ? null
-              : noBongkarSusunCtrl.text.trim(), // must start with "BG."
+          noBongkarSusun: null,
           toDbDateString: toDbDateString,
         );
 
@@ -366,8 +335,6 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
   Widget _buildLeftColumn() {
     final bool isCrusherProductionEnabled =
         !isEdit && _selectedMode == InputMode.crusherProduction;
-    final bool isBongkarEnabled =
-        !isEdit && _selectedMode == InputMode.bongkarSusun;
 
     final errorStyle = TextStyle(
       color: Theme.of(context).colorScheme.error,
@@ -535,7 +502,8 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
                                         _crusherOutputs = [];
                                         _crusherProductionError = null;
                                       });
-                                      if ((cp?.noCrusherProduksi ?? '').isNotEmpty) {
+                                      if ((cp?.noCrusherProduksi ?? '')
+                                          .isNotEmpty) {
                                         _fetchOutputs(cp!.noCrusherProduksi);
                                       }
                                     }
@@ -555,59 +523,6 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
               ),
 
               const SizedBox(height: 16),
-
-              // ===== BONGKAR =====
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Radio<InputMode>(
-                    value: InputMode.bongkarSusun,
-                    groupValue: _selectedMode,
-                    onChanged: isEdit ? null : (val) => _selectMode(val!),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: IgnorePointer(
-                      ignoring: !isBongkarEnabled,
-                      child: Opacity(
-                        opacity: isBongkarEnabled ? 1 : 0.6,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            BongkarSusunDropdown(
-                              preselectNoBongkarSusun:
-                                  widget.header?.noBongkarSusun,
-                              date: _selectedDate,
-                              enabled: isBongkarEnabled,
-                              onChanged: isBongkarEnabled
-                                  ? (bs) {
-                                      if (_selectedMode !=
-                                          InputMode.bongkarSusun) {
-                                        _selectMode(InputMode.bongkarSusun);
-                                      }
-                                      setState(() {
-                                        noBongkarSusunCtrl.text =
-                                            bs?.noBongkarSusun ?? '';
-                                        _crusherOutputs = [];
-                                        _bongkarSusunError = null;
-                                      });
-                                      if ((bs?.noBongkarSusun ?? '').isNotEmpty) {
-                                        _fetchOutputs(bs!.noBongkarSusun);
-                                      }
-                                    }
-                                  : null,
-                            ),
-                            if (_bongkarSusunError != null) ...[
-                              const SizedBox(height: 6),
-                              Text(_bongkarSusunError!, style: errorStyle),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
         ),
@@ -616,23 +531,16 @@ class _CrusherFormDialogState extends State<CrusherFormDialog> {
   }
 
   Widget _buildOutputPanel() {
-    final sourceCode = _selectedMode == InputMode.crusherProduction
-        ? noCrusherProduksiCtrl.text.trim()
-        : noBongkarSusunCtrl.text.trim();
+    final sourceCode = noCrusherProduksiCtrl.text.trim();
 
-    final noSourceMessage = _selectedMode == InputMode.crusherProduction
-        ? 'Pilih No Proses Crusher\nuntuk melihat output'
-        : _selectedMode == InputMode.bongkarSusun
-        ? 'Pilih No Bongkar Susun\nuntuk melihat output'
-        : 'Pilih sumber\nuntuk melihat output';
+    final noSourceMessage = 'Pilih No Proses Crusher\nuntuk melihat output';
 
     return LabelOutputPanel(
       title: 'Output Crusher',
       items: _crusherOutputs
-          .map((o) => LabelOutputItem(
-                code: o.noCrusher,
-                isPrinted: o.isPrinted,
-              ))
+          .map(
+            (o) => LabelOutputItem(code: o.noCrusher, isPrinted: o.isPrinted),
+          )
           .toList(),
       isLoading: _loadingOutputs,
       hasSource: sourceCode.isNotEmpty,

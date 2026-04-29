@@ -212,8 +212,8 @@ class HomeScreen extends StatelessWidget {
         const SizedBox(height: 16),
         _buildMenuCard(
           context,
-          title: 'Bongkar Susun V2',
-          subtitle: 'Input data Bongkar Susun V2',
+          title: 'Bongkar Susun',
+          subtitle: 'Input data Bongkar Susun',
           icon: Icons.production_quantity_limits_outlined,
           color: const Color(0xFF0D47A1),
           onTap: () {
@@ -275,7 +275,7 @@ class HomeScreen extends StatelessWidget {
         const SizedBox(height: 12),
         _buildMenuCard(
           context,
-          title: 'Audit',
+          title: 'History',
           subtitle: 'Lihat history',
           icon: Icons.newspaper_outlined,
           color: const Color(0xFF0D47A1), // BLUE PRIMARY

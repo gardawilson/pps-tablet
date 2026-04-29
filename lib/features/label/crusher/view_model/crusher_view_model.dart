@@ -4,7 +4,7 @@ import '../model/crusher_header_model.dart';
 import '../repository/crusher_repository.dart';
 
 // Keep this in the same file or export InputMode from your dialog file
-enum InputMode { crusherProduction, bongkarSusun }
+enum InputMode { crusherProduction }
 
 class CrusherViewModel extends ChangeNotifier {
   final  CrusherRepository repository;
@@ -128,14 +128,6 @@ class CrusherViewModel extends ChangeNotifier {
             return 'Format nomor produksi Crusher harus diawali "G."';
           }
           break;
-        case InputMode.bongkarSusun:
-          if (noBongkarSusun == null || noBongkarSusun.trim().isEmpty) {
-            return 'Nomor Bongkar Susun belum diisi.';
-          }
-          if (!noBongkarSusun.startsWith('BG.')) {
-            return 'Format nomor Bongkar Susun harus diawali "BG."';
-          }
-          break;
       }
     }
     return null; // OK
@@ -155,15 +147,10 @@ class CrusherViewModel extends ChangeNotifier {
   }) {
     // Decide ProcessedCode based on selected mode
     String? processedCode;
-    switch (mode) {
-      case InputMode.crusherProduction:
-        processedCode = noCrusherProduksi?.trim();
-        break;
-      case InputMode.bongkarSusun:
-        processedCode = noBongkarSusun?.trim();
-        break;
-      default:
-        processedCode = null;
+    if (mode == InputMode.crusherProduction) {
+      processedCode = noCrusherProduksi?.trim();
+    } else {
+      processedCode = null;
     }
 
     return <String, dynamic>{

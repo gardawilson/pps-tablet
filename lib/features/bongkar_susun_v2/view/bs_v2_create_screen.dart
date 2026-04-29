@@ -159,8 +159,8 @@ class _BsV2CreateScreenState extends State<BsV2CreateScreen> {
       await showDialog(
         context: context,
         builder: (_) => SuccessStatusDialog(
-          title: 'Transaksi Berhasil',
-          message: '${result.noBongkarSusun} berhasil dibuat.',
+          title: 'Berhasil Submit',
+          message: 'Data berhasil dibuat dengan nomor ${result.noBongkarSusun}',
         ),
       );
       if (context.mounted) Navigator.of(context).pop();
@@ -182,6 +182,7 @@ class _BsV2CreateScreenState extends State<BsV2CreateScreen> {
         _cleanupCtls(vm);
         return Scaffold(
           backgroundColor: _kSurface,
+          resizeToAvoidBottomInset: false,
           appBar: AppBar(
             backgroundColor: Colors.white,
             elevation: 0,

@@ -177,8 +177,8 @@ class _SrV2CreateScreenState extends State<SrV2CreateScreen> {
       await showDialog(
         context: context,
         builder: (_) => SuccessStatusDialog(
-          title: 'Transaksi Berhasil',
-          message: '${result.noSortir} berhasil dibuat.',
+          title: 'Berhasil Submit',
+          message: 'Data berhasil dibuat dengan nomor ${result.noSortir}',
         ),
       );
       if (context.mounted) Navigator.of(context).pop();
@@ -200,6 +200,7 @@ class _SrV2CreateScreenState extends State<SrV2CreateScreen> {
         _cleanupCtls(vm);
         return Scaffold(
           backgroundColor: _kSurface,
+          resizeToAvoidBottomInset: false,
           appBar: AppBar(
             backgroundColor: Colors.white,
             elevation: 0,
@@ -597,8 +598,11 @@ class _OutputsPanel extends StatelessWidget {
           ),
           const Divider(height: 1, color: _kBorder),
           Expanded(
-            child: vm.outputs.isEmpty
-                ? Center(
+            child: Builder(
+              builder: (context) {
+                final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+                if (vm.outputs.isEmpty) {
+                  return Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -617,8 +621,11 @@ class _OutputsPanel extends StatelessWidget {
                         ),
                       ],
                     ),
-                  )
-                : ListView.builder(
+                  );
+                }
+                return Padding(
+                  padding: EdgeInsets.only(bottom: bottomInset),
+                  child: ListView.builder(
                     padding: const EdgeInsets.all(12),
                     itemCount: vm.outputs.length,
                     itemBuilder: (context, i) {
@@ -634,6 +641,9 @@ class _OutputsPanel extends StatelessWidget {
                       );
                     },
                   ),
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -811,6 +821,18 @@ class _OutputCard extends StatelessWidget {
                     decoration: _fieldDecoration(
                       'Berat',
                     ).copyWith(suffixText: 'kg'),
+                    onTap: () {
+                      Future.delayed(const Duration(milliseconds: 350), () {
+                        if (context.mounted) {
+                          Scrollable.ensureVisible(
+                            context,
+                            duration: const Duration(milliseconds: 250),
+                            curve: Curves.easeInOut,
+                            alignment: 1.0,
+                          );
+                        }
+                      });
+                    },
                     onChanged: (v) {
                       final d = double.tryParse(v.trim().replaceAll(',', '.'));
                       vm.updateOutputBerat(entry.id, d ?? 0);
@@ -832,6 +854,18 @@ class _OutputCard extends StatelessWidget {
                             )
                           : null,
                     ),
+                    onTap: () {
+                      Future.delayed(const Duration(milliseconds: 350), () {
+                        if (context.mounted) {
+                          Scrollable.ensureVisible(
+                            context,
+                            duration: const Duration(milliseconds: 250),
+                            curve: Curves.easeInOut,
+                            alignment: 1.0,
+                          );
+                        }
+                      });
+                    },
                     onChanged: (v) {
                       final d = int.tryParse(v);
                       if (d != null) vm.updateOutputPcs(entry.id, d);

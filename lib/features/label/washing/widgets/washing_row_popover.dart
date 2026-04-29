@@ -9,6 +9,7 @@ import '../../../../core/network/endpoints.dart';
 import '../../../../core/network/label_print_lock_api.dart';
 import '../../../../core/view_model/label_print_lock_socket_manager.dart';
 import '../../../../core/services/label_print_sync_queue.dart';
+import '../../../../core/services/dialog_service.dart';
 import '../../../../core/utils/pdf_print_service.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../model/washing_header_model.dart';
@@ -46,6 +47,24 @@ class _WashingRowPopoverState extends State<WashingRowPopover> {
   void _runAndClose(VoidCallback action) {
     widget.onClose();
     action();
+  }
+
+  bool _isBongkarSusunLabel() {
+    final noBongkarSusun = (widget.header.noBongkarSusun ?? '').trim();
+    return noBongkarSusun.isNotEmpty;
+  }
+
+  Future<void> _handleEdit() async {
+    if (_isBongkarSusunLabel()) {
+      widget.onClose();
+      await DialogService.instance.showError(
+        title: 'Tidak Dapat Diedit',
+        message:
+            'Label yang berasal dari Bongkar Susun tidak dapat diedit. Silakan buat label baru jika diperlukan perubahan.',
+      );
+      return;
+    }
+    _runAndClose(widget.onEdit);
   }
 
   Future<void> _copyOnly() async {
@@ -195,7 +214,7 @@ class _WashingRowPopoverState extends State<WashingRowPopover> {
                 label: 'Edit',
                 enabled: canEdit,
                 tooltipWhenDisabled: 'Tidak punya izin edit',
-                onTap: () => _runAndClose(widget.onEdit),
+                onTap: _handleEdit,
               ),
               divider,
               LabelPopoverMenuTile(

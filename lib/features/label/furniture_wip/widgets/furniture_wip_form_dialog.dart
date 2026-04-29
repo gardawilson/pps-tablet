@@ -10,8 +10,6 @@ import '../../../../core/services/dialog_service.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../common/widgets/app_date_field.dart';
 
-import '../../../bongkar_susun/widgets/bongkar_susun_dropdown.dart';
-import '../../../bongkar_susun/model/bongkar_susun_model.dart';
 import '../../../production/hot_stamp/model/hot_stamp_production_model.dart';
 import '../../../production/hot_stamp/widgets/hot_stamp_production_dropdown.dart';
 import '../../../production/inject/model/inject_production_model.dart';
@@ -48,7 +46,6 @@ class _FurnitureWipCreateDraft {
   final FurnitureWipInputMode mode;
   final String? hotStampCode;
   final String? pasangKunciCode;
-  final String? bongkarSusunCode;
   final String? returCode;
   final String? spannerCode;
   final String? injectCode;
@@ -61,7 +58,6 @@ class _FurnitureWipCreateDraft {
     required this.mode,
     this.hotStampCode,
     this.pasangKunciCode,
-    this.bongkarSusunCode,
     this.returCode,
     this.spannerCode,
     this.injectCode,
@@ -98,7 +94,6 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
   // Selected source for each mode (hanya dipakai saat create)
   HotStampProduction? _selectedHotStamp;
   KeyFittingProduction? _selectedKeyFitting;
-  BongkarSusun? _selectedBongkar;
   ReturnProduction? _selectedReturBj;
   SpannerProduction? _selectedSpanner;
   InjectProduction? _selectedInject;
@@ -109,8 +104,6 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
 
   String? _preKeyFittingNoProduksi;
   String? _preKeyFittingNamaMesin;
-
-  String? _preBongkarNoBongkarSusun;
 
   String? _preReturNoRetur;
   String? _preReturNamaPembeli;
@@ -124,7 +117,6 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
   // Inline error messages per dropdown
   String? _hotStampError;
   String? _keyFittingError;
-  String? _bongkarError;
   String? _returError;
   String? _spannerError;
   String? _injectError;
@@ -214,9 +206,6 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
           _selectedMode = FurnitureWipInputMode.pasangKunci;
           _preKeyFittingNoProduksi = code;
           _preKeyFittingNamaMesin = nama;
-        } else if (type == 'BONGKAR_SUSUN' || code.startsWith('BG.')) {
-          _selectedMode = FurnitureWipInputMode.bongkarSusun;
-          _preBongkarNoBongkarSusun = code;
         } else if (type == 'RETUR' || code.startsWith('L.')) {
           _selectedMode = FurnitureWipInputMode.retur;
           _preReturNoRetur = code;
@@ -315,7 +304,6 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
       // reset pesan error supaya bersih
       _hotStampError = null;
       _keyFittingError = null;
-      _bongkarError = null;
       _returError = null;
       _spannerError = null;
       _injectError = null;
@@ -343,9 +331,6 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
           break;
         case FurnitureWipInputMode.spanner:
           outputs = await repo.fetchOutputsBySpannerNoProduksi(code);
-          break;
-        case FurnitureWipInputMode.bongkarSusun:
-          outputs = await repo.fetchOutputsByNoBongkarSusun(code);
           break;
         case FurnitureWipInputMode.retur:
           outputs = await repo.fetchOutputsByNoRetur(code);
@@ -388,7 +373,6 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
             mode: draft.mode,
             hotStampCode: draft.hotStampCode,
             pasangKunciCode: draft.pasangKunciCode,
-            bongkarSusunCode: draft.bongkarSusunCode,
             returCode: draft.returCode,
             spannerCode: draft.spannerCode,
             injectCode: draft.injectCode,
@@ -437,7 +421,6 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
             mode: draft.mode,
             hotStampCode: draft.hotStampCode,
             pasangKunciCode: draft.pasangKunciCode,
-            bongkarSusunCode: draft.bongkarSusunCode,
             returCode: draft.returCode,
             spannerCode: draft.spannerCode,
             injectCode: draft.injectCode,
@@ -538,7 +521,6 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
         // Mapping berdasarkan mode + dropdown
         String? hotStampCode;
         String? pasangKunciCode;
-        String? bongkarSusunCode;
         String? returCode;
         String? spannerCode;
         String? injectCode;
@@ -565,17 +547,6 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
               hasProcessError = true;
             } else {
               pasangKunciCode = _selectedKeyFitting!.noProduksi;
-            }
-            break;
-
-          case FurnitureWipInputMode.bongkarSusun:
-            if (_selectedBongkar == null) {
-              setState(() {
-                _bongkarError = 'Pilih nomor Bongkar Susun (BG.).';
-              });
-              hasProcessError = true;
-            } else {
-              bongkarSusunCode = _selectedBongkar!.noBongkarSusun;
             }
             break;
 
@@ -666,7 +637,6 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
           mode: _selectedMode,
           hotStampCode: hotStampCode,
           pasangKunciCode: pasangKunciCode,
-          bongkarSusunCode: bongkarSusunCode,
           returCode: returCode,
           spannerCode: spannerCode,
           injectCode: injectCode,
@@ -691,7 +661,6 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
           mode: _selectedMode!,
           hotStampCode: hotStampCode,
           pasangKunciCode: pasangKunciCode,
-          bongkarSusunCode: bongkarSusunCode,
           returCode: returCode,
           spannerCode: spannerCode,
           injectCode: injectCode,
@@ -877,8 +846,6 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
         !isEdit && _selectedMode == FurnitureWipInputMode.hotStamping;
     final isKeyFittingEnabled =
         !isEdit && _selectedMode == FurnitureWipInputMode.pasangKunci;
-    final isBongkarEnabled =
-        !isEdit && _selectedMode == FurnitureWipInputMode.bongkarSusun;
     final isReturEnabled =
         !isEdit && _selectedMode == FurnitureWipInputMode.retur;
     final isSpannerEnabled =
@@ -1174,59 +1141,6 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
 
               const SizedBox(height: 8),
 
-              // ===== BONGKAR SUSUN (BG.) =====
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Radio<FurnitureWipInputMode>(
-                    value: FurnitureWipInputMode.bongkarSusun,
-                    groupValue: _selectedMode,
-                    onChanged: isEdit ? null : (val) => _selectMode(val!),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: IgnorePointer(
-                      ignoring: !isBongkarEnabled,
-                      child: Opacity(
-                        opacity: isBongkarEnabled ? 1 : 0.6,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            BongkarSusunDropdown(
-                              preselectNoBongkarSusun:
-                                  _preBongkarNoBongkarSusun,
-                              date: _selectedDate,
-                              enabled: isBongkarEnabled,
-                              onChanged: isBongkarEnabled
-                                  ? (bs) {
-                                      if (_selectedMode !=
-                                          FurnitureWipInputMode.bongkarSusun) {
-                                        _selectMode(
-                                          FurnitureWipInputMode.bongkarSusun,
-                                        );
-                                      }
-                                      setState(() {
-                                        _selectedBongkar = bs;
-                                        _bongkarError = null;
-                                      });
-                                      _fetchOutputs(bs?.noBongkarSusun ?? '');
-                                    }
-                                  : null,
-                            ),
-                            if (_bongkarError != null) ...[
-                              const SizedBox(height: 4),
-                              Text(_bongkarError!, style: errorStyle),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 8),
-
               // ===== RETUR BJ (L.) =====
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -1278,7 +1192,7 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
                 ],
               ),
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 16),
 
               // ==========================
               // Jenis Furniture WIP
@@ -1430,11 +1344,6 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
         noSourceMessage = 'Pilih No Spanner\nuntuk melihat output';
         sourceCode =
             _selectedSpanner?.noProduksi ?? _preSpannerNoProduksi ?? '';
-        break;
-      case FurnitureWipInputMode.bongkarSusun:
-        noSourceMessage = 'Pilih No Bongkar Susun\nuntuk melihat output';
-        sourceCode =
-            _selectedBongkar?.noBongkarSusun ?? _preBongkarNoBongkarSusun ?? '';
         break;
       case FurnitureWipInputMode.retur:
         noSourceMessage = 'Pilih No Retur\nuntuk melihat output';

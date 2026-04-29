@@ -110,8 +110,11 @@ class _OutputsPanel extends StatelessWidget {
           ),
           const Divider(height: 1, color: _kBorder),
           Expanded(
-            child: vm.outputs.isEmpty
-                ? Center(
+            child: Builder(
+              builder: (context) {
+                final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+                if (vm.outputs.isEmpty) {
+                  return Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -132,8 +135,11 @@ class _OutputsPanel extends StatelessWidget {
                         ),
                       ],
                     ),
-                  )
-                : ListView.builder(
+                  );
+                }
+                return Padding(
+                  padding: EdgeInsets.only(bottom: bottomInset),
+                  child: ListView.builder(
                     padding: const EdgeInsets.all(12),
                     itemCount: vm.outputs.length,
                     itemBuilder: (_, i) {
@@ -149,6 +155,9 @@ class _OutputsPanel extends StatelessWidget {
                       );
                     },
                   ),
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -523,6 +532,23 @@ class _OutputCard extends StatelessWidget {
                                             )
                                           : null,
                                     ),
+                                onTap: () {
+                                  Future.delayed(
+                                    const Duration(milliseconds: 350),
+                                    () {
+                                      if (context.mounted) {
+                                        Scrollable.ensureVisible(
+                                          context,
+                                          duration: const Duration(
+                                            milliseconds: 250,
+                                          ),
+                                          curve: Curves.easeInOut,
+                                          alignment: 1.0,
+                                        );
+                                      }
+                                    },
+                                  );
+                                },
                                 onChanged: (v) {
                                   final d = double.tryParse(v);
                                   if (d != null) {
@@ -556,7 +582,7 @@ class _OutputCard extends StatelessWidget {
                 // Single quantity field (bonggolan / crusher / gilingan / furnitureWip)
                 if (!vm.hasSaks)
                   Builder(
-                    builder: (_) {
+                    builder: (context) {
                       final ctl = beratCtlOf(entry.id, entry.berat);
                       final maxVal =
                           (vm.remainingByJenis[entry.idJenis] ?? 0.0) +
@@ -601,6 +627,18 @@ class _OutputCard extends StatelessWidget {
                                     )
                                   : null,
                             ),
+                        onTap: () {
+                          Future.delayed(const Duration(milliseconds: 350), () {
+                            if (context.mounted) {
+                              Scrollable.ensureVisible(
+                                context,
+                                duration: const Duration(milliseconds: 250),
+                                curve: Curves.easeInOut,
+                                alignment: 1.0,
+                              );
+                            }
+                          });
+                        },
                         onChanged: (v) {
                           final d = double.tryParse(v);
                           if (d != null) vm.updateOutputBerat(entry.id, d);

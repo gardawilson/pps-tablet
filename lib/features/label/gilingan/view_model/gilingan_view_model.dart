@@ -5,9 +5,8 @@ import '../model/gilingan_partial_model.dart';
 import '../repository/gilingan_repository.dart';
 
 /// From which process this Gilingan comes
-/// - produksi     -> W.******  (GilinganProduksiOutput)
-/// - bongkarSusun -> BG.****** (BongkarSusunOutputGilingan)
-enum GilinganInputMode { produksi, bongkarSusun }
+/// - produksi -> W.****** (GilinganProduksiOutput)
+enum GilinganInputMode { produksi }
 
 class GilinganViewModel extends ChangeNotifier {
   final GilinganRepository repository;
@@ -121,41 +120,21 @@ class GilinganViewModel extends ChangeNotifier {
   /// Validate inputs for create Gilingan
   /// - must choose jenis gilingan
   /// - berat > 0 if filled
-  /// - mode (produksi/bongkar) required
-  /// - outputCode W.**** or BG.**** required
+  /// - outputCode W.**** required
   String? validateCreate({
     required int? idGilingan,
     required DateTime dateCreate,
     double? berat,
-    required GilinganInputMode? mode,
     String? noProduksiOutput, // W.******
-    String? noBongkarSusun,   // BG.******
   }) {
     if (idGilingan == null) return 'Pilih jenis gilingan terlebih dahulu.';
     if (berat != null && berat <= 0) return 'Berat harus angka > 0.';
 
-    if (mode == null) {
-      return 'Pilih proses sumber (Produksi atau Bongkar Susun).';
+    if (noProduksiOutput == null || noProduksiOutput.trim().isEmpty) {
+      return 'Nomor produksi (W...) belum diisi.';
     }
-
-    switch (mode) {
-      case GilinganInputMode.produksi:
-        if (noProduksiOutput == null || noProduksiOutput.trim().isEmpty) {
-          return 'Nomor produksi (W...) belum diisi.';
-        }
-        if (!noProduksiOutput.trim().startsWith('W.')) {
-          return 'Nomor produksi harus diawali "W."';
-        }
-        break;
-
-      case GilinganInputMode.bongkarSusun:
-        if (noBongkarSusun == null || noBongkarSusun.trim().isEmpty) {
-          return 'Nomor Bongkar Susun (BG...) belum diisi.';
-        }
-        if (!noBongkarSusun.trim().startsWith('BG.')) {
-          return 'Nomor Bongkar Susun harus diawali "BG."';
-        }
-        break;
+    if (!noProduksiOutput.trim().startsWith('W.')) {
+      return 'Nomor produksi harus diawali "W."';
     }
 
     return null;
@@ -169,23 +148,8 @@ class GilinganViewModel extends ChangeNotifier {
     int? idStatus,
     String? blok,
     String? idLokasi,
-    required GilinganInputMode? mode,
     String? noProduksiOutput, // W.******
-    String? noBongkarSusun,   // BG.******
   }) {
-    // Decide outputCode based on mode
-    String? outputCode;
-    switch (mode) {
-      case GilinganInputMode.produksi:
-        outputCode = noProduksiOutput?.trim();
-        break;
-      case GilinganInputMode.bongkarSusun:
-        outputCode = noBongkarSusun?.trim();
-        break;
-      default:
-        outputCode = null;
-    }
-
     final header = <String, dynamic>{
       "IdGilingan": idGilingan,
       "DateCreate": dateCreateYmd,
@@ -195,6 +159,8 @@ class GilinganViewModel extends ChangeNotifier {
       if (blok != null && blok.isNotEmpty) "Blok": blok,
       if (idLokasi != null && idLokasi.isNotEmpty) "IdLokasi": idLokasi,
     };
+
+    final outputCode = noProduksiOutput?.trim();
 
     return <String, dynamic>{
       "header": header,
@@ -211,16 +177,7 @@ class GilinganViewModel extends ChangeNotifier {
     int? idStatus,
     String? blok,
     String? idLokasi,
-
-    /// mode: Produksi (W.***) atau Bongkar (BG.***)
-    required GilinganInputMode? mode,
-
-    /// NoProduksi for W (e.g. "W.0000004133")
     String? noProduksiOutput,
-
-    /// NoBongkarSusun for BG (e.g. "BG.0000004133")
-    String? noBongkarSusun,
-
     required String Function(DateTime) toDbDateString, // yyyy-MM-dd
   }) async {
     // 1) Validate
@@ -228,9 +185,7 @@ class GilinganViewModel extends ChangeNotifier {
       idGilingan: idGilingan,
       dateCreate: dateCreate,
       berat: berat,
-      mode: mode,
       noProduksiOutput: noProduksiOutput,
-      noBongkarSusun: noBongkarSusun,
     );
     if (err != null) {
       throw Exception(err);
@@ -245,9 +200,7 @@ class GilinganViewModel extends ChangeNotifier {
       idStatus: idStatus,
       blok: blok,
       idLokasi: idLokasi,
-      mode: mode,
       noProduksiOutput: noProduksiOutput,
-      noBongkarSusun: noBongkarSusun,
     );
 
     // 3) API call

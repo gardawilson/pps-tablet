@@ -17,7 +17,6 @@ import '../../../../common/widgets/app_date_field.dart';
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
 
-import '../../../bongkar_susun/widgets/bongkar_susun_dropdown.dart';
 import '../../../production/inject/widgets/inject_production_dropdown.dart';
 import '../model/mixer_detail_model.dart';
 import '../model/mixer_header_model.dart';
@@ -37,26 +36,24 @@ class MixerFormDialog extends StatefulWidget {
   State<MixerFormDialog> createState() => _MixerFormDialogState();
 }
 
-enum InputMode { production, inject, bongkar }
+enum InputMode { production, inject }
 
 class _MixerFormDialogState extends State<MixerFormDialog> {
   late final TextEditingController noMixerCtrl;
   late final TextEditingController dateCreatedCtrl;
   late final TextEditingController jenisCtrl;
   late final TextEditingController noProduksiCtrl;
-  late final TextEditingController noBongkarSusunCtrl;
 
   late List<MixerDetail> detailList;
 
-  MixerType? _selectedType; // mixer type
-  InputMode? _selectedMode; // production vs inject vs bongkar
+  MixerType? _selectedType;
+  InputMode? _selectedMode;
 
-  DateTime _selectedDate = DateTime.now(); // single source of truth for date
+  DateTime _selectedDate = DateTime.now();
 
-  /// Kode label output yang akan dikirim ke BE (WAJIB untuk create):
-  /// - "I.XXXX"  → dari MixerProduksiOutput
-  /// - "S.XXXX"  → dari InjectProduksiOutputMixer
-  /// - "BG.XXXX" → dari BongkarSusunOutputMixer
+  /// Output code to send to BE (required for create):
+  /// - "I.XXXX" → from MixerProduksiOutput
+  /// - "S.XXXX" → from InjectProduksiOutputMixer
   String? _selectedOutputCode;
 
   List<MixerOutputItem> _mixerOutputs = [];
@@ -69,12 +66,6 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
       return output;
     }
     return (widget.header?.noProduksi ?? '').trim();
-  }
-
-  String _initialBongkarCode() {
-    final output = (widget.header?.outputCode ?? '').trim();
-    if (output.toUpperCase().startsWith('BG.')) return output;
-    return (widget.header?.noBongkarSusun ?? '').trim();
   }
 
   @override
@@ -95,7 +86,6 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
 
     jenisCtrl = TextEditingController(text: widget.header?.namaMixer ?? '');
     noProduksiCtrl = TextEditingController(text: _initialProductionLikeCode());
-    noBongkarSusunCtrl = TextEditingController(text: _initialBongkarCode());
 
     detailList = List.from(widget.details ?? []);
 
@@ -103,25 +93,20 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
     if (widget.header != null) {
       final outputCode = (widget.header!.outputCode ?? '').trim().toUpperCase();
       final np = (widget.header!.noProduksi ?? '').trim();
-      final nb = (widget.header!.noBongkarSusun ?? '').trim();
 
       if (outputCode.startsWith('S.')) {
         _selectedMode = InputMode.inject;
       } else if (outputCode.startsWith('I.')) {
         _selectedMode = InputMode.production;
-      } else if (outputCode.startsWith('BG.')) {
-        _selectedMode = InputMode.bongkar;
       } else if (np.isNotEmpty && np.toUpperCase().startsWith('S.')) {
         _selectedMode = InputMode.inject;
       } else if (np.isNotEmpty) {
         _selectedMode = InputMode.production;
-      } else if (nb.isNotEmpty) {
-        _selectedMode = InputMode.bongkar;
       } else {
         _selectedMode = InputMode.production;
       }
     } else {
-      _selectedMode = InputMode.production; // default add mode
+      _selectedMode = InputMode.production;
     }
 
     // Saat EDIT, kita biarkan _selectedOutputCode = null
@@ -130,9 +115,7 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
     // Auto-fetch outputs on edit mode
     if (widget.header != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        final code = _selectedMode == InputMode.bongkar
-            ? _initialBongkarCode()
-            : _initialProductionLikeCode();
+        final code = _initialProductionLikeCode();
         if (code.isNotEmpty) _fetchOutputs(code);
       });
     }
@@ -144,7 +127,6 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
     dateCreatedCtrl.dispose();
     jenisCtrl.dispose();
     noProduksiCtrl.dispose();
-    noBongkarSusunCtrl.dispose();
     super.dispose();
   }
 
@@ -159,10 +141,8 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
       List<MixerOutputItem> outputs;
       if (_selectedMode == InputMode.production) {
         outputs = await repo.fetchOutputsByNoProduksiMixer(code.trim());
-      } else if (_selectedMode == InputMode.inject) {
-        outputs = await repo.fetchOutputsByNoProduksiInject(code.trim());
       } else {
-        outputs = await repo.fetchOutputsByNoBongkarSusun(code.trim());
+        outputs = await repo.fetchOutputsByNoProduksiInject(code.trim());
       }
       if (mounted) setState(() => _mixerOutputs = outputs);
     } catch (_) {
@@ -238,7 +218,6 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
     final bool isProductionEnabled =
         !isEdit && _selectedMode == InputMode.production;
     final bool isInjectEnabled = !isEdit && _selectedMode == InputMode.inject;
-    final bool isBongkarEnabled = !isEdit && _selectedMode == InputMode.bongkar;
 
     final totalSak = detailList.length;
     final totalBerat = detailList.fold<double>(
@@ -303,7 +282,6 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                           'id_ID',
                         ).format(d);
                         noProduksiCtrl.clear();
-                        noBongkarSusunCtrl.clear();
                         _mixerOutputs = [];
                       });
                     }
@@ -341,7 +319,6 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                                 _selectedMode = val!;
                                 _selectedOutputCode = null;
                                 noProduksiCtrl.clear();
-                                noBongkarSusunCtrl.clear();
                                 _mixerOutputs = [];
                               });
                             },
@@ -399,7 +376,6 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                                 _selectedMode = val!;
                                 _selectedOutputCode = null;
                                 noProduksiCtrl.clear();
-                                noBongkarSusunCtrl.clear();
                                 _mixerOutputs = [];
                               });
                             },
@@ -427,59 +403,6 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                                     final code = (ip?.noProduksi ?? '').trim();
                                     setState(() {
                                       noProduksiCtrl.text = code;
-                                      _selectedOutputCode = code.isEmpty
-                                          ? null
-                                          : code;
-                                      _mixerOutputs = [];
-                                    });
-                                    if (code.isNotEmpty) _fetchOutputs(code);
-                                  }
-                                : null,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Mode: Bongkar Susun (BG.* → BongkarSusunOutputMixer)
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Radio<InputMode>(
-                      value: InputMode.bongkar,
-                      groupValue: _selectedMode,
-                      onChanged: isEdit
-                          ? null
-                          : (val) {
-                              setState(() {
-                                _selectedMode = val!;
-                                _selectedOutputCode = null;
-                                noProduksiCtrl.clear();
-                                noBongkarSusunCtrl.clear();
-                                _mixerOutputs = [];
-                              });
-                            },
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: IgnorePointer(
-                        ignoring: !isBongkarEnabled,
-                        child: Opacity(
-                          opacity: isBongkarEnabled ? 1 : 0.6,
-                          child: BongkarSusunDropdown(
-                            preselectNoBongkarSusun: isEdit
-                                ? _initialBongkarCode()
-                                : null,
-                            date: _selectedDate,
-                            enabled: isBongkarEnabled,
-                            onChanged: isBongkarEnabled
-                                ? (bs) {
-                                    final code = (bs?.noBongkarSusun ?? '')
-                                        .trim();
-                                    setState(() {
-                                      noBongkarSusunCtrl.text = code;
                                       _selectedOutputCode = code.isEmpty
                                           ? null
                                           : code;
@@ -763,10 +686,6 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
       case InputMode.inject:
         emptyMessage = 'Pilih No Inject\nuntuk melihat output';
         sourceCode = noProduksiCtrl.text.trim();
-        break;
-      case InputMode.bongkar:
-        emptyMessage = 'Pilih No Bongkar Susun\nuntuk melihat output';
-        sourceCode = noBongkarSusunCtrl.text.trim();
         break;
       default:
         emptyMessage = 'Pilih sumber\nuntuk melihat output';
@@ -1440,11 +1359,6 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                               ? null
                               : noProduksiCtrl.text.trim())
                         : null,
-                    noBongkarSusun: _selectedMode == InputMode.bongkar
-                        ? (noBongkarSusunCtrl.text.trim().isEmpty
-                              ? null
-                              : noBongkarSusunCtrl.text.trim())
-                        : null,
                     createBy: '',
                     dateTimeCreate: '',
                   )
@@ -1459,26 +1373,17 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                               ? null
                               : noProduksiCtrl.text.trim())
                         : null,
-                    noBongkarSusun: _selectedMode == InputMode.bongkar
-                        ? (noBongkarSusunCtrl.text.trim().isEmpty
-                              ? null
-                              : noBongkarSusunCtrl.text.trim())
-                        : null,
                   );
 
             // at least one reference must be filled
             final hasNoProduksi = (headerToSave.noProduksi ?? '')
                 .trim()
                 .isNotEmpty;
-            final hasNoBongkar = (headerToSave.noBongkarSusun ?? '')
-                .trim()
-                .isNotEmpty;
 
-            if (!hasNoProduksi && !hasNoBongkar) {
+            if (!hasNoProduksi) {
               await DialogService.instance.showError(
                 title: 'Lengkapi Data!',
-                message:
-                    'Wajib pilih Proses Produksi, Inject, atau Bongkar Susun',
+                message: 'Wajib pilih Proses Produksi atau Inject',
               );
               return;
             }
@@ -1491,7 +1396,7 @@ class _MixerFormDialogState extends State<MixerFormDialog> {
                 await DialogService.instance.showError(
                   title: 'Validasi',
                   message:
-                      'Output code belum terbentuk.\nPilih NoProduksi / Inject / Bongkar yang valid.',
+                      'Output code belum terbentuk.\nPilih NoProduksi / Inject yang valid.',
                 );
                 return;
               }

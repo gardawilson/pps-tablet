@@ -8,12 +8,10 @@ import '../repository/packing_repository.dart';
 /// Dari proses mana Barang Jadi (Packing) ini berasal (label sumber)
 /// - packing       -> BD.******   (PackingProduksiOutputLabelBJ)
 /// - inject        -> S.******    (InjectProduksiOutputBarangJadi)
-/// - bongkarSusun  -> BG.******   (BongkarSusunOutputBarangjadi)
 /// - retur         -> L.******    (BJReturBarangJadi_d)
 enum PackingInputMode {
   packing,
   inject,
-  bongkarSusun,
   retur,
 }
 
@@ -174,11 +172,10 @@ class PackingViewModel extends ChangeNotifier {
     required PackingInputMode? mode,
     String? packingCode,      // BD.******
     String? injectCode,       // S.******
-    String? bongkarSusunCode, // BG.******
     String? returCode,        // L.******
   }) {
     if (mode == null) {
-      return 'Pilih proses sumber (Packing / Inject / Bongkar Susun / Retur).';
+      return 'Pilih proses sumber (Packing / Inject / Retur).';
     }
 
     final bool isInjectMode = mode == PackingInputMode.inject;
@@ -206,10 +203,6 @@ class PackingViewModel extends ChangeNotifier {
       case PackingInputMode.inject:
         code = injectCode;
         prefix = 'S.';
-        break;
-      case PackingInputMode.bongkarSusun:
-        code = bongkarSusunCode;
-        prefix = 'BG.';
         break;
       case PackingInputMode.retur:
         code = returCode;
@@ -240,7 +233,6 @@ class PackingViewModel extends ChangeNotifier {
     required PackingInputMode? mode,
     String? packingCode,      // BD.******
     String? injectCode,       // S.******
-    String? bongkarSusunCode, // BG.******
     String? returCode,        // L.******
   }) {
     String? outputCode;
@@ -250,9 +242,6 @@ class PackingViewModel extends ChangeNotifier {
         break;
       case PackingInputMode.inject:
         outputCode = injectCode?.trim();
-        break;
-      case PackingInputMode.bongkarSusun:
-        outputCode = bongkarSusunCode?.trim();
         break;
       case PackingInputMode.retur:
         outputCode = returCode?.trim();
@@ -292,12 +281,11 @@ class PackingViewModel extends ChangeNotifier {
     String? idLokasi,
     String? jam,
 
-    /// mode: Packing / Inject / Bongkar Susun / Retur
+    /// mode: Packing / Inject / Retur
     required PackingInputMode? mode,
 
     String? packingCode,      // BD.******
     String? injectCode,       // S.******
-    String? bongkarSusunCode, // BG.******
     String? returCode,        // L.******
 
     required String Function(DateTime) toDbDateString, // yyyy-MM-dd
@@ -311,7 +299,6 @@ class PackingViewModel extends ChangeNotifier {
       mode: mode,
       packingCode: packingCode,
       injectCode: injectCode,
-      bongkarSusunCode: bongkarSusunCode,
       returCode: returCode,
     );
     if (err != null) {
@@ -332,7 +319,6 @@ class PackingViewModel extends ChangeNotifier {
       mode: mode,
       packingCode: packingCode,
       injectCode: injectCode,
-      bongkarSusunCode: bongkarSusunCode,
       returCode: returCode,
     );
 

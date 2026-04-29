@@ -4,7 +4,7 @@ import '../model/bonggolan_header_model.dart';
 import '../repository/bonggolan_repository.dart';
 
 // Keep this in the same file or export InputMode from your dialog file
-enum InputMode { brokerProduction, injectProduction, bongkar }
+enum InputMode { brokerProduction, injectProduction }
 
 class BonggolanViewModel extends ChangeNotifier {
   final BonggolanRepository repository;
@@ -144,14 +144,6 @@ class BonggolanViewModel extends ChangeNotifier {
             return 'Format nomor Inject harus diawali "S."';
           }
           break;
-        case InputMode.bongkar:
-          if (noBongkarSusun == null || noBongkarSusun.trim().isEmpty) {
-            return 'Nomor bongkar susun belum diisi.';
-          }
-          if (!noBongkarSusun.startsWith('BG.')) {
-            return 'Format nomor Bongkar Susun harus diawali "BG."';
-          }
-          break;
       }
     }
 
@@ -176,9 +168,6 @@ class BonggolanViewModel extends ChangeNotifier {
         break;
       case InputMode.injectProduction:
         processedCode = injectNoProduksi?.trim();
-        break;
-      case InputMode.bongkar:
-        processedCode = noBongkarSusun?.trim();
         break;
       default:
         processedCode = null;

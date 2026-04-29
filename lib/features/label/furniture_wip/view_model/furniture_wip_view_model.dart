@@ -10,14 +10,12 @@ import '../repository/furniture_wip_repository.dart';
 /// Dari proses mana Furniture WIP ini berasal (label sumber)
 /// - hotStamping  -> BH.******
 /// - pasangKunci  -> BI.******
-/// - bongkarSusun -> BG.******
 /// - retur        -> L.******
 /// - spanner      -> BJ.******
 /// - inject       -> S.******
 enum FurnitureWipInputMode {
   hotStamping,
   pasangKunci,
-  bongkarSusun,
   retur,
   spanner,
   inject,
@@ -199,7 +197,6 @@ class FurnitureWipViewModel extends ChangeNotifier {
     required FurnitureWipInputMode? mode,
     String? hotStampCode,      // BH.******
     String? pasangKunciCode,   // BI.******
-    String? bongkarSusunCode,  // BG.******
     String? returCode,         // L.******
     String? spannerCode,       // BJ.******
     String? injectCode,        // S.******
@@ -234,10 +231,6 @@ class FurnitureWipViewModel extends ChangeNotifier {
       case FurnitureWipInputMode.pasangKunci:
         code = pasangKunciCode;
         prefix = 'BI.';
-        break;
-      case FurnitureWipInputMode.bongkarSusun:
-        code = bongkarSusunCode;
-        prefix = 'BG.';
         break;
       case FurnitureWipInputMode.retur:
         code = returCode;
@@ -275,7 +268,6 @@ class FurnitureWipViewModel extends ChangeNotifier {
     required FurnitureWipInputMode? mode,
     String? hotStampCode,      // BH.******
     String? pasangKunciCode,   // BI.******
-    String? bongkarSusunCode,  // BG.******
     String? returCode,         // L.******
     String? spannerCode,       // BJ.******
     String? injectCode,        // S.******
@@ -288,9 +280,6 @@ class FurnitureWipViewModel extends ChangeNotifier {
         break;
       case FurnitureWipInputMode.pasangKunci:
         outputCode = pasangKunciCode?.trim();
-        break;
-      case FurnitureWipInputMode.bongkarSusun:
-        outputCode = bongkarSusunCode?.trim();
         break;
       case FurnitureWipInputMode.retur:
         outputCode = returCode?.trim();
@@ -339,7 +328,6 @@ class FurnitureWipViewModel extends ChangeNotifier {
 
     String? hotStampCode,      // BH.******
     String? pasangKunciCode,   // BI.******
-    String? bongkarSusunCode,  // BG.******
     String? returCode,         // L.******
     String? spannerCode,       // BJ.******
     String? injectCode,        // S.******
@@ -355,7 +343,6 @@ class FurnitureWipViewModel extends ChangeNotifier {
       mode: mode,
       hotStampCode: hotStampCode,
       pasangKunciCode: pasangKunciCode,
-      bongkarSusunCode: bongkarSusunCode,
       returCode: returCode,
       spannerCode: spannerCode,
       injectCode: injectCode,
@@ -377,7 +364,6 @@ class FurnitureWipViewModel extends ChangeNotifier {
       mode: mode,
       hotStampCode: hotStampCode,
       pasangKunciCode: pasangKunciCode,
-      bongkarSusunCode: bongkarSusunCode,
       returCode: returCode,
       spannerCode: spannerCode,
       injectCode: injectCode,

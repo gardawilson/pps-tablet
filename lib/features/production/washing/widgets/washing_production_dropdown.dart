@@ -23,7 +23,7 @@ class WashingProductionDropdown extends StatefulWidget {
     this.preselectNoProduksi,
     this.preselectNamaMesin,
     this.onChanged,
-    this.label = 'No Produksi',
+    this.label = 'Proses Washing',
     this.icon = Icons.factory_outlined,
     this.hintText,
     this.date,
@@ -32,7 +32,8 @@ class WashingProductionDropdown extends StatefulWidget {
   });
 
   @override
-  State<WashingProductionDropdown> createState() => _WashingProductionDropdownState();
+  State<WashingProductionDropdown> createState() =>
+      _WashingProductionDropdownState();
 }
 
 class _WashingProductionDropdownState extends State<WashingProductionDropdown> {
@@ -150,7 +151,9 @@ class _WashingProductionDropdownState extends State<WashingProductionDropdown> {
     return Consumer<WashingProductionViewModel>(
       builder: (context, vm, _) {
         // Pilih sumber data: lokal (edit) atau VM (fetch)
-        List<WashingProduction> base = _usePreselectedOnly ? _localItems : vm.items;
+        List<WashingProduction> base = _usePreselectedOnly
+            ? _localItems
+            : vm.items;
 
         // Filter shift jika ada
         if (widget.shiftFilter != null) {
@@ -175,15 +178,17 @@ class _WashingProductionDropdownState extends State<WashingProductionDropdown> {
           // === data ===
           value: safeValue,
           items: base,
-          itemAsString: (e) => '${e.noProduksi} | ${e.namaMesin ?? ''} (SHIFT ${e.shift ?? ''})'.trim(),
+          itemAsString: (e) =>
+              '${e.noProduksi} | ${e.namaMesin ?? ''} (SHIFT ${e.shift ?? ''})'
+                  .trim(),
           compareFn: (a, b) => a.noProduksi == b.noProduksi,
 
           // === interaksi ===
           onChanged: widget.enabled
               ? (val) {
-            setState(() => _value = val);
-            widget.onChanged?.call(val);
-          }
+                  setState(() => _value = val);
+                  widget.onChanged?.call(val);
+                }
               : null,
           enabled: widget.enabled,
 
@@ -196,8 +201,10 @@ class _WashingProductionDropdownState extends State<WashingProductionDropdown> {
           hint: isLoading
               ? 'Memuat...'
               : (hasError
-              ? 'Terjadi error'
-              : (base.isEmpty ? (widget.hintText ?? 'Tidak ada data') : 'PILIH')),
+                    ? 'Terjadi error'
+                    : (base.isEmpty
+                          ? (widget.hintText ?? 'Tidak ada data')
+                          : 'PILIH')),
         );
       },
     );

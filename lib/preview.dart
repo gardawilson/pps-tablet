@@ -357,3 +357,5 @@ class _PreviewTile extends StatelessWidget {
     );
   }
 }
+
+//flutter run -t lib/preview.dart

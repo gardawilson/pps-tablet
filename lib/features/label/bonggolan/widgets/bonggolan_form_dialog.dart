@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import '../../../bongkar_susun/widgets/bongkar_susun_dropdown.dart';
 import 'bonggolan_text_field.dart';
 import '../../../../core/services/dialog_service.dart';
 import '../../../../core/utils/date_formatter.dart';
@@ -42,7 +41,6 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
   late final TextEditingController warehouseCtrl;
   late final TextEditingController noBrokerProduksiCtrl;
   late final TextEditingController noInjectProduksiCtrl;
-  late final TextEditingController noBongkarSusunCtrl;
   late final TextEditingController beratCtrl;
 
   // State
@@ -53,7 +51,6 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
   // Inline error text under process dropdowns
   String? _brokerError;
   String? _injectError;
-  String? _bongkarError;
 
   // Output panel
   List<BonggolanOutputItem> _bonggolanOutputs = [];
@@ -86,9 +83,6 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
     noInjectProduksiCtrl = TextEditingController(
       text: widget.header?.injectNoProduksi ?? '',
     );
-    noBongkarSusunCtrl = TextEditingController(
-      text: widget.header?.noBongkarSusun ?? '',
-    );
 
     beratCtrl = TextEditingController(
       text: (widget.header?.berat != null)
@@ -98,13 +92,11 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
           : '',
     );
 
-    // Auto pick mode on edit (priority: broker → inject → bongkar)
+    // Auto pick mode on edit (priority: broker → inject)
     if ((noBrokerProduksiCtrl.text).trim().isNotEmpty) {
       _selectedMode = InputMode.brokerProduction;
     } else if ((noInjectProduksiCtrl.text).trim().isNotEmpty) {
       _selectedMode = InputMode.injectProduction;
-    } else if ((noBongkarSusunCtrl.text).trim().isNotEmpty) {
-      _selectedMode = InputMode.bongkar;
     } else {
       _selectedMode = null;
     }
@@ -116,19 +108,13 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
     noInjectProduksiCtrl.addListener(() {
       if (_injectError != null && mounted) setState(() => _injectError = null);
     });
-    noBongkarSusunCtrl.addListener(() {
-      if (_bongkarError != null && mounted)
-        setState(() => _bongkarError = null);
-    });
 
     // Auto-fetch outputs on edit mode
     if (widget.header != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final code = _selectedMode == InputMode.brokerProduction
             ? noBrokerProduksiCtrl.text
-            : _selectedMode == InputMode.injectProduction
-            ? noInjectProduksiCtrl.text
-            : noBongkarSusunCtrl.text;
+            : noInjectProduksiCtrl.text;
         if (code.trim().isNotEmpty) _fetchOutputs(code.trim());
       });
     }
@@ -142,7 +128,6 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
     warehouseCtrl.dispose();
     noBrokerProduksiCtrl.dispose();
     noInjectProduksiCtrl.dispose();
-    noBongkarSusunCtrl.dispose();
     beratCtrl.dispose();
     super.dispose();
   }
@@ -160,10 +145,8 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
       List<BonggolanOutputItem> outputs;
       if (_selectedMode == InputMode.brokerProduction) {
         outputs = await repo.fetchOutputsByBrokerNoProduksi(code.trim());
-      } else if (_selectedMode == InputMode.injectProduction) {
-        outputs = await repo.fetchOutputsByInjectNoProduksi(code.trim());
       } else {
-        outputs = await repo.fetchOutputsByNoBongkarSusun(code.trim());
+        outputs = await repo.fetchOutputsByInjectNoProduksi(code.trim());
       }
       if (mounted) setState(() => _bonggolanOutputs = outputs);
     } catch (_) {
@@ -178,7 +161,6 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
       _selectedMode = m;
       _brokerError = null;
       _injectError = null;
-      _bongkarError = null;
       _bonggolanOutputs = [];
     });
   }
@@ -210,12 +192,6 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
         case InputMode.injectProduction:
           if (noInjectProduksiCtrl.text.trim().isEmpty) {
             setState(() => _injectError = 'Pilih Nomor Proses Inject');
-            hasProcessError = true;
-          }
-          break;
-        case InputMode.bongkar:
-          if (noBongkarSusunCtrl.text.trim().isEmpty) {
-            setState(() => _bongkarError = 'Pilih Nomor Bongkar Susun');
             hasProcessError = true;
           }
           break;
@@ -275,9 +251,7 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
           injectNoProduksi: noInjectProduksiCtrl.text.trim().isEmpty
               ? null
               : noInjectProduksiCtrl.text.trim(),
-          noBongkarSusun: noBongkarSusunCtrl.text.trim().isEmpty
-              ? null
-              : noBongkarSusunCtrl.text.trim(),
+          noBongkarSusun: null,
           toDbDateString: toDbDateString,
         );
 
@@ -393,7 +367,6 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
         !isEdit && _selectedMode == InputMode.brokerProduction;
     final bool isInjectProductionEnabled =
         !isEdit && _selectedMode == InputMode.injectProduction;
-    final bool isBongkarEnabled = !isEdit && _selectedMode == InputMode.bongkar;
 
     final errorStyle = TextStyle(
       color: Theme.of(context).colorScheme.error,
@@ -624,56 +597,6 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
               ),
 
               const SizedBox(height: 16),
-
-              // ===== BONGKAR =====
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Radio<InputMode>(
-                    value: InputMode.bongkar,
-                    groupValue: _selectedMode,
-                    onChanged: isEdit ? null : (val) => _selectMode(val!),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: IgnorePointer(
-                      ignoring: !isBongkarEnabled,
-                      child: Opacity(
-                        opacity: isBongkarEnabled ? 1 : 0.6,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            BongkarSusunDropdown(
-                              preselectNoBongkarSusun:
-                                  widget.header?.noBongkarSusun,
-                              date: _selectedDate,
-                              enabled: isBongkarEnabled,
-                              onChanged: isBongkarEnabled
-                                  ? (bs) {
-                                      if (_selectedMode != InputMode.bongkar) {
-                                        _selectMode(InputMode.bongkar);
-                                      }
-                                      final code = bs?.noBongkarSusun ?? '';
-                                      setState(() {
-                                        noBongkarSusunCtrl.text = code;
-                                        _bongkarError = null;
-                                        _bonggolanOutputs = [];
-                                      });
-                                      if (code.isNotEmpty) _fetchOutputs(code);
-                                    }
-                                  : null,
-                            ),
-                            if (_bongkarError != null) ...[
-                              const SizedBox(height: 6),
-                              Text(_bongkarError!, style: errorStyle),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
         ),
@@ -695,10 +618,6 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
         noSourceMessage = 'Pilih No Produksi Inject\nuntuk melihat output';
         sourceCode = noInjectProduksiCtrl.text.trim();
         break;
-      case InputMode.bongkar:
-        noSourceMessage = 'Pilih No Bongkar Susun\nuntuk melihat output';
-        sourceCode = noBongkarSusunCtrl.text.trim();
-        break;
       default:
         noSourceMessage = 'Pilih sumber\nuntuk melihat output';
         sourceCode = '';
@@ -707,10 +626,9 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
     return LabelOutputPanel(
       title: 'Output Bonggolan',
       items: _bonggolanOutputs
-          .map((o) => LabelOutputItem(
-                code: o.noBonggolan,
-                isPrinted: o.isPrinted,
-              ))
+          .map(
+            (o) => LabelOutputItem(code: o.noBonggolan, isPrinted: o.isPrinted),
+          )
           .toList(),
       isLoading: _loadingOutputs,
       hasSource: sourceCode.isNotEmpty,

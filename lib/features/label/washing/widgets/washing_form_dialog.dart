@@ -9,7 +9,6 @@ import '../../../../core/services/dialog_service.dart';
 import '../../../../common/widgets/app_date_field.dart';
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
-import '../../../bongkar_susun/widgets/bongkar_susun_dropdown.dart';
 import '../../../production/washing/widgets/washing_production_dropdown.dart';
 import '../../../washing_type/model/washing_type_model.dart';
 import '../../../washing_type/widgets/washing_type_dropdown.dart';
@@ -40,7 +39,6 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
   late final TextEditingController jenisCtrl;
   late final TextEditingController warehouseCtrl;
   late final TextEditingController noProduksiCtrl;
-  late final TextEditingController noBongkarSusunCtrl;
 
   late List<WashingDetail> detailList;
 
@@ -53,10 +51,6 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
   // 🔹 Outputs: NoWashing yang sudah dibuat untuk NoProduksi terpilih
   List<WashingOutputItem> _washingOutputs = [];
   bool _loadingOutputs = false;
-
-  // 🔹 Outputs: NoWashing terkait NoBongkarSusun
-  List<WashingOutputItem> _bongkarOutputs = [];
-  bool _loadingBongkarOutputs = false;
 
   @override
   void initState() {
@@ -82,33 +76,16 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
     noProduksiCtrl = TextEditingController(
       text: widget.header?.noProduksi ?? '',
     );
-    noBongkarSusunCtrl = TextEditingController(
-      text: widget.header?.noBongkarSusun ?? '',
-    );
     detailList = List.from(widget.details ?? []);
 
-    // 🔹 Jika form edit, tentukan mode awal otomatis
-    if ((widget.header?.noProduksi ?? '').isNotEmpty) {
-      _selectedMode = InputMode.production;
-    } else if ((widget.header?.noBongkarSusun ?? '').isNotEmpty) {
-      _selectedMode = InputMode.bongkar;
-    } else {
-      _selectedMode = InputMode.production; // default
-    }
+    // 🔹 Selalu production mode
+    _selectedMode = InputMode.production;
 
     // 🔹 Fetch outputs jika ada NoProduksi (edit mode atau preselect)
     final preNoProduksi = widget.header?.noProduksi ?? '';
     if (preNoProduksi.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _fetchOutputs(preNoProduksi),
-      );
-    }
-
-    // 🔹 Fetch outputs jika ada NoBongkarSusun (edit mode)
-    final preNoBongkar = widget.header?.noBongkarSusun ?? '';
-    if (preNoBongkar.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _fetchBongkarOutputs(preNoBongkar),
       );
     }
   }
@@ -120,7 +97,6 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
     jenisCtrl.dispose();
     warehouseCtrl.dispose();
     noProduksiCtrl.dispose();
-    noBongkarSusunCtrl.dispose();
     super.dispose();
   }
 
@@ -141,24 +117,6 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
       if (mounted) setState(() => _washingOutputs = []);
     } finally {
       if (mounted) setState(() => _loadingOutputs = false);
-    }
-  }
-
-  Future<void> _fetchBongkarOutputs(String noBongkarSusun) async {
-    if (noBongkarSusun.trim().isEmpty) {
-      setState(() => _bongkarOutputs = []);
-      return;
-    }
-    setState(() => _loadingBongkarOutputs = true);
-    try {
-      final outputs = await WashingRepository().fetchOutputsByNoBongkarSusun(
-        noBongkarSusun.trim(),
-      );
-      if (mounted) setState(() => _bongkarOutputs = outputs);
-    } catch (_) {
-      if (mounted) setState(() => _bongkarOutputs = []);
-    } finally {
-      if (mounted) setState(() => _loadingBongkarOutputs = false);
     }
   }
 
@@ -226,7 +184,6 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
   Widget _buildLeftColumn() {
     final bool isProductionEnabled =
         !isEdit && _selectedMode == InputMode.production;
-    final bool isBongkarEnabled = !isEdit && _selectedMode == InputMode.bongkar;
     final totalSak = detailList.length;
     final totalBerat = detailList.fold<double>(0, (a, b) => a + (b.berat ?? 0));
 
@@ -284,9 +241,7 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
                         ).format(d);
                         // Tanggal berubah → referensi & output tidak valid lagi
                         noProduksiCtrl.clear();
-                        noBongkarSusunCtrl.clear();
                         _washingOutputs = [];
-                        _bongkarOutputs = [];
                       });
                     }
                   },
@@ -334,45 +289,6 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
                                       _washingOutputs = [];
                                     });
                                     _fetchOutputs(no);
-                                  }
-                                : null,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-
-                // 🔹 No Bongkar Susun
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Radio<InputMode>(
-                      value: InputMode.bongkar,
-                      groupValue: _selectedMode,
-                      onChanged: isEdit
-                          ? null
-                          : (val) => setState(() => _selectedMode = val!),
-                    ),
-                    Expanded(
-                      child: IgnorePointer(
-                        ignoring: !isBongkarEnabled,
-                        child: Opacity(
-                          opacity: isBongkarEnabled ? 1 : 0.6,
-                          child: BongkarSusunDropdown(
-                            preselectNoBongkarSusun:
-                                widget.header?.noBongkarSusun,
-                            date: _selectedDate,
-                            enabled: isBongkarEnabled,
-                            onChanged: isBongkarEnabled
-                                ? (bs) {
-                                    final no = bs?.noBongkarSusun ?? '';
-                                    setState(() {
-                                      noBongkarSusunCtrl.text = no;
-                                      _bongkarOutputs = [];
-                                    });
-                                    _fetchBongkarOutputs(no);
                                   }
                                 : null,
                           ),
@@ -636,19 +552,10 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
 
   // KOLOM KANAN: Output Panel (production = NoWashing list, bongkar = grouped categories)
   Widget _buildOutputPanel() {
-    final bool isProductionMode = _selectedMode == InputMode.production;
-    final bool isBongkarMode = _selectedMode == InputMode.bongkar;
     final bool hasNoProduksi = noProduksiCtrl.text.trim().isNotEmpty;
-    final bool hasNoBongkar = noBongkarSusunCtrl.text.trim().isNotEmpty;
 
-    final bool isLoading = isProductionMode
-        ? _loadingOutputs
-        : _loadingBongkarOutputs;
-
-    // Badge count
-    final int count = isProductionMode
-        ? _washingOutputs.length
-        : _bongkarOutputs.length;
+    final bool isLoading = _loadingOutputs;
+    final int count = _washingOutputs.length;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -663,11 +570,7 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
           // ── Header ──
           Row(
             children: [
-              Icon(
-                isProductionMode ? Icons.label_outline : Icons.output_outlined,
-                size: 18,
-                color: Colors.blue.shade700,
-              ),
+              Icon(Icons.label_outline, size: 18, color: Colors.blue.shade700),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -729,7 +632,7 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
               ),
             )
           // ── Production mode ──
-          else if (isProductionMode) ...[
+          else ...[
             if (!hasNoProduksi)
               _buildOutputEmptyState(
                 icon: Icons.touch_app_outlined,
@@ -749,32 +652,6 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
                       Divider(height: 1, color: Colors.grey.shade100),
                   itemBuilder: (_, index) {
                     final item = _washingOutputs[index];
-                    return _buildOutputItem(item);
-                  },
-                ),
-              ),
-          ]
-          // ── Bongkar mode ──
-          else if (isBongkarMode) ...[
-            if (!hasNoBongkar)
-              _buildOutputEmptyState(
-                icon: Icons.touch_app_outlined,
-                message: 'Pilih No Bongkar Susun\nuntuk melihat label terkait',
-              )
-            else if (_bongkarOutputs.isEmpty)
-              _buildOutputEmptyState(
-                icon: Icons.inbox_outlined,
-                message: 'Belum ada label output\nuntuk bongkar susun ini',
-              )
-            else
-              Expanded(
-                child: ListView.separated(
-                  padding: EdgeInsets.zero,
-                  itemCount: _bongkarOutputs.length,
-                  separatorBuilder: (_, __) =>
-                      Divider(height: 1, color: Colors.grey.shade100),
-                  itemBuilder: (_, index) {
-                    final item = _bongkarOutputs[index];
                     return _buildOutputItem(item);
                   },
                 ),
@@ -1422,16 +1299,10 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
                     idStatus: null,
                     createBy: '',
                     dateTimeCreate: '',
-                    noProduksi: _selectedMode == InputMode.production
-                        ? (noProduksiCtrl.text.trim().isEmpty
-                              ? null
-                              : noProduksiCtrl.text.trim())
-                        : null,
-                    noBongkarSusun: _selectedMode == InputMode.bongkar
-                        ? (noBongkarSusunCtrl.text.trim().isEmpty
-                              ? null
-                              : noBongkarSusunCtrl.text.trim())
-                        : null,
+                    noProduksi: noProduksiCtrl.text.trim().isEmpty
+                        ? null
+                        : noProduksiCtrl.text.trim(),
+                    noBongkarSusun: null,
                   )
                 : widget.header!.copyWith(
                     idJenisPlastik: selected.idWashing,
@@ -1441,23 +1312,14 @@ class _WashingFormDialogState extends State<WashingFormDialog> {
                     noProduksi: noProduksiCtrl.text.trim().isEmpty
                         ? null
                         : noProduksiCtrl.text.trim(),
-                    noBongkarSusun: noBongkarSusunCtrl.text.trim().isEmpty
-                        ? null
-                        : noBongkarSusunCtrl.text.trim(),
+                    noBongkarSusun: null,
                   );
 
-            // Minimal salah satu terisi
-            final hasNoProduksi = (headerToSave.noProduksi ?? '')
-                .trim()
-                .isNotEmpty;
-            final hasNoBongkar = (headerToSave.noBongkarSusun ?? '')
-                .trim()
-                .isNotEmpty;
-            if (!hasNoProduksi && !hasNoBongkar) {
+            // Validasi: NoProduksi wajib diisi
+            if ((headerToSave.noProduksi ?? '').trim().isEmpty) {
               await DialogService.instance.showError(
                 title: 'Validasi',
-                message:
-                    'Isi NoProduksi atau NoBongkarSusun (minimal salah satu).',
+                message: 'Pilih Proses Washing!',
               );
               return;
             }

@@ -9,7 +9,6 @@ import '../../../../core/services/dialog_service.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../common/widgets/app_date_field.dart';
 
-import '../../../bongkar_susun/widgets/bongkar_susun_dropdown.dart';
 import '../../../gilingan_type/model/gilingan_type_model.dart';
 import '../../../gilingan_type/widgets/gilingan_type_dropdown.dart';
 import '../../../production/gilingan/widgets/gilingan_production_dropdown.dart';
@@ -38,7 +37,6 @@ class _GilinganFormDialogState extends State<GilinganFormDialog> {
   late final TextEditingController dateCreatedCtrl;
   late final TextEditingController jenisCtrl;
   late final TextEditingController noProduksiOutputCtrl;
-  late final TextEditingController noBongkarSusunCtrl;
   late final TextEditingController beratCtrl;
 
   // State
@@ -50,9 +48,8 @@ class _GilinganFormDialogState extends State<GilinganFormDialog> {
   List<GilinganOutputItem> _gilinganOutputs = [];
   bool _loadingOutputs = false;
 
-  // Inline error text under process dropdowns
+  // Inline error text under process dropdown
   String? _produksiOutputError;
-  String? _bongkarSusunError;
 
   @override
   void initState() {
@@ -75,9 +72,6 @@ class _GilinganFormDialogState extends State<GilinganFormDialog> {
     noProduksiOutputCtrl = TextEditingController(
       text: widget.header?.gilinganNoProduksi ?? '',
     );
-    noBongkarSusunCtrl = TextEditingController(
-      text: widget.header?.noBongkarSusun ?? '',
-    );
 
     beratCtrl = TextEditingController(
       text: (widget.header?.berat != null)
@@ -87,11 +81,9 @@ class _GilinganFormDialogState extends State<GilinganFormDialog> {
           : '',
     );
 
-    // Auto pick mode on edit (priority: produksi → bongkar)
+    // Auto pick mode on edit
     if ((noProduksiOutputCtrl.text).trim().isNotEmpty) {
       _selectedMode = GilinganInputMode.produksi;
-    } else if ((noBongkarSusunCtrl.text).trim().isNotEmpty) {
-      _selectedMode = GilinganInputMode.bongkarSusun;
     } else {
       _selectedMode = null;
     }
@@ -102,21 +94,15 @@ class _GilinganFormDialogState extends State<GilinganFormDialog> {
         if (_selectedMode == GilinganInputMode.produksi &&
             noProduksiOutputCtrl.text.trim().isNotEmpty) {
           _fetchOutputs(noProduksiOutputCtrl.text.trim());
-        } else if (_selectedMode == GilinganInputMode.bongkarSusun &&
-            noBongkarSusunCtrl.text.trim().isNotEmpty) {
-          _fetchOutputs(noBongkarSusunCtrl.text.trim());
         }
       });
     }
 
     // Clear inline error when user types
     noProduksiOutputCtrl.addListener(() {
-      if (_produksiOutputError != null && mounted)
+      if (_produksiOutputError != null && mounted) {
         setState(() => _produksiOutputError = null);
-    });
-    noBongkarSusunCtrl.addListener(() {
-      if (_bongkarSusunError != null && mounted)
-        setState(() => _bongkarSusunError = null);
+      }
     });
   }
 
@@ -126,7 +112,6 @@ class _GilinganFormDialogState extends State<GilinganFormDialog> {
     dateCreatedCtrl.dispose();
     jenisCtrl.dispose();
     noProduksiOutputCtrl.dispose();
-    noBongkarSusunCtrl.dispose();
     beratCtrl.dispose();
     super.dispose();
   }
@@ -138,7 +123,6 @@ class _GilinganFormDialogState extends State<GilinganFormDialog> {
       _selectedMode = m;
       _gilinganOutputs = [];
       _produksiOutputError = null;
-      _bongkarSusunError = null;
     });
   }
 
@@ -147,15 +131,7 @@ class _GilinganFormDialogState extends State<GilinganFormDialog> {
     setState(() => _loadingOutputs = true);
     try {
       final repo = GilinganRepository();
-      List<GilinganOutputItem> results;
-      switch (_selectedMode!) {
-        case GilinganInputMode.produksi:
-          results = await repo.fetchOutputsByNoProduksi(code.trim());
-          break;
-        case GilinganInputMode.bongkarSusun:
-          results = await repo.fetchOutputsByNoBongkarSusun(code.trim());
-          break;
-      }
+      final results = await repo.fetchOutputsByNoProduksi(code.trim());
       if (mounted) setState(() => _gilinganOutputs = results);
     } catch (_) {
       if (mounted) setState(() => _gilinganOutputs = []);
@@ -172,31 +148,17 @@ class _GilinganFormDialogState extends State<GilinganFormDialog> {
     if (!isEdit && _selectedMode == null) {
       await DialogService.instance.showError(
         title: 'PILIH PROSES',
-        message: 'Pilih salah satu dari Proses Produksi atau Bongkar Susun',
+        message: 'Pilih Proses Produksi',
       );
       return;
     }
 
-    // 3) In CREATE, validate process number for the chosen mode
+    // 3) In CREATE, validate process number
     if (!isEdit && _selectedMode != null) {
-      bool hasProcessError = false;
-      switch (_selectedMode!) {
-        case GilinganInputMode.produksi:
-          if (noProduksiOutputCtrl.text.trim().isEmpty) {
-            setState(
-              () => _produksiOutputError = 'Pilih Nomor Produksi Output',
-            );
-            hasProcessError = true;
-          }
-          break;
-        case GilinganInputMode.bongkarSusun:
-          if (noBongkarSusunCtrl.text.trim().isEmpty) {
-            setState(() => _bongkarSusunError = 'Pilih Nomor Bongkar Susun');
-            hasProcessError = true;
-          }
-          break;
+      if (noProduksiOutputCtrl.text.trim().isEmpty) {
+        setState(() => _produksiOutputError = 'Pilih Nomor Produksi Output');
+        return;
       }
-      if (hasProcessError) return;
     }
 
     // 4) Build common values
@@ -239,18 +201,13 @@ class _GilinganFormDialogState extends State<GilinganFormDialog> {
           idGilingan: _selectedJenis?.idGilingan,
           dateCreate: _selectedDate,
           berat: beratVal,
-          isPartial: false, // default
-          idStatus: 1, // PASS
+          isPartial: false,
+          idStatus: 1,
           blok: null,
           idLokasi: null,
-          mode: _selectedMode,
-          // processed codes:
           noProduksiOutput: noProduksiOutputCtrl.text.trim().isEmpty
               ? null
-              : noProduksiOutputCtrl.text.trim(), // must start with "W."
-          noBongkarSusun: noBongkarSusunCtrl.text.trim().isEmpty
-              ? null
-              : noBongkarSusunCtrl.text.trim(), // must start with "BG."
+              : noProduksiOutputCtrl.text.trim(),
           toDbDateString: toDbDateString,
         );
 
@@ -364,8 +321,6 @@ class _GilinganFormDialogState extends State<GilinganFormDialog> {
   Widget _buildLeftColumn() {
     final bool isProduksiEnabled =
         !isEdit && _selectedMode == GilinganInputMode.produksi;
-    final bool isBongkarEnabled =
-        !isEdit && _selectedMode == GilinganInputMode.bongkarSusun;
 
     final errorStyle = TextStyle(
       color: Theme.of(context).colorScheme.error,
@@ -538,61 +493,6 @@ class _GilinganFormDialogState extends State<GilinganFormDialog> {
                   ),
                 ],
               ),
-
-              const SizedBox(height: 16),
-
-              // ===== BONGKAR SUSUN (BG.*****) =====
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Radio<GilinganInputMode>(
-                    value: GilinganInputMode.bongkarSusun,
-                    groupValue: _selectedMode,
-                    onChanged: isEdit ? null : (val) => _selectMode(val!),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: IgnorePointer(
-                      ignoring: !isBongkarEnabled,
-                      child: Opacity(
-                        opacity: isBongkarEnabled ? 1 : 0.6,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            BongkarSusunDropdown(
-                              preselectNoBongkarSusun:
-                                  widget.header?.noBongkarSusun,
-                              date: _selectedDate,
-                              enabled: isBongkarEnabled,
-                              onChanged: isBongkarEnabled
-                                  ? (bs) {
-                                      if (_selectedMode !=
-                                          GilinganInputMode.bongkarSusun) {
-                                        _selectMode(
-                                          GilinganInputMode.bongkarSusun,
-                                        );
-                                      }
-                                      final code = bs?.noBongkarSusun ?? '';
-                                      setState(() {
-                                        noBongkarSusunCtrl.text = code;
-                                        _gilinganOutputs = [];
-                                        _bongkarSusunError = null;
-                                      });
-                                      if (code.isNotEmpty) _fetchOutputs(code);
-                                    }
-                                  : null,
-                            ),
-                            if (_bongkarSusunError != null) ...[
-                              const SizedBox(height: 6),
-                              Text(_bongkarSusunError!, style: errorStyle),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
         ),
@@ -601,22 +501,9 @@ class _GilinganFormDialogState extends State<GilinganFormDialog> {
   }
 
   Widget _buildOutputPanel() {
-    final String noSourceMessage;
-    final String sourceCode;
-
-    switch (_selectedMode) {
-      case GilinganInputMode.produksi:
-        noSourceMessage = 'Pilih No Produksi Gilingan\nuntuk melihat output';
-        sourceCode = noProduksiOutputCtrl.text.trim();
-        break;
-      case GilinganInputMode.bongkarSusun:
-        noSourceMessage = 'Pilih No Bongkar Susun\nuntuk melihat output';
-        sourceCode = noBongkarSusunCtrl.text.trim();
-        break;
-      default:
-        noSourceMessage = 'Pilih sumber\nuntuk melihat output';
-        sourceCode = '';
-    }
+    const String noSourceMessage =
+        'Pilih No Produksi Gilingan\nuntuk melihat output';
+    final String sourceCode = noProduksiOutputCtrl.text.trim();
 
     return LabelOutputPanel(
       title: 'Output Gilingan',

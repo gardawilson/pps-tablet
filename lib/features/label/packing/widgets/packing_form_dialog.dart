@@ -9,8 +9,6 @@ import '../../../../core/services/dialog_service.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../common/widgets/app_date_field.dart';
 
-import '../../../bongkar_susun/widgets/bongkar_susun_dropdown.dart';
-import '../../../bongkar_susun/model/bongkar_susun_model.dart';
 import '../../../packing_type/model/packing_type_model.dart';
 import '../../../packing_type/widgets/packing_type_dropdown.dart';
 
@@ -44,7 +42,6 @@ class _PackingCreateDraft {
   final PackingInputMode mode;
   final String? packingCode;
   final String? injectCode;
-  final String? bongkarSusunCode;
   final String? returCode;
 
   const _PackingCreateDraft({
@@ -55,7 +52,6 @@ class _PackingCreateDraft {
     required this.mode,
     this.packingCode,
     this.injectCode,
-    this.bongkarSusunCode,
     this.returCode,
   });
 }
@@ -98,7 +94,6 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
   // Selected source for each mode
   PackingProduction? _selectedPacking;
   InjectProduction? _selectedInject;
-  BongkarSusun? _selectedBongkar;
   ReturnProduction? _selectedRetur;
 
   // Preselect untuk EDIT
@@ -106,14 +101,12 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
   String? _prePackingNamaMesin;
   String? _preInjectNoProduksi;
   String? _preInjectNamaMesin;
-  String? _preBongkarNoBongkarSusun;
   String? _preReturNoRetur;
   String? _preReturNamaPembeli;
 
   // Inline error messages
   String? _packingError;
   String? _injectError;
-  String? _bongkarError;
   String? _returError;
 
   // Output panel
@@ -191,9 +184,6 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
           _selectedMode = PackingInputMode.inject;
           _preInjectNoProduksi = code;
           _preInjectNamaMesin = nama;
-        } else if (type == 'BONGKAR_SUSUN' || code.startsWith('BG.')) {
-          _selectedMode = PackingInputMode.bongkarSusun;
-          _preBongkarNoBongkarSusun = code;
         } else if (type == 'RETUR' || code.startsWith('L.')) {
           _selectedMode = PackingInputMode.retur;
           _preReturNoRetur = code;
@@ -273,7 +263,6 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
 
       _packingError = null;
       _injectError = null;
-      _bongkarError = null;
       _returError = null;
     });
 
@@ -292,9 +281,6 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
           break;
         case PackingInputMode.packing:
           outputs = await repo.fetchOutputsByPackingNoPacking(code);
-          break;
-        case PackingInputMode.bongkarSusun:
-          outputs = await repo.fetchOutputsByNoBongkarSusun(code);
           break;
         case PackingInputMode.retur:
           outputs = await repo.fetchOutputsByNoRetur(code);
@@ -364,8 +350,7 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
         if (_selectedMode == null) {
           await DialogService.instance.showError(
             title: 'PILIH PROSES',
-            message:
-                'Pilih sumber proses (Packing / Inject / Bongkar Susun / Retur).',
+            message: 'Pilih sumber proses (Packing / Inject / Retur).',
           );
           return;
         }
@@ -380,7 +365,6 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
 
         String? packingCode;
         String? injectCode;
-        String? bongkarSusunCode;
         String? returCode;
 
         bool hasProcessError = false;
@@ -403,17 +387,6 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
               hasProcessError = true;
             } else {
               injectCode = _selectedInject!.noProduksi;
-            }
-            break;
-
-          case PackingInputMode.bongkarSusun:
-            if (_selectedBongkar == null) {
-              setState(
-                () => _bongkarError = 'Pilih nomor Bongkar Susun (BG.).',
-              );
-              hasProcessError = true;
-            } else {
-              bongkarSusunCode = _selectedBongkar!.noBongkarSusun;
             }
             break;
 
@@ -468,7 +441,6 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
           mode: _selectedMode!,
           packingCode: packingCode,
           injectCode: injectCode,
-          bongkarSusunCode: bongkarSusunCode,
           returCode: returCode,
         );
 
@@ -486,7 +458,6 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
           mode: _selectedMode,
           packingCode: packingCode,
           injectCode: injectCode,
-          bongkarSusunCode: bongkarSusunCode,
           returCode: returCode,
           toDbDateString: toDbDateString,
         );
@@ -639,7 +610,6 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
             mode: draft.mode,
             packingCode: draft.packingCode,
             injectCode: draft.injectCode,
-            bongkarSusunCode: draft.bongkarSusunCode,
             returCode: draft.returCode,
             toDbDateString: toDbDateString,
           );
@@ -688,7 +658,6 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
             mode: draft.mode,
             packingCode: draft.packingCode,
             injectCode: draft.injectCode,
-            bongkarSusunCode: draft.bongkarSusunCode,
             returCode: draft.returCode,
             toDbDateString: toDbDateString,
           );
@@ -914,8 +883,6 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
     final isPackingEnabled =
         !isEdit && _selectedMode == PackingInputMode.packing;
     final isInjectEnabled = !isEdit && _selectedMode == PackingInputMode.inject;
-    final isBongkarEnabled =
-        !isEdit && _selectedMode == PackingInputMode.bongkarSusun;
     final isReturEnabled = !isEdit && _selectedMode == PackingInputMode.retur;
 
     final isInjectMode = _selectedMode == PackingInputMode.inject;
@@ -1078,59 +1045,6 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
                             if (_packingError != null) ...[
                               const SizedBox(height: 4),
                               Text(_packingError!, style: errorStyle),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 8),
-
-              // BONGKAR SUSUN
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Radio<PackingInputMode>(
-                    value: PackingInputMode.bongkarSusun,
-                    groupValue: _selectedMode,
-                    onChanged: isEdit ? null : (val) => _selectMode(val!),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: IgnorePointer(
-                      ignoring: !isBongkarEnabled,
-                      child: Opacity(
-                        opacity: isBongkarEnabled ? 1 : 0.6,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            BongkarSusunDropdown(
-                              preselectNoBongkarSusun:
-                                  _preBongkarNoBongkarSusun,
-                              date: _selectedDate,
-                              enabled: isBongkarEnabled,
-                              onChanged: isBongkarEnabled
-                                  ? (bs) {
-                                      if (_selectedMode !=
-                                          PackingInputMode.bongkarSusun) {
-                                        _selectMode(
-                                          PackingInputMode.bongkarSusun,
-                                        );
-                                      }
-                                      setState(() {
-                                        _selectedBongkar = bs;
-                                        _bongkarError = null;
-                                      });
-                                      _fetchOutputs(bs?.noBongkarSusun ?? '');
-                                    }
-                                  : null,
-                            ),
-                            if (_bongkarError != null) ...[
-                              const SizedBox(height: 4),
-                              Text(_bongkarError!, style: errorStyle),
                             ],
                           ],
                         ),
@@ -1316,11 +1230,6 @@ class _PackingFormDialogState extends State<PackingFormDialog> {
       case PackingInputMode.packing:
         noSourceMessage = 'Pilih No Packing\nuntuk melihat output';
         sourceCode = _selectedPacking?.noPacking ?? _prePackingNoPacking ?? '';
-        break;
-      case PackingInputMode.bongkarSusun:
-        noSourceMessage = 'Pilih No Bongkar Susun\nuntuk melihat output';
-        sourceCode =
-            _selectedBongkar?.noBongkarSusun ?? _preBongkarNoBongkarSusun ?? '';
         break;
       case PackingInputMode.retur:
         noSourceMessage = 'Pilih No Retur\nuntuk melihat output';

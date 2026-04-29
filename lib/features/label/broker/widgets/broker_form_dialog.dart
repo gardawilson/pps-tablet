@@ -10,7 +10,6 @@ import '../../../../core/network/api_client.dart';
 import '../../../../common/widgets/app_date_field.dart';
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
-import '../../../bongkar_susun/widgets/bongkar_susun_dropdown.dart';
 import '../../../production/broker/widgets/broker_production_dropdown.dart';
 import '../../../broker_type/model/broker_type_model.dart';
 import '../../../broker_type/widgets/broker_type_dropdown.dart';
@@ -41,7 +40,6 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
   late final TextEditingController jenisCtrl;
   late final TextEditingController warehouseCtrl;
   late final TextEditingController noProduksiCtrl;
-  late final TextEditingController noBongkarSusunCtrl;
 
   late List<BrokerDetail> detailList;
 
@@ -51,8 +49,6 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
 
   List<BrokerOutputItem> _brokerOutputs = [];
   bool _loadingOutputs = false;
-  List<BrokerOutputItem> _bongkarOutputs = [];
-  bool _loadingBongkarOutputs = false;
 
   @override
   void initState() {
@@ -77,30 +73,16 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
     noProduksiCtrl = TextEditingController(
       text: widget.header?.noProduksi ?? '',
     );
-    noBongkarSusunCtrl = TextEditingController(
-      text: widget.header?.noBongkarSusun ?? '',
-    );
     detailList = List.from(widget.details ?? []);
 
-    if ((widget.header?.noProduksi ?? '').isNotEmpty) {
-      _selectedMode = InputMode.production;
-    } else if ((widget.header?.noBongkarSusun ?? '').isNotEmpty) {
-      _selectedMode = InputMode.bongkar;
-    } else {
-      _selectedMode = InputMode.production;
-    }
+    // 🔹 Selalu production mode
+    _selectedMode = InputMode.production;
 
-    // Auto-fetch outputs on edit mode
+    // 🔹 Fetch outputs jika ada NoProduksi (edit mode atau preselect)
     final preNoProduksi = widget.header?.noProduksi ?? '';
     if (preNoProduksi.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _fetchOutputs(preNoProduksi),
-      );
-    }
-    final preNoBongkar = widget.header?.noBongkarSusun ?? '';
-    if (preNoBongkar.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _fetchBongkarOutputs(preNoBongkar),
       );
     }
   }
@@ -112,7 +94,6 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
     jenisCtrl.dispose();
     warehouseCtrl.dispose();
     noProduksiCtrl.dispose();
-    noBongkarSusunCtrl.dispose();
     super.dispose();
   }
 
@@ -132,25 +113,6 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
       if (mounted) setState(() => _brokerOutputs = []);
     } finally {
       if (mounted) setState(() => _loadingOutputs = false);
-    }
-  }
-
-  Future<void> _fetchBongkarOutputs(String noBongkarSusun) async {
-    if (noBongkarSusun.trim().isEmpty) {
-      setState(() => _bongkarOutputs = []);
-      return;
-    }
-    setState(() => _loadingBongkarOutputs = true);
-    try {
-      final repo = BrokerRepository(api: ApiClient());
-      final outputs = await repo.fetchOutputsByNoBongkarSusun(
-        noBongkarSusun.trim(),
-      );
-      if (mounted) setState(() => _bongkarOutputs = outputs);
-    } catch (_) {
-      if (mounted) setState(() => _bongkarOutputs = []);
-    } finally {
-      if (mounted) setState(() => _loadingBongkarOutputs = false);
     }
   }
 
@@ -219,9 +181,7 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
 
   // KOLOM KIRI: Form Header + Detail (single scroll)
   Widget _buildLeftColumn() {
-    final bool isProductionEnabled =
-        !isEdit && _selectedMode == InputMode.production;
-    final bool isBongkarEnabled = !isEdit && _selectedMode == InputMode.bongkar;
+    final bool isProductionEnabled = !isEdit;
 
     final totalSak = detailList.length;
     final totalBerat = detailList.fold<double>(0, (a, b) => a + (b.berat ?? 0));
@@ -279,9 +239,7 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                           'id_ID',
                         ).format(d);
                         noProduksiCtrl.clear();
-                        noBongkarSusunCtrl.clear();
                         _brokerOutputs = [];
-                        _bongkarOutputs = [];
                       });
                     }
                   },
@@ -329,45 +287,6 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                                       _brokerOutputs = [];
                                     });
                                     _fetchOutputs(no);
-                                  }
-                                : null,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                // No Bongkar Susun
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Radio<InputMode>(
-                      value: InputMode.bongkar,
-                      groupValue: _selectedMode,
-                      onChanged: isEdit
-                          ? null
-                          : (val) => setState(() => _selectedMode = val!),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: IgnorePointer(
-                        ignoring: !isBongkarEnabled,
-                        child: Opacity(
-                          opacity: isBongkarEnabled ? 1 : 0.6,
-                          child: BongkarSusunDropdown(
-                            preselectNoBongkarSusun:
-                                widget.header?.noBongkarSusun,
-                            date: _selectedDate,
-                            enabled: isBongkarEnabled,
-                            onChanged: isBongkarEnabled
-                                ? (bs) {
-                                    final no = bs?.noBongkarSusun ?? '';
-                                    setState(() {
-                                      noBongkarSusunCtrl.text = no;
-                                      _bongkarOutputs = [];
-                                    });
-                                    _fetchBongkarOutputs(no);
                                   }
                                 : null,
                           ),
@@ -634,14 +553,9 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
 
   // KOLOM KANAN: Output Panel
   Widget _buildOutputPanel() {
-    final isProductionMode = _selectedMode == InputMode.production;
-    final outputs = isProductionMode ? _brokerOutputs : _bongkarOutputs;
-    final isLoading = isProductionMode
-        ? _loadingOutputs
-        : _loadingBongkarOutputs;
-    final hasSource = isProductionMode
-        ? noProduksiCtrl.text.trim().isNotEmpty
-        : noBongkarSusunCtrl.text.trim().isNotEmpty;
+    final outputs = _brokerOutputs;
+    final isLoading = _loadingOutputs;
+    final hasSource = noProduksiCtrl.text.trim().isNotEmpty;
     final count = outputs.length;
 
     return Container(
@@ -698,9 +612,7 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                 : !hasSource
                 ? _buildOutputEmptyState(
                     icon: Icons.link_off,
-                    message: isProductionMode
-                        ? 'Pilih No Produksi\nuntuk melihat output'
-                        : 'Pilih No Bongkar Susun\nuntuk melihat output',
+                    message: 'Pilih No Produksi\nuntuk melihat output',
                   )
                 : outputs.isEmpty
                 ? _buildOutputEmptyState(
@@ -1299,45 +1211,27 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                     idStatus: null,
                     createBy: '',
                     dateTimeCreate: '',
-                    noProduksi: _selectedMode == InputMode.production
-                        ? (noProduksiCtrl.text.trim().isEmpty
-                              ? null
-                              : noProduksiCtrl.text.trim())
-                        : null,
-                    noBongkarSusun: _selectedMode == InputMode.bongkar
-                        ? (noBongkarSusunCtrl.text.trim().isEmpty
-                              ? null
-                              : noBongkarSusunCtrl.text.trim())
-                        : null,
+                    noProduksi: noProduksiCtrl.text.trim().isEmpty
+                        ? null
+                        : noProduksiCtrl.text.trim(),
+                    noBongkarSusun: null,
                   )
                 : widget.header!.copyWith(
                     idJenisPlastik: selected.idBroker,
                     namaJenisPlastik: selected.nama,
                     namaWarehouse: warehouseCtrl.text.trim(),
                     dateCreate: _selectedDate.toIso8601String(),
-                    noProduksi: _selectedMode == InputMode.production
-                        ? (noProduksiCtrl.text.trim().isEmpty
-                              ? null
-                              : noProduksiCtrl.text.trim())
-                        : null,
-                    noBongkarSusun: _selectedMode == InputMode.bongkar
-                        ? (noBongkarSusunCtrl.text.trim().isEmpty
-                              ? null
-                              : noBongkarSusunCtrl.text.trim())
-                        : null,
+                    noProduksi: noProduksiCtrl.text.trim().isEmpty
+                        ? null
+                        : noProduksiCtrl.text.trim(),
+                    noBongkarSusun: null,
                   );
 
-            final hasNoProduksi = (headerToSave.noProduksi ?? '')
-                .trim()
-                .isNotEmpty;
-            final hasNoBongkar = (headerToSave.noBongkarSusun ?? '')
-                .trim()
-                .isNotEmpty;
-            if (!hasNoProduksi && !hasNoBongkar) {
+            // Validasi: NoProduksi wajib diisi
+            if ((headerToSave.noProduksi ?? '').trim().isEmpty) {
               await DialogService.instance.showError(
                 title: 'Validasi',
-                message:
-                    'Isi NoProduksi atau NoBongkarSusun (minimal salah satu).',
+                message: 'Pilih Proses Brokernya!',
               );
               return;
             }

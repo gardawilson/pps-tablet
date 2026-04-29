@@ -502,8 +502,12 @@ class _InputsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isFurnitureWip = inputs.isNotEmpty && inputs.first.isPcsCategory;
-    final totalBerat = inputs.fold(0.0, (s, e) => s + e.totalBerat);
+    final totalPcs = inputs
+        .where((e) => e.isPcsCategory)
+        .fold(0.0, (s, e) => s + e.totalBerat);
+    final totalBeratKg = inputs
+        .where((e) => !e.isPcsCategory)
+        .fold(0.0, (s, e) => s + e.totalBerat);
 
     return Container(
       decoration: _cardDecoration(),
@@ -581,11 +585,7 @@ class _InputsCard extends StatelessWidget {
                 endIndent: 16,
                 color: _kBorder,
               ),
-              itemBuilder: (_, i) => _InputTile(
-                lbl: inputs[i],
-                nf: nf,
-                isFurnitureWip: isFurnitureWip,
-              ),
+              itemBuilder: (_, i) => _InputTile(lbl: inputs[i], nf: nf),
             ),
             // Total row
             Container(
@@ -597,27 +597,55 @@ class _InputsCard extends StatelessWidget {
                 ),
                 border: const Border(top: BorderSide(color: _kBorder)),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    isFurnitureWip ? 'Total Pcs Input' : 'Total Berat Input',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: _kPrimary,
+                  if (totalBeratKg > 0)
+                    Row(
+                      children: [
+                        const Text(
+                          'Total Berat Input',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: _kPrimary,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${nf.format(totalBeratKg)} kg',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: _kPrimary,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    isFurnitureWip
-                        ? '${totalBerat.toInt()} pcs'
-                        : '${nf.format(totalBerat)} kg',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: _kPrimary,
+                  if (totalBeratKg > 0 && totalPcs > 0)
+                    const SizedBox(height: 4),
+                  if (totalPcs > 0)
+                    Row(
+                      children: [
+                        const Text(
+                          'Total Pcs Input',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: _kPrimary,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${totalPcs.toInt()} pcs',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: _kPrimary,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
                 ],
               ),
             ),
@@ -631,13 +659,8 @@ class _InputsCard extends StatelessWidget {
 class _InputTile extends StatelessWidget {
   final BsV2LabelInfo lbl;
   final NumberFormat nf;
-  final bool isFurnitureWip;
 
-  const _InputTile({
-    required this.lbl,
-    required this.nf,
-    this.isFurnitureWip = false,
-  });
+  const _InputTile({required this.lbl, required this.nf});
 
   @override
   Widget build(BuildContext context) {
@@ -706,7 +729,7 @@ class _InputTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                isFurnitureWip
+                lbl.isPcsCategory
                     ? '${lbl.totalBerat.toInt()} pcs'
                     : '${nf.format(lbl.totalBerat)} kg',
                 style: const TextStyle(
@@ -760,8 +783,12 @@ class _OutputsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isFurnitureWip = outputs.isNotEmpty && outputs.first.isPcsCategory;
-    final totalBerat = outputs.fold(0.0, (s, e) => s + e.totalBerat);
+    final totalPcs = outputs
+        .where((e) => e.isPcsCategory)
+        .fold(0.0, (s, e) => s + e.totalBerat);
+    final totalBeratKg = outputs
+        .where((e) => !e.isPcsCategory)
+        .fold(0.0, (s, e) => s + e.totalBerat);
 
     return Container(
       decoration: _cardDecoration(borderColor: _kGreen.withValues(alpha: 0.3)),
@@ -839,12 +866,8 @@ class _OutputsCard extends StatelessWidget {
                 endIndent: 16,
                 color: _kBorder,
               ),
-              itemBuilder: (_, i) => _OutputTile(
-                out: outputs[i],
-                nf: nf,
-                index: i,
-                isFurnitureWip: isFurnitureWip,
-              ),
+              itemBuilder: (_, i) =>
+                  _OutputTile(out: outputs[i], nf: nf, index: i),
             ),
             // Total row
             Container(
@@ -856,27 +879,55 @@ class _OutputsCard extends StatelessWidget {
                 ),
                 border: const Border(top: BorderSide(color: _kBorder)),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    isFurnitureWip ? 'Total Pcs Output' : 'Total Berat Output',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: _kGreen,
+                  if (totalBeratKg > 0)
+                    Row(
+                      children: [
+                        const Text(
+                          'Total Berat Output',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: _kGreen,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${nf.format(totalBeratKg)} kg',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: _kGreen,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    isFurnitureWip
-                        ? '${totalBerat.toInt()} pcs'
-                        : '${nf.format(totalBerat)} kg',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: _kGreen,
+                  if (totalBeratKg > 0 && totalPcs > 0)
+                    const SizedBox(height: 4),
+                  if (totalPcs > 0)
+                    Row(
+                      children: [
+                        const Text(
+                          'Total Pcs Output',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: _kGreen,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${totalPcs.toInt()} pcs',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: _kGreen,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
                 ],
               ),
             ),
@@ -891,14 +942,7 @@ class _OutputTile extends StatelessWidget {
   final BsV2OutputLabel out;
   final NumberFormat nf;
   final int index;
-  final bool isFurnitureWip;
-
-  const _OutputTile({
-    required this.out,
-    required this.nf,
-    required this.index,
-    this.isFurnitureWip = false,
-  });
+  const _OutputTile({required this.out, required this.nf, required this.index});
 
   @override
   Widget build(BuildContext context) {
@@ -974,7 +1018,7 @@ class _OutputTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    isFurnitureWip
+                    out.isPcsCategory
                         ? '${out.totalBerat.toInt()} pcs'
                         : '${nf.format(out.totalBerat)} kg',
                     style: const TextStyle(

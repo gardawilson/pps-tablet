@@ -158,7 +158,7 @@ import 'features/production/broker/view/broker_production_screen.dart';
 import 'features/production/gilingan/repository/gilingan_production_input_repository.dart';
 import 'features/shared/lokasi/lokasi_view_model.dart';
 import 'features/stock_opname/view/stock_opname_list_screen.dart';
-import 'features/home/view/home_screen.dart';
+import 'core/view/app_shell.dart';
 import 'features/stock_opname/view_model/stock_opname_list_view_model.dart';
 import 'features/stock_opname/view_model/stock_opname_detail_view_model.dart';
 import 'features/stock_opname/view_model/stock_opname_label_before_view_model.dart';
@@ -537,7 +537,7 @@ class MyApp extends StatelessWidget {
         initialRoute: '/',
         routes: {
           '/': (context) => LoginScreen(),
-          '/home': (context) => HomeScreen(),
+          '/home': (context) => const AppShell(),
           '/stockopname': (context) => StockOpnameListScreen(),
           '/label': (context) => LabelSelectionScreen(),
           '/label/bahan-baku': (context) => BahanBakuScreen(),
@@ -556,13 +556,18 @@ class MyApp extends StatelessWidget {
           '/label/reject': (context) => RejectScreen(),
           '/production/gilingan': (context) => GilinganProductionScreen(),
           '/production/mixer': (context) => MixerProductionScreen(),
+          '/shell/hot-stamp': (context) => HotStampProductionScreen(),
           '/production/hot-stamp': (context) => HotStampProductionScreen(),
           '/production/inject': (context) => InjectProductionScreen(),
+          '/shell/key-fitting': (context) => KeyFittingProductionScreen(),
           '/production/key-fitting': (context) => KeyFittingProductionScreen(),
+          '/shell/spanner': (context) => SpannerProductionScreen(),
           '/production/spanner': (context) => SpannerProductionScreen(),
+          '/shell/packing': (context) => PackingProductionScreen(),
           '/production/packing': (context) => PackingProductionScreen(),
           '/production/sortir-reject': (context) =>
               SortirRejectProductionScreen(),
+          '/shell/return': (context) => ReturnProductionScreen(),
           '/production/return': (context) => ReturnProductionScreen(),
         },
       ),

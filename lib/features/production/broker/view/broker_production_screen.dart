@@ -154,21 +154,6 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
       child: Consumer<BrokerProductionViewModel>(
         builder: (context, vm, _) {
           return Scaffold(
-            appBar: AppBar(
-              title: const Text('Broker Production'),
-              actions: [
-                if (vm.isByDateMode)
-                  IconButton(
-                    icon: const Icon(Icons.list_alt),
-                    onPressed: vm.exitByDateModeAndRefreshPaged,
-                  )
-                else
-                  IconButton(
-                    icon: const Icon(Icons.refresh),
-                    onPressed: vm.refreshPaged,
-                  ),
-              ],
-            ),
             body: Column(
               children: [
                 BrokerProductionActionBar(

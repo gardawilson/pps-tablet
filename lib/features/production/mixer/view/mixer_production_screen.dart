@@ -199,16 +199,6 @@ class _MixerProductionScreenState extends State<MixerProductionScreen> {
       child: Consumer<MixerProductionViewModel>(
         builder: (context, vm, _) {
           return Scaffold(
-            appBar: AppBar(
-              title: const Text('Mixer Production'),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  tooltip: 'Refresh',
-                  onPressed: vm.refreshPaged,
-                ),
-              ],
-            ),
             body: Column(
               children: [
                 MixerProductionActionBar(

@@ -28,12 +28,6 @@ class LabelSelectionScreen extends StatelessWidget {
     final canReadReject = perm.can('label_reject:read');
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Pilih Label'),
-        backgroundColor: const Color(0xFF0D47A1),
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [

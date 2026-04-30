@@ -203,16 +203,6 @@ class _SortirRejectProductionScreenState
       child: Consumer<SortirRejectProductionViewModel>(
         builder: (context, vm, _) {
           return Scaffold(
-            appBar: AppBar(
-              title: const Text('Sortir Reject'),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  tooltip: 'Refresh',
-                  onPressed: vm.refreshPaged,
-                ),
-              ],
-            ),
             body: Column(
               children: [
                 SortirRejectProductionActionBar(

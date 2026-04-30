@@ -183,40 +183,6 @@ class _BsV2CreateScreenState extends State<BsV2CreateScreen> {
         return Scaffold(
           backgroundColor: _kSurface,
           resizeToAvoidBottomInset: false,
-          appBar: AppBar(
-            backgroundColor: Colors.white,
-            elevation: 0,
-            surfaceTintColor: Colors.transparent,
-            titleSpacing: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            title: Row(
-              children: [
-                const Text(
-                  'Buat Bongkar Susun',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-                ),
-                if (vm.category != null) ...[
-                  const SizedBox(width: 12),
-                  bsV2CategoryBadge(
-                    vm.category,
-                    textStyle: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.grey.shade800,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(1),
-              child: Container(height: 1, color: _kBorder),
-            ),
-          ),
           body: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(

@@ -200,16 +200,6 @@ class _HotStampProductionScreenState extends State<HotStampProductionScreen> {
       child: Consumer<HotStampProductionViewModel>(
         builder: (context, vm, _) {
           return Scaffold(
-            appBar: AppBar(
-              title: const Text('Hot Stamp Production'),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  tooltip: 'Refresh',
-                  onPressed: vm.refreshPaged,
-                ),
-              ],
-            ),
             body: Column(
               children: [
                 HotStampProductionActionBar(

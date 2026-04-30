@@ -65,28 +65,7 @@ class _SrV2DetailScreenState extends State<SrV2DetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _kSurface,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        titleSpacing: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text(
-          'Detail - ${widget.noSortir}',
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: _kBorder),
-        ),
-      ),
-      body: _buildBody(),
-    );
+    return Scaffold(backgroundColor: _kSurface, body: _buildBody());
   }
 
   Widget _buildBody() {

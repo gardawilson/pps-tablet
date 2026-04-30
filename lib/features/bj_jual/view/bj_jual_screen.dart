@@ -197,18 +197,19 @@ class _BJJualScreenState extends State<BJJualScreen> {
       child: Consumer<BJJualViewModel>(
         builder: (context, vm, _) {
           return Scaffold(
-            appBar: AppBar(
-              title: const Text('BJ Jual'),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  tooltip: 'Refresh',
-                  onPressed: vm.refreshPaged,
-                ),
-              ],
-            ),
             body: Column(
               children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: IconButton(
+                      icon: const Icon(Icons.refresh),
+                      tooltip: 'Refresh',
+                      onPressed: vm.refreshPaged,
+                    ),
+                  ),
+                ),
                 BJJualActionBar(
                   controller: _searchCtl,
                   onSearchChanged: (value) => vm.setSearchDebounced(value),

@@ -172,41 +172,6 @@ class _BahanBakuScreenState extends State<BahanBakuScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
-      appBar: AppBar(
-        elevation: 2,
-        title: Consumer<BahanBakuViewModel>(
-          builder: (_, vm, __) {
-            final label = vm.isLoading && vm.items.isEmpty
-                ? 'LABEL BAHAN BAKU (...)'
-                : 'LABEL BAHAN BAKU (${vm.totalCount})';
-            return Text(
-              label,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.5,
-              ),
-            );
-          },
-        ),
-        actions: [
-          Consumer<LabelPrintSyncQueue>(
-            builder: (_, syncQueue, __) {
-              final pending = syncQueue.pendingCountFor('bahan_baku');
-              if (pending <= 0) return const SizedBox.shrink();
-              return Tooltip(
-                message: 'Sinkronisasi print bahan baku tertunda ($pending)',
-                child: const Padding(
-                  padding: EdgeInsets.only(right: 12),
-                  child: Icon(Icons.sync, color: Color(0xFFFFE082)),
-                ),
-              );
-            },
-          ),
-        ],
-        backgroundColor: const Color(0xFF1565C0),
-        foregroundColor: Colors.white,
-      ),
       body: Row(
         children: [
           // 1️⃣ Header Table (Kiri) - FLEX DIKURANGI
@@ -216,6 +181,22 @@ class _BahanBakuScreenState extends State<BahanBakuScreen> {
               color: Colors.white,
               child: Column(
                 children: [
+                  Consumer<LabelPrintSyncQueue>(
+                    builder: (_, syncQueue, __) {
+                      final pending = syncQueue.pendingCountFor('bahan_baku');
+                      if (pending <= 0) return const SizedBox.shrink();
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: Tooltip(
+                            message: 'Sinkronisasi print bahan baku tertunda ($pending)',
+                            child: const Icon(Icons.sync, color: Color(0xFFFFE082)),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                   Consumer<BahanBakuViewModel>(
                     builder: (_, vm, __) => BahanBakuActionBar(
                       controller: searchCtrl,

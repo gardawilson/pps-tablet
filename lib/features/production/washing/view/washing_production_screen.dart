@@ -189,21 +189,6 @@ class _WashingProductionScreenState extends State<WashingProductionScreen> {
       child: Consumer<WashingProductionViewModel>(
         builder: (context, vm, _) {
           return Scaffold(
-            appBar: AppBar(
-              title: const Text('Washing Production'),
-              actions: [
-                if (vm.isByDateMode)
-                  IconButton(
-                    icon: const Icon(Icons.list_alt),
-                    onPressed: vm.exitByDateModeAndRefreshPaged,
-                  )
-                else
-                  IconButton(
-                    icon: const Icon(Icons.refresh),
-                    onPressed: vm.refreshPaged,
-                  ),
-              ],
-            ),
             body: Column(
               children: [
                 WashingProductionActionBar(

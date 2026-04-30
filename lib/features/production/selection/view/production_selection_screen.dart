@@ -26,12 +26,6 @@ class ProductionSelectionScreen extends StatelessWidget {
     final canReadFurnitureMaterial = perm.can('furniturematerial:read');
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Pilih Proses'),
-        backgroundColor: const Color(0xFF0D47A1),
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [

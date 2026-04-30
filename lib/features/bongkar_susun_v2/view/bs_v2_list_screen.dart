@@ -166,7 +166,6 @@ class _BsV2ListScreenState extends State<BsV2ListScreen> {
         builder: (context, vm, _) {
           return Scaffold(
             backgroundColor: _kSurface,
-            appBar: _buildAppBar(vm),
             floatingActionButton: FloatingActionButton.extended(
               onPressed: _openCreate,
               backgroundColor: _kPrimary,
@@ -208,63 +207,6 @@ class _BsV2ListScreenState extends State<BsV2ListScreen> {
             ),
           );
         },
-      ),
-    );
-  }
-
-  PreferredSizeWidget _buildAppBar(BsV2ListViewModel vm) {
-    return PreferredSize(
-      preferredSize: const Size.fromHeight(64),
-      child: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(bottom: BorderSide(color: _kBorder)),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: _kPrimary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.swap_horiz_rounded,
-                    color: _kPrimary,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Bongkar Susun',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF1A1D23),
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                    Text(
-                      'Riwayat transaksi',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF8A94A6),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

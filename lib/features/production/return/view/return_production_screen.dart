@@ -212,20 +212,6 @@ class _ReturnProductionScreenState extends State<ReturnProductionScreen> {
           ];
 
           return Scaffold(
-            appBar: AppBar(
-              title: const Text('Return'),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  onPressed: () {
-                    debugPrint(
-                      '🟩 [RETURN_SCREEN] Manual refresh pressed, VM hash=${vm.hashCode}',
-                    );
-                    vm.refreshPaged();
-                  },
-                ),
-              ],
-            ),
             body: Column(
               children: [
                 ReturnProductionActionBar(

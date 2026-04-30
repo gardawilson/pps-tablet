@@ -164,23 +164,6 @@ class _ReportListViewState extends State<_ReportListView> {
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        elevation: 0,
-        title: const Text(
-          'Laporan',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
-        ),
-        backgroundColor: const Color(0xFF0D47A1),
-        iconTheme: const IconThemeData(color: Colors.white),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(color: Colors.white.withOpacity(0.2), height: 1),
-        ),
-      ),
       body: Column(
         children: [
           // Search Bar

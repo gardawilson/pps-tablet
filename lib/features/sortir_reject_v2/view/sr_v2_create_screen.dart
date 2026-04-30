@@ -201,24 +201,6 @@ class _SrV2CreateScreenState extends State<SrV2CreateScreen> {
         return Scaffold(
           backgroundColor: _kSurface,
           resizeToAvoidBottomInset: false,
-          appBar: AppBar(
-            backgroundColor: Colors.white,
-            elevation: 0,
-            surfaceTintColor: Colors.transparent,
-            titleSpacing: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            title: const Text(
-              'Buat Sortir Reject',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-            ),
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(1),
-              child: Container(height: 1, color: _kBorder),
-            ),
-          ),
           body: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(

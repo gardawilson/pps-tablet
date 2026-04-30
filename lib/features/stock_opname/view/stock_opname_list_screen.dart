@@ -15,19 +15,6 @@ class StockOpnameListScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
-      appBar: AppBar(
-        title: const Text(
-          'Stock Opname List',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: const Color(0xFF0D47A1),
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
       body: Consumer<StockOpnameViewModel>(
         builder: (context, viewModel, child) {
           if (viewModel.isLoading && viewModel.stockOpnameList.isEmpty) {

@@ -205,16 +205,6 @@ class _GilinganProductionScreenState extends State<GilinganProductionScreen> {
       child: Consumer<GilinganProductionViewModel>(
         builder: (context, vm, _) {
           return Scaffold(
-            appBar: AppBar(
-              title: const Text('Gilingan Production'),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  tooltip: 'Refresh',
-                  onPressed: vm.refreshPaged,
-                ),
-              ],
-            ),
             body: Column(
               children: [
                 GilinganProductionActionBar(

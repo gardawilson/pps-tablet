@@ -319,41 +319,6 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        elevation: 2,
-        title: Consumer<WashingViewModel>(
-          builder: (_, vm, __) {
-            final label = vm.isLoading && vm.items.isEmpty
-                ? 'LABEL WASHING (...)'
-                : 'LABEL WASHING (${vm.totalCount})';
-            return Text(
-              label,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.5,
-              ),
-            );
-          },
-        ),
-        actions: [
-          Consumer<LabelPrintSyncQueue>(
-            builder: (_, syncQueue, __) {
-              final pending = syncQueue.pendingCountFor('washing');
-              if (pending <= 0) return const SizedBox.shrink();
-              return Tooltip(
-                message: 'Sinkronisasi print tertunda ($pending)',
-                child: const Padding(
-                  padding: EdgeInsets.only(right: 12),
-                  child: Icon(Icons.sync, color: Color(0xFFFFE082)),
-                ),
-              );
-            },
-          ),
-        ],
-        backgroundColor: const Color(0xFF1565C0),
-        foregroundColor: Colors.white,
-      ),
       body: Row(
         children: [
           // Master Table
@@ -363,6 +328,22 @@ class _WashingTableScreenState extends State<WashingTableScreen> {
               color: Colors.white,
               child: Column(
                 children: [
+                  Consumer<LabelPrintSyncQueue>(
+                    builder: (_, syncQueue, __) {
+                      final pending = syncQueue.pendingCountFor('washing');
+                      if (pending <= 0) return const SizedBox.shrink();
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: Tooltip(
+                            message: 'Sinkronisasi print tertunda ($pending)',
+                            child: const Icon(Icons.sync, color: Color(0xFFFFE082)),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                   Consumer<WashingViewModel>(
                     builder: (_, vm, __) => WashingActionBar(
                       controller: searchCtrl,

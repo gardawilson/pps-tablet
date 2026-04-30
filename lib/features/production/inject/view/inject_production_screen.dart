@@ -242,16 +242,6 @@ class _InjectProductionScreenState extends State<InjectProductionScreen> {
       child: Consumer<InjectProductionViewModel>(
         builder: (context, vm, _) {
           return Scaffold(
-            appBar: AppBar(
-              title: const Text('Inject Production'),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  tooltip: 'Refresh',
-                  onPressed: vm.refreshPaged,
-                ),
-              ],
-            ),
             body: Column(
               children: [
                 InjectProductionActionBar(

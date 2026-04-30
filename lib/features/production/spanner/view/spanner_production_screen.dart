@@ -203,16 +203,6 @@ class _SpannerProductionScreenState extends State<SpannerProductionScreen> {
       child: Consumer<SpannerProductionViewModel>(
         builder: (context, vm, _) {
           return Scaffold(
-            appBar: AppBar(
-              title: const Text('Spanner'),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  tooltip: 'Refresh',
-                  onPressed: vm.refreshPaged,
-                ),
-              ],
-            ),
             body: Column(
               children: [
                 SpannerProductionActionBar(

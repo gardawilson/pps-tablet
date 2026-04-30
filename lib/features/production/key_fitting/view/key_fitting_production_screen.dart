@@ -204,16 +204,6 @@ class _KeyFittingProductionScreenState
       child: Consumer<KeyFittingProductionViewModel>(
         builder: (context, vm, _) {
           return Scaffold(
-            appBar: AppBar(
-              title: const Text('Pasang Kunci'),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  tooltip: 'Refresh',
-                  onPressed: vm.refreshPaged,
-                ),
-              ],
-            ),
             body: Column(
               children: [
                 KeyFittingProductionActionBar(

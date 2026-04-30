@@ -207,23 +207,6 @@ class _CrusherProductionScreenState extends State<CrusherProductionScreen> {
       child: Consumer<CrusherProductionViewModel>(
         builder: (context, vm, _) {
           return Scaffold(
-            appBar: AppBar(
-              title: const Text('Crusher Production'),
-              actions: [
-                if (vm.isByDateMode)
-                  IconButton(
-                    icon: const Icon(Icons.list_alt),
-                    tooltip: 'Kembali ke mode list',
-                    onPressed: vm.exitByDateModeAndRefreshPaged,
-                  )
-                else
-                  IconButton(
-                    icon: const Icon(Icons.refresh),
-                    tooltip: 'Refresh',
-                    onPressed: vm.refreshPaged,
-                  ),
-              ],
-            ),
             body: Column(
               children: [
                 CrusherProductionActionBar(

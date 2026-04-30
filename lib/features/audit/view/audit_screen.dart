@@ -52,42 +52,24 @@ class _AuditScreenState extends State<AuditScreen> {
       value: _viewModel,
       child: Scaffold(
         backgroundColor: const Color(0xFFFAFBFC),
-        appBar: AppBar(
-          backgroundColor: const Color(0xFF0052CC),
-          elevation: 0,
-          title: const Row(
-            children: [
-              Icon(Icons.history, size: 24, color: Colors.white),
-              SizedBox(width: 12),
-              Text(
-                'Audit History',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                  letterSpacing: -0.2,
-                ),
-              ),
-            ],
-          ),
-          actions: [
+        body: Column(
+          children: [
             Consumer<AuditViewModel>(
               builder: (context, vm, _) {
-                if (vm.currentDocumentNo == null) {
-                  return const SizedBox.shrink();
-                }
-                return IconButton(
-                  icon: const Icon(Icons.refresh, color: Colors.white),
-                  tooltip: 'Refresh',
-                  onPressed: vm.isLoading ? null : _search,
+                if (vm.currentDocumentNo == null) return const SizedBox.shrink();
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: IconButton(
+                      icon: const Icon(Icons.refresh),
+                      tooltip: 'Refresh',
+                      onPressed: vm.isLoading ? null : _search,
+                    ),
+                  ),
                 );
               },
             ),
-            const SizedBox(width: 8),
-          ],
-        ),
-        body: Column(
-          children: [
             _buildSearchBar(),
             const Divider(height: 1, color: Color(0xFFDFE1E6)),
             Expanded(

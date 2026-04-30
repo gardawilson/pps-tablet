@@ -203,16 +203,6 @@ class _PackingProductionScreenState extends State<PackingProductionScreen> {
       child: Consumer<PackingProductionViewModel>(
         builder: (context, vm, _) {
           return Scaffold(
-            appBar: AppBar(
-              title: const Text('Packing'),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  tooltip: 'Refresh',
-                  onPressed: vm.refreshPaged,
-                ),
-              ],
-            ),
             body: Column(
               children: [
                 PackingProductionActionBar(

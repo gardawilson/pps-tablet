@@ -211,41 +211,6 @@ class _PackingScreenState extends State<PackingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        elevation: 2,
-        title: Consumer<PackingViewModel>(
-          builder: (_, vm, __) {
-            final label = vm.isLoading && vm.items.isEmpty
-                ? 'LABEL BARANG JADI (...)'
-                : 'LABEL BARANG JADI (${vm.totalCount})';
-            return Text(
-              label,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.5,
-              ),
-            );
-          },
-        ),
-        actions: [
-          Consumer<LabelPrintSyncQueue>(
-            builder: (_, syncQueue, __) {
-              final pending = syncQueue.pendingCountFor('packing');
-              if (pending <= 0) return const SizedBox.shrink();
-              return Tooltip(
-                message: 'Sinkronisasi print packing tertunda ($pending)',
-                child: const Padding(
-                  padding: EdgeInsets.only(right: 12),
-                  child: Icon(Icons.sync, color: Color(0xFFFFE082)),
-                ),
-              );
-            },
-          ),
-        ],
-        backgroundColor: const Color(0xFF1565C0),
-        foregroundColor: Colors.white,
-      ),
       body: Row(
         children: [
           Expanded(
@@ -254,6 +219,22 @@ class _PackingScreenState extends State<PackingScreen> {
               color: Colors.white,
               child: Column(
                 children: [
+                  Consumer<LabelPrintSyncQueue>(
+                    builder: (_, syncQueue, __) {
+                      final pending = syncQueue.pendingCountFor('packing');
+                      if (pending <= 0) return const SizedBox.shrink();
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: Tooltip(
+                            message: 'Sinkronisasi print packing tertunda ($pending)',
+                            child: const Icon(Icons.sync, color: Color(0xFFFFE082)),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                   Consumer<PackingViewModel>(
                     builder: (_, vm, __) => PackingActionBar(
                       controller: searchCtrl,

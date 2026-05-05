@@ -18,6 +18,14 @@ export '../../shared/models/gilingan_item.dart';
 export '../../shared/models/mixer_item.dart';
 export '../../shared/models/reject_item.dart';
 
+bool _readPrintedFlag(Map<String, dynamic> j, List<String> keys) {
+  final asBoolValue = pickB(j, keys);
+  if (asBoolValue != null) return asBoolValue;
+  final asIntValue = pickI(j, keys);
+  if (asIntValue != null) return asIntValue > 0;
+  return false;
+}
+
 /* ===================== ROOT AGGREGATOR ===================== */
 
 class BrokerInputs {
@@ -73,4 +81,95 @@ class BrokerInputs {
   double totalBeratBroker() => broker.fold(0.0, (s, it) => s + (it.berat ?? 0));
   double totalBeratWashing() => washing.fold(0.0, (s, it) => s + (it.berat ?? 0));
   double totalBeratCrusher() => crusher.fold(0.0, (s, it) => s + (it.berat ?? 0));
+}
+
+class BrokerOutputSak {
+  final int? noSak;
+  final double? berat;
+  final DateTime? dateUsage;
+  final bool isPartial;
+  final int? idLokasi;
+
+  const BrokerOutputSak({
+    this.noSak,
+    this.berat,
+    this.dateUsage,
+    this.isPartial = false,
+    this.idLokasi,
+  });
+
+  factory BrokerOutputSak.fromJson(Map<String, dynamic> j) {
+    return BrokerOutputSak(
+      noSak: pickI(j, ['NoSak', 'noSak']),
+      berat: pickD(j, ['Berat', 'berat']),
+      dateUsage: pickDT(j, ['DateUsage', 'dateUsage']),
+      isPartial: pickB(j, ['IsPartial', 'isPartial']) ?? false,
+      idLokasi: pickI(j, ['IdLokasi', 'idLokasi']),
+    );
+  }
+}
+
+class BrokerOutput {
+  final String? noProduksi;
+  final String? noBroker;
+  final int? idJenis;
+  final String? namaJenis;
+  final bool hasBeenPrinted;
+  final List<BrokerOutputSak> detailSak;
+
+  const BrokerOutput({
+    this.noProduksi,
+    this.noBroker,
+    this.idJenis,
+    this.namaJenis,
+    this.hasBeenPrinted = false,
+    this.detailSak = const [],
+  });
+
+  factory BrokerOutput.fromJson(Map<String, dynamic> j) {
+    final rawDetails = (j['DetailSak'] ?? j['detailSak'] ?? []) as List;
+    return BrokerOutput(
+      noProduksi: pickS(j, ['NoProduksi', 'noProduksi']),
+      noBroker: pickS(j, ['NoBroker', 'noBroker']),
+      idJenis: pickI(j, ['IdJenis', 'idJenis']),
+      namaJenis: pickS(j, ['NamaJenis', 'namaJenis']),
+      hasBeenPrinted: _readPrintedFlag(j, ['HasBeenPrinted', 'hasBeenPrinted']),
+      detailSak: rawDetails
+          .map((e) => BrokerOutputSak.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList(),
+    );
+  }
+
+  int get totalSak => detailSak.length;
+  double get totalBerat =>
+      detailSak.fold(0.0, (sum, item) => sum + (item.berat ?? 0.0));
+}
+
+class BonggolanOutput {
+  final String? noProduksi;
+  final String? noBonggolan;
+  final int? idBonggolan;
+  final String? namaBonggolan;
+  final double? berat;
+  final bool hasBeenPrinted;
+
+  const BonggolanOutput({
+    this.noProduksi,
+    this.noBonggolan,
+    this.idBonggolan,
+    this.namaBonggolan,
+    this.berat,
+    this.hasBeenPrinted = false,
+  });
+
+  factory BonggolanOutput.fromJson(Map<String, dynamic> j) {
+    return BonggolanOutput(
+      noProduksi: pickS(j, ['NoProduksi', 'noProduksi']),
+      noBonggolan: pickS(j, ['NoBonggolan', 'noBonggolan']),
+      idBonggolan: pickI(j, ['IdBonggolan', 'idBonggolan']),
+      namaBonggolan: pickS(j, ['NamaBonggolan', 'namaBonggolan']),
+      berat: pickD(j, ['Berat', 'berat']),
+      hasBeenPrinted: _readPrintedFlag(j, ['HasBeenPrinted', 'hasBeenPrinted']),
+    );
+  }
 }

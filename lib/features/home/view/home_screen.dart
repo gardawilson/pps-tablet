@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pps_tablet/core/services/user_session_storage.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -17,10 +18,32 @@ class HomeScreen extends StatelessWidget {
             colors: [_primaryColor.withValues(alpha: 0.04), Colors.white],
           ),
         ),
-        child: const Center(
-          child: Text(
-            'Hello World',
-            style: TextStyle(fontSize: 24, color: Colors.black54),
+        child: Center(
+          child: FutureBuilder<String>(
+            future: UserSessionStorage.getUsername(fallback: '-'),
+            builder: (context, snapshot) {
+              final username = snapshot.data ?? '-';
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Selamat datang, $username',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      color: Color(0xFF1F2937),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'PPS Tablet',
+                    style: TextStyle(fontSize: 14, color: Colors.black54),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),

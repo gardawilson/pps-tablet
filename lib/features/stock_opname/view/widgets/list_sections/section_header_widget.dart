@@ -14,23 +14,21 @@ class SectionHeaderWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color primaryBlue = const Color(0xFF1565C0);
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            primaryBlue,
-            primaryBlue.withOpacity(0.85),
+            color,
+            color.withOpacity(0.85),
           ],
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
         ),
         boxShadow: [
           BoxShadow(
-            color: primaryBlue.withOpacity(0.3),
+            color: color.withOpacity(0.24),
             offset: const Offset(0, 1),
             blurRadius: 3,
           ),

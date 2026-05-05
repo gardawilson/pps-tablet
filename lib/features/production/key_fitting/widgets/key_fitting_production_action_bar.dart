@@ -109,10 +109,11 @@ class _KeyFittingProductionActionBarState
                     child: FilledButton.icon(
                       onPressed: canCreate ? widget.onAddPressed : null,
                       icon: const Icon(Icons.add),
-                      label: const Text('Tambah Produksi Pasang Kunci'),
+                      label: const Text('Buat Baru'),
                       style: FilledButton.styleFrom(
-                        backgroundColor:
-                        canCreate ? const Color(0xFF3F51B5) : Colors.grey.shade400,
+                        backgroundColor: canCreate
+                            ? const Color(0xFF3F51B5)
+                            : Colors.grey.shade400,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 18,
@@ -147,12 +148,12 @@ class _KeyFittingProductionActionBarState
                         ),
                         boxShadow: _focused
                             ? [
-                          BoxShadow(
-                            color: cs.primary.withOpacity(.12),
-                            blurRadius: 14,
-                            offset: const Offset(0, 6),
-                          ),
-                        ]
+                                BoxShadow(
+                                  color: cs.primary.withOpacity(.12),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ]
                             : null,
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -169,9 +170,10 @@ class _KeyFittingProductionActionBarState
                               textInputAction: TextInputAction.none,
                               decoration: InputDecoration(
                                 hintText:
-                                'Cari NoProduksi Pasang Kunci (contains)…',
-                                hintStyle:
-                                TextStyle(color: Colors.grey.shade500),
+                                    'Cari NoProduksi Pasang Kunci (contains)…',
+                                hintStyle: TextStyle(
+                                  color: Colors.grey.shade500,
+                                ),
                                 isCollapsed: true,
                                 border: InputBorder.none,
                                 contentPadding: const EdgeInsets.symmetric(
@@ -186,14 +188,14 @@ class _KeyFittingProductionActionBarState
                             duration: const Duration(milliseconds: 140),
                             child: _hasText
                                 ? IconButton(
-                              key: const ValueKey('clear_on'),
-                              tooltip: 'Bersihkan',
-                              icon: const Icon(Icons.close_rounded),
-                              onPressed: _handleClear,
-                            )
+                                    key: const ValueKey('clear_on'),
+                                    tooltip: 'Bersihkan',
+                                    icon: const Icon(Icons.close_rounded),
+                                    onPressed: _handleClear,
+                                  )
                                 : const SizedBox.shrink(
-                              key: ValueKey('clear_off'),
-                            ),
+                                    key: ValueKey('clear_off'),
+                                  ),
                           ),
                         ],
                       ),

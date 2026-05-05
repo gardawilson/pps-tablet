@@ -82,16 +82,19 @@ class _BrokerActionBarState extends State<BrokerActionBar> {
                     child: FilledButton.icon(
                       onPressed: canCreate ? widget.onAddPressed : null,
                       icon: const Icon(Icons.add),
-                      label: const Text('Buat Label'),
+                      label: const Text('Buat Baru'),
                       style: FilledButton.styleFrom(
                         backgroundColor: canCreate
                             ? const Color(0xFF00897B)
                             : Colors.grey.shade400,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 18, vertical: 14),
+                          horizontal: 18,
+                          vertical: 14,
+                        ),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         textStyle: const TextStyle(
                           fontWeight: FontWeight.w700,
                           letterSpacing: .2,
@@ -118,12 +121,12 @@ class _BrokerActionBarState extends State<BrokerActionBar> {
                         ),
                         boxShadow: _focused
                             ? [
-                          BoxShadow(
-                            color: cs.primary.withOpacity(.12),
-                            blurRadius: 14,
-                            offset: const Offset(0, 6),
-                          ),
-                        ]
+                                BoxShadow(
+                                  color: cs.primary.withOpacity(.12),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ]
                             : null,
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -143,14 +146,15 @@ class _BrokerActionBarState extends State<BrokerActionBar> {
                               onSubmitted: widget.onSearchChanged,
                               textInputAction: TextInputAction.search,
                               decoration: InputDecoration(
-                                hintText:
-                                'Cari No Broker / Jenis / Warehouse…',
-                                hintStyle:
-                                TextStyle(color: Colors.grey.shade500),
+                                hintText: 'Cari No Broker / Jenis / Warehouse…',
+                                hintStyle: TextStyle(
+                                  color: Colors.grey.shade500,
+                                ),
                                 isCollapsed: true,
                                 border: InputBorder.none,
-                                contentPadding:
-                                const EdgeInsets.symmetric(vertical: 14),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                               ),
                             ),
                           ),
@@ -159,18 +163,19 @@ class _BrokerActionBarState extends State<BrokerActionBar> {
                             duration: const Duration(milliseconds: 140),
                             child: _hasText
                                 ? IconButton(
-                              key: const ValueKey('clear_on'),
-                              tooltip: 'Bersihkan',
-                              icon: const Icon(Icons.close_rounded),
-                              onPressed: () {
-                                widget.controller.clear();
-                                setState(() {});
-                                widget.onClear();
-                                _searchFocus.requestFocus();
-                              },
-                            )
+                                    key: const ValueKey('clear_on'),
+                                    tooltip: 'Bersihkan',
+                                    icon: const Icon(Icons.close_rounded),
+                                    onPressed: () {
+                                      widget.controller.clear();
+                                      setState(() {});
+                                      widget.onClear();
+                                      _searchFocus.requestFocus();
+                                    },
+                                  )
                                 : const SizedBox.shrink(
-                                key: ValueKey('clear_off')),
+                                    key: ValueKey('clear_off'),
+                                  ),
                           ),
                         ],
                       ),
@@ -202,7 +207,9 @@ class _BrokerActionBarState extends State<BrokerActionBar> {
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: widget.includeUsed
-                                ? const Color(0xFF1565C0).withValues(alpha: 0.35)
+                                ? const Color(
+                                    0xFF1565C0,
+                                  ).withValues(alpha: 0.35)
                                 : Colors.grey.shade300,
                           ),
                         ),
@@ -251,7 +258,8 @@ class _BrokerActionBarState extends State<BrokerActionBar> {
                       },
                       style: IconButton.styleFrom(
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                     ),
                 ],

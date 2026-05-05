@@ -25,7 +25,19 @@ class BonggolanFormDialog extends StatefulWidget {
   final BonggolanHeader? header;
   final Function(BonggolanHeader)? onSave;
 
-  const BonggolanFormDialog({super.key, this.header, this.onSave});
+  /// Jika diisi, broker production & date di-preselect dan dikunci.
+  final String? preselectBrokerNoProduksi;
+  final String? preselectBrokerNamaMesin;
+  final DateTime? preselectDate;
+
+  const BonggolanFormDialog({
+    super.key,
+    this.header,
+    this.onSave,
+    this.preselectBrokerNoProduksi,
+    this.preselectBrokerNamaMesin,
+    this.preselectDate,
+  });
 
   @override
   State<BonggolanFormDialog> createState() => _BonggolanFormDialogState();
@@ -63,9 +75,11 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
       text: widget.header?.noBonggolan ?? '',
     );
 
-    final DateTime seededDate = widget.header != null
-        ? (parseAnyToDateTime(widget.header!.dateCreate) ?? DateTime.now())
-        : DateTime.now();
+    final DateTime seededDate =
+        widget.preselectDate ??
+        (widget.header != null
+            ? (parseAnyToDateTime(widget.header!.dateCreate) ?? DateTime.now())
+            : DateTime.now());
 
     _selectedDate = seededDate;
     dateCreatedCtrl = TextEditingController(
@@ -78,7 +92,10 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
     );
 
     noBrokerProduksiCtrl = TextEditingController(
-      text: widget.header?.brokerNoProduksi ?? '',
+      text:
+          widget.preselectBrokerNoProduksi ??
+          widget.header?.brokerNoProduksi ??
+          '',
     );
     noInjectProduksiCtrl = TextEditingController(
       text: widget.header?.injectNoProduksi ?? '',
@@ -92,8 +109,10 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
           : '',
     );
 
-    // Auto pick mode on edit (priority: broker → inject)
-    if ((noBrokerProduksiCtrl.text).trim().isNotEmpty) {
+    // Auto pick mode: preselect broker → edit priority → null
+    if (widget.preselectBrokerNoProduksi != null) {
+      _selectedMode = InputMode.brokerProduction;
+    } else if ((noBrokerProduksiCtrl.text).trim().isNotEmpty) {
       _selectedMode = InputMode.brokerProduction;
     } else if ((noInjectProduksiCtrl.text).trim().isNotEmpty) {
       _selectedMode = InputMode.injectProduction;
@@ -109,13 +128,13 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
       if (_injectError != null && mounted) setState(() => _injectError = null);
     });
 
-    // Auto-fetch outputs on edit mode
-    if (widget.header != null) {
+    // Auto-fetch outputs on edit mode or preselect
+    final preCode = noBrokerProduksiCtrl.text.trim().isNotEmpty
+        ? noBrokerProduksiCtrl.text.trim()
+        : noInjectProduksiCtrl.text.trim();
+    if (widget.header != null || preCode.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        final code = _selectedMode == InputMode.brokerProduction
-            ? noBrokerProduksiCtrl.text
-            : noInjectProduksiCtrl.text;
-        if (code.trim().isNotEmpty) _fetchOutputs(code.trim());
+        if (preCode.isNotEmpty) _fetchOutputs(preCode);
       });
     }
   }
@@ -133,6 +152,9 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
   }
 
   bool get isEdit => widget.header != null;
+
+  bool get _isLocked =>
+      widget.preselectBrokerNoProduksi != null || widget.preselectDate != null;
 
   Future<void> _fetchOutputs(String code) async {
     if (code.trim().isEmpty) {
@@ -364,9 +386,9 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
 
   Widget _buildLeftColumn() {
     final bool isBrokerProductionEnabled =
-        !isEdit && _selectedMode == InputMode.brokerProduction;
+        !isEdit && !_isLocked && _selectedMode == InputMode.brokerProduction;
     final bool isInjectProductionEnabled =
-        !isEdit && _selectedMode == InputMode.injectProduction;
+        !isEdit && !_isLocked && _selectedMode == InputMode.injectProduction;
 
     final errorStyle = TextStyle(
       color: Theme.of(context).colorScheme.error,
@@ -410,23 +432,30 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
 
               const SizedBox(height: 16),
 
-              AppDateField(
-                controller: dateCreatedCtrl,
-                label: 'Date Created',
-                format: DateFormat('EEEE, dd MMM yyyy', 'id_ID'),
-                initialDate: _selectedDate,
-                // Date picker is always valid here; you can add extra rules if needed.
-                onChanged: (d) {
-                  if (d != null) {
-                    setState(() {
-                      _selectedDate = d;
-                      dateCreatedCtrl.text = DateFormat(
-                        'EEEE, dd MMM yyyy',
-                        'id_ID',
-                      ).format(d);
-                    });
-                  }
-                },
+              IgnorePointer(
+                ignoring: _isLocked,
+                child: Opacity(
+                  opacity: _isLocked ? 0.6 : 1,
+                  child: AppDateField(
+                    controller: dateCreatedCtrl,
+                    label: 'Date Created',
+                    format: DateFormat('EEEE, dd MMM yyyy', 'id_ID'),
+                    initialDate: _selectedDate,
+                    onChanged: _isLocked
+                        ? null
+                        : (d) {
+                            if (d != null) {
+                              setState(() {
+                                _selectedDate = d;
+                                dateCreatedCtrl.text = DateFormat(
+                                  'EEEE, dd MMM yyyy',
+                                  'id_ID',
+                                ).format(d);
+                              });
+                            }
+                          },
+                  ),
+                ),
               ),
 
               const SizedBox(height: 16),
@@ -492,12 +521,13 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Radio<InputMode>(
-                    value: InputMode.brokerProduction,
-                    groupValue: _selectedMode,
-                    onChanged: isEdit ? null : (val) => _selectMode(val!),
-                  ),
-                  const SizedBox(width: 8),
+                  if (!_isLocked)
+                    Radio<InputMode>(
+                      value: InputMode.brokerProduction,
+                      groupValue: _selectedMode,
+                      onChanged: isEdit ? null : (val) => _selectMode(val!),
+                    ),
+                  if (!_isLocked) const SizedBox(width: 8),
                   Expanded(
                     child: IgnorePointer(
                       ignoring: !isBrokerProductionEnabled,
@@ -508,8 +538,10 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
                           children: [
                             BrokerProductionDropdown(
                               preselectNoProduksi:
+                                  widget.preselectBrokerNoProduksi ??
                                   widget.header?.brokerNoProduksi,
                               preselectNamaMesin:
+                                  widget.preselectBrokerNamaMesin ??
                                   widget.header?.brokerNamaMesin,
                               date: _selectedDate,
                               enabled: isBrokerProductionEnabled,

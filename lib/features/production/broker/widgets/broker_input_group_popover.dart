@@ -9,22 +9,27 @@ import '../view_model/broker_production_input_view_model.dart';
 
 /// Cek apakah bucket TEMP untuk labelCode berisi item partial.
 bool _hasPartialTempForLabel(
-    BrokerProductionInputViewModel vm,
-    String labelCode,
-    ) {
+  BrokerProductionInputViewModel vm,
+  String labelCode,
+) {
   final b = vm.getTemporaryDataForLabel(labelCode.trim());
   if (b == null || b.isEmpty) return false;
 
-  final hasBrokerPart =
-  b.brokerItems.any((e) => (e.noBrokerPartial ?? '').trim().isNotEmpty);
-  final hasBbPart =
-  b.bbItems.any((e) => (e.noBBPartial ?? '').trim().isNotEmpty);
-  final hasGilinganPart = b.gilinganItems
-      .any((e) => (e.noGilinganPartial ?? '').trim().isNotEmpty);
-  final hasMixerPart =
-  b.mixerItems.any((e) => (e.noMixerPartial ?? '').trim().isNotEmpty);
-  final hasRejectPart =
-  b.rejectItems.any((e) => (e.noRejectPartial ?? '').trim().isNotEmpty);
+  final hasBrokerPart = b.brokerItems.any(
+    (e) => (e.noBrokerPartial ?? '').trim().isNotEmpty,
+  );
+  final hasBbPart = b.bbItems.any(
+    (e) => (e.noBBPartial ?? '').trim().isNotEmpty,
+  );
+  final hasGilinganPart = b.gilinganItems.any(
+    (e) => (e.noGilinganPartial ?? '').trim().isNotEmpty,
+  );
+  final hasMixerPart = b.mixerItems.any(
+    (e) => (e.noMixerPartial ?? '').trim().isNotEmpty,
+  );
+  final hasRejectPart = b.rejectItems.any(
+    (e) => (e.noRejectPartial ?? '').trim().isNotEmpty,
+  );
 
   return hasBrokerPart ||
       hasBbPart ||
@@ -37,11 +42,8 @@ bool _hasPartialTempForLabel(
 class TooltipSummary {
   final double totalBerat;
 
-  const TooltipSummary({
-    required this.totalBerat,
-  });
+  const TooltipSummary({required this.totalBerat});
 }
-
 
 /// Popover tooltip di sebelah KIRI anchor tile.
 class InputsGroupTooltip extends StatefulWidget {
@@ -145,29 +147,28 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
 
     widget.onClose();
 
-    final confirmed = await showDialog<bool>(
-      context: rootCtx,
-      useRootNavigator: true,
-      builder: (ctx) => AlertDialog(
-        title: Text('Hapus $count item?'),
-        content: Text(
-          'Yakin ingin menghapus $count item yang sudah dipilih?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Batal'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text(
-              'Hapus',
-              style: TextStyle(color: Colors.red),
+    final confirmed =
+        await showDialog<bool>(
+          context: rootCtx,
+          useRootNavigator: true,
+          builder: (ctx) => AlertDialog(
+            title: Text('Hapus $count item?'),
+            content: Text(
+              'Yakin ingin menghapus $count item yang sudah dipilih?',
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Batal'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Hapus', style: TextStyle(color: Colors.red)),
+              ),
+            ],
           ),
-        ],
-      ),
-    ) ?? false;
+        ) ??
+        false;
 
     if (!confirmed) return;
 
@@ -252,8 +253,11 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
 
   @override
   Widget build(BuildContext context) {
-    final divider =
-    Divider(height: 0, thickness: 0.6, color: Colors.grey.shade300);
+    final divider = Divider(
+      height: 0,
+      thickness: 0.6,
+      color: Colors.grey.shade300,
+    );
     final double clampedMaxH = widget.maxHeight.clamp(180.0, 520.0).toDouble();
     final bool canDeleteExisting = widget.canDelete;
 
@@ -319,8 +323,9 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                           builder: (_) {
                             final vm = context
                                 .read<BrokerProductionInputViewModel>();
-                            final hasTempForThis =
-                            vm.hasTemporaryDataForLabel(widget.title);
+                            final hasTempForThis = vm.hasTemporaryDataForLabel(
+                              widget.title,
+                            );
                             final showTempChip = hasTempForThis;
                             final chipText = 'PENDING';
 
@@ -352,11 +357,13 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                                         ),
                                         decoration: BoxDecoration(
                                           color: Colors.white.withOpacity(0.2),
-                                          borderRadius:
-                                          BorderRadius.circular(999),
+                                          borderRadius: BorderRadius.circular(
+                                            999,
+                                          ),
                                           border: Border.all(
-                                            color:
-                                            Colors.white.withOpacity(0.35),
+                                            color: Colors.white.withOpacity(
+                                              0.35,
+                                            ),
                                           ),
                                         ),
                                         child: Text(
@@ -371,7 +378,9 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                                     ],
                                   ],
                                 ),
-                                if ((widget.subtitle ?? '').trim().isNotEmpty) ...[
+                                if ((widget.subtitle ?? '')
+                                    .trim()
+                                    .isNotEmpty) ...[
                                   const SizedBox(height: 2),
                                   Text(
                                     widget.subtitle!.trim(),
@@ -405,12 +414,12 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                         onPressed: !canDeleteExisting
                             ? null
                             : () {
-                          if (_selectionMode) {
-                            _exitSelectionMode();
-                          } else {
-                            _enterSelectionMode();
-                          }
-                        },
+                                if (_selectionMode) {
+                                  _exitSelectionMode();
+                                } else {
+                                  _enterSelectionMode();
+                                }
+                              },
                       ),
                     ],
                   ),
@@ -440,54 +449,53 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                       children: [
                         if (_selectionMode && canDeleteExisting)
                           const SizedBox(width: 36),
-                        ...widget.tableHeaders!.asMap().entries.map(
-                              (entry) {
-                            final index = entry.key;
-                            final header = entry.value;
+                        ...widget.tableHeaders!.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final header = entry.value;
 
-                            if (index == widget.tableHeaders!.length - 1) {
-                              return SizedBox(
-                                width: 60,
-                                child: Text(
-                                  header,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.grey.shade700,
-                                    letterSpacing: 0.5,
-                                  ),
-                                  textAlign: TextAlign.center,
+                          if (index == widget.tableHeaders!.length - 1) {
+                            return SizedBox(
+                              width: 60,
+                              child: Text(
+                                header,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.grey.shade700,
+                                  letterSpacing: 0.5,
                                 ),
-                              );
-                            }
-
-                            final flex = (widget.columnFlexes != null &&
-                                index < widget.columnFlexes!.length &&
-                                widget.columnFlexes![index] > 0)
-                                ? widget.columnFlexes![index]
-                                : 1;
-
-                            return Expanded(
-                              flex: flex,
-                              child: Padding(
-                                padding: EdgeInsets.only(
-                                  right: index < widget.tableHeaders!.length - 1
-                                      ? 8
-                                      : 0,
-                                ),
-                                child: Text(
-                                  header,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.grey.shade700,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
+                                textAlign: TextAlign.center,
                               ),
                             );
-                          },
-                        ),
+                          }
+
+                          final flex =
+                              (widget.columnFlexes != null &&
+                                  index < widget.columnFlexes!.length &&
+                                  widget.columnFlexes![index] > 0)
+                              ? widget.columnFlexes![index]
+                              : 1;
+
+                          return Expanded(
+                            flex: flex,
+                            child: Padding(
+                              padding: EdgeInsets.only(
+                                right: index < widget.tableHeaders!.length - 1
+                                    ? 8
+                                    : 0,
+                              ),
+                              child: Text(
+                                header,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.grey.shade700,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
                       ],
                     ),
                   ),
@@ -537,9 +545,9 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                   ),
                 ),
 
-// =======================================================
-// ✅ SUMMARY SECTION (Total Berat Sejajar)
-// =======================================================
+                // =======================================================
+                // ✅ SUMMARY SECTION (Total Berat Sejajar)
+                // =======================================================
                 if (widget.summaryBuilder != null)
                   Consumer<BrokerProductionInputViewModel>(
                     builder: (context, vm, _) {
@@ -612,7 +620,9 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                                       Expanded(
                                         flex: flexes[i],
                                         child: Padding(
-                                          padding: const EdgeInsets.only(right: 8),
+                                          padding: const EdgeInsets.only(
+                                            right: 8,
+                                          ),
                                           child: Text(
                                             '${summary.totalBerat.toStringAsFixed(2)} kg',
                                             style: TextStyle(
@@ -630,7 +640,9 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                                       Expanded(
                                         flex: flexes[i],
                                         child: Padding(
-                                          padding: const EdgeInsets.only(right: 8),
+                                          padding: const EdgeInsets.only(
+                                            right: 8,
+                                          ),
                                           child: Text(
                                             'TOTAL',
                                             style: TextStyle(
@@ -676,42 +688,38 @@ class _InputsGroupTooltipState extends State<InputsGroupTooltip> {
                   child: Row(
                     children: _selectionMode && canDeleteExisting
                         ? [
-                      TextButton(
-                        onPressed: _exitSelectionMode,
-                        child: const Text('Batal'),
-                      ),
-                      const Spacer(),
-                      FilledButton.icon(
-                        onPressed: _selectedIndices.isEmpty
-                            ? null
-                            : _confirmBulkDelete,
-                        icon: const Icon(Icons.delete_outline),
-                        label: Text(
-                          'Hapus (${_selectedIndices.length})',
-                        ),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.red.shade600,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                    ]
+                            TextButton(
+                              onPressed: _exitSelectionMode,
+                              child: const Text('Batal'),
+                            ),
+                            const Spacer(),
+                            FilledButton.icon(
+                              onPressed: _selectedIndices.isEmpty
+                                  ? null
+                                  : _confirmBulkDelete,
+                              icon: const Icon(Icons.delete_outline),
+                              label: Text('Hapus (${_selectedIndices.length})'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Colors.red.shade600,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ]
                         : [
-                      if (widget.onDeleteAllTemp != null)
-                        TextButton.icon(
-                          onPressed: widget.deleteAllTempDisabled
-                              ? null
-                              : widget.onDeleteAllTemp,
-                          icon: const Icon(
-                            Icons.delete_sweep_outlined,
-                          ),
-                          label: Text(widget.deleteAllTempLabel),
-                          style: TextButton.styleFrom(
-                            foregroundColor: Colors.red.shade700,
-                          ),
-                        ),
-                      const Spacer(),
-                      ...widget.actions,
-                    ],
+                            if (widget.onDeleteAllTemp != null)
+                              TextButton.icon(
+                                onPressed: widget.deleteAllTempDisabled
+                                    ? null
+                                    : widget.onDeleteAllTemp,
+                                icon: const Icon(Icons.delete_sweep_outlined),
+                                label: Text(widget.deleteAllTempLabel),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.red.shade700,
+                                ),
+                              ),
+                            const Spacer(),
+                            ...widget.actions,
+                          ],
                   ),
                 ),
               ],
@@ -761,9 +769,10 @@ class TooltipTableRow extends StatelessWidget {
             final index = entry.key;
             final value = entry.value;
 
-            final flex = (columnFlexes != null &&
-                index < columnFlexes!.length &&
-                columnFlexes![index] > 0)
+            final flex =
+                (columnFlexes != null &&
+                    index < columnFlexes!.length &&
+                    columnFlexes![index] > 0)
                 ? columnFlexes![index]
                 : 1;
 
@@ -790,37 +799,34 @@ class TooltipTableRow extends StatelessWidget {
             child: Center(
               child: showDelete && onDelete != null
                   ? Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: isDisabled ? null : onDelete,
-                  borderRadius: BorderRadius.circular(6),
-                  child: Opacity(
-                    opacity: isDisabled ? 0.4 : 1.0,
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: deleteColor ?? Colors.red.shade50,
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: isDisabled ? null : onDelete,
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: deleteColor ?? Colors.red.shade200,
-                          width: 1,
+                        child: Opacity(
+                          opacity: isDisabled ? 0.4 : 1.0,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: deleteColor ?? Colors.red.shade50,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: deleteColor ?? Colors.red.shade200,
+                                width: 1,
+                              ),
+                            ),
+                            child: Icon(
+                              isDisabled
+                                  ? Icons.lock_outline
+                                  : Icons.delete_outline,
+                              size: 16,
+                              color: deleteColor ?? Colors.red.shade700,
+                            ),
+                          ),
                         ),
                       ),
-                      child: Icon(
-                        isDisabled
-                            ? Icons.lock_outline
-                            : Icons.delete_outline,
-                        size: 16,
-                        color: deleteColor ?? Colors.red.shade700,
-                      ),
-                    ),
-                  ),
-                ),
-              )
-                  : const Text(
-                '-',
-                style: TextStyle(color: Colors.grey),
-              ),
+                    )
+                  : const Text('-', style: TextStyle(color: Colors.grey)),
             ),
           ),
         ],
@@ -845,12 +851,14 @@ class GroupTooltipAnchorTile extends StatefulWidget {
 
   /// ✅ NEW: Summary builder
   final TooltipSummary Function()? summaryBuilder;
+  final List<String> tileMetrics;
 
   const GroupTooltipAnchorTile({
     super.key,
     required this.title,
     required this.color,
     required this.detailsBuilder,
+    this.tileMetrics = const [],
     this.headerSubtitle,
     this.tableHeaders,
     this.columnFlexes,
@@ -863,8 +871,7 @@ class GroupTooltipAnchorTile extends StatefulWidget {
   });
 
   @override
-  State<GroupTooltipAnchorTile> createState() =>
-      _GroupTooltipAnchorTileState();
+  State<GroupTooltipAnchorTile> createState() => _GroupTooltipAnchorTileState();
 }
 
 class _GroupTooltipAnchorTileState extends State<GroupTooltipAnchorTile> {
@@ -885,8 +892,9 @@ class _GroupTooltipAnchorTileState extends State<GroupTooltipAnchorTile> {
     final tileSize = rb.size;
     final tileCenterY = targetTopLeft.dy + tileSize.height / 2;
 
-    final double maxHeight =
-    (screenH - padding.vertical - 32).clamp(180.0, 520.0).toDouble();
+    final double maxHeight = (screenH - padding.vertical - 32)
+        .clamp(180.0, 520.0)
+        .toDouble();
 
     final double topLimit = padding.top + 8;
     final double bottomLimit = screenH - padding.bottom - 8;
@@ -940,8 +948,9 @@ class _GroupTooltipAnchorTileState extends State<GroupTooltipAnchorTile> {
                 onBulkDelete: widget.onBulkDelete,
                 summaryBuilder: widget.summaryBuilder, // ✅ PASS summary builder
                 childrenBuilder: widget.detailsBuilder,
-                onDeleteAllTemp:
-                hasTempForThis ? () => _handleDeleteAllTemp(vm) : null,
+                onDeleteAllTemp: hasTempForThis
+                    ? () => _handleDeleteAllTemp(vm)
+                    : null,
                 deleteAllTempDisabled: !hasTempForThis,
                 deleteAllTempLabel: delAllLabel,
                 actions: [
@@ -966,8 +975,7 @@ class _GroupTooltipAnchorTileState extends State<GroupTooltipAnchorTile> {
     _entry = null;
   }
 
-  Future<void> _handleDeleteAllTemp(
-      BrokerProductionInputViewModel vm) async {
+  Future<void> _handleDeleteAllTemp(BrokerProductionInputViewModel vm) async {
     final removed = vm.deleteAllTempForLabel(widget.title);
     widget.onUpdate?.call();
     _hide();
@@ -1006,8 +1014,7 @@ class _GroupTooltipAnchorTileState extends State<GroupTooltipAnchorTile> {
           return Card(
             margin: const EdgeInsets.only(bottom: 6),
             elevation: 0,
-            color:
-            hasTempForThis ? Colors.yellow.shade50 : Colors.grey.shade50,
+            color: hasTempForThis ? Colors.yellow.shade50 : Colors.grey.shade50,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
               side: BorderSide(
@@ -1020,29 +1027,71 @@ class _GroupTooltipAnchorTileState extends State<GroupTooltipAnchorTile> {
               borderRadius: BorderRadius.circular(8),
               onTap: _show,
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 8,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 4,
-                        ),
-                        child: Text(
-                          widget.title,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: hasTempForThis
-                                ? Colors.brown.shade800
-                                : null,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.title,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: hasTempForThis
+                                  ? Colors.brown.shade800
+                                  : Colors.grey.shade900,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                          if ((widget.headerSubtitle ?? '').trim().isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              widget.headerSubtitle!.trim(),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey.shade700,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                          if (widget.tileMetrics.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: widget.tileMetrics
+                                  .map(
+                                    (metric) => Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 7,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
+                                          color: Colors.grey.shade300,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        metric,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.grey.shade700,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                     const SizedBox(width: 8),

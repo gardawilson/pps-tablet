@@ -12,10 +12,11 @@ class BrokerProductionViewModel extends ChangeNotifier {
   final BrokerProductionRepository repository;
 
   // ✅ Constructor dengan optional repository parameter
-  BrokerProductionViewModel({
-    BrokerProductionRepository? repository,
-  }) : repository = repository ?? BrokerProductionRepository() {
-    debugPrint('🟢 [BROKER_VM] ctor called, repository: ${this.repository}, VM hash=$hashCode');
+  BrokerProductionViewModel({BrokerProductionRepository? repository})
+    : repository = repository ?? BrokerProductionRepository() {
+    debugPrint(
+      '🟢 [BROKER_VM] ctor called, repository: ${this.repository}, VM hash=$hashCode',
+    );
     _initializePagingController();
   }
 
@@ -40,10 +41,13 @@ class BrokerProductionViewModel extends ChangeNotifier {
   // MODE PAGED
   // =========================
   late final PagingController<int, BrokerProduction> _pagingController;
-  PagingController<int, BrokerProduction> get pagingController => _pagingController;
+  PagingController<int, BrokerProduction> get pagingController =>
+      _pagingController;
 
   void _initializePagingController() {
-    debugPrint('🟢 [BROKER_VM] _initializePagingController: creating controller, VM hash=$hashCode');
+    debugPrint(
+      '🟢 [BROKER_VM] _initializePagingController: creating controller, VM hash=$hashCode',
+    );
 
     _pagingController = PagingController<int, BrokerProduction>(
       getNextPageKey: (state) {
@@ -51,7 +55,9 @@ class BrokerProductionViewModel extends ChangeNotifier {
         return state.lastPageIsEmpty ? null : state.nextIntPageKey;
       },
       fetchPage: (pageKey) {
-        debugPrint('🟢 [BROKER_VM] fetchPage wrapper called for pageKey=$pageKey, VM hash=$hashCode');
+        debugPrint(
+          '🟢 [BROKER_VM] fetchPage wrapper called for pageKey=$pageKey, VM hash=$hashCode',
+        );
         return _fetchPaged(pageKey);
       },
     );
@@ -73,7 +79,8 @@ class BrokerProductionViewModel extends ChangeNotifier {
   bool _exactNoProduksi = false;
 
   int? _shift;
-  DateTime? _date; // legacy single-day filter (mapped to dateFrom/dateTo in repo)
+  DateTime?
+  _date; // legacy single-day filter (mapped to dateFrom/dateTo in repo)
 
   String get search => _search;
   String? get noProduksi => _noProduksi;
@@ -109,14 +116,18 @@ class BrokerProductionViewModel extends ChangeNotifier {
 
   // ===== BY DATE =====
   Future<void> fetchByDate(DateTime date) async {
-    debugPrint('📅 [BROKER_VM] fetchByDate($date) dipanggil, VM hash=$hashCode');
+    debugPrint(
+      '📅 [BROKER_VM] fetchByDate($date) dipanggil, VM hash=$hashCode',
+    );
     _isByDateMode = true;
     isLoading = true;
     error = '';
     notifyListeners();
     try {
       final data = await repository.fetchByDate(date);
-      debugPrint('📅 [BROKER_VM] fetchByDate success, items length = ${data.length}, VM hash=$hashCode');
+      debugPrint(
+        '📅 [BROKER_VM] fetchByDate success, items length = ${data.length}, VM hash=$hashCode',
+      );
       items = data;
     } catch (e, st) {
       debugPrint('❌ [BROKER_VM] fetchByDate error: $e, VM hash=$hashCode');
@@ -129,13 +140,17 @@ class BrokerProductionViewModel extends ChangeNotifier {
   }
 
   void exitByDateModeAndRefreshPaged() {
-    debugPrint('🔁 [BROKER_VM] exitByDateModeAndRefreshPaged(), VM hash=$hashCode');
+    debugPrint(
+      '🔁 [BROKER_VM] exitByDateModeAndRefreshPaged(), VM hash=$hashCode',
+    );
     if (_isByDateMode) {
       _isByDateMode = false;
       items = [];
       error = '';
       isLoading = false;
-      debugPrint('🔁 [BROKER_VM] exitByDateMode -> pagingController.refresh(), VM hash=$hashCode');
+      debugPrint(
+        '🔁 [BROKER_VM] exitByDateMode -> pagingController.refresh(), VM hash=$hashCode',
+      );
       _pagingController.refresh();
       notifyListeners();
     }
@@ -144,10 +159,13 @@ class BrokerProductionViewModel extends ChangeNotifier {
   // ====== FETCH per halaman (PagingController v5) ======
   Future<List<BrokerProduction>> _fetchPaged(int pageKey) async {
     debugPrint(
-        '📡 [BROKER_VM] _fetchPaged(pageKey=$pageKey), isByDateMode=$_isByDateMode, VM hash=$hashCode');
+      '📡 [BROKER_VM] _fetchPaged(pageKey=$pageKey), isByDateMode=$_isByDateMode, VM hash=$hashCode',
+    );
 
     if (_isByDateMode) {
-      debugPrint('📡 [BROKER_VM] _fetchPaged: isByDateMode=true, return empty, VM hash=$hashCode');
+      debugPrint(
+        '📡 [BROKER_VM] _fetchPaged: isByDateMode=true, return empty, VM hash=$hashCode',
+      );
       return const <BrokerProduction>[];
     }
 
@@ -155,15 +173,16 @@ class BrokerProductionViewModel extends ChangeNotifier {
     final String? searchContains = _exactNoProduksi
         ? null
         : ((_noProduksi?.trim().isNotEmpty ?? false)
-        ? _noProduksi!.trim()
-        : (_search.trim().isNotEmpty ? _search.trim() : null));
+              ? _noProduksi!.trim()
+              : (_search.trim().isNotEmpty ? _search.trim() : null));
 
     final String? noProduksiExact = _exactNoProduksi
         ? (_noProduksi?.trim().isNotEmpty == true ? _noProduksi!.trim() : null)
         : null;
 
     debugPrint(
-        '📡 [BROKER_VM] _fetchPaged filters -> searchContains="$searchContains", noProduksiExact="$noProduksiExact", shift=$_shift, date=$_date, pageSize=$pageSize, VM hash=$hashCode');
+      '📡 [BROKER_VM] _fetchPaged filters -> searchContains="$searchContains", noProduksiExact="$noProduksiExact", shift=$_shift, date=$_date, pageSize=$pageSize, VM hash=$hashCode',
+    );
 
     try {
       final res = await repository.fetchAll(
@@ -180,14 +199,19 @@ class BrokerProductionViewModel extends ChangeNotifier {
       final totalPages = (res['totalPages'] as int?) ?? 1;
 
       debugPrint(
-          '📡 [BROKER_VM] _fetchPaged result: items.length=${items.length}, totalPages=$totalPages, currentPage=$pageKey, VM hash=$hashCode');
+        '📡 [BROKER_VM] _fetchPaged result: items.length=${items.length}, totalPages=$totalPages, currentPage=$pageKey, VM hash=$hashCode',
+      );
 
       if (pageKey > totalPages) {
-        debugPrint('📡 [BROKER_VM] _fetchPaged: pageKey > totalPages, return empty, VM hash=$hashCode');
+        debugPrint(
+          '📡 [BROKER_VM] _fetchPaged: pageKey > totalPages, return empty, VM hash=$hashCode',
+        );
         return const <BrokerProduction>[];
       }
 
-      debugPrint('📡 [BROKER_VM] _fetchPaged: returning ${items.length} items, VM hash=$hashCode');
+      debugPrint(
+        '📡 [BROKER_VM] _fetchPaged: returning ${items.length} items, VM hash=$hashCode',
+      );
       return items;
     } catch (e, st) {
       debugPrint('❌ [BROKER_VM] _fetchPaged error: $e, VM hash=$hashCode');
@@ -206,7 +230,8 @@ class BrokerProductionViewModel extends ChangeNotifier {
     int? newPageSize,
   }) {
     debugPrint(
-        '🔍 [BROKER_VM] applyFilters(search="$search", shift=$shift, date=$date, newPageSize=$newPageSize), VM hash=$hashCode');
+      '🔍 [BROKER_VM] applyFilters(search="$search", shift=$shift, date=$date, newPageSize=$newPageSize), VM hash=$hashCode',
+    );
     _isByDateMode = false;
     if (newPageSize != null && newPageSize > 0) pageSize = newPageSize;
 
@@ -219,14 +244,18 @@ class BrokerProductionViewModel extends ChangeNotifier {
     _date = date;
 
     clearInputsCache();
-    debugPrint('🔍 [BROKER_VM] applyFilters -> pagingController.refresh(), VM hash=$hashCode');
+    debugPrint(
+      '🔍 [BROKER_VM] applyFilters -> pagingController.refresh(), VM hash=$hashCode',
+    );
     _pagingController.refresh();
     notifyListeners();
   }
 
   /// Cari NoProduksi dengan contains (LIKE '%text%')
   void searchNoProduksiContains(String text) {
-    debugPrint('🔍 [BROKER_VM] searchNoProduksiContains("$text"), VM hash=$hashCode');
+    debugPrint(
+      '🔍 [BROKER_VM] searchNoProduksiContains("$text"), VM hash=$hashCode',
+    );
     _isByDateMode = false;
     _exactNoProduksi = false;
     _noProduksi = text;
@@ -239,7 +268,9 @@ class BrokerProductionViewModel extends ChangeNotifier {
 
   /// Cari NoProduksi exact (persis sama).
   void searchNoProduksiExact(String no) {
-    debugPrint('🔍 [BROKER_VM] searchNoProduksiExact("$no"), VM hash=$hashCode');
+    debugPrint(
+      '🔍 [BROKER_VM] searchNoProduksiExact("$no"), VM hash=$hashCode',
+    );
     _isByDateMode = false;
     _exactNoProduksi = true;
     _noProduksi = no;
@@ -258,7 +289,9 @@ class BrokerProductionViewModel extends ChangeNotifier {
     _date = null;
 
     clearInputsCache();
-    debugPrint('🧹 [BROKER_VM] clearFilters -> pagingController.refresh(), VM hash=$hashCode');
+    debugPrint(
+      '🧹 [BROKER_VM] clearFilters -> pagingController.refresh(), VM hash=$hashCode',
+    );
     _pagingController.refresh();
     notifyListeners();
   }
@@ -267,22 +300,29 @@ class BrokerProductionViewModel extends ChangeNotifier {
     debugPrint('🔄 [BROKER_VM] refreshPaged() called, VM hash=$hashCode');
     _isByDateMode = false;
     clearInputsCache();
-    debugPrint('🔄 [BROKER_VM] Calling _pagingController.refresh(), VM hash=$hashCode');
+    debugPrint(
+      '🔄 [BROKER_VM] Calling _pagingController.refresh(), VM hash=$hashCode',
+    );
     _pagingController.refresh();
-    debugPrint('🔄 [BROKER_VM] _pagingController.refresh() completed, VM hash=$hashCode');
+    debugPrint(
+      '🔄 [BROKER_VM] _pagingController.refresh() completed, VM hash=$hashCode',
+    );
   }
 
   // ===== Optional: Debounced search helper =====
   Timer? _searchDebounce;
   void setSearchDebounced(
-      String text, {
-        Duration delay = const Duration(milliseconds: 350),
-      }) {
+    String text, {
+    Duration delay = const Duration(milliseconds: 350),
+  }) {
     debugPrint(
-        '⌛ [BROKER_VM] setSearchDebounced("$text", delay=${delay.inMilliseconds}ms), VM hash=$hashCode');
+      '⌛ [BROKER_VM] setSearchDebounced("$text", delay=${delay.inMilliseconds}ms), VM hash=$hashCode',
+    );
     _searchDebounce?.cancel();
     _searchDebounce = Timer(delay, () {
-      debugPrint('⌛ [BROKER_VM] debounce fired, applyFilters("$text"), VM hash=$hashCode');
+      debugPrint(
+        '⌛ [BROKER_VM] debounce fired, applyFilters("$text"), VM hash=$hashCode',
+      );
       applyFilters(search: text);
     });
   }
@@ -305,7 +345,8 @@ class BrokerProductionViewModel extends ChangeNotifier {
     int? idRegu,
   }) async {
     debugPrint(
-        '🆕 [BROKER_VM] createProduksi(tglProduksi=$tglProduksi, idMesin=$idMesin, idOperator=$idOperator, jam=$jam, shift=$shift, hourStart=$hourStart, hourEnd=$hourEnd, jmlhAnggota=$jmlhAnggota, hadir=$hadir, hourMeter=$hourMeter), VM hash=$hashCode');
+      '🆕 [BROKER_VM] createProduksi(tglProduksi=$tglProduksi, idMesin=$idMesin, idOperator=$idOperator, jam=$jam, shift=$shift, hourStart=$hourStart, hourEnd=$hourEnd, jmlhAnggota=$jmlhAnggota, hadir=$hadir, hourMeter=$hourMeter), VM hash=$hashCode',
+    );
     isSaving = true;
     saveError = null;
     notifyListeners();
@@ -329,14 +370,19 @@ class BrokerProductionViewModel extends ChangeNotifier {
       );
 
       debugPrint(
-          '🆕 [BROKER_VM] createProduksi success, noProduksi=${created?.noProduksi}, VM hash=$hashCode');
+        '🆕 [BROKER_VM] createProduksi success, noProduksi=${created?.noProduksi}, VM hash=$hashCode',
+      );
 
       // 🔄 AUTO REFRESH LIST SETELAH CREATE
       if (_isByDateMode) {
-        debugPrint('🆕 [BROKER_VM] create in BY_DATE mode -> fetchByDate, VM hash=$hashCode');
+        debugPrint(
+          '🆕 [BROKER_VM] create in BY_DATE mode -> fetchByDate, VM hash=$hashCode',
+        );
         await fetchByDate(tglProduksi);
       } else {
-        debugPrint('🆕 [BROKER_VM] create in PAGED mode -> refreshPaged, VM hash=$hashCode');
+        debugPrint(
+          '🆕 [BROKER_VM] create in PAGED mode -> refreshPaged, VM hash=$hashCode',
+        );
         clearInputsCache();
         refreshPaged();
       }
@@ -372,7 +418,8 @@ class BrokerProductionViewModel extends ChangeNotifier {
     int? idRegu,
   }) async {
     debugPrint(
-        '✏️ [BROKER_VM] updateProduksi(noProduksi=$noProduksi, tglProduksi=$tglProduksi, idMesin=$idMesin, idOperator=$idOperator, jam=$jam, shift=$shift, hourStart=$hourStart, hourEnd=$hourEnd, jmlhAnggota=$jmlhAnggota, hadir=$hadir, hourMeter=$hourMeter), VM hash=$hashCode');
+      '✏️ [BROKER_VM] updateProduksi(noProduksi=$noProduksi, tglProduksi=$tglProduksi, idMesin=$idMesin, idOperator=$idOperator, jam=$jam, shift=$shift, hourStart=$hourStart, hourEnd=$hourEnd, jmlhAnggota=$jmlhAnggota, hadir=$hadir, hourMeter=$hourMeter), VM hash=$hashCode',
+    );
     isSaving = true;
     saveError = null;
     notifyListeners();
@@ -397,26 +444,32 @@ class BrokerProductionViewModel extends ChangeNotifier {
       );
 
       debugPrint(
-          '✏️ [BROKER_VM] updateProduksi success, noProduksi=${updated?.noProduksi}, VM hash=$hashCode');
+        '✏️ [BROKER_VM] updateProduksi success, noProduksi=${updated?.noProduksi}, VM hash=$hashCode',
+      );
 
       // 🔄 AUTO REFRESH LIST SETELAH UPDATE
       if (_isByDateMode) {
         if (tglProduksi != null) {
           debugPrint(
-              '✏️ [BROKER_VM] update in BY_DATE mode, tglProduksi!=null -> fetchByDate($tglProduksi), VM hash=$hashCode');
+            '✏️ [BROKER_VM] update in BY_DATE mode, tglProduksi!=null -> fetchByDate($tglProduksi), VM hash=$hashCode',
+          );
           await fetchByDate(tglProduksi);
         } else if (_date != null) {
           debugPrint(
-              '✏️ [BROKER_VM] update in BY_DATE mode, _date!=null -> fetchByDate($_date), VM hash=$hashCode');
+            '✏️ [BROKER_VM] update in BY_DATE mode, _date!=null -> fetchByDate($_date), VM hash=$hashCode',
+          );
           await fetchByDate(_date!);
         } else {
           debugPrint(
-              '✏️ [BROKER_VM] update in BY_DATE mode, no date info -> refreshPaged(), VM hash=$hashCode');
+            '✏️ [BROKER_VM] update in BY_DATE mode, no date info -> refreshPaged(), VM hash=$hashCode',
+          );
           clearInputsCache(noProduksi);
           refreshPaged();
         }
       } else {
-        debugPrint('✏️ [BROKER_VM] update in PAGED mode -> refreshPaged(), VM hash=$hashCode');
+        debugPrint(
+          '✏️ [BROKER_VM] update in PAGED mode -> refreshPaged(), VM hash=$hashCode',
+        );
         clearInputsCache(noProduksi);
         refreshPaged();
       }
@@ -434,7 +487,9 @@ class BrokerProductionViewModel extends ChangeNotifier {
   }
 
   Future<bool> deleteProduksi(String noProduksi) async {
-    debugPrint('🗑 [BROKER_VM] deleteProduksi(noProduksi=$noProduksi), VM hash=$hashCode');
+    debugPrint(
+      '🗑 [BROKER_VM] deleteProduksi(noProduksi=$noProduksi), VM hash=$hashCode',
+    );
     try {
       saveError = null;
       notifyListeners();
@@ -446,11 +501,14 @@ class BrokerProductionViewModel extends ChangeNotifier {
       if (isByDateMode) {
         if (date != null) {
           debugPrint(
-              '🗑 [BROKER_VM] delete in BY_DATE mode -> fetchByDate($date), VM hash=$hashCode');
+            '🗑 [BROKER_VM] delete in BY_DATE mode -> fetchByDate($date), VM hash=$hashCode',
+          );
           await fetchByDate(date!);
         }
       } else {
-        debugPrint('🗑 [BROKER_VM] delete in PAGED mode -> refreshPaged(), VM hash=$hashCode');
+        debugPrint(
+          '🗑 [BROKER_VM] delete in PAGED mode -> refreshPaged(), VM hash=$hashCode',
+        );
         clearInputsCache(noProduksi);
         refreshPaged();
       }

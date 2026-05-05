@@ -83,7 +83,7 @@ class _FurnitureWipActionBarState extends State<FurnitureWipActionBar> {
                     child: FilledButton.icon(
                       onPressed: canCreate ? widget.onAddPressed : null,
                       icon: const Icon(Icons.add),
-                      label: const Text('Create Label'),
+                      label: const Text('Buat Barur'),
                       style: FilledButton.styleFrom(
                         backgroundColor: canCreate
                             ? const Color(0xFF00897B)

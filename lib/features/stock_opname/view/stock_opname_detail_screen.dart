@@ -28,6 +28,13 @@ class StockOpnameDetailScreen extends StatefulWidget {
 }
 
 class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
+  static const _primary = Color(0xFF0D47A1);
+  static const _bgPage = Color(0xFFF8F9FB);
+  static const _surface = Color(0xFFFFFFFF);
+  static const _border = Color(0xFFE2E6EE);
+  static const _textPrimary = Color(0xFF1A2340);
+  static const _textSec = Color(0xFF4A5568);
+
   String? _selectedFilter;
   String? _selectedBlok;
   int? _selectedIdLokasi;
@@ -39,10 +46,14 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
   }
 
   void _initializeData() {
-    final detailVM =
-    Provider.of<StockOpnameDetailViewModel>(context, listen: false);
-    final beforeVM =
-    Provider.of<StockOpnameLabelBeforeViewModel>(context, listen: false);
+    final detailVM = Provider.of<StockOpnameDetailViewModel>(
+      context,
+      listen: false,
+    );
+    final beforeVM = Provider.of<StockOpnameLabelBeforeViewModel>(
+      context,
+      listen: false,
+    );
     final socketManager = SocketManager();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -58,16 +69,15 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: _buildAppBar(),
+      backgroundColor: _bgPage,
       body: Column(
         children: [
-          _buildFilterSection(),
+          _buildToolbar(),
           Expanded(
             child: Row(
               children: [
                 _buildStockDataSection(),
-                Container(width: 1, color: Colors.grey.shade300),
+                Container(width: 1, color: _border),
                 _buildScanResultSection(),
               ],
             ),
@@ -77,51 +87,51 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
-    return AppBar(
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Stock Opname',
-            style: TextStyle(color: Colors.white, fontSize: 18),
-          ),
-          Text(
-            '${widget.tgl} • ${widget.noSO}',
-            style: const TextStyle(color: Colors.white70, fontSize: 12),
-          ),
-        ],
-      ),
-      backgroundColor: const Color(0xFF0D47A1),
-      elevation: 0,
-      iconTheme: const IconThemeData(color: Colors.white),
-      actions: [
-        Padding(
-          padding: const EdgeInsets.only(right: 8.0),
-          child: IconButton(
-            onPressed: _showSummaryDialog,
-            icon: const Icon(Icons.assessment, color: Colors.white),
-            tooltip: 'Lihat Ringkasan',
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFilterSection() {
+  Widget _buildToolbar() {
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.all(16),
+      decoration: const BoxDecoration(
+        color: _surface,
+        border: Border(bottom: BorderSide(color: _border)),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Row(
         children: [
-          Expanded(
+          SizedBox(
+            width: 190,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.noSO,
+                  style: TextStyle(
+                    color: _textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  widget.tgl,
+                  style: const TextStyle(color: _textSec, fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 180,
             child: FilterDropdownWidget(
               selectedFilter: _selectedFilter,
               onChanged: _onFilterChanged,
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 200,
             child: LokasiDropdownWidget(
               selectedBlok: _selectedBlok,
               selectedIdLokasi: _selectedIdLokasi,
@@ -134,11 +144,35 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
               },
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: SearchLabelWidget(
               onSearch: _onSearch,
               onClear: _onSearchClear,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Tooltip(
+            message: 'Lihat Ringkasan',
+            child: SizedBox(
+              height: 40,
+              child: OutlinedButton.icon(
+                onPressed: _showSummaryDialog,
+                icon: const Icon(Icons.assessment_outlined, size: 17),
+                label: const Text('Ringkasan'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _primary,
+                  side: const BorderSide(color: Color(0xFFC5CEE0)),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  textStyle: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -154,7 +188,7 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
             builder: (context, beforeVM, _) {
               return SectionHeaderWidget(
                 title: 'DATA STOCK',
-                color: Colors.orange.shade600,
+                color: const Color(0xFFF59E0B),
                 totalData: beforeVM.totalData,
               );
             },
@@ -180,7 +214,7 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
             builder: (context, detailVM, _) {
               return SectionHeaderWidget(
                 title: 'HASIL SCAN',
-                color: Colors.green.shade600,
+                color: const Color(0xFF0A7349),
                 totalData: detailVM.totalData,
               );
             },
@@ -200,17 +234,20 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
   }
 
   Future<void> _showSummaryDialog() async {
-    final detailVM =
-    Provider.of<StockOpnameDetailViewModel>(context, listen: false);
-    final beforeVM =
-    Provider.of<StockOpnameLabelBeforeViewModel>(context, listen: false);
+    final detailVM = Provider.of<StockOpnameDetailViewModel>(
+      context,
+      listen: false,
+    );
+    final beforeVM = Provider.of<StockOpnameLabelBeforeViewModel>(
+      context,
+      listen: false,
+    );
 
     if (detailVM.isInitialLoading || beforeVM.isInitialLoading) {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (_) =>
-        const LoadingDialog(message: 'Menyiapkan ringkasan...'),
+        builder: (_) => const LoadingDialog(message: 'Menyiapkan ringkasan...'),
       );
 
       while (detailVM.isInitialLoading || beforeVM.isInitialLoading) {
@@ -250,35 +287,48 @@ class _StockOpnameDetailScreenState extends State<StockOpnameDetailScreen> {
   }
 
   void _onSearch(String query) {
-    final detailVM =
-    Provider.of<StockOpnameDetailViewModel>(context, listen: false);
-    final beforeVM =
-    Provider.of<StockOpnameLabelBeforeViewModel>(context, listen: false);
+    final detailVM = Provider.of<StockOpnameDetailViewModel>(
+      context,
+      listen: false,
+    );
+    final beforeVM = Provider.of<StockOpnameLabelBeforeViewModel>(
+      context,
+      listen: false,
+    );
 
     detailVM.search(query);
     beforeVM.search(query);
   }
 
   void _onSearchClear() {
-    final detailVM =
-    Provider.of<StockOpnameDetailViewModel>(context, listen: false);
-    final beforeVM =
-    Provider.of<StockOpnameLabelBeforeViewModel>(context, listen: false);
+    final detailVM = Provider.of<StockOpnameDetailViewModel>(
+      context,
+      listen: false,
+    );
+    final beforeVM = Provider.of<StockOpnameLabelBeforeViewModel>(
+      context,
+      listen: false,
+    );
 
     detailVM.clearSearch();
     beforeVM.clearSearch();
   }
 
   void _refreshData() {
-    final detailVM =
-    Provider.of<StockOpnameDetailViewModel>(context, listen: false);
-    final beforeVM =
-    Provider.of<StockOpnameLabelBeforeViewModel>(context, listen: false);
+    final detailVM = Provider.of<StockOpnameDetailViewModel>(
+      context,
+      listen: false,
+    );
+    final beforeVM = Provider.of<StockOpnameLabelBeforeViewModel>(
+      context,
+      listen: false,
+    );
 
     // ✅ Normalisasi agar selalu kirim null jika "Semua Lokasi"
-    final String? blok = (_selectedBlok == null ||
-        _selectedBlok == 'all' ||
-        _selectedBlok!.trim().isEmpty)
+    final String? blok =
+        (_selectedBlok == null ||
+            _selectedBlok == 'all' ||
+            _selectedBlok!.trim().isEmpty)
         ? null
         : _selectedBlok;
 

@@ -111,7 +111,7 @@ class _SpannerProductionActionBarState
                     child: FilledButton.icon(
                       onPressed: canCreate ? widget.onAddPressed : null,
                       icon: const Icon(Icons.add),
-                      label: const Text('Tambah Produksi Spanner'),
+                      label: const Text('Buat Baru'),
                       style: FilledButton.styleFrom(
                         backgroundColor: canCreate
                             ? const Color(0xFF3F51B5)

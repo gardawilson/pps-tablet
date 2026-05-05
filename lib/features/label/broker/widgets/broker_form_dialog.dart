@@ -26,7 +26,20 @@ class BrokerFormDialog extends StatefulWidget {
   final List<BrokerDetail>? details;
   final Function(BrokerHeader, List<BrokerDetail>)? onSave;
 
-  const BrokerFormDialog({super.key, this.header, this.details, this.onSave});
+  /// Jika diisi, date created & proses broker di-preselect dan dikunci (tidak bisa diubah).
+  final String? preselectNoProduksi;
+  final String? preselectNamaMesin;
+  final DateTime? preselectDate;
+
+  const BrokerFormDialog({
+    super.key,
+    this.header,
+    this.details,
+    this.onSave,
+    this.preselectNoProduksi,
+    this.preselectNamaMesin,
+    this.preselectDate,
+  });
 
   @override
   State<BrokerFormDialog> createState() => _BrokerFormDialogState();
@@ -50,14 +63,19 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
   List<BrokerOutputItem> _brokerOutputs = [];
   bool _loadingOutputs = false;
 
+  bool get _isLocked =>
+      widget.preselectNoProduksi != null || widget.preselectDate != null;
+
   @override
   void initState() {
     super.initState();
     noBrokerCtrl = TextEditingController(text: widget.header?.noBroker ?? '');
 
-    final DateTime seededDate = widget.header != null
-        ? (parseAnyToDateTime(widget.header!.dateCreate) ?? DateTime.now())
-        : DateTime.now();
+    final DateTime seededDate =
+        widget.preselectDate ??
+        (widget.header != null
+            ? (parseAnyToDateTime(widget.header!.dateCreate) ?? DateTime.now())
+            : DateTime.now());
 
     _selectedDate = seededDate;
     dateCreatedCtrl = TextEditingController(
@@ -71,7 +89,7 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
       text: widget.header?.namaWarehouse ?? '',
     );
     noProduksiCtrl = TextEditingController(
-      text: widget.header?.noProduksi ?? '',
+      text: widget.preselectNoProduksi ?? widget.header?.noProduksi ?? '',
     );
     detailList = List.from(widget.details ?? []);
 
@@ -79,7 +97,8 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
     _selectedMode = InputMode.production;
 
     // 🔹 Fetch outputs jika ada NoProduksi (edit mode atau preselect)
-    final preNoProduksi = widget.header?.noProduksi ?? '';
+    final preNoProduksi =
+        widget.preselectNoProduksi ?? widget.header?.noProduksi ?? '';
     if (preNoProduksi.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _fetchOutputs(preNoProduksi),
@@ -181,7 +200,7 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
 
   // KOLOM KIRI: Form Header + Detail (single scroll)
   Widget _buildLeftColumn() {
-    final bool isProductionEnabled = !isEdit;
+    final bool isProductionEnabled = !isEdit && !_isLocked;
 
     final totalSak = detailList.length;
     final totalBerat = detailList.fold<double>(0, (a, b) => a + (b.berat ?? 0));
@@ -225,24 +244,32 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                   asText: true,
                 ),
                 const SizedBox(height: 16),
-                AppDateField(
-                  controller: dateCreatedCtrl,
-                  label: 'Date Created',
-                  format: DateFormat('EEEE, dd MMM yyyy', 'id_ID'),
-                  initialDate: _selectedDate,
-                  onChanged: (d) {
-                    if (d != null) {
-                      setState(() {
-                        _selectedDate = d;
-                        dateCreatedCtrl.text = DateFormat(
-                          'EEEE, dd MMM yyyy',
-                          'id_ID',
-                        ).format(d);
-                        noProduksiCtrl.clear();
-                        _brokerOutputs = [];
-                      });
-                    }
-                  },
+                IgnorePointer(
+                  ignoring: _isLocked,
+                  child: Opacity(
+                    opacity: _isLocked ? 0.6 : 1,
+                    child: AppDateField(
+                      controller: dateCreatedCtrl,
+                      label: 'Date Created',
+                      format: DateFormat('EEEE, dd MMM yyyy', 'id_ID'),
+                      initialDate: _selectedDate,
+                      onChanged: _isLocked
+                          ? null
+                          : (d) {
+                              if (d != null) {
+                                setState(() {
+                                  _selectedDate = d;
+                                  dateCreatedCtrl.text = DateFormat(
+                                    'EEEE, dd MMM yyyy',
+                                    'id_ID',
+                                  ).format(d);
+                                  noProduksiCtrl.clear();
+                                  _brokerOutputs = [];
+                                });
+                              }
+                            },
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 BrokerTypeDropdown(
@@ -261,22 +288,27 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Radio<InputMode>(
-                      value: InputMode.production,
-                      groupValue: _selectedMode,
-                      onChanged: isEdit
-                          ? null
-                          : (val) => setState(() => _selectedMode = val!),
-                    ),
-                    const SizedBox(width: 8),
+                    if (!_isLocked)
+                      Radio<InputMode>(
+                        value: InputMode.production,
+                        groupValue: _selectedMode,
+                        onChanged: isEdit
+                            ? null
+                            : (val) => setState(() => _selectedMode = val!),
+                      ),
+                    if (!_isLocked) const SizedBox(width: 8),
                     Expanded(
                       child: IgnorePointer(
                         ignoring: !isProductionEnabled,
                         child: Opacity(
                           opacity: isProductionEnabled ? 1 : 0.6,
                           child: BrokerProductionDropdown(
-                            preselectNoProduksi: widget.header?.noProduksi,
-                            preselectNamaMesin: widget.header?.namaMesin,
+                            preselectNoProduksi:
+                                widget.preselectNoProduksi ??
+                                widget.header?.noProduksi,
+                            preselectNamaMesin:
+                                widget.preselectNamaMesin ??
+                                widget.header?.namaMesin,
                             date: _selectedDate,
                             enabled: isProductionEnabled,
                             onChanged: isProductionEnabled

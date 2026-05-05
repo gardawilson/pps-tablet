@@ -82,7 +82,7 @@ class _WashingActionBarState extends State<WashingActionBar> {
                     child: FilledButton.icon(
                       onPressed: canCreate ? widget.onAddPressed : null,
                       icon: const Icon(Icons.add),
-                      label: const Text('Buat Label'),
+                      label: const Text('Buat Baru'),
                       style: FilledButton.styleFrom(
                         backgroundColor: canCreate
                             ? const Color(0xFF00897B)
@@ -208,7 +208,9 @@ class _WashingActionBarState extends State<WashingActionBar> {
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: widget.includeUsed
-                                ? const Color(0xFF1565C0).withValues(alpha: 0.35)
+                                ? const Color(
+                                    0xFF1565C0,
+                                  ).withValues(alpha: 0.35)
                                 : Colors.grey.shade300,
                           ),
                         ),

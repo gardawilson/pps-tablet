@@ -27,16 +27,16 @@ class TempCommitResult {
 class TempItemsByLabel {
   final String labelCode;
   final List<BrokerItem> brokerItems;
-  final List<BrokerItem> brokerPartials;     // partial - TAMBAHKAN INI
-  final List<BbItem> bbItems;              // full
-  final List<BbItem> bbPartials;           // partial
+  final List<BrokerItem> brokerPartials; // partial - TAMBAHKAN INI
+  final List<BbItem> bbItems; // full
+  final List<BbItem> bbPartials; // partial
   final List<WashingItem> washingItems;
   final List<CrusherItem> crusherItems;
-  final List<GilinganItem> gilinganItems;  // full
+  final List<GilinganItem> gilinganItems; // full
   final List<GilinganItem> gilinganPartials;
-  final List<MixerItem> mixerItems;        // full
+  final List<MixerItem> mixerItems; // full
   final List<MixerItem> mixerPartials;
-  final List<RejectItem> rejectItems;      // full
+  final List<RejectItem> rejectItems; // full
   final List<RejectItem> rejectPartials;
   final DateTime addedAt;
 
@@ -59,17 +59,17 @@ class TempItemsByLabel {
 
   int get totalCount =>
       brokerItems.length +
-          brokerPartials.length +
-          bbItems.length +
-          bbPartials.length +
-          washingItems.length +
-          crusherItems.length +
-          gilinganItems.length +
-          gilinganPartials.length +
-          mixerItems.length +
-          mixerPartials.length +
-          rejectItems.length +
-          rejectPartials.length;
+      brokerPartials.length +
+      bbItems.length +
+      bbPartials.length +
+      washingItems.length +
+      crusherItems.length +
+      gilinganItems.length +
+      gilinganPartials.length +
+      mixerItems.length +
+      mixerPartials.length +
+      rejectItems.length +
+      rejectPartials.length;
 
   bool get isEmpty => totalCount == 0;
 
@@ -107,7 +107,8 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
   // ---------- DEBUG HELPERS ----------
   String _nn(Object? v) =>
       (v == null || (v is String && v.trim().isEmpty)) ? '-' : v.toString();
-  String _kg(num? v) => v == null ? '-' : (v is int ? '$v' : v.toStringAsFixed(2));
+  String _kg(num? v) =>
+      v == null ? '-' : (v is int ? '$v' : v.toStringAsFixed(2));
 
   String _labelOf(dynamic it) => _getItemLabelCode(it) ?? '-';
 
@@ -179,7 +180,9 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     }
     if (it is GilinganItem) {
       final isPart = (it.noGilinganPartial ?? '').trim().isNotEmpty;
-      return isPart ? '[GIL•PART] $t • ${_kg(it.berat)}kg' : '[GIL] $t • ${_kg(it.berat)}kg';
+      return isPart
+          ? '[GIL•PART] $t • ${_kg(it.berat)}kg'
+          : '[GIL] $t • ${_kg(it.berat)}kg';
     }
     if (it is MixerItem) {
       final isPart = (it.noMixerPartial ?? '').trim().isNotEmpty;
@@ -189,7 +192,9 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     }
     if (it is RejectItem) {
       final isPart = (it.noRejectPartial ?? '').trim().isNotEmpty;
-      return isPart ? '[REJ•PART] $t • ${_kg(it.berat)}kg' : '[REJ] $t • ${_kg(it.berat)}kg';
+      return isPart
+          ? '[REJ•PART] $t • ${_kg(it.berat)}kg'
+          : '[REJ] $t • ${_kg(it.berat)}kg';
     }
     return '[UNKNOWN] $it';
   }
@@ -207,7 +212,11 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     final hdr = tag.isEmpty ? '' : ' <$tag>';
     _d('========== TEMP LIST DUMP$hdr ==========');
     _dumpList('tempBroker', tempBroker, _keyFromBrokerItem);
-    _dumpList('tempBrokerPartial', tempBrokerPartial, _keyFromBrokerItem); // TAMBAHKAN
+    _dumpList(
+      'tempBrokerPartial',
+      tempBrokerPartial,
+      _keyFromBrokerItem,
+    ); // TAMBAHKAN
     _dumpList('tempBb', tempBb, _keyFromBbItem);
     _dumpList('tempBbPartial', tempBbPartial, _keyFromBbItem);
     _dumpList('tempWashing', tempWashing, _keyFromWashingItem);
@@ -230,7 +239,9 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
       return;
     }
     _tempItemsByLabel.forEach((label, bucket) {
-      _d('Label "$label" • total=${bucket.totalCount} • since=${bucket.addedAt.toIso8601String()}');
+      _d(
+        'Label "$label" • total=${bucket.totalCount} • since=${bucket.addedAt.toIso8601String()}',
+      );
       for (final it in bucket.allItems) {
         _d('  - ${_fmtItem(it)}');
       }
@@ -273,9 +284,6 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
   bool isSaving = false;
   String? saveError;
 
-  // Prevent duplicate per-row inputs fetch
-  final Map<String, Future<BrokerInputs>> _inflight = {};
-
   // ---------------------------------------------------------------------------
   // Paged mode
   // ---------------------------------------------------------------------------
@@ -296,42 +304,78 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
   DateTime? get date => _date;
 
   // ---------------------------------------------------------------------------
-  // Inputs per row (cache, loading & error per NoProduksi)
+  // Inputs per row (latest fetched state, loading & error per NoProduksi)
   // ---------------------------------------------------------------------------
   final Map<String, BrokerInputs> _inputsCache = {};
   final Map<String, bool> _inputsLoading = {};
   final Map<String, String?> _inputsError = {};
+  final Map<String, List<BrokerOutput>> _outputsByNoProduksi = {};
+  final Map<String, List<BonggolanOutput>> _bonggolanOutputsByNoProduksi = {};
+  final Map<String, bool> _outputsLoading = {};
+  final Map<String, String?> _outputsError = {};
 
   bool isInputsLoading(String noProduksi) => _inputsLoading[noProduksi] == true;
   String? inputsError(String noProduksi) => _inputsError[noProduksi];
   BrokerInputs? inputsOf(String noProduksi) => _inputsCache[noProduksi];
-  int inputsCount(String noProduksi, String key) => _inputsCache[noProduksi]?.summary[key] ?? 0;
+  int inputsCount(String noProduksi, String key) =>
+      _inputsCache[noProduksi]?.summary[key] ?? 0;
+  bool isOutputsLoading(String noProduksi) =>
+      _outputsLoading[noProduksi] == true;
+  String? outputsError(String noProduksi) => _outputsError[noProduksi];
+  List<BrokerOutput> outputsOf(String noProduksi) =>
+      _outputsByNoProduksi[noProduksi] ?? const <BrokerOutput>[];
+  List<BonggolanOutput> bonggolanOutputsOf(String noProduksi) =>
+      _bonggolanOutputsByNoProduksi[noProduksi] ?? const <BonggolanOutput>[];
 
-  Future<BrokerInputs?> loadInputs(String noProduksi, {bool force = false}) async {
-    if (!force && _inputsCache.containsKey(noProduksi)) return _inputsCache[noProduksi];
-    if (!force && _inflight.containsKey(noProduksi)) {
-      try {
-        return await _inflight[noProduksi];
-      } catch (_) {}
-    }
-
+  Future<BrokerInputs?> loadInputs(
+    String noProduksi, {
+    bool force = false,
+  }) async {
     _inputsLoading[noProduksi] = true;
     _inputsError[noProduksi] = null;
     notifyListeners();
 
-    final future = repository.fetchInputs(noProduksi, force: force);
-    _inflight[noProduksi] = future;
-
     try {
-      final result = await future;
+      final result = await repository.fetchInputs(noProduksi, force: true);
       _inputsCache[noProduksi] = result;
       return result;
     } catch (e) {
       _inputsError[noProduksi] = e.toString();
       return null;
     } finally {
-      _inflight.remove(noProduksi);
       _inputsLoading[noProduksi] = false;
+      notifyListeners();
+    }
+  }
+
+  Future<List<BrokerOutput>> loadOutputs(String noProduksi) async {
+    _outputsLoading[noProduksi] = true;
+    _outputsError[noProduksi] = null;
+    notifyListeners();
+
+    List<BrokerOutput> brokerOutputs = const <BrokerOutput>[];
+    List<BonggolanOutput> bonggolanOutputs = const <BonggolanOutput>[];
+    final errors = <String>[];
+
+    try {
+      try {
+        brokerOutputs = await repository.fetchOutputs(noProduksi);
+      } catch (e) {
+        errors.add('Broker: $e');
+      }
+
+      try {
+        bonggolanOutputs = await repository.fetchBonggolanOutputs(noProduksi);
+      } catch (e) {
+        errors.add('Bonggolan: $e');
+      }
+
+      _outputsByNoProduksi[noProduksi] = brokerOutputs;
+      _bonggolanOutputsByNoProduksi[noProduksi] = bonggolanOutputs;
+      _outputsError[noProduksi] = errors.isEmpty ? null : errors.join('\n');
+      return brokerOutputs;
+    } finally {
+      _outputsLoading[noProduksi] = false;
       notifyListeners();
     }
   }
@@ -349,6 +393,21 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void clearOutputsState([String? noProduksi]) {
+    if (noProduksi == null) {
+      _outputsByNoProduksi.clear();
+      _bonggolanOutputsByNoProduksi.clear();
+      _outputsLoading.clear();
+      _outputsError.clear();
+    } else {
+      _outputsByNoProduksi.remove(noProduksi);
+      _bonggolanOutputsByNoProduksi.remove(noProduksi);
+      _outputsLoading.remove(noProduksi);
+      _outputsError.remove(noProduksi);
+    }
+    notifyListeners();
+  }
+
   // ---------------------------------------------------------------------------
   // Lookup label
   // ---------------------------------------------------------------------------
@@ -360,7 +419,10 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
   // Track temp items by label code
   final Map<String, TempItemsByLabel> _tempItemsByLabel = {};
 
-  Future<ProductionLabelLookupResult?> lookupLabel(String code, {bool force = false}) async {
+  Future<ProductionLabelLookupResult?> lookupLabel(
+    String code, {
+    bool force = false,
+  }) async {
     final trimmed = code.trim();
     if (trimmed.isEmpty) {
       lookupError = 'Kode label kosong';
@@ -420,17 +482,23 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     if (t == null || t.isEmpty) return 'Tidak ada data temporary';
     final s = <String>[];
     if (t.brokerItems.isNotEmpty) s.add('${t.brokerItems.length} Broker');
-    if (t.brokerPartials.isNotEmpty) s.add('${t.brokerPartials.length} Broker Partial'); // TAMBAHKAN
+    if (t.brokerPartials.isNotEmpty)
+      s.add('${t.brokerPartials.length} Broker Partial'); // TAMBAHKAN
     if (t.bbItems.isNotEmpty) s.add('${t.bbItems.length} Bahan Baku (full)');
     if (t.bbPartials.isNotEmpty) s.add('${t.bbPartials.length} BB Partial');
     if (t.washingItems.isNotEmpty) s.add('${t.washingItems.length} Washing');
     if (t.crusherItems.isNotEmpty) s.add('${t.crusherItems.length} Crusher');
-    if (t.gilinganItems.isNotEmpty) s.add('${t.gilinganItems.length} Gilingan (full)');
-    if (t.gilinganPartials.isNotEmpty) s.add('${t.gilinganPartials.length} Gilingan Partial');
+    if (t.gilinganItems.isNotEmpty)
+      s.add('${t.gilinganItems.length} Gilingan (full)');
+    if (t.gilinganPartials.isNotEmpty)
+      s.add('${t.gilinganPartials.length} Gilingan Partial');
     if (t.mixerItems.isNotEmpty) s.add('${t.mixerItems.length} Mixer (full)');
-    if (t.mixerPartials.isNotEmpty) s.add('${t.mixerPartials.length} Mixer Partial');
-    if (t.rejectItems.isNotEmpty) s.add('${t.rejectItems.length} Reject (full)');
-    if (t.rejectPartials.isNotEmpty) s.add('${t.rejectPartials.length} Reject Partial');
+    if (t.mixerPartials.isNotEmpty)
+      s.add('${t.mixerPartials.length} Mixer Partial');
+    if (t.rejectItems.isNotEmpty)
+      s.add('${t.rejectItems.length} Reject (full)');
+    if (t.rejectPartials.isNotEmpty)
+      s.add('${t.rejectPartials.length} Reject Partial');
     return s.join(', ');
   }
 
@@ -440,7 +508,10 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     if (t != null && !t.isEmpty) onShowTemporaryDataDialog?.call(t);
   }
 
-  void removeTemporaryItemsForLabel(String labelCode, List<dynamic> itemsToRemove) {
+  void removeTemporaryItemsForLabel(
+    String labelCode,
+    List<dynamic> itemsToRemove,
+  ) {
     final trimmed = labelCode.trim();
     final t = _tempItemsByLabel[trimmed];
     if (t == null) return;
@@ -482,27 +553,61 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
   void _updateTempItemsByLabel(String labelCode) {
     final code = labelCode.trim();
 
-    final brokerFull = tempBroker.where((e) => _getItemLabelCode(e) == code).toList();
-    final brokerPart = tempBrokerPartial.where((e) => _getItemLabelCode(e) == code).toList();
+    final brokerFull = tempBroker
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
+    final brokerPart = tempBrokerPartial
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
 
     // Split full vs partial per kategori
     final bbFull = tempBb.where((e) => _getItemLabelCode(e) == code).toList();
-    final bbPart = tempBbPartial.where((e) => _getItemLabelCode(e) == code).toList();
+    final bbPart = tempBbPartial
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
 
-    final washingItems = tempWashing.where((e) => _getItemLabelCode(e) == code).toList();
-    final crusherItems = tempCrusher.where((e) => _getItemLabelCode(e) == code).toList();
+    final washingItems = tempWashing
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
+    final crusherItems = tempCrusher
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
 
-    final gilFull = tempGilingan.where((e) => _getItemLabelCode(e) == code).toList();
-    final gilPart = tempGilinganPartial.where((e) => _getItemLabelCode(e) == code).toList();
+    final gilFull = tempGilingan
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
+    final gilPart = tempGilinganPartial
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
 
-    final mixFull = tempMixer.where((e) => _getItemLabelCode(e) == code).toList();
-    final mixPart = tempMixerPartial.where((e) => _getItemLabelCode(e) == code).toList();
+    final mixFull = tempMixer
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
+    final mixPart = tempMixerPartial
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
 
-    final rejFull = tempReject.where((e) => _getItemLabelCode(e) == code).toList();
-    final rejPart = tempRejectPartial.where((e) => _getItemLabelCode(e) == code).toList();
+    final rejFull = tempReject
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
+    final rejPart = tempRejectPartial
+        .where((e) => _getItemLabelCode(e) == code)
+        .toList();
 
-    if ([brokerFull, brokerPart, bbFull, bbPart, washingItems, crusherItems, gilFull, gilPart, mixFull, mixPart, rejFull, rejPart]
-        .every((l) => l.isEmpty)) {
+    if ([
+      brokerFull,
+      brokerPart,
+      bbFull,
+      bbPart,
+      washingItems,
+      crusherItems,
+      gilFull,
+      gilPart,
+      mixFull,
+      mixPart,
+      rejFull,
+      rejPart,
+    ].every((l) => l.isEmpty)) {
       _tempItemsByLabel.remove(code);
       return;
     }
@@ -605,6 +710,7 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
 
     return 'A.|BahanBaku_d|$noBB|$noPallet|$noSak';
   }
+
   String _keyFromWashingItem(WashingItem i) =>
       'B.|Washing_d|${i.noWashing ?? '-'}|${(i.noSak ?? '').toString().trim()}';
   String _keyFromCrusherItem(CrusherItem i) =>
@@ -639,7 +745,7 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     return all;
   }
 
-// ====== PUBLIC API (TEMP-only duplicate checks) ======
+  // ====== PUBLIC API (TEMP-only duplicate checks) ======
   bool isRowAlreadyPresent(Map<String, dynamic> row, String noProduksi) {
     final ctx = lastLookup;
     if (ctx == null) return false;
@@ -662,7 +768,6 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     // ⬇️ hanya cek di TEMP
     return _tempKeys.contains(simpleKey);
   }
-
 
   // Picks (UI)
   void togglePick(Map<String, dynamic> row) {
@@ -718,7 +823,6 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-
   void unpickAll() => clearPicks();
   List<Map<String, dynamic>> get pickedRows => List.unmodifiable(_pickedRows);
 
@@ -733,7 +837,12 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
   // Commit picked → TEMP (strict anti-duplicate)
   // ---------------------------------------------------------------------------
   bool _rowIsPartial(Map<String, dynamic> row, PrefixType t) {
-    final candKeys = const ['IsPartial', 'isPartial', 'IsPartialRow', 'isPartialRow'];
+    final candKeys = const [
+      'IsPartial',
+      'isPartial',
+      'IsPartialRow',
+      'isPartialRow',
+    ];
     for (final k in candKeys) {
       final v = row[k];
       if (v is bool && v) return true;
@@ -742,19 +851,29 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     }
     switch (t) {
       case PrefixType.broker: // TAMBAHKAN
-        final s = (row['NoBrokerPartial'] ?? row['noBrokerPartial'] ?? '').toString().trim();
+        final s = (row['NoBrokerPartial'] ?? row['noBrokerPartial'] ?? '')
+            .toString()
+            .trim();
         return s.isNotEmpty;
       case PrefixType.bb:
-        final s = (row['NoBBPartial'] ?? row['noBBPartial'] ?? '').toString().trim();
+        final s = (row['NoBBPartial'] ?? row['noBBPartial'] ?? '')
+            .toString()
+            .trim();
         return s.isNotEmpty;
       case PrefixType.gilingan:
-        final s = (row['NoGilinganPartial'] ?? row['noGilinganPartial'] ?? '').toString().trim();
+        final s = (row['NoGilinganPartial'] ?? row['noGilinganPartial'] ?? '')
+            .toString()
+            .trim();
         return s.isNotEmpty;
       case PrefixType.mixer:
-        final s = (row['NoMixerPartial'] ?? row['noMixerPartial'] ?? '').toString().trim();
+        final s = (row['NoMixerPartial'] ?? row['noMixerPartial'] ?? '')
+            .toString()
+            .trim();
         return s.isNotEmpty;
       case PrefixType.reject:
-        final s = (row['NoRejectPartial'] ?? row['noRejectPartial'] ?? '').toString().trim();
+        final s = (row['NoRejectPartial'] ?? row['noRejectPartial'] ?? '')
+            .toString()
+            .trim();
         return s.isNotEmpty;
       default:
         return false;
@@ -785,7 +904,7 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     final Set<String> affectedLabels = <String>{};
 
     for (int i = 0; i < typedItems.length; i++) {
-      final item   = typedItems[i];
+      final item = typedItems[i];
       final rawRow = filteredData[i];
 
       // ⬇️ PENTING: Gunakan rawRow yang sudah mungkin dimodifikasi (berat diubah)
@@ -831,18 +950,27 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
         continue;
       }
 
-      final String tempKey =
-      item is BrokerItem   ? _keyFromBrokerItem(item)
-          : item is BbItem       ? _keyFromBbItem(item)
-          : item is WashingItem  ? _keyFromWashingItem(item)
-          : item is CrusherItem  ? _keyFromCrusherItem(item)
-          : item is GilinganItem ? _keyFromGilinganItem(item)
-          : item is MixerItem    ? _keyFromMixerItem(item)
-          : item is RejectItem   ? _keyFromRejectItem(item)
+      final String tempKey = item is BrokerItem
+          ? _keyFromBrokerItem(item)
+          : item is BbItem
+          ? _keyFromBbItem(item)
+          : item is WashingItem
+          ? _keyFromWashingItem(item)
+          : item is CrusherItem
+          ? _keyFromCrusherItem(item)
+          : item is GilinganItem
+          ? _keyFromGilinganItem(item)
+          : item is MixerItem
+          ? _keyFromMixerItem(item)
+          : item is RejectItem
+          ? _keyFromRejectItem(item)
           : simpleKey;
 
       // ⬇️ kalau key TEMP sama sudah ada, skip (ini juga TEMP-only)
-      if (!_tempKeys.add(tempKey)) { skipped++; continue; }
+      if (!_tempKeys.add(tempKey)) {
+        skipped++;
+        continue;
+      }
       // masukkan juga ke "seen" supaya batch berikutnya tahu
       seenTemp.add(simpleKey);
 
@@ -851,20 +979,32 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
 
       bool itemAdded = false;
       if (newItem is BbItem) {
-        if (newItem.isPartialRow) { tempBbPartial.add(newItem); }
-        else { tempBb.add(newItem); }
+        if (newItem.isPartialRow) {
+          tempBbPartial.add(newItem);
+        } else {
+          tempBb.add(newItem);
+        }
         itemAdded = true;
       } else if (newItem is GilinganItem) {
-        if (newItem.isPartialRow) { tempGilinganPartial.add(newItem); }
-        else { tempGilingan.add(newItem); }
+        if (newItem.isPartialRow) {
+          tempGilinganPartial.add(newItem);
+        } else {
+          tempGilingan.add(newItem);
+        }
         itemAdded = true;
       } else if (newItem is MixerItem) {
-        if (newItem.isPartialRow) { tempMixerPartial.add(newItem); }
-        else { tempMixer.add(newItem); }
+        if (newItem.isPartialRow) {
+          tempMixerPartial.add(newItem);
+        } else {
+          tempMixer.add(newItem);
+        }
         itemAdded = true;
       } else if (newItem is RejectItem) {
-        if (newItem.isPartialRow) { tempRejectPartial.add(newItem); }
-        else { tempReject.add(newItem); }
+        if (newItem.isPartialRow) {
+          tempRejectPartial.add(newItem);
+        } else {
+          tempReject.add(newItem);
+        }
         itemAdded = true;
       } else if (newItem is BrokerItem) {
         if (newItem.isPartialRow) {
@@ -874,14 +1014,17 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
         }
         itemAdded = true;
       } else if (newItem is WashingItem) {
-        tempWashing.add(newItem); itemAdded = true;
+        tempWashing.add(newItem);
+        itemAdded = true;
       } else if (newItem is CrusherItem) {
-        tempCrusher.add(newItem); itemAdded = true;
+        tempCrusher.add(newItem);
+        itemAdded = true;
       }
 
       if (itemAdded) {
         final code = _getItemLabelCode(newItem);
-        if (code != null && code.trim().isNotEmpty) affectedLabels.add(code.trim());
+        if (code != null && code.trim().isNotEmpty)
+          affectedLabels.add(code.trim());
         added++;
       } else {
         // rollback key yg barusan ditambah
@@ -903,11 +1046,11 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     return TempCommitResult(added, skipped);
   }
 
-// Helper methods baru untuk cek partial
+  // Helper methods baru untuk cek partial
   String _getBaseKeyWithoutWeight(Map<String, dynamic> row, PrefixType type) {
     // Buat key tanpa memperhitungkan berat
     switch (type) {
-      case PrefixType.broker:                  // TAMBAHKAN
+      case PrefixType.broker: // TAMBAHKAN
         final noBroker = row['NoBroker'] ?? row['noBroker'] ?? '';
         final noSak = row['NoSak'] ?? row['noSak'] ?? '';
         return 'D.|Broker_d|$noBroker|$noSak';
@@ -958,8 +1101,7 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     } else if (item is MixerItem) {
       // Cari di tempMixerPartial
       for (final existing in tempMixerPartial) {
-        if (existing.noMixer == item.noMixer &&
-            existing.noSak == item.noSak) {
+        if (existing.noMixer == item.noMixer && existing.noSak == item.noSak) {
           return existing;
         }
       }
@@ -1137,7 +1279,7 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
 
   // ===== Temp-partial numbering state (per kategori) =====
   final Map<PrefixType, int> _tempPartialSeq = {
-    PrefixType.broker: 0,    // TAMBAHKAN
+    PrefixType.broker: 0, // TAMBAHKAN
     PrefixType.bb: 0,
     PrefixType.gilingan: 0,
     PrefixType.mixer: 0,
@@ -1170,7 +1312,12 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
 
   /// create copy with temp-partial only if `isPartial==true` and category supports it
   dynamic _withTempPartialIfNeeded(dynamic item, PrefixType t, bool isPartial) {
-    final supports = t == PrefixType.broker || t == PrefixType.bb || t == PrefixType.gilingan || t == PrefixType.mixer || t == PrefixType.reject;
+    final supports =
+        t == PrefixType.broker ||
+        t == PrefixType.bb ||
+        t == PrefixType.gilingan ||
+        t == PrefixType.mixer ||
+        t == PrefixType.reject;
     if (!supports || !isPartial) return item;
 
     if (item is BrokerItem) {
@@ -1223,25 +1370,17 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
 
   int get totalTempCount =>
       tempBroker.length +
-          tempBrokerPartial.length +      // TAMBAHKAN
-          tempBb.length +
-          tempBbPartial.length +
-          tempWashing.length +
-          tempCrusher.length +
-          tempGilingan.length +
-          tempGilinganPartial.length +
-          tempMixer.length +
-          tempMixerPartial.length +
-          tempReject.length +
-          tempRejectPartial.length;
-
-
-
-
-
-
-
-
+      tempBrokerPartial.length + // TAMBAHKAN
+      tempBb.length +
+      tempBbPartial.length +
+      tempWashing.length +
+      tempCrusher.length +
+      tempGilingan.length +
+      tempGilinganPartial.length +
+      tempMixer.length +
+      tempMixerPartial.length +
+      tempReject.length +
+      tempRejectPartial.length;
 
   // ---------------------------------------------------------------------------
   // Submit temp items to backend
@@ -1255,90 +1394,93 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
 
     // Existing inputs (full items only, tanpa partial)
     if (tempBroker.isNotEmpty) {
-      payload['broker'] = tempBroker.map((e) => {
-        'noBroker': e.noBroker,
-        'noSak': e.noSak,
-      }).toList();
+      payload['broker'] = tempBroker
+          .map((e) => {'noBroker': e.noBroker, 'noSak': e.noSak})
+          .toList();
     }
 
     if (tempBb.isNotEmpty) {
-      payload['bb'] = tempBb.map((e) => {
-        'noBahanBaku': e.noBahanBaku,
-        'noPallet': e.noPallet,
-        'noSak': e.noSak,
-      }).toList();
+      payload['bb'] = tempBb
+          .map(
+            (e) => {
+              'noBahanBaku': e.noBahanBaku,
+              'noPallet': e.noPallet,
+              'noSak': e.noSak,
+            },
+          )
+          .toList();
     }
 
     if (tempWashing.isNotEmpty) {
-      payload['washing'] = tempWashing.map((e) => {
-        'noWashing': e.noWashing,
-        'noSak': e.noSak,
-      }).toList();
+      payload['washing'] = tempWashing
+          .map((e) => {'noWashing': e.noWashing, 'noSak': e.noSak})
+          .toList();
     }
 
     if (tempCrusher.isNotEmpty) {
-      payload['crusher'] = tempCrusher.map((e) => {
-        'noCrusher': e.noCrusher,
-      }).toList();
+      payload['crusher'] = tempCrusher
+          .map((e) => {'noCrusher': e.noCrusher})
+          .toList();
     }
 
     if (tempGilingan.isNotEmpty) {
-      payload['gilingan'] = tempGilingan.map((e) => {
-        'noGilingan': e.noGilingan,
-      }).toList();
+      payload['gilingan'] = tempGilingan
+          .map((e) => {'noGilingan': e.noGilingan})
+          .toList();
     }
 
     if (tempMixer.isNotEmpty) {
-      payload['mixer'] = tempMixer.map((e) => {
-        'noMixer': e.noMixer,
-        'noSak': e.noSak,
-      }).toList();
+      payload['mixer'] = tempMixer
+          .map((e) => {'noMixer': e.noMixer, 'noSak': e.noSak})
+          .toList();
     }
 
     if (tempReject.isNotEmpty) {
-      payload['reject'] = tempReject.map((e) => {
-        'noReject': e.noReject,
-      }).toList();
+      payload['reject'] = tempReject
+          .map((e) => {'noReject': e.noReject})
+          .toList();
     }
 
     if (tempBrokerPartial.isNotEmpty) {
-      payload['brokerPartial'] = tempBrokerPartial.map((e) => {
-        'noBroker': e.noBroker,
-        'noSak': e.noSak,
-        'berat': e.berat,
-      }).toList();
+      payload['brokerPartial'] = tempBrokerPartial
+          .map(
+            (e) => {'noBroker': e.noBroker, 'noSak': e.noSak, 'berat': e.berat},
+          )
+          .toList();
     }
 
     // NEW partials to create
     if (tempBbPartial.isNotEmpty) {
-      payload['bbPartial'] = tempBbPartial.map((e) => {
-        'noBahanBaku': e.noBahanBaku,
-        'noPallet': e.noPallet,
-        'noSak': e.noSak,
-        'berat': e.berat,
-      }).toList();
+      payload['bbPartial'] = tempBbPartial
+          .map(
+            (e) => {
+              'noBahanBaku': e.noBahanBaku,
+              'noPallet': e.noPallet,
+              'noSak': e.noSak,
+              'berat': e.berat,
+            },
+          )
+          .toList();
     }
 
     if (tempGilinganPartial.isNotEmpty) {
-      payload['gilinganPartial'] = tempGilinganPartial.map((e) => {
-        'noGilingan': e.noGilingan,
-        'berat': e.berat,
-      }).toList();
+      payload['gilinganPartial'] = tempGilinganPartial
+          .map((e) => {'noGilingan': e.noGilingan, 'berat': e.berat})
+          .toList();
     }
 
     if (tempMixerPartial.isNotEmpty) {
-      payload['mixerPartial'] = tempMixerPartial.map((e) => {
-        'noMixer': e.noMixer,
-        'noSak': e.noSak,
-        'berat': e.berat,
-      }).toList();
+      payload['mixerPartial'] = tempMixerPartial
+          .map(
+            (e) => {'noMixer': e.noMixer, 'noSak': e.noSak, 'berat': e.berat},
+          )
+          .toList();
     }
 
     if (tempRejectPartial.isNotEmpty) {
-      payload['rejectPartial'] = tempRejectPartial.map((e) => {
-        'noReject': e.noReject,
-        'berat': e.berat,
-      }).toList();
+      payload['rejectPartial'] = tempRejectPartial
+          .map((e) => {'noReject': e.noReject, 'berat': e.berat})
+          .toList();
     }
 
     return payload;
@@ -1393,7 +1535,8 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
 
       // Log created partials if any
       if (data != null) {
-        final createdPartials = data['createdPartials'] as Map<String, dynamic>?;
+        final createdPartials =
+            data['createdPartials'] as Map<String, dynamic>?;
         if (createdPartials != null) {
           _d('Created partials: ${json.encode(createdPartials)}');
         }
@@ -1407,9 +1550,11 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
 
       // Invalidate cache untuk noProduksi ini
       clearInputsCache(noProduksi);
+      clearOutputsState(noProduksi);
 
       // Reload inputs
       await loadInputs(noProduksi, force: true);
+      await loadOutputs(noProduksi);
 
       return true;
     } catch (e) {
@@ -1431,7 +1576,8 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     if (tempBroker.isNotEmpty) {
       parts.add('${tempBroker.length} Broker');
     }
-    if (tempBrokerPartial.isNotEmpty) {        // TAMBAHKAN
+    if (tempBrokerPartial.isNotEmpty) {
+      // TAMBAHKAN
       parts.add('${tempBrokerPartial.length} Broker Partial');
     }
     if (tempBb.isNotEmpty) {
@@ -1468,9 +1614,6 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     return 'Total $totalTempCount items:\n${parts.join(', ')}';
   }
 
-
-
-
   // ---------------------------------------------------------------------------
   // Delete inputs & partials (DB + TEMP)
   // ---------------------------------------------------------------------------
@@ -1478,44 +1621,38 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
   String? deleteError;
   Map<String, dynamic>? lastDeleteResult;
 
-
   /// Build payload untuk endpoint DELETE /api/production/broker/:noProduksi/inputs
   /// dari list item yang berasal dari DB (bukan temp).
   Map<String, dynamic> _buildDeletePayloadFromItems(List<dynamic> items) {
     final payload = <String, dynamic>{};
 
     void add(String key, Map<String, dynamic> row) {
-      final list = (payload[key] ?? <Map<String, dynamic>>[]) as List<Map<String, dynamic>>;
+      final list =
+          (payload[key] ?? <Map<String, dynamic>>[])
+              as List<Map<String, dynamic>>;
       list.add(row);
       payload[key] = list;
     }
 
     for (final it in items) {
       if (it is BrokerItem) {
-        final isPart = it.isPartialRow ||
-            ((it.noBrokerPartial ?? '').trim().isNotEmpty);
+        final isPart =
+            it.isPartialRow || ((it.noBrokerPartial ?? '').trim().isNotEmpty);
         if (isPart) {
           final code = (it.noBrokerPartial ?? '').trim();
           if (code.isNotEmpty) {
-            add('brokerPartial', {
-              'noBrokerPartial': code,
-            });
+            add('brokerPartial', {'noBrokerPartial': code});
           }
         } else {
-          add('broker', {
-            'noBroker': it.noBroker,
-            'noSak': it.noSak,
-          });
+          add('broker', {'noBroker': it.noBroker, 'noSak': it.noSak});
         }
       } else if (it is BbItem) {
-        final isPart = it.isPartialRow ||
-            ((it.noBBPartial ?? '').trim().isNotEmpty);
+        final isPart =
+            it.isPartialRow || ((it.noBBPartial ?? '').trim().isNotEmpty);
         if (isPart) {
           final code = (it.noBBPartial ?? '').trim();
           if (code.isNotEmpty) {
-            add('bbPartial', {
-              'noBBPartial': code,
-            });
+            add('bbPartial', {'noBBPartial': code});
           }
         } else {
           add('bb', {
@@ -1525,66 +1662,47 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
           });
         }
       } else if (it is WashingItem) {
-        add('washing', {
-          'noWashing': it.noWashing,
-          'noSak': it.noSak,
-        });
+        add('washing', {'noWashing': it.noWashing, 'noSak': it.noSak});
       } else if (it is CrusherItem) {
-        add('crusher', {
-          'noCrusher': it.noCrusher,
-        });
+        add('crusher', {'noCrusher': it.noCrusher});
       } else if (it is GilinganItem) {
-        final isPart = it.isPartialRow ||
-            ((it.noGilinganPartial ?? '').trim().isNotEmpty);
+        final isPart =
+            it.isPartialRow || ((it.noGilinganPartial ?? '').trim().isNotEmpty);
         if (isPart) {
           final code = (it.noGilinganPartial ?? '').trim();
           if (code.isNotEmpty) {
-            add('gilinganPartial', {
-              'noGilinganPartial': code,
-            });
+            add('gilinganPartial', {'noGilinganPartial': code});
           }
         } else {
-          add('gilingan', {
-            'noGilingan': it.noGilingan,
-          });
+          add('gilingan', {'noGilingan': it.noGilingan});
         }
       } else if (it is MixerItem) {
-        final isPart = it.isPartialRow ||
-            ((it.noMixerPartial ?? '').trim().isNotEmpty);
+        final isPart =
+            it.isPartialRow || ((it.noMixerPartial ?? '').trim().isNotEmpty);
         if (isPart) {
           final code = (it.noMixerPartial ?? '').trim();
           if (code.isNotEmpty) {
-            add('mixerPartial', {
-              'noMixerPartial': code,
-            });
+            add('mixerPartial', {'noMixerPartial': code});
           }
         } else {
-          add('mixer', {
-            'noMixer': it.noMixer,
-            'noSak': it.noSak,
-          });
+          add('mixer', {'noMixer': it.noMixer, 'noSak': it.noSak});
         }
       } else if (it is RejectItem) {
-        final isPart = it.isPartialRow ||
-            ((it.noRejectPartial ?? '').trim().isNotEmpty);
+        final isPart =
+            it.isPartialRow || ((it.noRejectPartial ?? '').trim().isNotEmpty);
         if (isPart) {
           final code = (it.noRejectPartial ?? '').trim();
           if (code.isNotEmpty) {
-            add('rejectPartial', {
-              'noRejectPartial': code,
-            });
+            add('rejectPartial', {'noRejectPartial': code});
           }
         } else {
-          add('reject', {
-            'noReject': it.noReject,
-          });
+          add('reject', {'noReject': it.noReject});
         }
       }
     }
 
     return payload;
   }
-
 
   /// Hapus item (bisa campuran DB & TEMP) untuk satu noProduksi:
   /// - Jika item ada di TEMP → cukup delete dari temp (tanpa call API)
@@ -1646,7 +1764,9 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
 
       // Berhasil: invalidasi & reload inputs
       clearInputsCache(noProduksi);
+      clearOutputsState(noProduksi);
       await loadInputs(noProduksi, force: true);
+      await loadOutputs(noProduksi);
 
       // Opsional: bisa juga clear temp untuk label terkait,
       // tapi karena tadi deleteIfTemp sudah dipanggil, state temp sudah bersih untuk item2 yg dihapus.

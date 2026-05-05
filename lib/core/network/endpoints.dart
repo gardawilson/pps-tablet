@@ -10,6 +10,7 @@ class ApiConstants {
   static String get login => '$baseUrl/api/auth/login2';
   static String get checkLabel => '$baseUrl/api/label-list/check';
   static String get saveChanges => '$baseUrl/api/label-list/save-changes';
+  static String get stockOpnameList => '$baseUrl/api/no-stock-opname';
   static String get listNoSO => '$baseUrl/api/no-stock-opname';
   static String get listNyangkut => '$baseUrl/api/nyangkut-list';
   static String get mstLokasi => '$baseUrl/api/mst-lokasi';

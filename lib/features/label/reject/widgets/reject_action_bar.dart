@@ -85,7 +85,7 @@ class _RejectActionBarState extends State<RejectActionBar> {
                     child: FilledButton.icon(
                       onPressed: canCreate ? widget.onAddPressed : null,
                       icon: const Icon(Icons.add),
-                      label: const Text('Create Reject Label'),
+                      label: const Text('Buat Baru'),
                       style: FilledButton.styleFrom(
                         backgroundColor: canCreate
                             ? const Color(0xFF00897B)
@@ -124,12 +124,12 @@ class _RejectActionBarState extends State<RejectActionBar> {
                         ),
                         boxShadow: _focused
                             ? [
-                          BoxShadow(
-                            color: cs.primary.withValues(alpha: .12),
-                            blurRadius: 14,
-                            offset: const Offset(0, 6),
-                          ),
-                        ]
+                                BoxShadow(
+                                  color: cs.primary.withValues(alpha: .12),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ]
                             : null,
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -150,7 +150,7 @@ class _RejectActionBarState extends State<RejectActionBar> {
                               textInputAction: TextInputAction.search,
                               decoration: InputDecoration(
                                 hintText:
-                                'Search No Reject / Lokasi / IdReject / Mesin / Kode sumber',
+                                    'Search No Reject / Lokasi / IdReject / Mesin / Kode sumber',
                                 hintStyle: TextStyle(
                                   color: Colors.grey.shade500,
                                 ),
@@ -167,21 +167,19 @@ class _RejectActionBarState extends State<RejectActionBar> {
                             duration: const Duration(milliseconds: 140),
                             child: _hasText
                                 ? IconButton(
-                              key: const ValueKey('clear_on_reject'),
-                              tooltip: 'Clear',
-                              icon:
-                              const Icon(Icons.close_rounded),
-                              onPressed: () {
-                                widget.controller.clear();
-                                setState(() {});
-                                widget.onClear();
-                                _searchFocus.requestFocus();
-                              },
-                            )
+                                    key: const ValueKey('clear_on_reject'),
+                                    tooltip: 'Clear',
+                                    icon: const Icon(Icons.close_rounded),
+                                    onPressed: () {
+                                      widget.controller.clear();
+                                      setState(() {});
+                                      widget.onClear();
+                                      _searchFocus.requestFocus();
+                                    },
+                                  )
                                 : const SizedBox.shrink(
-                              key:
-                              ValueKey('clear_off_reject'),
-                            ),
+                                    key: ValueKey('clear_off_reject'),
+                                  ),
                           ),
                         ],
                       ),
@@ -213,7 +211,9 @@ class _RejectActionBarState extends State<RejectActionBar> {
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: widget.includeUsed
-                                ? const Color(0xFF1565C0).withValues(alpha: 0.35)
+                                ? const Color(
+                                    0xFF1565C0,
+                                  ).withValues(alpha: 0.35)
                                 : Colors.grey.shade300,
                           ),
                         ),

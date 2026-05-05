@@ -1,10 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:pps_tablet/core/services/permission_storage.dart';
-import 'package:pps_tablet/core/services/token_storage.dart';
-import 'package:pps_tablet/core/view_model/label_print_lock_socket_manager.dart';
-import 'package:pps_tablet/core/view_model/permission_view_model.dart';
-import 'package:pps_tablet/features/home/view/widgets/user_profile_dialog.dart';
-import 'package:provider/provider.dart';
 
 class HomeSidebar extends StatefulWidget {
   final GlobalKey<NavigatorState> navigatorKey;
@@ -29,6 +23,7 @@ class _HomeSidebarState extends State<HomeSidebar> {
   int? _expandedGroup;
 
   static const Color _primaryColor = Color(0xFF0D47A1);
+  static const String _logoAsset = 'assets/images/icon_without_bg.png';
 
   static List<_MenuGroup> get _menuGroups => <_MenuGroup>[
     _MenuGroup(
@@ -76,7 +71,7 @@ class _HomeSidebarState extends State<HomeSidebar> {
           route: '/label/furniture_wip',
         ),
         _SubItem(
-          title: 'Packing',
+          title: 'Barang Jadi',
           icon: Icons.inventory_outlined,
           route: '/label/packing',
         ),
@@ -139,8 +134,8 @@ class _HomeSidebarState extends State<HomeSidebar> {
       route: '/shell/hot-stamp',
     ),
     _MenuItem(
-      title: 'Key Fitting',
-      subtitle: 'Input data Key Fitting',
+      title: 'Pasang Kunci',
+      subtitle: 'Input data Pasang Kunci',
       icon: Icons.key_outlined,
       route: '/shell/key-fitting',
     ),
@@ -217,48 +212,55 @@ class _HomeSidebarState extends State<HomeSidebar> {
     _toggleGroup(index);
   }
 
-  void _showAccountDialog() {
-    showDialog(context: context, builder: (_) => UserProfileDialog());
-  }
-
   bool get _collapsed => widget.isCollapsed;
 
   @override
   Widget build(BuildContext context) {
+    final contentWidth = _collapsed ? 64.0 : 260.0;
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeInOut,
-      width: _collapsed ? 64 : 260,
+      width: contentWidth,
       decoration: const BoxDecoration(
         color: _primaryColor,
         boxShadow: [
           BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(2, 0)),
         ],
       ),
-      child: Column(
-        children: [
-          _buildHeader(),
-          const Divider(color: Colors.white24, height: 1),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+      child: ClipRect(
+        child: OverflowBox(
+          alignment: Alignment.topLeft,
+          minWidth: contentWidth,
+          maxWidth: contentWidth,
+          child: SizedBox(
+            width: contentWidth,
+            child: Column(
               children: [
-                _buildFlatItem(
-                  _MenuItem(
-                    title: 'Dashboard',
-                    subtitle: 'Halaman utama',
-                    icon: Icons.dashboard_outlined,
-                    route: '/shell/welcome',
+                _buildHeader(),
+                const Divider(color: Colors.white24, height: 1),
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    children: [
+                      _buildFlatItem(
+                        _MenuItem(
+                          title: 'Dashboard',
+                          subtitle: 'Halaman utama',
+                          icon: Icons.dashboard_outlined,
+                          route: '/shell/welcome',
+                        ),
+                      ),
+                      for (int i = 0; i < _menuGroups.length; i++)
+                        _buildGroup(i),
+                      for (final item in _menuItems) _buildFlatItem(item),
+                    ],
                   ),
                 ),
-                for (int i = 0; i < _menuGroups.length; i++) _buildGroup(i),
-                for (final item in _menuItems) _buildFlatItem(item),
               ],
             ),
           ),
-          const Divider(color: Colors.white24, height: 1),
-          _buildBottomActions(context),
-        ],
+        ),
       ),
     );
   }
@@ -271,11 +273,20 @@ class _HomeSidebarState extends State<HomeSidebar> {
           onTap: widget.onToggleCollapse,
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            child: const Icon(
-              Icons.chevron_right,
-              color: Colors.white,
-              size: 22,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Image.asset(_logoAsset, width: 30, height: 30),
+                ),
+                const SizedBox(height: 8),
+                const Icon(Icons.chevron_right, color: Colors.white, size: 18),
+              ],
             ),
           ),
         ),
@@ -292,14 +303,10 @@ class _HomeSidebarState extends State<HomeSidebar> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(
-                  Icons.dashboard,
-                  color: Colors.white,
-                  size: 22,
-                ),
+                child: Image.asset(_logoAsset, width: 24, height: 24),
               ),
               const SizedBox(width: 10),
               const Expanded(
@@ -557,103 +564,6 @@ class _HomeSidebarState extends State<HomeSidebar> {
         ),
       ),
     );
-  }
-
-  Widget _buildBottomActions(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-      child: Column(
-        children: [
-          _buildActionTile(
-            icon: Icons.manage_accounts_outlined,
-            label: 'Akun',
-            onTap: _showAccountDialog,
-          ),
-          _buildActionTile(
-            icon: Icons.logout,
-            label: 'Logout',
-            onTap: () => _handleLogout(context),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionTile({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return Tooltip(
-      message: _collapsed ? label : '',
-      preferBelow: false,
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(10),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(10),
-          onTap: onTap,
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: _collapsed ? 0 : 12,
-              vertical: 10,
-            ),
-            child: _collapsed
-                ? Center(child: Icon(icon, color: Colors.white70, size: 20))
-                : Row(
-                    children: [
-                      Icon(icon, color: Colors.white70, size: 20),
-                      const SizedBox(width: 12),
-                      Text(
-                        label,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _handleLogout(BuildContext context) async {
-    final socketMgr = context.read<LabelPrintLockSocketManager>();
-    final permVm = context.read<PermissionViewModel>();
-
-    final shouldLogout = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Konfirmasi Logout'),
-        content: const Text('Apakah Anda yakin ingin keluar dari aplikasi?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Logout'),
-          ),
-        ],
-      ),
-    );
-
-    if (shouldLogout != true) return;
-
-    socketMgr.disconnect();
-    await TokenStorage.clear();
-    await PermissionStorage.clear();
-
-    if (context.mounted) {
-      permVm.clear();
-      Navigator.of(
-        context,
-        rootNavigator: true,
-      ).pushNamedAndRemoveUntil('/', (route) => false);
-    }
   }
 }
 

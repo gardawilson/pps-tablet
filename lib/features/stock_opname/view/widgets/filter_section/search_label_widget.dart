@@ -31,16 +31,20 @@ class _SearchLabelWidgetState extends State<SearchLabelWidget> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 53,
+      height: 40,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFFF8F9FB),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade300),
+        border: Border.all(color: const Color(0xFFDCDFE4)),
       ),
       child: Row(
         children: [
           const SizedBox(width: 12),
-          const Icon(Icons.search, size: 20, color: Colors.grey),
+          const Icon(
+            Icons.search_rounded,
+            size: 18,
+            color: Color(0xFF8896A6),
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: TextField(
@@ -48,17 +52,20 @@ class _SearchLabelWidgetState extends State<SearchLabelWidget> {
               onChanged: _onTextChanged,
               decoration: const InputDecoration(
                 hintText: 'Cari label...',
+                hintStyle: TextStyle(fontSize: 13, color: Color(0xFF8896A6)),
                 border: InputBorder.none,
                 isDense: true,
-                contentPadding: EdgeInsets.symmetric(vertical: 14),
+                contentPadding: EdgeInsets.symmetric(vertical: 11),
               ),
-              style: const TextStyle(fontSize: 14),
+              style: const TextStyle(fontSize: 13, color: Color(0xFF1A2340)),
             ),
           ),
           if (_searchController.text.isNotEmpty)
             IconButton(
+              constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+              padding: EdgeInsets.zero,
               icon: const Icon(Icons.clear, size: 20),
-              color: Colors.grey,
+              color: const Color(0xFF8896A6),
               onPressed: _clearSearch,
             )
           else

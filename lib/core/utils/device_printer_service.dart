@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../network/endpoints.dart';
 import '../services/token_storage.dart';
+import '../services/user_session_storage.dart';
 
 // ── Model ─────────────────────────────────────────────────────────────────────
 
@@ -184,7 +185,6 @@ class DevicePrinterService {
   // ── Get logged-in username ─────────────────────────────────────────────────
 
   static Future<String> getLoggedUsername() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('logged_username') ?? 'unknown';
+    return UserSessionStorage.getUsername();
   }
 }

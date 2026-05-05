@@ -1,414 +1,425 @@
 import 'package:flutter/material.dart';
+import 'package:pps_tablet/common/widgets/atlas_data_table.dart';
+import 'package:pps_tablet/common/widgets/atlas_paged_data_table.dart';
+import 'package:pps_tablet/core/utils/date_formatter.dart';
 import 'package:provider/provider.dart';
+import '../model/stock_opname_model.dart';
 import '../view_model/stock_opname_list_view_model.dart';
-import '../../../common/widgets/loading_skeleton.dart';
 import 'stock_opname_detail_screen.dart';
 import 'stock_opname_ascend_detail_screen.dart';
 
-class StockOpnameListScreen extends StatelessWidget {
+class StockOpnameListScreen extends StatefulWidget {
+  const StockOpnameListScreen({super.key});
+
+  @override
+  State<StockOpnameListScreen> createState() => _StockOpnameListScreenState();
+}
+
+class _StockOpnameListScreenState extends State<StockOpnameListScreen> {
+  final _searchCtrl = TextEditingController();
+
+  static const _primary = Color(0xFF0D47A1);
+  static const _primaryLt = Color(0xFFE3F0FF);
+  static const _primaryMid = Color(0xFF90CAF9);
+  static const _bgPage = Color(0xFFF8F9FB);
+  static const _surface = Color(0xFFFFFFFF);
+  static const _border = Color(0xFFE2E6EE);
+  static const _border2 = Color(0xFFDCDFE4);
+  static const _textPrimary = Color(0xFF1A2340);
+  static const _textSec = Color(0xFF4A5568);
+  static const _textHint = Color(0xFF8896A6);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final vm = Provider.of<StockOpnameViewModel>(context, listen: false);
+      vm.pagingController.refresh();
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<StockOpnameViewModel>(context, listen: false)
-          .fetchStockOpname();
-    });
-
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: _bgPage,
       body: Consumer<StockOpnameViewModel>(
-        builder: (context, viewModel, child) {
-          if (viewModel.isLoading && viewModel.stockOpnameList.isEmpty) {
-            return _buildLoading();
-          }
-
-          if (viewModel.stockOpnameList.isEmpty) {
-            return _buildEmptyState(viewModel);
-          }
-
-          if (viewModel.errorMessage.isNotEmpty) {
-            return _buildErrorState(viewModel);
-          }
-
-          return RefreshIndicator(
-            onRefresh: () async {
-              await viewModel.fetchStockOpname();
-            },
-            color: const Color(0xFF0D47A1),
-            child: ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: viewModel.stockOpnameList.length,
-              itemBuilder: (context, index) {
-                final stockOpname = viewModel.stockOpnameList[index];
-                return _buildStockOpnameCard(context, stockOpname);
-              },
-              separatorBuilder: (context, index) => const SizedBox(height: 12),
-            ),
+        builder: (context, vm, _) {
+          return Column(
+            children: [
+              _buildToolbar(vm),
+              Expanded(child: _buildTable(vm)),
+              _buildStatsBar(vm),
+            ],
           );
         },
       ),
     );
   }
 
-  Widget _buildStockOpnameCard(BuildContext context, dynamic stockOpname) {
-    final activeProcesses = _getActiveProcesses(stockOpname);
+  // ── Toolbar ───────────────────────────────────────────────────────────────
+  Widget _buildToolbar(StockOpnameViewModel vm) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: _surface,
+        border: Border(bottom: BorderSide(color: _border)),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: SizedBox(
+              height: 38,
+              child: TextField(
+                controller: _searchCtrl,
+                onChanged: (v) => vm.setSearchQuery(v),
+                style: const TextStyle(fontSize: 13, color: _textPrimary),
+                decoration: InputDecoration(
+                  hintText: 'Cari Nomor SO...',
+                  hintStyle: const TextStyle(fontSize: 13, color: _textHint),
+                  prefixIcon: const Icon(
+                    Icons.search_rounded,
+                    size: 18,
+                    color: _textHint,
+                  ),
+                  prefixIconConstraints: const BoxConstraints(minWidth: 38),
+                  filled: true,
+                  fillColor: _bgPage,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 0,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: _border2),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: _primary, width: 1.4),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          ..._filterChips(vm),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _filterChips(StockOpnameViewModel vm) {
+    return ['Semua', 'Ascend', 'PPS'].map((f) {
+      final active = vm.activeFilter == f;
+      return Padding(
+        padding: const EdgeInsets.only(left: 6),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => vm.setFilter(f),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            height: 38,
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              color: active ? _primaryLt : _surface,
+              border: Border.all(color: active ? _primaryMid : _border2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              f,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                color: active ? _primary : _textSec,
+              ),
+            ),
+          ),
+        ),
+      );
+    }).toList();
+  }
+
+  Widget _buildTable(StockOpnameViewModel vm) {
+    return AtlasPagedDataTable<StockOpname>(
+      pagingController: vm.pagingController,
+      columns: _columns(),
+      selectedPredicate: (row) => false,
+      onRowTap: (row) {
+        Future.delayed(const Duration(milliseconds: 120), () {
+          if (!mounted) return;
+
+          if (row.isAscend == true) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => StockOpnameAscendDetailScreen(
+                  noSO: row.noSO,
+                  tgl: row.tanggal,
+                  idWarehouses: row.idWarehouses,
+                ),
+              ),
+            );
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    StockOpnameDetailScreen(noSO: row.noSO, tgl: row.tanggal),
+              ),
+            );
+          }
+        });
+      },
+      firstPageProgress: (_) =>
+          const Center(child: CircularProgressIndicator()),
+      newPageProgress: (_) => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: CircularProgressIndicator(),
+      ),
+      firstPageError: (_) => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                border: Border.all(color: const Color(0xFFFCA5A5)),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.error_outline,
+                size: 40,
+                color: Color(0xFFDC2626),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Terjadi kesalahan',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: _textPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                vm.errorMessage.isNotEmpty
+                    ? vm.errorMessage
+                    : 'Gagal memuat data Stock Opname',
+                style: const TextStyle(fontSize: 12, color: _textHint),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () => vm.pagingController.refresh(),
+              icon: const Icon(Icons.refresh_rounded, size: 15),
+              label: const Text('Muat Ulang'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                elevation: 0,
+              ),
+            ),
+          ],
+        ),
+      ),
+      noItems: (_) => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _bgPage,
+                border: Border.all(color: _border),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.inbox_outlined,
+                size: 40,
+                color: _textHint,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Tidak ada data',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: _textPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Belum ada dokumen stock opname',
+              style: TextStyle(fontSize: 12, color: _textHint),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<AtlasTableColumn<StockOpname>> _columns() {
+    return [
+      AtlasTableColumn<StockOpname>(
+        title: 'NOMOR SO',
+        width: 170,
+        cellBuilder: (_, row, state) => Text(
+          row.noSO,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: state.isSelected ? const Color(0xFF0C66E4) : _textPrimary,
+          ),
+        ),
+      ),
+      AtlasTableColumn<StockOpname>(
+        title: 'TANGGAL',
+        width: 120,
+        cellBuilder: (_, row, state) => Text(
+          formatDateToShortId(row.tanggal),
+          style: TextStyle(
+            fontSize: 13,
+            color: state.isSelected ? const Color(0xFF0C66E4) : _textSec,
+          ),
+        ),
+      ),
+
+      AtlasTableColumn<StockOpname>(
+        title: 'SOURCE',
+        width: 110,
+        cellBuilder: (_, row, state) {
+          return Text(
+            row.isAscend ? 'Ascend' : 'PPS',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: state.isSelected ? const Color(0xFF0C66E4) : _textSec,
+            ),
+          );
+        },
+      ),
+
+      AtlasTableColumn<StockOpname>(
+        title: 'WAREHOUSE',
+        width: 220,
+        cellBuilder: (_, row, state) => Text(
+          row.namaWarehouse,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: state.isSelected ? const Color(0xFF0C66E4) : _textSec,
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+
+      AtlasTableColumn<StockOpname>(
+        title: 'KATEGORI',
+        width: 360,
+        showDivider: false,
+        cellBuilder: (_, row, state) {
+          final cats = _activeCats(row);
+          if (cats.isEmpty) {
+            return Text(
+              '-',
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+            );
+          }
+
+          return Text(
+            cats.join(', '),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: state.isSelected ? const Color(0xFF0C66E4) : _textSec,
+            ),
+          );
+        },
+      ),
+    ];
+  }
+
+  // ── Stats bar ─────────────────────────────────────────────────────────────
+  Widget _buildStatsBar(StockOpnameViewModel vm) {
+    final total = vm.totalResults;
 
     return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.white, Colors.grey[50]!],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 0,
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+      height: 32,
+      decoration: const BoxDecoration(
+        color: _surface,
+        border: Border(top: BorderSide(color: _border)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 1,
+            height: 14,
+            margin: const EdgeInsets.symmetric(horizontal: 10),
+            color: _border,
           ),
+          _statItem('Total', '$total'),
         ],
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () {
-            if (stockOpname.isAscend == true) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => StockOpnameAscendDetailScreen(
-                    noSO: stockOpname.noSO,
-                    tgl: stockOpname.tanggal,
-                    idWarehouses: stockOpname.idWarehouses,
-                  ),
-                ),
-              );
-            } else {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => StockOpnameDetailScreen(
-                    noSO: stockOpname.noSO,
-                    tgl: stockOpname.tanggal,
-                  ),
-                ),
-              );
-            }
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header dengan tanggal dan nomor SO
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0D47A1).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        Icons.calendar_today,
-                        color: const Color(0xFF0D47A1),
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            stockOpname.tanggal,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF2D3748),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            stockOpname.noSO,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey[600],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(
-                      Icons.arrow_forward_ios,
-                      color: Colors.grey[400],
-                      size: 16,
-                    ),
-                  ],
-                ),
+    );
+  }
 
-                const SizedBox(height: 16),
-
-                // Warehouse info
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue[200]!),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.warehouse,
-                        color: const Color(0xFF0D47A1),
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          stockOpname.namaWarehouse,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF0D47A1),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Active processes
-                if (activeProcesses.isNotEmpty) ...[
-                  Text(
-                    'Kategori:',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[600],
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: activeProcesses.map((process) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: _getProcessColor(process).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: _getProcessColor(process).withOpacity(0.3),
-                          ),
-                        ),
-                        child: Text(
-                          process,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: _getProcessColor(process),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ] else ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          color: Colors.grey[500],
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'No active processes',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
+  Widget _statItem(String label, String val) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 14),
+      child: Text.rich(
+        TextSpan(
+          style: const TextStyle(fontSize: 11, color: _textHint),
+          children: [
+            TextSpan(text: '$label: '),
+            TextSpan(
+              text: val,
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                color: _textPrimary,
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
   }
 
-  List<String> _getActiveProcesses(dynamic stockOpname) {
-    List<String> processes = [];
-
-    if (stockOpname.isBahanBaku) processes.add('Bahan Baku');
-    if (stockOpname.isWashing) processes.add('Washing');
-    if (stockOpname.isBonggolan) processes.add('Bonggolan');
-    if (stockOpname.isCrusher) processes.add('Crusher');
-    if (stockOpname.isBroker) processes.add('Broker');
-    if (stockOpname.isGilingan) processes.add('Gilingan');
-    if (stockOpname.isMixer) processes.add('Mixer');
-    if (stockOpname.isFurnitureWIP) processes.add('Furniture WIP');
-    if (stockOpname.isBarangJadi) processes.add('Barang Jadi');
-    if (stockOpname.isReject) processes.add('Reject');
-    if (stockOpname.isAscend) processes.add('Ascend');
-
-    return processes;
-  }
-
-  Color _getProcessColor(String process) {
-    switch (process) {
-      case 'Bahan Baku':
-      case 'Washing':
-      case 'Bonggolan':
-      case 'Crusher':
-      case 'Broker':
-      case 'Gilingan':
-      case 'Mixer':
-      case 'Furniture WIP':
-      case 'Barang Jadi':
-      case 'Reject':
-      case 'Ascend':
-        return Colors.blue[600]!;
-      default:
-        return Colors.grey[600]!;
-    }
-  }
-
-  Widget _buildEmptyState(dynamic viewModel) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.inventory_2_outlined,
-              size: 64,
-              color: Colors.grey[400],
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Tidak Ada Data',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[700],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            viewModel.errorMessage.isNotEmpty
-                ? viewModel.errorMessage
-                : 'No data available at the moment',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () {
-              viewModel.fetchStockOpname();
-            },
-            icon: const Icon(Icons.refresh),
-            label: const Text('Retry'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0D47A1),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorState(dynamic viewModel) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.red[50],
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Colors.red[400],
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Something went wrong',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[700],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Text(
-              viewModel.errorMessage,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[500],
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () {
-              viewModel.fetchStockOpname();
-            },
-            icon: const Icon(Icons.refresh),
-            label: const Text('Try Again'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0D47A1),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLoading() => const LoadingSkeleton();
-
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  List<String> _activeCats(dynamic so) => [
+    if (so.isBahanBaku == true) 'Bahan Baku',
+    if (so.isWashing == true) 'Washing',
+    if (so.isBonggolan == true) 'Bonggolan',
+    if (so.isCrusher == true) 'Crusher',
+    if (so.isBroker == true) 'Broker',
+    if (so.isGilingan == true) 'Gilingan',
+    if (so.isMixer == true) 'Mixer',
+    if (so.isFurnitureWIP == true) 'Furniture WIP',
+    if (so.isBarangJadi == true) 'Barang Jadi',
+    if (so.isReject == true) 'Reject',
+  ];
 }

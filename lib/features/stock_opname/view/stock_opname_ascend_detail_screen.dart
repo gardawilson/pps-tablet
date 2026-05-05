@@ -3,8 +3,6 @@ import 'package:provider/provider.dart';
 import '../view_model/stock_opname_family_view_model.dart';
 import '../view_model/stock_opname_ascend_view_model.dart';
 import '../../../common/widgets/loading_dialog.dart';
-
-import 'widgets/list_sections/ascend_appbar.dart';
 import 'widgets/list_sections/ascend_filter_section.dart';
 import 'widgets/list_sections/ascend_family_section.dart';
 import 'widgets/list_sections/ascend_item_section.dart';
@@ -28,6 +26,10 @@ class StockOpnameAscendDetailScreen extends StatefulWidget {
 
 class _StockOpnameAscendDetailScreenState
     extends State<StockOpnameAscendDetailScreen> {
+  static const _bgPage = Color(0xFFF8F9FB);
+  static const _surface = Color(0xFFFFFFFF);
+  static const _border = Color(0xFFE2E6EE);
+
   int? _selectedFamilyID;
 
   // cache controller tetap di parent agar lifecycle-nya aman
@@ -57,6 +59,7 @@ class _StockOpnameAscendDetailScreenState
   Future<void> _onSavePressed() async {
     final ascendVM = context.read<StockOpnameAscendViewModel>();
     final familyVM = context.read<StockOpnameFamilyViewModel>();
+    final rootNavigator = Navigator.of(context, rootNavigator: true);
 
     if (ascendVM.items.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -67,6 +70,7 @@ class _StockOpnameAscendDetailScreenState
 
     showDialog(
       context: context,
+      useRootNavigator: true,
       barrierDismissible: false,
       builder: (_) => const LoadingDialog(message: "Menyimpan data..."),
     );
@@ -79,8 +83,10 @@ class _StockOpnameAscendDetailScreenState
       errorMsg = e.toString();
     }
 
+    if (rootNavigator.canPop()) {
+      rootNavigator.pop();
+    }
     if (!mounted) return;
-    Navigator.pop(context); // pastikan loading dialog selalu tertutup
 
     if (success) {
       await familyVM.fetchFamilies(widget.noSO);
@@ -91,13 +97,13 @@ class _StockOpnameAscendDetailScreenState
         const SnackBar(content: Text("✅ Data berhasil disimpan & di-refresh")),
       );
     } else if (errorMsg != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("❌ Gagal menyimpan: $errorMsg")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("❌ Gagal menyimpan: $errorMsg")));
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("❌ Gagal menyimpan data")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("❌ Gagal menyimpan data")));
     }
   }
 
@@ -114,12 +120,12 @@ class _StockOpnameAscendDetailScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AscendAppBar(noSO: widget.noSO, tgl: widget.tgl),
+      backgroundColor: _bgPage,
       body: Column(
         children: [
           AscendFilterSection(
             noSO: widget.noSO,
+            tgl: widget.tgl,
             selectedFamilyID: _selectedFamilyID,
             onSavePressed: _onSavePressed,
           ),
@@ -127,13 +133,14 @@ class _StockOpnameAscendDetailScreenState
             child: Container(
               margin: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: _surface,
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _border),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withOpacity(0.04),
                     blurRadius: 10,
-                    offset: const Offset(0, 4),
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),

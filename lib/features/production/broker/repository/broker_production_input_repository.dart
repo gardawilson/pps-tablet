@@ -17,8 +17,6 @@ import 'package:pps_tablet/core/utils/date_formatter.dart';
 class BrokerProductionInputRepository {
   static const _timeout = Duration(seconds: 25);
 
-  final Map<String, BrokerInputs> _inputsCache = {};
-
   String get _base => ApiConstants.baseUrl.replaceFirst(RegExp(r'/*$'), '');
 
   Map<String, String> _headers(String? token) => {
@@ -37,11 +35,31 @@ class BrokerProductionInputRepository {
     return BrokerInputs.fromJson(data);
   }
 
-  Future<BrokerInputs> fetchInputs(String noProduksi, {bool force = false}) async {
-    if (!force && _inputsCache.containsKey(noProduksi)) {
-      return _inputsCache[noProduksi]!;
+  static List<BrokerOutput> _parseOutputs(Map<String, dynamic> body) {
+    final data = body['data'] as List?;
+    if (data == null) {
+      throw FormatException('Response tidak valid: field data kosong');
     }
+    return data
+        .map((e) => BrokerOutput.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
 
+  static List<BonggolanOutput> _parseBonggolanOutputs(
+    Map<String, dynamic> body,
+  ) {
+    final data = body['data'] as List?;
+    if (data == null) {
+      throw FormatException('Response tidak valid: field data kosong');
+    }
+    return data
+        .map(
+          (e) => BonggolanOutput.fromJson(Map<String, dynamic>.from(e as Map)),
+        )
+        .toList();
+  }
+
+  Future<BrokerInputs> fetchInputs(String noProduksi, {bool force = false}) async {
     final token = await TokenStorage.getToken();
     final url = Uri.parse('$_base/api/production/broker/$noProduksi/inputs');
 
@@ -73,14 +91,85 @@ class BrokerProductionInputRepository {
       throw FormatException('Response bukan JSON valid: $e');
     }
 
-    final inputs = await compute(_parseInputs, body);
-
-    _inputsCache[noProduksi] = inputs;
-    return inputs;
+    return compute(_parseInputs, body);
   }
 
-  void invalidateInputs(String noProduksi) => _inputsCache.remove(noProduksi);
-  void clearCache() => _inputsCache.clear();
+  Future<List<BrokerOutput>> fetchOutputs(String noProduksi) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/production/broker/$noProduksi/outputs');
+
+    final started = DateTime.now();
+    print('➡️ [GET] $url');
+
+    http.Response res;
+    try {
+      res = await http.get(url, headers: _headers(token)).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout mengambil output ($noProduksi)');
+    } catch (e) {
+      print('❌ Request error: $e');
+      rethrow;
+    }
+
+    final elapsedMs = DateTime.now().difference(started).inMilliseconds;
+    print('⬅️ [${res.statusCode}] outputs in ${elapsedMs}ms');
+
+    final decoded = utf8.decode(res.bodyBytes);
+    Map<String, dynamic> body;
+    try {
+      body = json.decode(decoded) as Map<String, dynamic>;
+    } catch (e) {
+      throw FormatException('Response output bukan JSON valid: $e');
+    }
+
+    if (res.statusCode != 200) {
+      final message =
+          body['message'] as String? ?? 'Gagal mengambil output ($noProduksi)';
+      throw Exception('$message (HTTP ${res.statusCode})');
+    }
+
+    return compute(_parseOutputs, body);
+  }
+
+  Future<List<BonggolanOutput>> fetchBonggolanOutputs(String noProduksi) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse(
+      '$_base/api/production/broker/$noProduksi/outputs/bonggolan',
+    );
+
+    final started = DateTime.now();
+    print('[GET] $url');
+
+    http.Response res;
+    try {
+      res = await http.get(url, headers: _headers(token)).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout mengambil output bonggolan ($noProduksi)');
+    } catch (e) {
+      print('[ERROR] Request error: $e');
+      rethrow;
+    }
+
+    final elapsedMs = DateTime.now().difference(started).inMilliseconds;
+    print('[${res.statusCode}] bonggolan outputs in ${elapsedMs}ms');
+
+    final decoded = utf8.decode(res.bodyBytes);
+    Map<String, dynamic> body;
+    try {
+      body = json.decode(decoded) as Map<String, dynamic>;
+    } catch (e) {
+      throw FormatException('Response output bonggolan bukan JSON valid: $e');
+    }
+
+    if (res.statusCode != 200) {
+      final message =
+          body['message'] as String? ??
+          'Gagal mengambil output bonggolan ($noProduksi)';
+      throw Exception('$message (HTTP ${res.statusCode})');
+    }
+
+    return compute(_parseBonggolanOutputs, body);
+  }
 
   // -----------------------------
   // NEW: validateLabel

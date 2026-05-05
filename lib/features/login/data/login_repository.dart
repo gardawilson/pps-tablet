@@ -4,13 +4,13 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-
 
 import '../../../core/network/endpoints.dart';
 import '../../../core/services/permission_storage.dart';
-import '../model/user_model.dart';
+import '../../../core/services/token_storage.dart';
+import '../../../core/services/user_session_storage.dart';
 import '../model/login_result.dart';
+import '../model/user_model.dart';
 
 class LoginRepository {
   Future<LoginResult> login(User user) async {
@@ -90,13 +90,19 @@ class LoginRepository {
           permissions = _normalizePermissions(userData['permissions']);
         }
 
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('token', token);
+        await TokenStorage.saveToken(token);
         // Simpan username agar bisa digunakan di fitur lain (mis. print log)
         final savedUsername = (userData is Map<String, dynamic>)
-            ? (userData['username'] ?? userData['name'] ?? user.username).toString()
+            ? (userData['username'] ?? userData['name'] ?? user.username)
+                  .toString()
             : user.username;
-        await prefs.setString('logged_username', savedUsername);
+        final savedFullName = (userData is Map<String, dynamic>)
+            ? userData['fullName']?.toString()
+            : null;
+        await UserSessionStorage.saveUser(
+          username: savedUsername,
+          fullName: savedFullName,
+        );
         await PermissionStorage.savePermissions(permissions);
 
         print('✅ Token disimpan: ${token.substring(0, token.length > 12 ? 12 : token.length)}...');

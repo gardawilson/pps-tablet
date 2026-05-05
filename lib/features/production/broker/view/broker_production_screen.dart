@@ -76,6 +76,9 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
                       MaterialPageRoute(
                         builder: (_) => BrokerProductionInputScreen(
                           noProduksi: row.noProduksi,
+                          namaMesin: row.namaMesin,
+                          shift: row.shift,
+                          tglProduksi: row.tglProduksi,
                           isLocked: row.isLocked,
                           lastClosedDate: row.lastClosedDate,
                         ),

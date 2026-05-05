@@ -53,6 +53,11 @@ class SrV2ListViewModel extends ChangeNotifier {
     _pagingController.refresh();
   }
 
+  Future<void> delete(String noSortir) async {
+    await repository.delete(noSortir);
+    _pagingController.refresh();
+  }
+
   void refresh() => _pagingController.refresh();
 
   @override

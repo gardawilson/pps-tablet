@@ -1,6 +1,25 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
+import '../../../core/network/api_client.dart';
+import '../../../core/network/endpoints.dart';
+import '../../../core/network/label_print_lock_api.dart';
+import '../../../core/services/label_print_sync_queue.dart';
+import '../../../core/utils/pdf_print_service.dart';
+import '../../../core/view_model/label_print_lock_socket_manager.dart';
+import '../../label/bahan_baku/repository/bahan_baku_repository.dart';
+import '../../label/bahan_baku/view_model/bahan_baku_view_model.dart';
+import '../../label/bonggolan/repository/bonggolan_repository.dart';
+import '../../label/broker/repository/broker_repository.dart';
+import '../../label/crusher/repository/crusher_repository.dart';
+import '../../label/furniture_wip/repository/furniture_wip_repository.dart';
+import '../../label/gilingan/repository/gilingan_repository.dart';
+import '../../label/mixer/repository/mixer_repository.dart';
+import '../../label/packing/repository/packing_repository.dart';
+import '../../label/washing/repository/washing_repository.dart';
 import '../model/bs_v2_label_info.dart';
 import '../model/bs_v2_transaction.dart';
 import '../repository/bs_v2_repository.dart';
@@ -919,8 +938,220 @@ class _OutputTile extends StatelessWidget {
   final int index;
   const _OutputTile({required this.out, required this.nf, required this.index});
 
+  bool get _canPrint {
+    final labelCode = (out.labelCode ?? '').trim();
+    return labelCode.startsWith('A') ||
+        labelCode.startsWith('B') ||
+        labelCode.startsWith('D') ||
+        labelCode.startsWith('F') ||
+        labelCode.startsWith('H') ||
+        labelCode.startsWith('M') ||
+        labelCode.startsWith('V');
+  }
+
+  String _deriveNoBahanBaku(String noPallet) {
+    if (noPallet.contains('-')) {
+      return noPallet.substring(0, noPallet.lastIndexOf('-'));
+    }
+    return noPallet;
+  }
+
+  Future<void> _handlePrint(BuildContext context, String labelCode) async {
+    final rootCtx = Navigator.of(context, rootNavigator: true).context;
+    final isBahanBakuLabel = labelCode.startsWith('A');
+    final isPackingLabel = labelCode.startsWith('BA');
+    final isFurnitureWipLabel = labelCode.startsWith('BB');
+    final isBrokerLabel = labelCode.startsWith('D');
+    final isCrusherLabel = labelCode.startsWith('F');
+    final isMixerLabel = labelCode.startsWith('H');
+    final isBonggolanLabel = labelCode.startsWith('M');
+    final isGilinganLabel = labelCode.startsWith('V');
+    final lockApi = LabelPrintLockApi();
+    final noPallet = (out.noPallet?.trim().isNotEmpty ?? false)
+        ? out.noPallet!.trim()
+        : labelCode;
+    final noBahanBaku = (out.noBahanBaku?.trim().isNotEmpty ?? false)
+        ? out.noBahanBaku!.trim()
+        : _deriveNoBahanBaku(noPallet);
+    final bahanBakuRepo = isBahanBakuLabel
+        ? BahanBakuRepository(api: ApiClient())
+        : null;
+    final bahanBakuVm = isBahanBakuLabel
+        ? context.read<BahanBakuViewModel>()
+        : null;
+    final packingRepo = isPackingLabel
+        ? PackingRepository(api: ApiClient())
+        : null;
+    final furnitureWipRepo = isFurnitureWipLabel
+        ? FurnitureWipRepository()
+        : null;
+    final brokerRepo = isBrokerLabel
+        ? BrokerRepository(api: ApiClient())
+        : null;
+    final crusherRepo = isCrusherLabel ? CrusherRepository() : null;
+    final mixerRepo = isMixerLabel ? MixerRepository() : null;
+    final bonggolanRepo = isBonggolanLabel ? BonggolanRepository() : null;
+    final gilinganRepo = isGilinganLabel ? GilinganRepository() : null;
+    final washingRepo =
+        isBahanBakuLabel ||
+            isPackingLabel ||
+            isFurnitureWipLabel ||
+            isBrokerLabel ||
+            isCrusherLabel ||
+            isMixerLabel ||
+            isBonggolanLabel ||
+            isGilinganLabel
+        ? null
+        : WashingRepository();
+    final lockVm = context.read<LabelPrintLockSocketManager>();
+    final queue = context.read<LabelPrintSyncQueue>();
+    final feature = isBahanBakuLabel
+        ? 'bahan_baku'
+        : isPackingLabel
+        ? 'packing'
+        : isFurnitureWipLabel
+        ? 'furniture_wip'
+        : isBrokerLabel
+        ? 'broker'
+        : isCrusherLabel
+        ? 'crusher'
+        : isMixerLabel
+        ? 'mixer'
+        : isBonggolanLabel
+        ? 'bonggolan'
+        : isGilinganLabel
+        ? 'gilingan'
+        : 'washing';
+    final pdfUrl = isBahanBakuLabel
+        ? ApiConstants.bahanBakuPalletLabelPdf(noBahanBaku, noPallet)
+        : isPackingLabel
+        ? ApiConstants.packingLabelPdf(labelCode)
+        : isFurnitureWipLabel
+        ? ApiConstants.furnitureWipLabelPdf(labelCode)
+        : isBrokerLabel
+        ? ApiConstants.brokerLabelPdf(labelCode)
+        : isCrusherLabel
+        ? ApiConstants.crusherLabelPdf(labelCode)
+        : isMixerLabel
+        ? ApiConstants.mixerLabelPdf(labelCode)
+        : isBonggolanLabel
+        ? ApiConstants.bonggolanLabelPdf(labelCode)
+        : isGilinganLabel
+        ? ApiConstants.gilinganLabelPdf(labelCode)
+        : ApiConstants.washingLabelPdf(labelCode);
+    final title = isBahanBakuLabel
+        ? '$noBahanBaku-$noPallet'
+        : isPackingLabel ||
+              isFurnitureWipLabel ||
+              isBrokerLabel ||
+              isCrusherLabel ||
+              isMixerLabel ||
+              isBonggolanLabel ||
+              isGilinganLabel
+        ? labelCode
+        : 'Label $labelCode';
+    var isLockAcquired = false;
+    var isPrinted = false;
+
+    try {
+      await lockApi.acquire(isBahanBakuLabel ? noPallet : labelCode);
+      isLockAcquired = true;
+
+      await PdfPrintService(defaultSystem: 'pps').previewFromUrl(
+        context: rootCtx,
+        pdfUrl: Uri.parse(pdfUrl),
+        title: title,
+        onPrinted: () {
+          isPrinted = true;
+          () async {
+            var needsIncrement = false;
+            var needsRelease = false;
+
+            try {
+              final count = isBahanBakuLabel
+                  ? await bahanBakuRepo!.markAsPrinted(
+                      noBahanBaku: noBahanBaku,
+                      noPallet: noPallet,
+                    )
+                  : isPackingLabel
+                  ? await packingRepo!.markAsPrinted(labelCode)
+                  : isFurnitureWipLabel
+                  ? await furnitureWipRepo!.markAsPrinted(labelCode)
+                  : isBrokerLabel
+                  ? await brokerRepo!.markAsPrinted(labelCode)
+                  : isCrusherLabel
+                  ? await crusherRepo!.markAsPrinted(labelCode)
+                  : isMixerLabel
+                  ? await mixerRepo!.markAsPrinted(labelCode)
+                  : isBonggolanLabel
+                  ? await bonggolanRepo!.markAsPrinted(labelCode)
+                  : isGilinganLabel
+                  ? await gilinganRepo!.markAsPrinted(labelCode)
+                  : await washingRepo!.markAsPrinted(labelCode);
+              if (count != null) {
+                lockVm.setPrintCount(
+                  isBahanBakuLabel ? noPallet : labelCode,
+                  count,
+                );
+                if (isBahanBakuLabel) {
+                  bahanBakuVm!.setPalletPrintedCount(
+                    noPallet: noPallet,
+                    count: count,
+                  );
+                }
+              }
+            } catch (_) {
+              needsIncrement = true;
+            }
+
+            try {
+              await lockApi.release(isBahanBakuLabel ? noPallet : labelCode);
+            } catch (_) {
+              needsRelease = true;
+            }
+
+            if (needsIncrement || needsRelease) {
+              await queue.enqueue(
+                feature: feature,
+                noLabel: isBahanBakuLabel ? noPallet : labelCode,
+                extra: isBahanBakuLabel
+                    ? {'noBahanBaku': noBahanBaku, 'noPallet': noPallet}
+                    : null,
+                needsIncrement: needsIncrement,
+                needsReleaseLock: needsRelease,
+              );
+            }
+          }().ignore();
+        },
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } finally {
+      if (isLockAcquired && !isPrinted) {
+        () async {
+          try {
+            await lockApi.release(isBahanBakuLabel ? noPallet : labelCode);
+          } catch (_) {
+            await queue.enqueue(
+              feature: feature,
+              noLabel: isBahanBakuLabel ? noPallet : labelCode,
+              extra: isBahanBakuLabel
+                  ? {'noBahanBaku': noBahanBaku, 'noPallet': noPallet}
+                  : null,
+              needsReleaseLock: true,
+            );
+          }
+        }().ignore();
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final labelCode = out.labelCode?.trim();
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Column(
@@ -948,14 +1179,28 @@ class _OutputTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (out.labelCode != null)
-                      Text(
-                        out.labelCode!,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1A1D23),
-                        ),
+                    if (labelCode != null)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              labelCode,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF1A1D23),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (_canPrint) ...[
+                            const SizedBox(width: 6),
+                            _OutputPrintButton(
+                              onPressed: () => _handlePrint(context, labelCode),
+                            ),
+                          ],
+                        ],
                       ),
                     Text(
                       out.namaJenis,
@@ -1052,6 +1297,34 @@ class _OutputTile extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _OutputPrintButton extends StatelessWidget {
+  final VoidCallback onPressed;
+
+  const _OutputPrintButton({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Print',
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          width: 26,
+          height: 24,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: _kGreen.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: _kGreen.withValues(alpha: 0.18)),
+          ),
+          child: const Icon(Icons.print_outlined, size: 14, color: _kGreen),
+        ),
       ),
     );
   }

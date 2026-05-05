@@ -1,6 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
+import '../../../core/network/api_client.dart';
+import '../../../core/network/endpoints.dart';
+import '../../../core/network/label_print_lock_api.dart';
+import '../../../core/services/label_print_sync_queue.dart';
+import '../../../core/utils/pdf_print_service.dart';
+import '../../../core/view_model/label_print_lock_socket_manager.dart';
+import '../../label/packing/repository/packing_repository.dart';
+import '../../label/reject/repository/reject_repository.dart';
 import '../model/sr_v2_transaction.dart';
 import '../repository/sr_v2_repository.dart';
 
@@ -790,24 +801,97 @@ class _OutputTile extends StatelessWidget {
 
   const _OutputTile({required this.out, required this.nf, required this.index});
 
-  String _categoryLabel(String? category) {
-    switch (category) {
-      case 'barangJadi':
-        return 'Barang Jadi';
-      case 'reject':
-        return 'Reject';
-      default:
-        return '';
+  bool get _canPrint {
+    final noBJ = (out.noBJ ?? '').trim();
+    return noBJ.startsWith('BA') || noBJ.startsWith('BF');
+  }
+
+  Future<void> _handlePrint(BuildContext context, String noBJ) async {
+    final rootCtx = Navigator.of(context, rootNavigator: true).context;
+    final isRejectLabel = noBJ.startsWith('BF');
+    final lockApi = LabelPrintLockApi();
+    final api = ApiClient();
+    final packingRepo = isRejectLabel ? null : PackingRepository(api: api);
+    final rejectRepo = isRejectLabel ? RejectRepository(api: api) : null;
+    final lockVm = context.read<LabelPrintLockSocketManager>();
+    final queue = context.read<LabelPrintSyncQueue>();
+    final feature = isRejectLabel ? 'reject' : 'packing';
+    final pdfUrl = isRejectLabel
+        ? ApiConstants.rejectLabelPdf(noBJ)
+        : ApiConstants.packingLabelPdf(noBJ);
+    var isLockAcquired = false;
+    var isPrinted = false;
+
+    try {
+      await lockApi.acquire(noBJ);
+      isLockAcquired = true;
+
+      await PdfPrintService(defaultSystem: 'pps').previewFromUrl(
+        context: rootCtx,
+        pdfUrl: Uri.parse(pdfUrl),
+        title: noBJ,
+        onPrinted: () {
+          isPrinted = true;
+          () async {
+            var needsIncrement = false;
+            var needsRelease = false;
+
+            try {
+              final count = isRejectLabel
+                  ? await rejectRepo!.markAsPrinted(noBJ)
+                  : await packingRepo!.markAsPrinted(noBJ);
+              if (count != null) {
+                lockVm.setPrintCount(noBJ, count);
+              }
+            } catch (_) {
+              needsIncrement = true;
+            }
+
+            try {
+              await lockApi.release(noBJ);
+            } catch (_) {
+              needsRelease = true;
+            }
+
+            if (needsIncrement || needsRelease) {
+              await queue.enqueue(
+                feature: feature,
+                noLabel: noBJ,
+                needsIncrement: needsIncrement,
+                needsReleaseLock: needsRelease,
+              );
+            }
+          }().ignore();
+        },
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } finally {
+      if (isLockAcquired && !isPrinted) {
+        () async {
+          try {
+            await lockApi.release(noBJ);
+          } catch (_) {
+            await queue.enqueue(
+              feature: feature,
+              noLabel: noBJ,
+              needsReleaseLock: true,
+            );
+          }
+        }().ignore();
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final categoryLabel = _categoryLabel(out.category);
     final berat = out.berat;
     final qtyText = berat != null && berat > 0
         ? '${nf.format(berat)} kg'
         : '${nf.format(out.pcs)} pcs';
+    final noBJ = out.noBJ?.trim();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -833,14 +917,28 @@ class _OutputTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (out.noBJ != null)
-                  Text(
-                    out.noBJ!,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF1A1D23),
-                    ),
+                if (noBJ != null)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          noBJ,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1A1D23),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (_canPrint) ...[
+                        const SizedBox(width: 6),
+                        _OutputPrintButton(
+                          onPressed: () => _handlePrint(context, noBJ),
+                        ),
+                      ],
+                    ],
                   ),
                 Text(
                   out.namaJenis,
@@ -859,6 +957,34 @@ class _OutputTile extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _OutputPrintButton extends StatelessWidget {
+  final VoidCallback onPressed;
+
+  const _OutputPrintButton({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Print',
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          width: 26,
+          height: 24,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: _kGreen.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: _kGreen.withValues(alpha: 0.18)),
+          ),
+          child: const Icon(Icons.print_outlined, size: 14, color: _kGreen),
+        ),
       ),
     );
   }

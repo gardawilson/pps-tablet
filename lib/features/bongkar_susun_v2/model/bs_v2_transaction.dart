@@ -29,6 +29,8 @@ class BsV2SakItem {
 
 class BsV2OutputLabel {
   final String? labelCode;
+  final String? noBahanBaku;
+  final String? noPallet;
   final int idJenis;
   final String namaJenis;
   final double totalBerat;
@@ -39,6 +41,8 @@ class BsV2OutputLabel {
 
   const BsV2OutputLabel({
     this.labelCode,
+    this.noBahanBaku,
+    this.noPallet,
     required this.idJenis,
     required this.namaJenis,
     required this.totalBerat,
@@ -78,10 +82,20 @@ class BsV2OutputLabel {
     final isGilingan = category == 'gilingan';
     final isFurnitureWip = category == 'furnitureWip';
     final isBarangJadi = category == 'barangJadi';
+    final isBahanBaku = category == 'bahanBaku';
     final isPcsCategory = isFurnitureWip || isBarangJadi;
-    // labelCode: noWashing, noBonggolan, noBroker, noCrusher, noGilingan, noMixer, noFurnitureWIP, noBJ, or labelCode
+    final rawNoPallet = j['noPallet'] ?? j['NoPallet'];
+    final rawNoBahanBaku = j['noBahanBaku'] ?? j['NoBahanBaku'];
+    final noPallet = rawNoPallet == null ? null : _s(rawNoPallet);
+    final noBahanBaku = rawNoBahanBaku == null
+        ? (noPallet != null && noPallet.contains('-')
+              ? noPallet.substring(0, noPallet.lastIndexOf('-'))
+              : null)
+        : _s(rawNoBahanBaku);
+    // labelCode: noPallet, noWashing, noBonggolan, noBroker, noCrusher, noGilingan, noMixer, noFurnitureWIP, noBJ, noBahanBaku, or labelCode
     final labelCode =
         j['labelCode'] ??
+        rawNoPallet ??
         j['noWashing'] ??
         j['noBonggolan'] ??
         j['noBroker'] ??
@@ -90,12 +104,14 @@ class BsV2OutputLabel {
         j['noMixer'] ??
         j['noFurnitureWIP'] ??
         j['noBJ'] ??
-        j['noBahanBaku'];
+        rawNoBahanBaku;
     final totalBerat = isPcsCategory
         ? _d(j['pcs'] ?? j['totalPcs'])
         : _d(j['totalBerat'] ?? j['berat']);
     return BsV2OutputLabel(
       labelCode: labelCode == null ? null : _s(labelCode),
+      noBahanBaku: isBahanBaku ? noBahanBaku : null,
+      noPallet: isBahanBaku ? noPallet : null,
       idJenis: isGilingan
           ? ((j['idGilingan'] is int)
                 ? j['idGilingan'] as int

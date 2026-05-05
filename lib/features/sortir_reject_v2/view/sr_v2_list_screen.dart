@@ -14,6 +14,7 @@ import '../view_model/sr_v2_create_view_model.dart';
 import '../view_model/sr_v2_list_view_model.dart';
 import 'sr_v2_create_screen.dart';
 import 'sr_v2_detail_screen.dart';
+import 'sr_v2_edit_sheet.dart';
 
 // ─── Theme ─────────────────────────────────────────────────────────────────
 
@@ -60,7 +61,7 @@ class _SrV2ListScreenState extends State<SrV2ListScreen> {
       barrierColor: Colors.black26,
       builder: (dialogCtx) {
         final safeLeft = local.dx.clamp(8.0, overlay.size.width - 240.0);
-        final safeTop = local.dy.clamp(8.0, overlay.size.height - 140.0);
+        final safeTop = local.dy.clamp(8.0, overlay.size.height - 160.0);
         return Stack(
           children: [
             Positioned(
@@ -79,12 +80,77 @@ class _SrV2ListScreenState extends State<SrV2ListScreen> {
                     );
                   });
                 },
+                onEdit: () {
+                  Navigator.of(dialogCtx).pop();
+                  Future.microtask(() {
+                    if (!mounted) return;
+                    showSrV2EditSheet(
+                      context,
+                      transaction: row,
+                      repository: _vm.repository,
+                      onUpdated: _vm.refresh,
+                    );
+                  });
+                },
+                onDelete: () {
+                  Navigator.of(dialogCtx).pop();
+                  Future.microtask(() => _confirmDelete(row));
+                },
               ),
             ),
           ],
         );
       },
     );
+  }
+
+  Future<void> _confirmDelete(SrV2Transaction row) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Text(
+          'Hapus Sortir Reject',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+        ),
+        content: Text(
+          'Yakin ingin menghapus ${row.noSortir}? Tindakan ini tidak dapat dibatalkan.',
+          style: const TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await _vm.delete(row.noSortir);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${row.noSortir} berhasil dihapus'),
+            backgroundColor: Colors.green.shade700,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal menghapus: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
   }
 
   void _openCreate() {
@@ -390,11 +456,15 @@ class _RowPopover extends StatelessWidget {
   final SrV2Transaction row;
   final VoidCallback onClose;
   final VoidCallback onDetail;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   const _RowPopover({
     required this.row,
     required this.onClose,
     required this.onDetail,
+    required this.onEdit,
+    required this.onDelete,
   });
 
   @override
@@ -448,6 +518,30 @@ class _RowPopover extends StatelessWidget {
               'Lihat Detail',
               onDetail,
               color: _kPrimary,
+            ),
+            const Divider(
+              height: 1,
+              indent: 14,
+              endIndent: 14,
+              color: _kBorder,
+            ),
+            _tile(
+              Icons.edit_rounded,
+              'Ubah',
+              onEdit,
+              color: const Color(0xFF0A7349),
+            ),
+            const Divider(
+              height: 1,
+              indent: 14,
+              endIndent: 14,
+              color: _kBorder,
+            ),
+            _tile(
+              Icons.delete_outline_rounded,
+              'Hapus',
+              onDelete,
+              color: Colors.red.shade600,
             ),
             const Divider(
               height: 1,

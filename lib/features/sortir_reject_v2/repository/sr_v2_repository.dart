@@ -54,6 +54,21 @@ class SrV2Repository {
     return SrV2Transaction.fromJson(data);
   }
 
+  Future<void> update({
+    required String noSortir,
+    required int idWarehouse,
+    required String tglBJSortir,
+  }) async {
+    await _api.putJson(
+      '/api/sortir-reject-v2/$noSortir',
+      body: {'idWarehouse': idWarehouse, 'tglBJSortir': tglBJSortir},
+    );
+  }
+
+  Future<void> delete(String noSortir) async {
+    await _api.deleteJson('/api/sortir-reject-v2/$noSortir');
+  }
+
   Future<SrV2Transaction> submit({
     required int idWarehouse,
     required List<String> inputs,

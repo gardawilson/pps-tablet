@@ -129,13 +129,13 @@ class _FurnitureWipByInjectSectionState
               else if (isLoading)
                 _buildLoadingIndicator()
               else if (error.isNotEmpty)
-                  _buildErrorMessage(error)
-                else if (items.isEmpty)
-                    _buildEmptyMessage(
-                      'Tidak ada furniture WIP untuk NoProduksi ${widget.noProduksi}',
-                    )
-                  else
-                    _buildFurnitureChips(items),
+                _buildErrorMessage(error)
+              else if (items.isEmpty)
+                _buildEmptyMessage(
+                  'Tidak ada furniture WIP untuk NoProduksi ${widget.noProduksi}',
+                )
+              else
+                _buildFurnitureChips(items),
             ],
           ),
         );
@@ -153,18 +153,13 @@ class _FurnitureWipByInjectSectionState
             height: 16,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                Colors.grey.shade600,
-              ),
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.grey.shade600),
             ),
           ),
           const SizedBox(width: 10),
           Text(
             'Memuat...',
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey.shade600,
-            ),
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
           ),
         ],
       ),
@@ -234,11 +229,7 @@ class _FurnitureWipByInjectSectionState
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.label,
-                size: 14,
-                color: Colors.blue.shade700,
-              ),
+              Icon(Icons.label, size: 14, color: Colors.blue.shade700),
               const SizedBox(width: 6),
               Text(
                 item.namaFurnitureWip,

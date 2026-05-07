@@ -27,7 +27,7 @@ class _HomeSidebarState extends State<HomeSidebar> {
 
   static List<_MenuGroup> get _menuGroups => <_MenuGroup>[
     _MenuGroup(
-      title: 'Input Label',
+      title: 'Buat Label',
       icon: Icons.label_outlined,
       children: [
         _SubItem(
@@ -186,6 +186,12 @@ class _HomeSidebarState extends State<HomeSidebar> {
       subtitle: 'Lihat history aktivitas',
       icon: Icons.history,
       route: '/shell/history',
+    ),
+    _MenuItem(
+      title: 'Mapping',
+      subtitle: 'Monitoring lokasi label',
+      icon: Icons.map_outlined,
+      route: '/shell/mapping',
     ),
   ];
 

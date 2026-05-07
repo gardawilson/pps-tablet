@@ -68,6 +68,11 @@ class _PackingRowPopoverState extends State<PackingRowPopover> {
     return outputCode.startsWith('BG.');
   }
 
+  bool _isSortirRejectLabel() {
+    final outputCode = (widget.header.outputCode ?? '').trim();
+    return outputCode.startsWith('J.');
+  }
+
   Future<void> _handleEdit() async {
     if (_isBongkarSusunLabel()) {
       widget.onClose();
@@ -75,6 +80,14 @@ class _PackingRowPopoverState extends State<PackingRowPopover> {
         title: 'Tidak Dapat Diedit',
         message:
             'Label yang berasal dari Bongkar Susun tidak dapat diedit. Silakan buat label baru jika diperlukan perubahan.',
+      );
+      return;
+    } else if (_isSortirRejectLabel()) {
+      widget.onClose();
+      await DialogService.instance.showError(
+        title: 'Tidak Dapat Diedit',
+        message:
+            'Label yang berasal dari Sortir Reject tidak dapat diedit. Silakan buat label baru jika diperlukan perubahan.',
       );
       return;
     }

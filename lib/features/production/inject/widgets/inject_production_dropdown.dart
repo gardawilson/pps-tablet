@@ -177,8 +177,7 @@ class _InjectProductionDropdownState extends State<InjectProductionDropdown> {
           value: safeValue,
           items: base,
           itemAsString: (e) =>
-              '${e.noProduksi} | ${e.namaMesin} (SHIFT ${e.shift ?? ''})'
-                  .trim(),
+              '${e.noProduksi} | ${e.namaMesin} (SHIFT ${e.shift})'.trim(),
           compareFn: (a, b) => a.noProduksi == b.noProduksi,
 
           onChanged: widget.enabled

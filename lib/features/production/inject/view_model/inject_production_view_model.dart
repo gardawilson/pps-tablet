@@ -13,10 +13,10 @@ import 'package:pps_tablet/core/utils/date_formatter.dart';
 class InjectProductionViewModel extends ChangeNotifier {
   final InjectProductionRepository repository;
 
-  InjectProductionViewModel({
-    required this.repository,
-  }) {
-    debugPrint('🟢 [INJECT_VM] ctor called, repo=$repository, VM hash=$hashCode');
+  InjectProductionViewModel({required this.repository}) {
+    debugPrint(
+      '🟢 [INJECT_VM] ctor called, repo=$repository, VM hash=$hashCode',
+    );
     _initializePagingController();
   }
 
@@ -39,10 +39,13 @@ class InjectProductionViewModel extends ChangeNotifier {
   // MODE PAGED (TABLE)
   // =========================
   late final PagingController<int, InjectProduction> _pagingController;
-  PagingController<int, InjectProduction> get pagingController => _pagingController;
+  PagingController<int, InjectProduction> get pagingController =>
+      _pagingController;
 
   void _initializePagingController() {
-    debugPrint('🟢 [INJECT_VM] _initializePagingController() VM hash=$hashCode');
+    debugPrint(
+      '🟢 [INJECT_VM] _initializePagingController() VM hash=$hashCode',
+    );
 
     _pagingController = PagingController<int, InjectProduction>(
       getNextPageKey: (state) {
@@ -103,7 +106,9 @@ class InjectProductionViewModel extends ChangeNotifier {
 
     try {
       items = await repository.fetchByDate(date);
-      debugPrint('📅 [INJECT_VM] fetchByDate success items=${items.length} VM hash=$hashCode');
+      debugPrint(
+        '📅 [INJECT_VM] fetchByDate success items=${items.length} VM hash=$hashCode',
+      );
     } catch (e, st) {
       debugPrint('❌ [INJECT_VM] fetchByDate error: $e');
       debugPrint('❌ [INJECT_VM] fetchByDate stack: $st');
@@ -116,7 +121,9 @@ class InjectProductionViewModel extends ChangeNotifier {
   }
 
   void exitByDateModeAndRefreshPaged() {
-    debugPrint('🔁 [INJECT_VM] exitByDateModeAndRefreshPaged VM hash=$hashCode');
+    debugPrint(
+      '🔁 [INJECT_VM] exitByDateModeAndRefreshPaged VM hash=$hashCode',
+    );
     if (_isByDateMode) {
       _isByDateMode = false;
       items = [];
@@ -131,7 +138,9 @@ class InjectProductionViewModel extends ChangeNotifier {
   // PAGED FETCH (table)
   // ===========================================================================
   Future<List<InjectProduction>> _fetchPaged(int pageKey) async {
-    debugPrint('📡 [INJECT_VM] _fetchPaged(pageKey=$pageKey) isByDateMode=$_isByDateMode VM hash=$hashCode');
+    debugPrint(
+      '📡 [INJECT_VM] _fetchPaged(pageKey=$pageKey) isByDateMode=$_isByDateMode VM hash=$hashCode',
+    );
 
     if (_isByDateMode) {
       return const <InjectProduction>[];
@@ -145,7 +154,9 @@ class InjectProductionViewModel extends ChangeNotifier {
         pageSize: pageSize,
         search: s,
       );
-      debugPrint('📡 [INJECT_VM] _fetchPaged got=${list.length} VM hash=$hashCode');
+      debugPrint(
+        '📡 [INJECT_VM] _fetchPaged got=${list.length} VM hash=$hashCode',
+      );
       return list;
     } catch (e, st) {
       debugPrint('❌ [INJECT_VM] _fetchPaged error: $e');
@@ -155,11 +166,10 @@ class InjectProductionViewModel extends ChangeNotifier {
   }
 
   // Filters
-  void applyFilters({
-    String? search,
-    int? newPageSize,
-  }) {
-    debugPrint('🔍 [INJECT_VM] applyFilters(search=$search, newPageSize=$newPageSize) VM hash=$hashCode');
+  void applyFilters({String? search, int? newPageSize}) {
+    debugPrint(
+      '🔍 [INJECT_VM] applyFilters(search=$search, newPageSize=$newPageSize) VM hash=$hashCode',
+    );
 
     _isByDateMode = false;
 
@@ -185,10 +195,12 @@ class InjectProductionViewModel extends ChangeNotifier {
   }
 
   void setSearchDebounced(
-      String text, {
-        Duration delay = const Duration(milliseconds: 350),
-      }) {
-    debugPrint('⌛ [INJECT_VM] setSearchDebounced("$text") delay=${delay.inMilliseconds}ms VM hash=$hashCode');
+    String text, {
+    Duration delay = const Duration(milliseconds: 350),
+  }) {
+    debugPrint(
+      '⌛ [INJECT_VM] setSearchDebounced("$text") delay=${delay.inMilliseconds}ms VM hash=$hashCode',
+    );
     _searchDebounce?.cancel();
     _searchDebounce = Timer(delay, () {
       applyFilters(search: text);
@@ -219,12 +231,14 @@ class InjectProductionViewModel extends ChangeNotifier {
     double? hourMeter,
     double? beratProdukHasilTimbang,
     String? hourStart, // "HH:mm"
-    String? hourEnd,   // "HH:mm"
+    String? hourEnd, // "HH:mm"
     String? checkBy1,
     String? checkBy2,
     String? approveBy,
   }) async {
-    debugPrint('🆕 [INJECT_VM] createProduksi(tgl=$tglProduksi, idMesin=$idMesin, idOperator=$idOperator, shift=$shift, jam=$jam) VM hash=$hashCode');
+    debugPrint(
+      '🆕 [INJECT_VM] createProduksi(tgl=$tglProduksi, idMesin=$idMesin, idOperator=$idOperator, shift=$shift, jam=$jam) VM hash=$hashCode',
+    );
 
     isSaving = true;
     saveError = null;
@@ -246,9 +260,11 @@ class InjectProductionViewModel extends ChangeNotifier {
         if (enableOffset != null) 'enableOffset': enableOffset ? 1 : 0,
         if (offsetCurrent != null) 'offsetCurrent': offsetCurrent,
         if (offsetNext != null) 'offsetNext': offsetNext,
-        if (idFurnitureMaterial != null) 'idFurnitureMaterial': idFurnitureMaterial,
+        if (idFurnitureMaterial != null)
+          'idFurnitureMaterial': idFurnitureMaterial,
         if (hourMeter != null) 'hourMeter': hourMeter,
-        if (beratProdukHasilTimbang != null) 'beratProdukHasilTimbang': beratProdukHasilTimbang,
+        if (beratProdukHasilTimbang != null)
+          'beratProdukHasilTimbang': beratProdukHasilTimbang,
 
         if (hourStart != null) 'hourStart': hourStart,
         if (hourEnd != null) 'hourEnd': hourEnd,
@@ -261,7 +277,9 @@ class InjectProductionViewModel extends ChangeNotifier {
       final body = await repository.createProduksi(payload);
 
       // backend kamu: { success, message, data: {...header...} }
-      final data = (body['data'] is Map) ? Map<String, dynamic>.from(body['data']) : null;
+      final data = (body['data'] is Map)
+          ? Map<String, dynamic>.from(body['data'])
+          : null;
       final created = data == null ? null : InjectProduction.fromJson(data);
 
       // auto refresh list
@@ -308,7 +326,9 @@ class InjectProductionViewModel extends ChangeNotifier {
     String? checkBy2,
     String? approveBy,
   }) async {
-    debugPrint('✏️ [INJECT_VM] updateProduksi(no=$noProduksi, tgl=$tglProduksi, jam=$jam) VM hash=$hashCode');
+    debugPrint(
+      '✏️ [INJECT_VM] updateProduksi(no=$noProduksi, tgl=$tglProduksi, jam=$jam) VM hash=$hashCode',
+    );
 
     isSaving = true;
     saveError = null;
@@ -330,9 +350,11 @@ class InjectProductionViewModel extends ChangeNotifier {
         if (enableOffset != null) 'enableOffset': enableOffset ? 1 : 0,
         if (offsetCurrent != null) 'offsetCurrent': offsetCurrent,
         if (offsetNext != null) 'offsetNext': offsetNext,
-        if (idFurnitureMaterial != null) 'idFurnitureMaterial': idFurnitureMaterial,
+        if (idFurnitureMaterial != null)
+          'idFurnitureMaterial': idFurnitureMaterial,
         if (hourMeter != null) 'hourMeter': hourMeter,
-        if (beratProdukHasilTimbang != null) 'beratProdukHasilTimbang': beratProdukHasilTimbang,
+        if (beratProdukHasilTimbang != null)
+          'beratProdukHasilTimbang': beratProdukHasilTimbang,
         if (hourStart != null) 'hourStart': hourStart,
         if (hourEnd != null) 'hourEnd': hourEnd,
 
@@ -343,7 +365,9 @@ class InjectProductionViewModel extends ChangeNotifier {
 
       final body = await repository.updateProduksi(noProduksi, payload);
 
-      final data = (body['data'] is Map) ? Map<String, dynamic>.from(body['data']) : null;
+      final data = (body['data'] is Map)
+          ? Map<String, dynamic>.from(body['data'])
+          : null;
       final updated = data == null ? null : InjectProduction.fromJson(data);
 
       // auto refresh
@@ -371,7 +395,9 @@ class InjectProductionViewModel extends ChangeNotifier {
   }
 
   Future<bool> deleteProduksi(String noProduksi) async {
-    debugPrint('🗑 [INJECT_VM] deleteProduksi(no=$noProduksi) VM hash=$hashCode');
+    debugPrint(
+      '🗑 [INJECT_VM] deleteProduksi(no=$noProduksi) VM hash=$hashCode',
+    );
 
     try {
       saveError = null;
@@ -420,8 +446,9 @@ class InjectProductionViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      furnitureWipResult =
-      await repository.fetchFurnitureWipByInjectProduction(noProduksi);
+      furnitureWipResult = await repository.fetchFurnitureWipByInjectProduction(
+        noProduksi,
+      );
     } catch (e) {
       furnitureWipError = e.toString();
       furnitureWipResult = null;
@@ -448,7 +475,9 @@ class InjectProductionViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      packingResult = await repository.fetchPackingByInjectProduction(noProduksi);
+      packingResult = await repository.fetchPackingByInjectProduction(
+        noProduksi,
+      );
     } catch (e) {
       packingError = e.toString();
       packingResult = null;

@@ -45,6 +45,7 @@ import 'package:pps_tablet/features/label/reject/view/reject_screen.dart';
 import 'package:pps_tablet/features/label/reject/view_model/reject_view_model.dart';
 import 'package:pps_tablet/features/mesin/repository/mesin_repository.dart';
 import 'package:pps_tablet/features/mesin/view_model/mesin_view_model.dart';
+import 'package:pps_tablet/features/mapping/view/mapping_screen.dart';
 import 'package:pps_tablet/features/mixer_type/repository/mixer_type_repository.dart';
 import 'package:pps_tablet/features/mixer_type/view_model/mixer_type_view_model.dart';
 import 'package:pps_tablet/features/operator/repository/operator_repository.dart';
@@ -569,6 +570,7 @@ class MyApp extends StatelessWidget {
               SortirRejectProductionScreen(),
           '/shell/return': (context) => ReturnProductionScreen(),
           '/production/return': (context) => ReturnProductionScreen(),
+          '/shell/mapping': (context) => const MappingScreen(),
         },
       ),
     );

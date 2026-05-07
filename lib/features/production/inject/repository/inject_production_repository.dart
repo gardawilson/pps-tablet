@@ -13,7 +13,7 @@ class InjectProductionRepository {
   final ApiClient api;
 
   InjectProductionRepository({ApiClient? apiClient})
-      : api = apiClient ?? ApiClient();
+    : api = apiClient ?? ApiClient();
 
   /* =============================
    * GET (BY DATE) - existing
@@ -24,8 +24,9 @@ class InjectProductionRepository {
   Future<List<InjectProduction>> fetchByDate(DateTime date) async {
     final dateDb = toDbDateString(date); // YYYY-MM-DD
 
-    final Map<String, dynamic> body =
-    await api.getJson('/api/production/inject/$dateDb');
+    final Map<String, dynamic> body = await api.getJson(
+      '/api/production/inject/$dateDb',
+    );
 
     final List list = (body['data'] ?? []) as List;
 
@@ -87,7 +88,8 @@ class InjectProductionRepository {
   /// 🔹 Fetch FurnitureWIP kandidat by NoProduksi Inject
   /// Backend: GET /api/production/inject/furniture-wip/:noProduksi
   Future<FurnitureWipByInjectResult> fetchFurnitureWipByInjectProduction(
-      String noProduksi) async {
+    String noProduksi,
+  ) async {
     final encodedNo = Uri.encodeComponent(noProduksi);
 
     try {
@@ -112,7 +114,8 @@ class InjectProductionRepository {
   /// 🔹 Fetch Packing (BarangJadi) kandidat by NoProduksi Inject
   /// Backend: GET /api/production/inject/packing/:noProduksi
   Future<PackingByInjectResult> fetchPackingByInjectProduction(
-      String noProduksi) async {
+    String noProduksi,
+  ) async {
     final encodedNo = Uri.encodeComponent(noProduksi);
 
     try {
@@ -149,7 +152,8 @@ class InjectProductionRepository {
   ///   "hourEnd":"10:00"
   /// }
   Future<Map<String, dynamic>> createProduksi(
-      Map<String, dynamic> payload) async {
+    Map<String, dynamic> payload,
+  ) async {
     final path = '/api/production/inject';
 
     try {
@@ -157,9 +161,7 @@ class InjectProductionRepository {
       return body;
     } on ApiException catch (e) {
       final parsed = _tryDecodeMap(e.responseBody);
-      final msg = (parsed['message'] as String?) ??
-          e.message ??
-          'Gagal create InjectProduksi (HTTP ${e.statusCode})';
+      final msg = (parsed['message'] as String?) ?? e.message;
 
       if (e.statusCode == 422) {
         throw Exception(msg.isNotEmpty ? msg : 'Beberapa data tidak valid');
@@ -174,9 +176,9 @@ class InjectProductionRepository {
 
   /// PUT /api/production/inject/:noProduksi
   Future<Map<String, dynamic>> updateProduksi(
-      String noProduksi,
-      Map<String, dynamic> payload,
-      ) async {
+    String noProduksi,
+    Map<String, dynamic> payload,
+  ) async {
     final no = noProduksi.trim();
     if (no.isEmpty) throw ArgumentError('noProduksi tidak boleh kosong');
 
@@ -187,7 +189,8 @@ class InjectProductionRepository {
       return body;
     } on ApiException catch (e) {
       final parsed = _tryDecodeMap(e.responseBody);
-      final msg = (parsed['message'] as String?) ??
+      final msg =
+          (parsed['message'] as String?) ??
           e.message ??
           'Gagal update InjectProduksi (HTTP ${e.statusCode})';
 
@@ -223,7 +226,8 @@ class InjectProductionRepository {
         return parsed;
       }
 
-      final msg = (parsed['message'] as String?) ??
+      final msg =
+          (parsed['message'] as String?) ??
           e.message ??
           'Gagal delete InjectProduksi (HTTP ${e.statusCode})';
 

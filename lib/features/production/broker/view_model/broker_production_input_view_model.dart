@@ -1783,6 +1783,74 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
   }
 
   // ---------------------------------------------------------------------------
+  // Move Outputs
+  // ---------------------------------------------------------------------------
+  bool isMoveOutputLoading = false;
+  String? moveOutputError;
+
+  Future<bool> moveOutputs(
+    String noProduksi,
+    String targetNoProduksi,
+    List<Map<String, dynamic>> items,
+  ) async {
+    if (items.isEmpty) {
+      moveOutputError = 'Pilih minimal satu item untuk dipindahkan';
+      notifyListeners();
+      return false;
+    }
+
+    isMoveOutputLoading = true;
+    moveOutputError = null;
+    notifyListeners();
+
+    try {
+      await repository.moveOutputs(noProduksi, targetNoProduksi, items);
+      await loadOutputs(noProduksi);
+      return true;
+    } catch (e) {
+      moveOutputError = e.toString().replaceFirst('Exception: ', '');
+      return false;
+    } finally {
+      isMoveOutputLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Move Bonggolan Outputs
+  // ---------------------------------------------------------------------------
+  bool isMoveBonggolanOutputLoading = false;
+  String? moveBonggolanOutputError;
+
+  Future<bool> moveBonggolanOutputs(
+    String noProduksi,
+    String targetNoProduksi,
+    List<String> noBonggolanList,
+  ) async {
+    if (noBonggolanList.isEmpty) {
+      moveBonggolanOutputError = 'Pilih minimal satu bonggolan untuk dipindahkan';
+      notifyListeners();
+      return false;
+    }
+
+    isMoveBonggolanOutputLoading = true;
+    moveBonggolanOutputError = null;
+    notifyListeners();
+
+    try {
+      await repository.moveBonggolanOutputs(noProduksi, targetNoProduksi, noBonggolanList);
+      await loadOutputs(noProduksi);
+      return true;
+    } catch (e) {
+      moveBonggolanOutputError = e.toString().replaceFirst('Exception: ', '');
+      return false;
+    } finally {
+      isMoveBonggolanOutputLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Lifecycle
   // ---------------------------------------------------------------------------
   @override

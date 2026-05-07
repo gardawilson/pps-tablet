@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../../../common/widgets/app_date_field.dart';
 import '../../../../common/widgets/app_number_field.dart';
 import '../../../../common/widgets/app_text_field.dart';
+import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/utils/time_formatter.dart';
 
@@ -46,11 +47,7 @@ class InjectProductionFormDialog extends StatefulWidget {
   final InjectProduction? header;
   final Function(InjectProduction)? onSave;
 
-  const InjectProductionFormDialog({
-    super.key,
-    this.header,
-    this.onSave,
-  });
+  const InjectProductionFormDialog({super.key, this.header, this.onSave});
 
   @override
   State<InjectProductionFormDialog> createState() =>
@@ -104,12 +101,12 @@ class _InjectProductionFormDialogState
   // ✅ placeholder karena model tidak support null id
   static const int _noneFurnitureId = 0;
   static const FurnitureMaterialLookupResult _noneFurnitureMaterial =
-  FurnitureMaterialLookupResult(
-    idFurnitureMaterial: _noneFurnitureId,
-    nama: 'Tidak ada Furniture Material',
-    itemCode: null,
-    enable: false,
-  );
+      FurnitureMaterialLookupResult(
+        idFurnitureMaterial: _noneFurnitureId,
+        nama: 'Tidak ada Furniture Material',
+        itemCode: null,
+        enable: false,
+      );
 
   @override
   void initState() {
@@ -126,13 +123,12 @@ class _InjectProductionFormDialogState
     );
 
     mesinCtrl = TextEditingController(text: widget.header?.namaMesin ?? '');
-    operatorCtrl =
-        TextEditingController(text: widget.header?.namaOperator ?? '');
+    operatorCtrl = TextEditingController(
+      text: widget.header?.namaOperator ?? '',
+    );
 
     // ✅ Initialize jam field
-    jamCtrl = TextEditingController(
-      text: widget.header?.jam?.toString() ?? '',
-    );
+    jamCtrl = TextEditingController(text: widget.header?.jam?.toString() ?? '');
 
     hourMeterCtrl = TextEditingController(
       text: widget.header?.hourMeter?.toString() ?? '',
@@ -188,26 +184,27 @@ class _InjectProductionFormDialogState
     // pastikan ada mesin & operator & shift
     final mesinId = _selectedMesin?.idMesin ?? widget.header?.idMesin;
     if (mesinId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mesin wajib dipilih')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Mesin wajib dipilih')));
       return;
     }
 
-    final operatorId = _selectedOperator?.idOperator ??
+    final operatorId =
+        _selectedOperator?.idOperator ??
         _operatorPreselectId ??
         widget.header?.idOperator;
     if (operatorId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Operator wajib dipilih')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Operator wajib dipilih')));
       return;
     }
 
     if (_selectedShift == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Shift wajib dipilih')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Shift wajib dipilih')));
       return;
     }
 
@@ -254,28 +251,30 @@ class _InjectProductionFormDialogState
 
     // parse angka
     final hourMeter = double.tryParse(hourMeterCtrl.text.trim());
-    final beratProduk = double.tryParse(beratProdukHasilTimbangCtrl.text.trim());
+    final beratProduk = double.tryParse(
+      beratProdukHasilTimbangCtrl.text.trim(),
+    );
 
     final idCetakan = _selectedCetakan?.idCetakan ?? widget.header?.idCetakan;
     final idWarna = _selectedWarna?.idWarna ?? widget.header?.idWarna;
 
     if (idCetakan == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cetakan wajib dipilih')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Cetakan wajib dipilih')));
       return;
     }
     if (idWarna == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Warna wajib dipilih')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Warna wajib dipilih')));
       return;
     }
 
     // ✅ convert placeholder -> null for payload
     final pickedId = int.tryParse(idFurnitureMaterialCtrl.text.trim());
     final int? idFurnitureMaterialPayload =
-    (pickedId == null || pickedId == _noneFurnitureId) ? null : pickedId;
+        (pickedId == null || pickedId == _noneFurnitureId) ? null : pickedId;
 
     final prodVm = context.read<InjectProductionViewModel>();
 
@@ -329,10 +328,14 @@ class _InjectProductionFormDialogState
 
     if (result != null) {
       widget.onSave?.call(result);
-      Navigator.of(context).pop(result); // tutup dialog form & kembalikan result
+      Navigator.of(context).pop(result);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(prodVm.saveError ?? 'Gagal menyimpan data')),
+      showDialog(
+        context: context,
+        builder: (_) => ErrorStatusDialog(
+          title: 'Gagal Menyimpan',
+          message: prodVm.saveError ?? 'Gagal menyimpan data',
+        ),
       );
     }
   }
@@ -421,19 +424,21 @@ class _InjectProductionFormDialogState
     // 3) kalau list cuma 1 -> auto pilih
     // 4) fallback -> "Tidak ada"
     // =========================================================
-    final headerId = widget.header?.idFurnitureMaterial; // <-- pastikan field ini ada
+    final headerId =
+        widget.header?.idFurnitureMaterial; // <-- pastikan field ini ada
     final currentId = _selectedFurnitureMaterial?.idFurnitureMaterial;
 
     FurnitureMaterialLookupResult pick;
 
     if (headerId != null) {
       pick = list.firstWhere(
-            (e) => e.idFurnitureMaterial == headerId,
+        (e) => e.idFurnitureMaterial == headerId,
         orElse: () => list.length == 1 ? list.first : _noneFurnitureMaterial,
       );
-    } else if (currentId != null && currentId != _noneFurnitureMaterial.idFurnitureMaterial) {
+    } else if (currentId != null &&
+        currentId != _noneFurnitureMaterial.idFurnitureMaterial) {
       pick = list.firstWhere(
-            (e) => e.idFurnitureMaterial == currentId,
+        (e) => e.idFurnitureMaterial == currentId,
         orElse: () => list.length == 1 ? list.first : _noneFurnitureMaterial,
       );
     } else if (list.length == 1) {
@@ -445,7 +450,8 @@ class _InjectProductionFormDialogState
     setState(() => _selectedFurnitureMaterial = pick);
 
     // ✅ kalau "Tidak ada" => kosongkan controller
-    if (pick.idFurnitureMaterial == _noneFurnitureMaterial.idFurnitureMaterial) {
+    if (pick.idFurnitureMaterial ==
+        _noneFurnitureMaterial.idFurnitureMaterial) {
       idFurnitureMaterialCtrl.text = '';
     } else {
       idFurnitureMaterialCtrl.text = pick.idFurnitureMaterial.toString();
@@ -484,9 +490,7 @@ class _InjectProductionFormDialogState
               Expanded(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(flex: 4, child: _buildLeftColumn()),
-                  ],
+                  children: [Expanded(flex: 4, child: _buildLeftColumn())],
                 ),
               ),
               const SizedBox(height: 16),
@@ -542,8 +546,11 @@ class _InjectProductionFormDialogState
     final fmVm = context.watch<FurnitureMaterialLookupViewModel>();
 
     final furnitureDropdownEnabled =
-        idCetakan != null && idWarna != null && fmVm.items.isNotEmpty && !fmVm.isLoading && fmVm.error.isEmpty;
-
+        idCetakan != null &&
+        idWarna != null &&
+        fmVm.items.isNotEmpty &&
+        !fmVm.isLoading &&
+        fmVm.error.isEmpty;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -559,8 +566,11 @@ class _InjectProductionFormDialogState
             children: [
               Row(
                 children: [
-                  Icon(Icons.description,
-                      color: Colors.blue.shade700, size: 20),
+                  Icon(
+                    Icons.description,
+                    color: Colors.blue.shade700,
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   const Text(
                     'Header',
@@ -590,8 +600,10 @@ class _InjectProductionFormDialogState
                   if (d != null) {
                     setState(() {
                       _selectedDate = d;
-                      dateCreatedCtrl.text =
-                          DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(d);
+                      dateCreatedCtrl.text = DateFormat(
+                        'EEEE, dd MMM yyyy',
+                        'id_ID',
+                      ).format(d);
                     });
                     await _checkOverlapIfReadyVM();
                   }
@@ -621,7 +633,9 @@ class _InjectProductionFormDialogState
 
               // Operator
               OperatorDropdown(
-                key: ValueKey(_operatorPreselectId ?? widget.header?.idOperator),
+                key: ValueKey(
+                  _operatorPreselectId ?? widget.header?.idOperator,
+                ),
                 preselectId: isEdit
                     ? widget.header?.idOperator
                     : _operatorPreselectId,
@@ -665,8 +679,11 @@ class _InjectProductionFormDialogState
                           return 'Wajib isi jam mulai (HH:mm)';
                         }
                         final diff = durationBetweenHHmmWrap(
-                            hourStartCtrl.text, hourEndCtrl.text);
-                        if (diff == null && parseHHmm(hourEndCtrl.text) != null) {
+                          hourStartCtrl.text,
+                          hourEndCtrl.text,
+                        );
+                        if (diff == null &&
+                            parseHHmm(hourEndCtrl.text) != null) {
                           return 'Durasi tidak boleh 0 menit';
                         }
                         return null;
@@ -701,7 +718,9 @@ class _InjectProductionFormDialogState
                         final s = parseHHmm(hourStartCtrl.text);
                         if (s != null) {
                           final diff = durationBetweenHHmmWrap(
-                              hourStartCtrl.text, hourEndCtrl.text);
+                            hourStartCtrl.text,
+                            hourEndCtrl.text,
+                          );
                           if (diff == null) {
                             return 'Durasi tidak boleh 0 menit';
                           }
@@ -796,7 +815,8 @@ class _InjectProductionFormDialogState
                       label: 'Cetakan',
                       hint: 'Pilih cetakan',
                       autovalidateMode: AutovalidateMode.onUserInteraction,
-                      validator: (v) => v == null ? 'Wajib pilih cetakan' : null,
+                      validator: (v) =>
+                          v == null ? 'Wajib pilih cetakan' : null,
                       onChanged: (c) async {
                         _selectedCetakan = c;
                         setState(() {});
@@ -841,14 +861,16 @@ class _InjectProductionFormDialogState
 
                       onChanged: (val) {
                         if (val == null) {
-                          setState(() =>
-                          _selectedFurnitureMaterial = _noneFurnitureMaterial);
+                          setState(
+                            () => _selectedFurnitureMaterial =
+                                _noneFurnitureMaterial,
+                          );
                           idFurnitureMaterialCtrl.text = '';
                           return;
                         }
                         setState(() => _selectedFurnitureMaterial = val);
                         idFurnitureMaterialCtrl.text =
-                        (val.idFurnitureMaterial == _noneFurnitureId)
+                            (val.idFurnitureMaterial == _noneFurnitureId)
                             ? ''
                             : val.idFurnitureMaterial.toString();
                       },
@@ -884,13 +906,11 @@ class _InjectProductionFormDialogState
         ElevatedButton(
           onPressed: (hasOverlap || isSaving) ? null : _submit,
           style: ElevatedButton.styleFrom(
-            backgroundColor:
-            isEdit ? const Color(0xFFF57C00) : const Color(0xFF00897B),
+            backgroundColor: isEdit
+                ? const Color(0xFFF57C00)
+                : const Color(0xFF00897B),
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(
-              horizontal: 28,
-              vertical: 14,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
           ),
           child: Text(
             isSaving ? 'MENYIMPAN...' : 'SIMPAN',

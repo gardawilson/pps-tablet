@@ -1,8 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/atlas_data_table.dart';
+import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/atlas_paged_data_table.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../mst_barang_jadi/repository/mst_barang_jadi_repository.dart';
 import '../../mst_barang_jadi/view_model/mst_barang_jadi_view_model.dart';
@@ -143,14 +147,29 @@ class _SrV2ListScreenState extends State<SrV2ListScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Gagal menghapus: $e'),
-            backgroundColor: Colors.red.shade700,
-          ),
+        final msg = _extractMessage(e);
+        showDialog<void>(
+          context: context,
+          builder: (_) =>
+              ErrorStatusDialog(title: 'Gagal Menghapus', message: msg),
         );
       }
     }
+  }
+
+  String _extractMessage(Object e) {
+    if (e is ApiException) {
+      final body = e.responseBody;
+      if (body != null && body.isNotEmpty) {
+        try {
+          final json = jsonDecode(body) as Map<String, dynamic>;
+          final msg = json['message'];
+          if (msg is String && msg.isNotEmpty) return msg;
+        } catch (_) {}
+      }
+      return e.message;
+    }
+    return e.toString();
   }
 
   void _openCreate() {

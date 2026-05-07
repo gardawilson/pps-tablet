@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:pps_tablet/core/services/dialog_service.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/label_popover_widgets.dart';
@@ -60,6 +61,24 @@ class _RejectRowPopoverState extends State<RejectRowPopover> {
         setState(() => _copied = false);
       }
     });
+  }
+
+  bool _isSortirRejectLabel() {
+    final outputCode = (widget.header.outputCode ?? '').trim();
+    return outputCode.startsWith('J.');
+  }
+
+  Future<void> _handleEdit() async {
+    if (_isSortirRejectLabel()) {
+      widget.onClose();
+      await DialogService.instance.showError(
+        title: 'Tidak Dapat Diedit',
+        message:
+            'Label yang berasal dari Sortir Reject tidak dapat diedit. Silakan buat label baru jika diperlukan perubahan.',
+      );
+      return;
+    }
+    _runAndClose(widget.onEdit);
   }
 
   @override
@@ -195,7 +214,7 @@ class _RejectRowPopoverState extends State<RejectRowPopover> {
                 label: 'Edit',
                 enabled: canEdit,
                 tooltipWhenDisabled: 'Tidak punya izin edit',
-                onTap: () => _runAndClose(widget.onEdit),
+                onTap: () => _handleEdit(),
               ),
               divider,
               LabelPopoverMenuTile(

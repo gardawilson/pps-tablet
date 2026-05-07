@@ -287,6 +287,124 @@ class BrokerProductionInputRepository {
 
 
   // -----------------------------
+  // NEW: Move Outputs
+  // -----------------------------
+  /// PATCH /api/production/broker/:noProduksi/outputs/move
+  Future<Map<String, dynamic>> moveOutputs(
+    String noProduksi,
+    String targetNoProduksi,
+    List<Map<String, dynamic>> items,
+  ) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse(
+      '$_base/api/production/broker/${Uri.encodeComponent(noProduksi)}/outputs/move',
+    );
+
+    final payload = {
+      'targetNoProduksi': targetNoProduksi,
+      'items': items,
+    };
+
+    print('➡️ [PATCH] $url');
+    print('📦 Move payload: ${json.encode(payload)}');
+
+    http.Response res;
+    try {
+      res = await http
+          .patch(
+            url,
+            headers: {
+              ..._headers(token),
+              'Content-Type': 'application/json',
+            },
+            body: json.encode(payload),
+          )
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout memindahkan output ($noProduksi)');
+    } catch (e) {
+      print('❌ Request error (move outputs): $e');
+      rethrow;
+    }
+
+    print('⬅️ [${res.statusCode}] move outputs');
+
+    final decoded = utf8.decode(res.bodyBytes);
+    Map<String, dynamic> body;
+    try {
+      body = json.decode(decoded) as Map<String, dynamic>;
+    } catch (e) {
+      throw FormatException('Response move outputs bukan JSON valid: $e');
+    }
+
+    if (res.statusCode == 200) return body;
+
+    final message =
+        body['message'] as String? ??
+        'Gagal memindahkan output (HTTP ${res.statusCode})';
+    throw Exception(message);
+  }
+
+  // -----------------------------
+  // NEW: Move Bonggolan Outputs
+  // -----------------------------
+  /// PATCH /api/production/broker/:noProduksi/outputs/bonggolan/move
+  Future<Map<String, dynamic>> moveBonggolanOutputs(
+    String noProduksi,
+    String targetNoProduksi,
+    List<String> noBonggolanList,
+  ) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse(
+      '$_base/api/production/broker/${Uri.encodeComponent(noProduksi)}/outputs/bonggolan/move',
+    );
+
+    final payload = {
+      'targetNoProduksi': targetNoProduksi,
+      'noBonggolanList': noBonggolanList,
+    };
+
+    print('➡️ [PATCH] $url');
+    print('📦 Move bonggolan payload: ${json.encode(payload)}');
+
+    http.Response res;
+    try {
+      res = await http
+          .patch(
+            url,
+            headers: {
+              ..._headers(token),
+              'Content-Type': 'application/json',
+            },
+            body: json.encode(payload),
+          )
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout memindahkan output bonggolan ($noProduksi)');
+    } catch (e) {
+      print('❌ Request error (move bonggolan): $e');
+      rethrow;
+    }
+
+    print('⬅️ [${res.statusCode}] move bonggolan outputs');
+
+    final decoded = utf8.decode(res.bodyBytes);
+    Map<String, dynamic> body;
+    try {
+      body = json.decode(decoded) as Map<String, dynamic>;
+    } catch (e) {
+      throw FormatException('Response move bonggolan bukan JSON valid: $e');
+    }
+
+    if (res.statusCode == 200) return body;
+
+    final message =
+        body['message'] as String? ??
+        'Gagal memindahkan output bonggolan (HTTP ${res.statusCode})';
+    throw Exception(message);
+  }
+
+  // -----------------------------
   // NEW: Delete Inputs & Partials
   // -----------------------------
   /// DELETE /api/production/broker/:noProduksi/inputs

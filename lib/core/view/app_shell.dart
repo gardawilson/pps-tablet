@@ -21,6 +21,7 @@ import 'package:pps_tablet/features/label/packing/view/packing_screen.dart';
 import 'package:pps_tablet/features/label/reject/view/reject_screen.dart';
 import 'package:pps_tablet/features/label/selection/view/label_selection_screen.dart';
 import 'package:pps_tablet/features/label/washing/view/washing_screen.dart';
+import 'package:pps_tablet/features/mapping/view/mapping_screen.dart';
 import 'package:pps_tablet/features/production/broker/view/broker_production_screen.dart';
 import 'package:pps_tablet/features/production/crusher/view/crusher_production_screen.dart';
 import 'package:pps_tablet/features/production/gilingan/view/gilingan_production_screen.dart';
@@ -446,6 +447,8 @@ class _AppShellState extends State<AppShell> {
         return const ReportListScreen();
       case '/shell/history':
         return const AuditScreen();
+      case '/shell/mapping':
+        return const MappingScreen();
       default:
         return const HomeScreen();
     }

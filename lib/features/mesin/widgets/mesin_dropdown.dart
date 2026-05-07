@@ -49,7 +49,10 @@ class MesinDropdown extends StatefulWidget {
     this.errorText,
     this.prefixIcon = Icons.precision_manufacturing_outlined,
     this.popupMaxHeight = 500,
-    this.contentPadding = const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+    this.contentPadding = const EdgeInsets.symmetric(
+      horizontal: 16,
+      vertical: 0,
+    ),
   });
 
   @override

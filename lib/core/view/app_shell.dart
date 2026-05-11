@@ -22,7 +22,7 @@ import 'package:pps_tablet/features/label/reject/view/reject_screen.dart';
 import 'package:pps_tablet/features/label/selection/view/label_selection_screen.dart';
 import 'package:pps_tablet/features/label/washing/view/washing_screen.dart';
 import 'package:pps_tablet/features/mapping/view/mapping_screen.dart';
-import 'package:pps_tablet/features/production/broker/view/broker_production_screen.dart';
+import 'package:pps_tablet/features/production/broker/view/broker_production_mesin_screen.dart';
 import 'package:pps_tablet/features/production/crusher/view/crusher_production_screen.dart';
 import 'package:pps_tablet/features/production/gilingan/view/gilingan_production_screen.dart';
 import 'package:pps_tablet/features/production/hot_stamp/view/hot_stamp_production_screen.dart';
@@ -130,7 +130,7 @@ class _AppShellState extends State<AppShell> {
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: Color(0xFF1F2937),
-                fontSize: 15,
+                fontSize: 18,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -206,7 +206,7 @@ class _AppShellState extends State<AppShell> {
                           'Masuk sebagai',
                           style: TextStyle(
                             color: Color(0xFF94A3B8),
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -216,7 +216,7 @@ class _AppShellState extends State<AppShell> {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Color(0xFF1E293B),
-                            fontSize: 14,
+                            fontSize: 15,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -250,7 +250,7 @@ class _AppShellState extends State<AppShell> {
                     'Akun',
                     style: TextStyle(
                       color: Color(0xFF334155),
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -280,7 +280,7 @@ class _AppShellState extends State<AppShell> {
                     'Logout',
                     style: TextStyle(
                       color: Color(0xFFDC2626),
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -306,7 +306,7 @@ class _AppShellState extends State<AppShell> {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Color(0xFF475569),
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -409,7 +409,7 @@ class _AppShellState extends State<AppShell> {
       case '/production/washing':
         return WashingProductionScreen();
       case '/production/broker':
-        return BrokerProductionScreen();
+        return const BrokerProductionMesinScreen();
       case '/production/crusher':
         return CrusherProductionScreen();
       case '/production/gilingan':

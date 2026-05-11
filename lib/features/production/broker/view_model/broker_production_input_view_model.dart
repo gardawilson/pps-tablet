@@ -1828,7 +1828,8 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     List<String> noBonggolanList,
   ) async {
     if (noBonggolanList.isEmpty) {
-      moveBonggolanOutputError = 'Pilih minimal satu bonggolan untuk dipindahkan';
+      moveBonggolanOutputError =
+          'Pilih minimal satu bonggolan untuk dipindahkan';
       notifyListeners();
       return false;
     }
@@ -1838,7 +1839,11 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await repository.moveBonggolanOutputs(noProduksi, targetNoProduksi, noBonggolanList);
+      await repository.moveBonggolanOutputs(
+        noProduksi,
+        targetNoProduksi,
+        noBonggolanList,
+      );
       await loadOutputs(noProduksi);
       return true;
     } catch (e) {

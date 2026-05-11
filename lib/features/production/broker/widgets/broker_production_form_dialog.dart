@@ -1,6 +1,9 @@
 // lib/features/production/broker/widgets/broker_production_form_dialog.dart
 
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -20,15 +23,40 @@ import '../../../shared/shift/widgets/shift_dropdown.dart';
 import '../../shared/widgets/time_form_field.dart';
 import '../model/broker_production_model.dart';
 import '../view_model/broker_production_view_model.dart';
-import 'broker_text_field.dart';
+import '../../../../core/network/endpoints.dart';
+import '../../../../core/services/token_storage.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../common/widgets/app_date_field.dart';
 
 class BrokerProductionFormDialog extends StatefulWidget {
   final BrokerProduction? header;
   final Function(BrokerProduction)? onSave;
+  final MstMesin? initialMesin;
+  final DateTime? initialDate;
+  final String? initialHourStart;
+  final String? initialHourEnd;
+  final int? initialShift;
+  final int? initialOperatorId;
+  final String? initialOperatorName;
+  final int? initialReguId;
+  final int? initialHadir;
+  final int? initialJmlhAnggota;
 
-  const BrokerProductionFormDialog({super.key, this.header, this.onSave});
+  const BrokerProductionFormDialog({
+    super.key,
+    this.header,
+    this.onSave,
+    this.initialMesin,
+    this.initialDate,
+    this.initialHourStart,
+    this.initialHourEnd,
+    this.initialShift,
+    this.initialOperatorId,
+    this.initialOperatorName,
+    this.initialReguId,
+    this.initialHadir,
+    this.initialJmlhAnggota,
+  });
 
   @override
   State<BrokerProductionFormDialog> createState() =>
@@ -79,30 +107,46 @@ class _BrokerProductionFormDialogState
 
     final DateTime seededDate = widget.header != null
         ? (parseAnyToDateTime(widget.header!.tglProduksi) ?? DateTime.now())
-        : DateTime.now();
+        : (widget.initialDate ?? DateTime.now());
 
     _selectedDate = seededDate;
     dateCreatedCtrl = TextEditingController(
       text: DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(seededDate),
     );
 
-    mesinCtrl = TextEditingController(text: widget.header?.namaMesin ?? '');
+    _selectedMesin = widget.initialMesin;
+    mesinCtrl = TextEditingController(
+      text: widget.header?.namaMesin ?? widget.initialMesin?.namaMesin ?? '',
+    );
     operatorCtrl = TextEditingController(
-      text: widget.header?.namaOperator ?? '',
+      text: widget.header?.namaOperator ?? widget.initialOperatorName ?? '',
     );
     jlhAnggotaCtrl = TextEditingController(
-      text: widget.header?.jmlhAnggota?.toString() ?? '',
+      text:
+          widget.header?.jmlhAnggota?.toString() ??
+          widget.initialJmlhAnggota?.toString() ??
+          '',
     );
     hadirCtrl = TextEditingController(
-      text: widget.header?.hadir?.toString() ?? '',
+      text:
+          widget.header?.hadir?.toString() ??
+          widget.initialHadir?.toString() ??
+          '',
     );
     hourMeterCtrl = TextEditingController(
       text: widget.header?.hourMeter?.toString() ?? '',
     );
 
-    hourStartCtrl = TextEditingController(text: widget.header?.hourStart);
-    hourEndCtrl = TextEditingController(text: widget.header?.hourEnd);
-    _selectedReguId = widget.header?.idRegu;
+    hourStartCtrl = TextEditingController(
+      text: widget.header?.hourStart ?? widget.initialHourStart,
+    );
+    hourEndCtrl = TextEditingController(
+      text: widget.header?.hourEnd ?? widget.initialHourEnd,
+    );
+    _selectedShift = widget.header?.shift ?? widget.initialShift;
+    _selectedReguId = widget.header?.idRegu ?? widget.initialReguId;
+    _operatorPreselectId =
+        widget.initialMesin?.defaultOperatorId ?? widget.initialOperatorId;
   }
 
   @override
@@ -291,6 +335,47 @@ class _BrokerProductionFormDialogState
     debugPrint('📝 [BROKER_FORM] _submit() completed');
   }
 
+  Future<void> _fetchShiftHour(int shift) async {
+    final tanggal = DateFormat('yyyy-MM-dd').format(_selectedDate);
+    final base = ApiConstants.baseUrl.replaceFirst(RegExp(r'/*$'), '');
+    final url = Uri.parse(
+      '$base/api/mst/shift/hour?tanggal=$tanggal&shift=$shift',
+    );
+    try {
+      final token = await TokenStorage.getToken();
+      final res = await http
+          .get(
+            url,
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Accept': 'application/json',
+            },
+          )
+          .timeout(const Duration(seconds: 10));
+      if (res.statusCode != 200) return;
+      final body =
+          jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      final data = body['data'] as Map<String, dynamic>?;
+      if (data == null) return;
+
+      // hourStart / hourEnd come as "HH:mm:ss" — trim to "HH:mm"
+      String trimTime(String? v) {
+        if (v == null || v.isEmpty) return '';
+        return v.length >= 5 ? v.substring(0, 5) : v;
+      }
+
+      final start = trimTime(data['hourStart'] as String?);
+      final end = trimTime(data['hourEnd'] as String?);
+
+      if (!mounted) return;
+      setState(() {
+        if (start.isNotEmpty) hourStartCtrl.text = start;
+        if (end.isNotEmpty) hourEndCtrl.text = end;
+      });
+      await _checkOverlapIfReadyVM();
+    } catch (_) {}
+  }
+
   /// Panggil cek-overlap via ViewModel hanya jika input sudah lengkap:
   /// - Jam Mulai & Jam Selesai terisi
   /// - IdMesin tersedia
@@ -403,105 +488,84 @@ class _BrokerProductionFormDialogState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (widget.initialMesin == null) ...[
+                AppDateField(
+                  controller: dateCreatedCtrl,
+                  label: 'Tanggal',
+                  format: DateFormat('EEEE, dd MMM yyyy', 'id_ID'),
+                  initialDate: _selectedDate,
+                  onChanged: (d) async {
+                    if (d != null) {
+                      setState(() {
+                        _selectedDate = d;
+                        dateCreatedCtrl.text = DateFormat(
+                          'EEEE, dd MMM yyyy',
+                          'id_ID',
+                        ).format(d);
+                      });
+                      await _checkOverlapIfReadyVM();
+                    }
+                  },
+                ),
+
+                const SizedBox(height: 16),
+
+                MesinDropdown(
+                  idBagianMesin: 2,
+                  preselectId: widget.header?.idMesin,
+                  label: 'Mesin',
+                  hint: 'Pilih jenis mesin',
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                  validator: (v) =>
+                      v == null ? 'Wajib pilih jenis mesin' : null,
+                  onChanged: (m) async {
+                    _selectedMesin = m;
+                    _operatorPreselectId = m?.defaultOperatorId;
+                    setState(() {});
+                    await _checkOverlapIfReadyVM();
+                  },
+                ),
+
+                const SizedBox(height: 16),
+              ],
+
+              // Baris 1: Shift + Operator
               Row(
                 children: [
-                  Icon(
-                    Icons.description,
-                    color: Colors.blue.shade700,
-                    size: 20,
+                  Expanded(
+                    child: ShiftDropdown(
+                      preselectId: widget.header?.shift ?? widget.initialShift,
+                      onChangedId: (id) {
+                        setState(() => _selectedShift = id);
+                        if (id != null) _fetchShiftHour(id);
+                      },
+                      validator: (v) => v == null ? 'Wajib pilih shift' : null,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                    ),
                   ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Header',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OperatorDropdown(
+                      key: ValueKey(
+                        _operatorPreselectId ?? widget.header?.idOperator,
+                      ),
+                      preselectId: isEdit
+                          ? widget.header?.idOperator
+                          : (_operatorPreselectId ?? widget.initialOperatorId),
+                      label: 'Operator',
+                      hint: 'Pilih operator',
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      validator: (v) =>
+                          v == null ? 'Wajib pilih operator' : null,
+                      onChanged: (op) => setState(() => _selectedOperator = op),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-
-              BrokerTextField(
-                controller: noProduction,
-                label: 'No. Produksi',
-                icon: Icons.label,
-                asText: true, // readonly text (bold)
-                placeholderText: 'F.XXXXXXXXXX',
-              ),
 
               const SizedBox(height: 16),
 
-              AppDateField(
-                controller: dateCreatedCtrl,
-                label: 'Tanggal',
-                format: DateFormat('EEEE, dd MMM yyyy', 'id_ID'),
-                initialDate: _selectedDate,
-                onChanged: (d) async {
-                  if (d != null) {
-                    setState(() {
-                      _selectedDate = d;
-                      dateCreatedCtrl.text = DateFormat(
-                        'EEEE, dd MMM yyyy',
-                        'id_ID',
-                      ).format(d);
-                    });
-                    await _checkOverlapIfReadyVM();
-                  }
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              // Jenis Mesin (Required)
-              MesinDropdown(
-                idBagianMesin: 2, // ganti sesuai ID bagian untuk modul ini
-                preselectId: widget.header?.idMesin,
-                label: 'Mesin',
-                hint: 'Pilih jenis mesin',
-                autovalidateMode: AutovalidateMode.onUserInteraction,
-                validator: (v) => v == null ? 'Wajib pilih jenis mesin' : null,
-                onChanged: (m) async {
-                  _selectedMesin = m;
-                  _operatorPreselectId = m?.defaultOperatorId;
-
-                  setState(() {});
-                  await _checkOverlapIfReadyVM();
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              // Operator Default (Required/Optional sesuai kebutuhan)
-              OperatorDropdown(
-                key: ValueKey(
-                  _operatorPreselectId ?? widget.header?.idOperator,
-                ),
-                preselectId: isEdit
-                    ? widget.header?.idOperator
-                    : _operatorPreselectId,
-                label: 'Operator',
-                hint: 'Pilih operator',
-                autovalidateMode: AutovalidateMode.onUserInteraction,
-                validator: (v) => v == null ? 'Wajib pilih operator' : null,
-                onChanged: (op) {
-                  _selectedOperator = op;
-                  setState(() {});
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              ReguDropdown(
-                preselectId: widget.header?.idRegu,
-                label: 'Regu',
-                hint: 'Pilih regu',
-                onChanged: (regu) {
-                  _selectedReguId = regu?.idRegu;
-                  setState(() {});
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              // Jam Mulai & Jam Selesai
+              // Baris 2: Jam Mulai + Jam Selesai + badge
               Row(
                 children: [
                   Expanded(
@@ -565,9 +629,7 @@ class _BrokerProductionFormDialogState
                             hourStartCtrl.text,
                             hourEndCtrl.text,
                           );
-                          if (diff == null) {
-                            return 'Durasi tidak boleh 0 menit';
-                          }
+                          if (diff == null) return 'Durasi tidak boleh 0 menit';
                         }
                         return null;
                       },
@@ -586,50 +648,17 @@ class _BrokerProductionFormDialogState
 
               const SizedBox(height: 16),
 
+              // Baris 3: Regu + Hadir
               Row(
                 children: [
                   Expanded(
-                    child: ShiftDropdown(
-                      preselectId: widget.header?.shift,
-                      onChangedId: (id) {
-                        setState(() {
-                          _selectedShift = id;
-                        });
-                      },
-                      validator: (v) => v == null ? 'Wajib pilih shift' : null,
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: AppNumberField(
-                      controller: hourMeterCtrl,
-                      label: 'Hour Meter',
-                      icon: Icons.timer_sharp,
-                      allowDecimal: false,
-                      allowNegative: false,
-                      hintText: '0',
-                      validator: (v) =>
-                          (v == null || v.isEmpty) ? 'Wajib diisi' : null,
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: AppNumberField(
-                      controller: jlhAnggotaCtrl,
-                      label: 'Jumlah Anggota',
-                      icon: Icons.people,
-                      allowDecimal: false,
-                      allowNegative: false,
-                      hintText: '0',
-                      validator: (v) =>
-                          (v == null || v.isEmpty) ? 'Wajib diisi' : null,
+                    child: ReguDropdown(
+                      preselectId:
+                          widget.header?.idRegu ?? widget.initialReguId,
+                      label: 'Regu',
+                      hint: 'Pilih regu',
+                      onChanged: (regu) =>
+                          setState(() => _selectedReguId = regu?.idRegu),
                     ),
                   ),
                   const SizedBox(width: 12),

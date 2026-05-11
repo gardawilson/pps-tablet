@@ -200,3 +200,57 @@ class BrokerProduction {
     return 'Locked (<= $d)';
   }
 }
+
+class BrokerMesinInfo {
+  final int idMesin;
+  final String namaMesin;
+  final String bagian;
+  final String? noProduksi;
+  final String? operator_;
+  final int? shift;
+  final String? hourStart;
+  final String? hourEnd;
+
+  bool get isActive => noProduksi != null && noProduksi!.isNotEmpty;
+
+  const BrokerMesinInfo({
+    required this.idMesin,
+    required this.namaMesin,
+    required this.bagian,
+    this.noProduksi,
+    this.operator_,
+    this.shift,
+    this.hourStart,
+    this.hourEnd,
+  });
+
+  factory BrokerMesinInfo.fromJson(Map<String, dynamic> j) {
+    String? _s(dynamic v) => v == null ? null : v.toString().trim().isEmpty ? null : v.toString().trim();
+    int? _i(dynamic v) {
+      if (v == null) return null;
+      if (v is num) return v.toInt();
+      return int.tryParse(v.toString());
+    }
+
+    String? _timeHHmm(dynamic v) {
+      final s = _s(v);
+      if (s == null) return null;
+      final parts = s.split(':');
+      if (parts.length < 2) return s;
+      final h = parts[0].padLeft(2, '0');
+      final m = parts[1].padLeft(2, '0');
+      return '$h:$m';
+    }
+
+    return BrokerMesinInfo(
+      idMesin: _i(j['IdMesin']) ?? 0,
+      namaMesin: _s(j['NamaMesin']) ?? '',
+      bagian: _s(j['Bagian']) ?? '',
+      noProduksi: _s(j['NoProduksi']),
+      operator_: _s(j['Operator']),
+      shift: _i(j['Shift']),
+      hourStart: _timeHHmm(j['HourStart']),
+      hourEnd: _timeHHmm(j['HourEnd']),
+    );
+  }
+}

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../../core/network/endpoints.dart';
@@ -23,6 +22,75 @@ class BrokerProductionRepository {
   };
 
   // =========================
+  //  BROKER MESIN LIST
+  // =========================
+  Future<List<BrokerMesinInfo>> fetchBrokerMesin() async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('http://192.168.11.153:7500/api/mst-mesin/broker');
+
+    late http.Response res;
+    try {
+      res = await http.get(url, headers: _headers(token)).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout mengambil data mesin broker');
+    } catch (e) {
+      throw Exception('Gagal terhubung ke server: $e');
+    }
+
+    if (res.statusCode != 200) {
+      throw Exception('Gagal memuat mesin broker (${res.statusCode})');
+    }
+
+    final body = json.decode(utf8.decode(res.bodyBytes));
+    final data = body['data'] as List<dynamic>? ?? [];
+    return data.map((e) => BrokerMesinInfo.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  // =========================
+  //  BY MESIN + TANGGAL
+  // =========================
+  Future<List<BrokerProduction>> fetchByMesinAndDate({
+    required int idMesin,
+    required DateTime tanggal,
+  }) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/production/broker').replace(
+      queryParameters: {
+        'idMesin': '$idMesin',
+        'tanggal': toDbDateString(tanggal),
+      },
+    );
+
+    print('➡️ [GET] $url');
+    final started = DateTime.now();
+    late http.Response res;
+    try {
+      res = await http.get(url, headers: _headers(token)).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout mengambil data broker produksi');
+    } catch (e) {
+      print('❌ Request error: $e');
+      rethrow;
+    }
+    print(
+      '⬅️ [${res.statusCode}] in ${DateTime.now().difference(started).inMilliseconds}ms',
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception(
+        'Gagal mengambil data broker produksi (${res.statusCode})',
+      );
+    }
+
+    final decoded = utf8.decode(res.bodyBytes);
+    final body = json.decode(decoded) as Map<String, dynamic>;
+    final List list = (body['data'] ?? []) as List;
+    return list
+        .map((e) => BrokerProduction.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  // =========================
   //  BY DATE (tetap ada)
   // =========================
   Future<List<BrokerProduction>> fetchByDate(DateTime date) async {
@@ -43,10 +111,14 @@ class BrokerProductionRepository {
       rethrow;
     }
 
-    print('⬅️ [${res.statusCode}] in ${DateTime.now().difference(started).inMilliseconds}ms');
+    print(
+      '⬅️ [${res.statusCode}] in ${DateTime.now().difference(started).inMilliseconds}ms',
+    );
 
     if (res.statusCode != 200) {
-      throw Exception('Gagal mengambil data broker produksi (${res.statusCode})');
+      throw Exception(
+        'Gagal mengambil data broker produksi (${res.statusCode})',
+      );
     }
 
     final decoded = utf8.decode(res.bodyBytes);
@@ -72,10 +144,9 @@ class BrokerProductionRepository {
     // VM convenience: prefer this if provided; if exactNoProduksi == true we still send as contains
     String? noProduksi,
     bool exactNoProduksi = false, // backend currently does LIKE only
-
     // Other optional filters (supported by backend)
     int? shift,
-    DateTime? date,               // legacy single date -> maps to dateFrom/dateTo
+    DateTime? date, // legacy single date -> maps to dateFrom/dateTo
     DateTime? dateFrom,
     DateTime? dateTo,
     int? idMesin,
@@ -84,7 +155,8 @@ class BrokerProductionRepository {
     final token = await TokenStorage.getToken();
 
     // Prefer explicit noProduksi over generic search
-    final String? effectiveSearch = (noProduksi != null && noProduksi.trim().isNotEmpty)
+    final String? effectiveSearch =
+        (noProduksi != null && noProduksi.trim().isNotEmpty)
         ? noProduksi.trim()
         : (search != null && search.trim().isNotEmpty ? search.trim() : null);
 
@@ -100,7 +172,8 @@ class BrokerProductionRepository {
     final qp = <String, String>{
       'page': '$page',
       'pageSize': '$pageSize',
-      if (effectiveSearch != null) 'search': effectiveSearch, // API searches NoProduksi only
+      if (effectiveSearch != null)
+        'search': effectiveSearch, // API searches NoProduksi only
       if (shift != null) 'shift': '$shift',
       if (df != null) 'dateFrom': df,
       if (dt != null) 'dateTo': dt,
@@ -108,7 +181,9 @@ class BrokerProductionRepository {
       if (idOperator != null) 'idOperator': '$idOperator',
     };
 
-    final url = Uri.parse('$_base/api/production/broker').replace(queryParameters: qp);
+    final url = Uri.parse(
+      '$_base/api/production/broker',
+    ).replace(queryParameters: qp);
 
     final started = DateTime.now();
     print('➡️ [GET] $url');
@@ -123,10 +198,14 @@ class BrokerProductionRepository {
       rethrow;
     }
 
-    print('⬅️ [${res.statusCode}] in ${DateTime.now().difference(started).inMilliseconds}ms');
+    print(
+      '⬅️ [${res.statusCode}] in ${DateTime.now().difference(started).inMilliseconds}ms',
+    );
 
     if (res.statusCode != 200) {
-      throw Exception('Gagal mengambil list broker produksi (${res.statusCode})');
+      throw Exception(
+        'Gagal mengambil list broker produksi (${res.statusCode})',
+      );
     }
 
     final decoded = utf8.decode(res.bodyBytes);
@@ -142,13 +221,15 @@ class BrokerProductionRepository {
     final totalPages = (meta['totalPages'] ?? 1) as int;
     final totalData = (body['totalData'] ?? meta['total'] ?? 0) as int;
 
-    print('✅ Broker parsed ${items.length} items (page $currentPage/$totalPages, total: $totalData)');
+    print(
+      '✅ Broker parsed ${items.length} items (page $currentPage/$totalPages, total: $totalData)',
+    );
 
     return {
-      'items': items,           // List<BrokerProduction>
-      'page': currentPage,      // int
+      'items': items, // List<BrokerProduction>
+      'page': currentPage, // int
       'totalPages': totalPages, // int
-      'total': totalData,       // int
+      'total': totalData, // int
     };
   }
 
@@ -200,8 +281,8 @@ class BrokerProductionRepository {
     required int idOperator,
     required dynamic jam, // int atau 'HH:mm-HH:mm'
     required int shift,
-    String? hourStart,    // ⬅️ baru
-    String? hourEnd,      // ⬅️ baru
+    String? hourStart, // ⬅️ baru
+    String? hourEnd, // ⬅️ baru
     String? checkBy1,
     String? checkBy2,
     String? approveBy,
@@ -258,11 +339,7 @@ class BrokerProductionRepository {
     late http.Response res;
     try {
       res = await http
-          .post(
-        url,
-        headers: headers,
-        body: body,
-      )
+          .post(url, headers: headers, body: body)
           .timeout(_timeout);
     } on TimeoutException {
       throw Exception('Timeout membuat broker produksi');
@@ -294,14 +371,12 @@ class BrokerProductionRepository {
     return BrokerProduction.fromJson(data);
   }
 
-
-
   Future<BrokerProduction> updateProduksi({
-    required String noProduksi,     // ← dari URL
+    required String noProduksi, // ← dari URL
     DateTime? tglProduksi,
     int? idMesin,
     int? idOperator,
-    dynamic jam,                    // int atau 'HH:mm-HH:mm'
+    dynamic jam, // int atau 'HH:mm-HH:mm'
     int? shift,
     String? hourStart,
     String? hourEnd,
@@ -383,13 +458,7 @@ class BrokerProductionRepository {
 
     late http.Response res;
     try {
-      res = await http
-          .put(
-        url,
-        headers: headers,
-        body: body,
-      )
-          .timeout(_timeout);
+      res = await http.put(url, headers: headers, body: body).timeout(_timeout);
     } on TimeoutException {
       throw Exception('Timeout mengubah broker produksi');
     } catch (e) {
@@ -420,6 +489,75 @@ class BrokerProductionRepository {
     return BrokerProduction.fromJson(data);
   }
 
+  // =========================
+  //  SPLIT TIME (POST)
+  // =========================
+  Future<BrokerProduction> splitTime({
+    required int idMesin,
+    required DateTime tanggal,
+    required String newHourStart,
+    required String newHourEnd,
+  }) async {
+    final token = await TokenStorage.getToken();
+    final tanggalStr = toDbDateString(tanggal);
+    final url = Uri.parse(
+      '$_base/api/production/broker/split-time/$idMesin/$tanggalStr',
+    );
+
+    String normalizeTime(String v) {
+      final t = v.trim();
+      if (t.length == 5) return '$t:00';
+      return t;
+    }
+
+    final body = <String, String>{
+      'hourStart': normalizeTime(newHourStart),
+      'hourEnd': normalizeTime(newHourEnd),
+    };
+
+    final headers = {
+      'Authorization': 'Bearer $token',
+      'Accept': 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
+    };
+
+    print('➡️ [POST] $url');
+    print('📦 split-time body: $body');
+
+    late http.Response res;
+    try {
+      res = await http
+          .post(url, headers: headers, body: body)
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout split-time broker produksi');
+    } catch (e) {
+      print('❌ Request error: $e');
+      rethrow;
+    }
+
+    print('⬅️ [${res.statusCode}] ${res.body}');
+
+    if (res.statusCode != 200 && res.statusCode != 201) {
+      String msg = 'Gagal membuat produksi baru (${res.statusCode})';
+      try {
+        final decoded = json.decode(utf8.decode(res.bodyBytes));
+        if (decoded is Map<String, dynamic>) {
+          msg = (decoded['message'] ?? msg).toString();
+        }
+      } catch (_) {}
+      throw Exception(msg);
+    }
+
+    final bodyJson =
+        json.decode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    final data = bodyJson['data'] as Map<String, dynamic>?;
+    final header = data?['header'] as Map<String, dynamic>?;
+    if (header == null) {
+      throw Exception('Response split-time tidak mengandung data header');
+    }
+    return BrokerProduction.fromJson(header);
+  }
 
   Future<void> deleteProduksi(String noProduksi) async {
     final token = await TokenStorage.getToken();
@@ -431,12 +569,12 @@ class BrokerProductionRepository {
     try {
       res = await http
           .delete(
-        url,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      )
+            url,
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Accept': 'application/json',
+            },
+          )
           .timeout(_timeout);
     } on TimeoutException {
       throw Exception('Timeout menghapus broker produksi');
@@ -458,11 +596,12 @@ class BrokerProductionRepository {
 
         if (decoded is Map<String, dynamic>) {
           // coba beberapa kemungkinan key
-          msg = (decoded['message'] ??
-              decoded['error'] ??
-              decoded['msg'] ??
-              'Gagal menghapus broker produksi')
-              .toString();
+          msg =
+              (decoded['message'] ??
+                      decoded['error'] ??
+                      decoded['msg'] ??
+                      'Gagal menghapus broker produksi')
+                  .toString();
         } else {
           // kalau backend kirim string langsung / array, pakai saja isinya
           msg = decoded.toString();
@@ -478,13 +617,7 @@ class BrokerProductionRepository {
       }
     }
 
-
     // kalau sebelumnya kita sudah pernah ambil inputs untuk noProduksi ini, buang dari cache
     _inputsCache.remove(noProduksi);
   }
-
-
-
-
 }
-

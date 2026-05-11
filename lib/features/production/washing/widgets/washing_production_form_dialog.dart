@@ -467,7 +467,7 @@ class _WashingProductionFormDialogState
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 8,
                         ),
-                        title: const Text('Cuci'),
+                        title: const Text('Washing'),
                         onChanged: (value) {
                           if (value == null) return;
                           setState(() => _isBlower = value);

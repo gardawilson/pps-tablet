@@ -31,10 +31,12 @@ class WashingProductionInputScreen extends StatefulWidget {
   });
 
   @override
-  State<WashingProductionInputScreen> createState() => _WashingProductionInputScreenState();
+  State<WashingProductionInputScreen> createState() =>
+      _WashingProductionInputScreenState();
 }
 
-class _WashingProductionInputScreenState extends State<WashingProductionInputScreen> {
+class _WashingProductionInputScreenState
+    extends State<WashingProductionInputScreen> {
   String _selectedMode = 'full';
 
   @override
@@ -78,7 +80,6 @@ class _WashingProductionInputScreenState extends State<WashingProductionInputScr
     if (np > 0) return '$nb-$np';
     return nb;
   }
-
 
   // ✅ Method untuk handle back button
   Future<bool> _onWillPop() async {
@@ -137,22 +138,22 @@ class _WashingProductionInputScreenState extends State<WashingProductionInputScr
       final errMsg = vm.deleteError ?? 'Gagal menghapus item';
       await showDialog(
         context: context,
-        builder: (_) => ErrorStatusDialog(
-          title: 'Gagal Menghapus',
-          message: errMsg,
-        ),
+        builder: (_) =>
+            ErrorStatusDialog(title: 'Gagal Menghapus', message: errMsg),
       );
     }
 
     return success;
   }
 
-
   Future<void> _handleSave(BuildContext context) async {
     final vm = context.read<WashingProductionInputViewModel>();
 
     if (vm.totalTempCount == 0) {
-      _showSnack('Tidak ada data untuk disimpan', backgroundColor: Colors.orange);
+      _showSnack(
+        'Tidak ada data untuk disimpan',
+        backgroundColor: Colors.orange,
+      );
       return;
     }
 
@@ -180,10 +181,8 @@ class _WashingProductionInputScreenState extends State<WashingProductionInputScr
 
       await showDialog(
         context: context,
-        builder: (_) => ErrorStatusDialog(
-          title: 'Gagal Menyimpan',
-          message: errMsg,
-        ),
+        builder: (_) =>
+            ErrorStatusDialog(title: 'Gagal Menyimpan', message: errMsg),
       );
       // retry kalau mau, user tinggal tekan tombol Save lagi
     }
@@ -215,7 +214,10 @@ class _WashingProductionInputScreenState extends State<WashingProductionInputScr
     if (!mounted) return;
 
     if (vm.lookupError != null) {
-      _showSnack('Gagal ambil data: ${vm.lookupError}', backgroundColor: Colors.red);
+      _showSnack(
+        'Gagal ambil data: ${vm.lookupError}',
+        backgroundColor: Colors.red,
+      );
       return;
     }
 
@@ -226,7 +228,10 @@ class _WashingProductionInputScreenState extends State<WashingProductionInputScr
           title: const Text('Data Tidak Ditemukan'),
           content: Text('Label "$code" tidak memiliki data yang tersedia.'),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Tutup')),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Tutup'),
+            ),
           ],
         ),
       );
@@ -245,17 +250,22 @@ class _WashingProductionInputScreenState extends State<WashingProductionInputScr
 
   /// MODE FULL: Langsung commit semua data tanpa dialog
   Future<void> _handleFullMode(
-      BuildContext context,
-      WashingProductionInputViewModel vm,
-      ProductionLabelLookupResult res,
-      ) async {
+    BuildContext context,
+    WashingProductionInputViewModel vm,
+    ProductionLabelLookupResult res,
+  ) async {
     final freshCount = vm.countNewRowsInLastLookup(widget.noProduksi);
 
     if (freshCount == 0) {
       final labelCode = _labelCodeOfFirst(res);
-      final hasTemp = labelCode != null && vm.hasTemporaryDataForLabel(labelCode);
-      final suffix = hasTemp ? ' • ${vm.getTemporaryDataSummary(labelCode!)}' : '';
-      _showSnack('Semua item untuk ${labelCode ?? "label ini"} sudah ada.$suffix');
+      final hasTemp =
+          labelCode != null && vm.hasTemporaryDataForLabel(labelCode);
+      final suffix = hasTemp
+          ? ' • ${vm.getTemporaryDataSummary(labelCode!)}'
+          : '';
+      _showSnack(
+        'Semua item untuk ${labelCode ?? "label ini"} sudah ada.$suffix',
+      );
       return;
     }
 
@@ -278,10 +288,10 @@ class _WashingProductionInputScreenState extends State<WashingProductionInputScr
 
   /// MODE PARTIAL: Dialog khusus untuk partial dengan radio button (single selection)
   Future<void> _handlePartialMode(
-      BuildContext context,
-      WashingProductionInputViewModel vm,
-      ProductionLabelLookupResult res,
-      ) async {
+    BuildContext context,
+    WashingProductionInputViewModel vm,
+    ProductionLabelLookupResult res,
+  ) async {
     // Langsung tampilkan dialog
     await showDialog(
       context: context,
@@ -295,17 +305,22 @@ class _WashingProductionInputScreenState extends State<WashingProductionInputScr
 
   /// MODE SELECT: Dialog dengan checkbox (default all selected untuk item baru)
   Future<void> _handleSelectMode(
-      BuildContext context,
-      WashingProductionInputViewModel vm,
-      ProductionLabelLookupResult res,
-      ) async {
+    BuildContext context,
+    WashingProductionInputViewModel vm,
+    ProductionLabelLookupResult res,
+  ) async {
     final freshCount = vm.countNewRowsInLastLookup(widget.noProduksi);
 
     if (freshCount == 0) {
       final labelCode = _labelCodeOfFirst(res);
-      final hasTemp = labelCode != null && vm.hasTemporaryDataForLabel(labelCode);
-      final suffix = hasTemp ? ' • ${vm.getTemporaryDataSummary(labelCode!)}' : '';
-      _showSnack('Semua item untuk ${labelCode ?? "label ini"} sudah ada.$suffix');
+      final hasTemp =
+          labelCode != null && vm.hasTemporaryDataForLabel(labelCode);
+      final suffix = hasTemp
+          ? ' • ${vm.getTemporaryDataSummary(labelCode!)}'
+          : '';
+      _showSnack(
+        'Semua item untuk ${labelCode ?? "label ini"} sudah ada.$suffix',
+      );
       return;
     }
 
@@ -433,7 +448,11 @@ class _WashingProductionInputScreenState extends State<WashingProductionInputScr
                         value: 'clear_temp',
                         child: Row(
                           children: [
-                            Icon(Icons.delete_sweep, size: 20, color: Colors.red.shade700),
+                            Icon(
+                              Icons.delete_sweep,
+                              size: 20,
+                              color: Colors.red.shade700,
+                            ),
                             const SizedBox(width: 8),
                             Text(
                               'Hapus Semua Temp',
@@ -454,24 +473,30 @@ class _WashingProductionInputScreenState extends State<WashingProductionInputScr
                 }
 
                 // ===== MERGE DB + TEMP (termasuk PARTIAL) =====
-                final bbAll = loading ? <BbItem>[] : [
-                  ...vm.tempBb.reversed,
-                  ...vm.tempBbPartial.reversed,
-                  ...?inputs?.bb,
-                ];
-                final washingAll = loading ? <WashingItem>[] : [
-                  ...vm.tempWashing,
-                  ...?inputs?.washing
-                ];
-                final gilinganAll = loading ? <GilinganItem>[] : [
-                  ...vm.tempGilingan.reversed,
-                  ...vm.tempGilinganPartial.reversed,
-                  ...?inputs?.gilingan,
-                ];
+                final bbAll = loading
+                    ? <BbItem>[]
+                    : [
+                        ...vm.tempBb.reversed,
+                        ...vm.tempBbPartial.reversed,
+                        ...?inputs?.bb,
+                      ];
+                final washingAll = loading
+                    ? <WashingItem>[]
+                    : [...vm.tempWashing, ...?inputs?.washing];
+                final gilinganAll = loading
+                    ? <GilinganItem>[]
+                    : [
+                        ...vm.tempGilingan.reversed,
+                        ...vm.tempGilinganPartial.reversed,
+                        ...?inputs?.gilingan,
+                      ];
 
                 // ===== GROUPED (key = titleKey yang sudah handle partial) =====
                 final bbGroups = groupBy(bbAll, bbTitleKey);
-                final washingGroups = groupBy(washingAll, (WashingItem e) => e.noWashing ?? '-');
+                final washingGroups = groupBy(
+                  washingAll,
+                  (WashingItem e) => e.noWashing ?? '-',
+                );
                 final gilinganGroups = groupBy(gilinganAll, gilinganTitleKey);
 
                 final locked = widget.isLocked == true;
@@ -488,20 +513,28 @@ class _WashingProductionInputScreenState extends State<WashingProductionInputScr
                           title: 'Input via Scan / Manual',
                           modeLabel: 'Pilih Mode',
                           modeItems: const [
-                            DropdownMenuItem(value: 'full', child: Text('FULL PALLET')),
-                            DropdownMenuItem(value: 'select', child: Text('SEBAGIAN PALLET')),
-                            DropdownMenuItem(value: 'partial', child: Text('PARTIAL')),
+                            DropdownMenuItem(
+                              value: 'full',
+                              child: Text('FULL PALLET'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'select',
+                              child: Text('SEBAGIAN PALLET'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'partial',
+                              child: Text('PARTIAL'),
+                            ),
                           ],
                           selectedMode: _selectedMode,
                           manualHint: 'X.XXXXXXXXXX',
                           isProcessing: vm.isLookupLoading,
                           isLocked: locked,
-                          onModeChanged: (mode) => setState(() => _selectedMode = mode),
+                          onModeChanged: (mode) =>
+                              setState(() => _selectedMode = mode),
                           onCodeScanned: (code) => _onCodeReady(context, code),
                         ),
                       ),
-
-
 
                       const SizedBox(width: 12),
 
@@ -529,7 +562,8 @@ class _WashingProductionInputScreenState extends State<WashingProductionInputScr
                                         // Loop semua groups
                                         for (final entry in bbGroups.entries) {
                                           for (final item in entry.value) {
-                                            totalSak += 1; // Count item (atau item.jumlahSak jika ada)
+                                            totalSak +=
+                                                1; // Count item (atau item.jumlahSak jika ada)
                                             totalBerat += (item.berat ?? 0.0);
                                           }
                                         }
@@ -543,97 +577,165 @@ class _WashingProductionInputScreenState extends State<WashingProductionInputScr
 
                                       child: bbGroups.isEmpty
                                           ? const Center(
-                                        child: Text('Tidak ada data', style: TextStyle(fontSize: 11)),
-                                      )
+                                              child: Text(
+                                                'Tidak ada data',
+                                                style: TextStyle(fontSize: 11),
+                                              ),
+                                            )
                                           : ListView(
-                                        padding: const EdgeInsets.all(8),
-                                        children: bbGroups.entries.map((entry) {
-                                          final hasPartial = entry.value.any((x) => x.isPartialRow);
+                                              padding: const EdgeInsets.all(8),
+                                              children: bbGroups.entries.map((
+                                                entry,
+                                              ) {
+                                                final hasPartial = entry.value
+                                                    .any((x) => x.isPartialRow);
 
-                                          late final List<String> headers;
-                                          late final List<int> columnFlexes;
-
-                                          if (hasPartial) {
-                                            headers = const ['Label', 'Sak', 'Berat', 'Action'];
-                                            columnFlexes = const [3, 1, 2];
-                                          } else {
-                                            headers = const ['Sak', 'Berat', 'Action'];
-                                            columnFlexes = const [1, 2];
-                                          }
-
-                                          return GroupTooltipAnchorTile(
-                                            title: entry.key,
-                                            headerSubtitle: (entry.value.isNotEmpty ? entry.value.first.namaJenis : '-') ?? '-',
-                                            color: Colors.blue,
-                                            tableHeaders: headers,
-                                            columnFlexes: columnFlexes,
-                                            canDelete: canDelete,
-                                            onBulkDelete: _handleBulkDelete,
-
-                                            summaryBuilder: () {
-                                              double totalBerat = 0.0;
-
-                                              for (final item in entry.value) {
-                                                totalBerat += (item.berat ?? 0.0);
-                                              }
-
-                                              return TooltipSummary(
-                                                totalBerat: totalBerat,
-                                              );
-                                            },
-
-                                            detailsBuilder: () {
-                                              final currentInputs = vm.inputsOf(widget.noProduksi);
-
-                                              final dbItems = currentInputs == null
-                                                  ? <BbItem>[]
-                                                  : currentInputs.bb.where((x) => bbTitleKey(x) == entry.key);
-                                              final tempFull = vm.tempBb.where((x) => bbTitleKey(x) == entry.key);
-                                              final tempPart = vm.tempBbPartial.where((x) => bbTitleKey(x) == entry.key);
-
-                                              final items = [
-                                                ...tempPart,
-                                                ...dbItems,
-                                                ...tempFull,
-                                              ];
-
-                                              return items.map((item) {
-                                                final isTemp = vm.tempBb.contains(item) || vm.tempBbPartial.contains(item);
-
-                                                late final List<String> columns;
+                                                late final List<String> headers;
+                                                late final List<int>
+                                                columnFlexes;
 
                                                 if (hasPartial) {
-                                                  columns = [
-                                                    item.isPartialRow ? bbPairLabel(item) : '-',
-                                                    '${item.noSak ?? '-'}',
-                                                    '${num2(item.berat)} kg',
+                                                  headers = const [
+                                                    'Label',
+                                                    'Sak',
+                                                    'Berat',
+                                                    'Action',
+                                                  ];
+                                                  columnFlexes = const [
+                                                    3,
+                                                    1,
+                                                    2,
                                                   ];
                                                 } else {
-                                                  columns = [
-                                                    '${item.noSak ?? '-'}',
-                                                    '${num2(item.berat)} kg',
+                                                  headers = const [
+                                                    'Sak',
+                                                    'Berat',
+                                                    'Action',
                                                   ];
+                                                  columnFlexes = const [1, 2];
                                                 }
 
-                                                return TooltipTableRow(
-                                                  columns: columns,
+                                                return GroupTooltipAnchorTile(
+                                                  title: entry.key,
+                                                  headerSubtitle:
+                                                      (entry.value.isNotEmpty
+                                                          ? entry
+                                                                .value
+                                                                .first
+                                                                .namaJenis
+                                                          : '-') ??
+                                                      '-',
+                                                  color: Colors.blue,
+                                                  tableHeaders: headers,
                                                   columnFlexes: columnFlexes,
-                                                  showDelete: isTemp,
-                                                  onDelete: () {
-                                                    if (isTemp) {
-                                                      vm.deleteTempBbItem(item);
+                                                  canDelete: canDelete,
+                                                  onBulkDelete:
+                                                      _handleBulkDelete,
+
+                                                  summaryBuilder: () {
+                                                    double totalBerat = 0.0;
+
+                                                    for (final item
+                                                        in entry.value) {
+                                                      totalBerat +=
+                                                          (item.berat ?? 0.0);
                                                     }
+
+                                                    return TooltipSummary(
+                                                      totalBerat: totalBerat,
+                                                    );
                                                   },
-                                                  isTempRow: isTemp,
-                                                  isHighlighted: isTemp,
-                                                  isDisabled: !isTemp && !canDelete,
-                                                  itemData: item, // ✅ PASS item asli
+
+                                                  detailsBuilder: () {
+                                                    final currentInputs = vm
+                                                        .inputsOf(
+                                                          widget.noProduksi,
+                                                        );
+
+                                                    final dbItems =
+                                                        currentInputs == null
+                                                        ? <BbItem>[]
+                                                        : currentInputs.bb
+                                                              .where(
+                                                                (x) =>
+                                                                    bbTitleKey(
+                                                                      x,
+                                                                    ) ==
+                                                                    entry.key,
+                                                              );
+                                                    final tempFull = vm.tempBb
+                                                        .where(
+                                                          (x) =>
+                                                              bbTitleKey(x) ==
+                                                              entry.key,
+                                                        );
+                                                    final tempPart = vm
+                                                        .tempBbPartial
+                                                        .where(
+                                                          (x) =>
+                                                              bbTitleKey(x) ==
+                                                              entry.key,
+                                                        );
+
+                                                    final items = [
+                                                      ...tempPart,
+                                                      ...dbItems,
+                                                      ...tempFull,
+                                                    ];
+
+                                                    return items.map((item) {
+                                                      final isTemp =
+                                                          vm.tempBb.contains(
+                                                            item,
+                                                          ) ||
+                                                          vm.tempBbPartial
+                                                              .contains(item);
+
+                                                      late final List<String>
+                                                      columns;
+
+                                                      if (hasPartial) {
+                                                        columns = [
+                                                          item.isPartialRow
+                                                              ? bbPairLabel(
+                                                                  item,
+                                                                )
+                                                              : '-',
+                                                          '${item.noSak ?? '-'}',
+                                                          '${num2(item.berat)} kg',
+                                                        ];
+                                                      } else {
+                                                        columns = [
+                                                          '${item.noSak ?? '-'}',
+                                                          '${num2(item.berat)} kg',
+                                                        ];
+                                                      }
+
+                                                      return TooltipTableRow(
+                                                        columns: columns,
+                                                        columnFlexes:
+                                                            columnFlexes,
+                                                        showDelete: isTemp,
+                                                        onDelete: () {
+                                                          if (isTemp) {
+                                                            vm.deleteTempBbItem(
+                                                              item,
+                                                            );
+                                                          }
+                                                        },
+                                                        isTempRow: isTemp,
+                                                        isHighlighted: isTemp,
+                                                        isDisabled:
+                                                            !isTemp &&
+                                                            !canDelete,
+                                                        itemData:
+                                                            item, // ✅ PASS item asli
+                                                      );
+                                                    }).toList();
+                                                  },
                                                 );
-                                              }).toList();
-                                            },
-                                          );
-                                        }).toList(),
-                                      ),
+                                              }).toList(),
+                                            ),
                                     ),
                                   ),
 
@@ -652,9 +754,11 @@ class _WashingProductionInputScreenState extends State<WashingProductionInputScr
                                         double totalBerat = 0.0;
 
                                         // Loop semua groups
-                                        for (final entry in washingGroups.entries) {
+                                        for (final entry
+                                            in washingGroups.entries) {
                                           for (final item in entry.value) {
-                                            totalSak += 1; // Count item (atau item.jumlahSak jika ada)
+                                            totalSak +=
+                                                1; // Count item (atau item.jumlahSak jika ada)
                                             totalBerat += (item.berat ?? 0.0);
                                           }
                                         }
@@ -667,62 +771,108 @@ class _WashingProductionInputScreenState extends State<WashingProductionInputScr
                                       },
 
                                       child: washingGroups.isEmpty
-                                          ? const Center(child: Text('Tidak ada data', style: TextStyle(fontSize: 11)))
+                                          ? const Center(
+                                              child: Text(
+                                                'Tidak ada data',
+                                                style: TextStyle(fontSize: 11),
+                                              ),
+                                            )
                                           : ListView(
-                                        padding: const EdgeInsets.all(8),
-                                        children: washingGroups.entries.map((entry) {
-                                          late final List<int> columnFlexes = [1, 2];
-                                          return GroupTooltipAnchorTile(
-                                            title: entry.key,
-                                            headerSubtitle: (entry.value.isNotEmpty ? entry.value.first.namaJenis : '-') ?? '-',
-                                            color: Colors.blue,
-                                            tableHeaders: const ['Sak', 'Berat', 'Action'],
-                                            columnFlexes: columnFlexes,
-                                            canDelete: canDelete,
-                                            onBulkDelete: _handleBulkDelete,
-
-                                            summaryBuilder: () {
-                                              double totalBerat = 0.0;
-
-                                              for (final item in entry.value) {
-                                                totalBerat += (item.berat ?? 0.0);
-                                              }
-
-                                              return TooltipSummary(
-                                                totalBerat: totalBerat,
-                                              );
-                                            },
-
-                                            detailsBuilder: () {
-                                              final currentInputs = vm.inputsOf(widget.noProduksi);
-                                              final items = [
-                                                if (currentInputs != null) ...currentInputs.washing.where((x) => (x.noWashing ?? '-') == entry.key),
-                                                ...vm.tempWashing.where((x) => (x.noWashing ?? '-') == entry.key),
-                                              ];
-                                              return items.map((item) {
-                                                final isTemp = vm.tempWashing.contains(item);
-                                                return TooltipTableRow(
-                                                  columns: [
-                                                    item.noSak?.toString() ?? '-',
-                                                    '${num2(item.berat)} kg',
+                                              padding: const EdgeInsets.all(8),
+                                              children: washingGroups.entries.map((
+                                                entry,
+                                              ) {
+                                                late final List<int>
+                                                columnFlexes = [1, 2];
+                                                return GroupTooltipAnchorTile(
+                                                  title: entry.key,
+                                                  headerSubtitle:
+                                                      (entry.value.isNotEmpty
+                                                          ? entry
+                                                                .value
+                                                                .first
+                                                                .namaJenis
+                                                          : '-') ??
+                                                      '-',
+                                                  color: Colors.blue,
+                                                  tableHeaders: const [
+                                                    'Sak',
+                                                    'Berat',
+                                                    'Action',
                                                   ],
-                                                  columnFlexes: [1, 2],
-                                                  showDelete: isTemp,
-                                                  onDelete: () {
-                                                    if (isTemp) {
-                                                      vm.deleteTempWashingItem(item);
+                                                  columnFlexes: columnFlexes,
+                                                  canDelete: canDelete,
+                                                  onBulkDelete:
+                                                      _handleBulkDelete,
+
+                                                  summaryBuilder: () {
+                                                    double totalBerat = 0.0;
+
+                                                    for (final item
+                                                        in entry.value) {
+                                                      totalBerat +=
+                                                          (item.berat ?? 0.0);
                                                     }
+
+                                                    return TooltipSummary(
+                                                      totalBerat: totalBerat,
+                                                    );
                                                   },
-                                                  isTempRow: isTemp,
-                                                  isHighlighted: isTemp,
-                                                  isDisabled: !isTemp && !canDelete,
-                                                  itemData: item, // ✅ TETAP pass untuk checkbox mode
+
+                                                  detailsBuilder: () {
+                                                    final currentInputs = vm
+                                                        .inputsOf(
+                                                          widget.noProduksi,
+                                                        );
+                                                    final items = [
+                                                      if (currentInputs != null)
+                                                        ...currentInputs.washing
+                                                            .where(
+                                                              (x) =>
+                                                                  (x.noWashing ??
+                                                                      '-') ==
+                                                                  entry.key,
+                                                            ),
+                                                      ...vm.tempWashing.where(
+                                                        (x) =>
+                                                            (x.noWashing ??
+                                                                '-') ==
+                                                            entry.key,
+                                                      ),
+                                                    ];
+                                                    return items.map((item) {
+                                                      final isTemp = vm
+                                                          .tempWashing
+                                                          .contains(item);
+                                                      return TooltipTableRow(
+                                                        columns: [
+                                                          item.noSak
+                                                                  ?.toString() ??
+                                                              '-',
+                                                          '${num2(item.berat)} kg',
+                                                        ],
+                                                        columnFlexes: [1, 2],
+                                                        showDelete: isTemp,
+                                                        onDelete: () {
+                                                          if (isTemp) {
+                                                            vm.deleteTempWashingItem(
+                                                              item,
+                                                            );
+                                                          }
+                                                        },
+                                                        isTempRow: isTemp,
+                                                        isHighlighted: isTemp,
+                                                        isDisabled:
+                                                            !isTemp &&
+                                                            !canDelete,
+                                                        itemData:
+                                                            item, // ✅ TETAP pass untuk checkbox mode
+                                                      );
+                                                    }).toList();
+                                                  },
                                                 );
-                                              }).toList();
-                                            },
-                                          );
-                                        }).toList(),
-                                      ),
+                                              }).toList(),
+                                            ),
                                     ),
                                   ),
 
@@ -741,9 +891,11 @@ class _WashingProductionInputScreenState extends State<WashingProductionInputScr
                                         double totalBerat = 0.0;
 
                                         // Loop semua groups
-                                        for (final entry in gilinganGroups.entries) {
+                                        for (final entry
+                                            in gilinganGroups.entries) {
                                           for (final item in entry.value) {
-                                            totalSak += 1; // Count item (atau item.jumlahSak jika ada)
+                                            totalSak +=
+                                                1; // Count item (atau item.jumlahSak jika ada)
                                             totalBerat += (item.berat ?? 0.0);
                                           }
                                         }
@@ -756,62 +908,127 @@ class _WashingProductionInputScreenState extends State<WashingProductionInputScr
                                       },
 
                                       child: gilinganGroups.isEmpty
-                                          ? const Center(child: Text('Tidak ada data', style: TextStyle(fontSize: 11)))
+                                          ? const Center(
+                                              child: Text(
+                                                'Tidak ada data',
+                                                style: TextStyle(fontSize: 11),
+                                              ),
+                                            )
                                           : ListView(
-                                        padding: const EdgeInsets.all(8),
-                                        children: gilinganGroups.entries.map((entry) {
-                                          final hasPartial = entry.value.any((x) => x.isPartialRow);
+                                              padding: const EdgeInsets.all(8),
+                                              children: gilinganGroups.entries.map((
+                                                entry,
+                                              ) {
+                                                final hasPartial = entry.value
+                                                    .any((x) => x.isPartialRow);
 
-                                          return GroupTooltipAnchorTile(
-                                            title: entry.key,
-                                            headerSubtitle: (entry.value.isNotEmpty ? entry.value.first.namaJenis : '-') ?? '-',
-                                            color: Colors.blue,
-                                            tableHeaders: hasPartial ? const ['Label', 'Berat', 'Action'] : const ['Berat', 'Action'],
-                                            canDelete: canDelete,
-                                            onBulkDelete: _handleBulkDelete,
-                                            detailsBuilder: () {
-                                              final currentInputs = vm.inputsOf(widget.noProduksi);
+                                                return GroupTooltipAnchorTile(
+                                                  title: entry.key,
+                                                  headerSubtitle:
+                                                      (entry.value.isNotEmpty
+                                                          ? entry
+                                                                .value
+                                                                .first
+                                                                .namaJenis
+                                                          : '-') ??
+                                                      '-',
+                                                  color: Colors.blue,
+                                                  tableHeaders: hasPartial
+                                                      ? const [
+                                                          'Label',
+                                                          'Berat',
+                                                          'Action',
+                                                        ]
+                                                      : const [
+                                                          'Berat',
+                                                          'Action',
+                                                        ],
+                                                  canDelete: canDelete,
+                                                  onBulkDelete:
+                                                      _handleBulkDelete,
+                                                  detailsBuilder: () {
+                                                    final currentInputs = vm
+                                                        .inputsOf(
+                                                          widget.noProduksi,
+                                                        );
 
-                                              final dbItems = currentInputs == null ? <GilinganItem>[] : currentInputs.gilingan.where((x) => gilinganTitleKey(x) == entry.key);
-                                              final tempFull = vm.tempGilingan.where((x) => gilinganTitleKey(x) == entry.key);
-                                              final tempPart = vm.tempGilinganPartial.where((x) => gilinganTitleKey(x) == entry.key);
+                                                    final dbItems =
+                                                        currentInputs == null
+                                                        ? <GilinganItem>[]
+                                                        : currentInputs.gilingan
+                                                              .where(
+                                                                (x) =>
+                                                                    gilinganTitleKey(
+                                                                      x,
+                                                                    ) ==
+                                                                    entry.key,
+                                                              );
+                                                    final tempFull = vm
+                                                        .tempGilingan
+                                                        .where(
+                                                          (x) =>
+                                                              gilinganTitleKey(
+                                                                x,
+                                                              ) ==
+                                                              entry.key,
+                                                        );
+                                                    final tempPart = vm
+                                                        .tempGilinganPartial
+                                                        .where(
+                                                          (x) =>
+                                                              gilinganTitleKey(
+                                                                x,
+                                                              ) ==
+                                                              entry.key,
+                                                        );
 
-                                              final items = [
-                                                ...tempPart,
-                                                ...dbItems,
-                                                ...tempFull,
-                                              ];
+                                                    final items = [
+                                                      ...tempPart,
+                                                      ...dbItems,
+                                                      ...tempFull,
+                                                    ];
 
-                                              return items.map((item) {
-                                                final isTemp = vm.tempGilingan.contains(item) || vm.tempGilinganPartial.contains(item);
+                                                    return items.map((item) {
+                                                      final isTemp =
+                                                          vm.tempGilingan
+                                                              .contains(item) ||
+                                                          vm.tempGilinganPartial
+                                                              .contains(item);
 
-                                                final columns = item.isPartialRow
-                                                    ? <String>[
-                                                  (item.noGilingan ?? '-'),
-                                                  '${num2(item.berat)} kg',
-                                                ]
-                                                    : <String>[
-                                                  '${num2(item.berat)} kg',
-                                                ];
+                                                      final columns =
+                                                          item.isPartialRow
+                                                          ? <String>[
+                                                              (item.noGilingan ??
+                                                                  '-'),
+                                                              '${num2(item.berat)} kg',
+                                                            ]
+                                                          : <String>[
+                                                              '${num2(item.berat)} kg',
+                                                            ];
 
-                                                return TooltipTableRow(
-                                                  columns: columns,
-                                                  showDelete: isTemp,
-                                                  onDelete: () {
-                                                    if (isTemp) {
-                                                      vm.deleteTempGilinganItem(item);
-                                                    }
+                                                      return TooltipTableRow(
+                                                        columns: columns,
+                                                        showDelete: isTemp,
+                                                        onDelete: () {
+                                                          if (isTemp) {
+                                                            vm.deleteTempGilinganItem(
+                                                              item,
+                                                            );
+                                                          }
+                                                        },
+                                                        isTempRow: isTemp,
+                                                        isHighlighted: isTemp,
+                                                        isDisabled:
+                                                            !isTemp &&
+                                                            !canDelete,
+                                                        itemData:
+                                                            item, // ✅ PASS item asli
+                                                      );
+                                                    }).toList();
                                                   },
-                                                  isTempRow: isTemp,
-                                                  isHighlighted: isTemp,
-                                                  isDisabled: !isTemp && !canDelete,
-                                                  itemData: item, // ✅ PASS item asli
                                                 );
-                                              }).toList();
-                                            },
-                                          );
-                                        }).toList(),
-                                      ),
+                                              }).toList(),
+                                            ),
                                     ),
                                   ),
                                 ],

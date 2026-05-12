@@ -213,9 +213,9 @@ class _BrokerProductionMesinScreenState
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton.icon(
-                        onPressed: () => setState(
-                          () => _future = _prodRepo.fetchBrokerMesin(),
-                        ),
+                        onPressed: () => setState(() {
+                          _future = _prodRepo.fetchBrokerMesin();
+                        }),
                         icon: const Icon(Icons.refresh),
                         label: const Text('Coba Lagi'),
                       ),
@@ -283,9 +283,9 @@ class _BrokerProductionMesinScreenState
                           child: _TodayProductionSection(
                             selectedNoProduksi: _selectedNoProduksi,
                             onRowTap: (prod) {
-                              setState(
-                                () => _selectedNoProduksi = prod.noProduksi,
-                              );
+                              setState(() {
+                                _selectedNoProduksi = prod.noProduksi;
+                              });
                               Navigator.of(context).push(
                                 MaterialPageRoute(
                                   builder: (_) => BrokerProductionInputScreen(

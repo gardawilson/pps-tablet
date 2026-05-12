@@ -14,12 +14,16 @@ class FurnitureWipByInjectSection extends StatefulWidget {
 
   /// Icon di depan title
   final IconData icon;
+  final Set<int> selectedIds;
+  final ValueChanged<Set<int>>? onSelectionChanged;
 
   const FurnitureWipByInjectSection({
     super.key,
     required this.noProduksi,
     this.title = 'Jenis Furniture WIP (Inject)',
     this.icon = Icons.chair_alt_outlined,
+    this.selectedIds = const <int>{},
+    this.onSelectionChanged,
   });
 
   @override
@@ -30,17 +34,24 @@ class FurnitureWipByInjectSection extends StatefulWidget {
 class _FurnitureWipByInjectSectionState
     extends State<FurnitureWipByInjectSection> {
   String? _lastNoProduksi;
+  Set<int> _selectedIds = <int>{};
 
   @override
   void initState() {
     super.initState();
+    _selectedIds = Set<int>.from(widget.selectedIds);
     WidgetsBinding.instance.addPostFrameCallback((_) => _fetchIfNeeded());
   }
 
   @override
   void didUpdateWidget(covariant FurnitureWipByInjectSection oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedIds != widget.selectedIds) {
+      _selectedIds = Set<int>.from(widget.selectedIds);
+    }
     if (oldWidget.noProduksi != widget.noProduksi) {
+      _selectedIds.clear();
+      widget.onSelectionChanged?.call(_selectedIds);
       WidgetsBinding.instance.addPostFrameCallback((_) => _fetchIfNeeded());
     }
   }
@@ -61,6 +72,23 @@ class _FurnitureWipByInjectSectionState
 
     _lastNoProduksi = noProd;
     await vm.fetchFurnitureWipByInjectProduction(noProd);
+
+    if (!mounted) return;
+    final items = vm.furnitureWipItems;
+    if (items.isEmpty) {
+      _selectedIds.clear();
+      widget.onSelectionChanged?.call(_selectedIds);
+      return;
+    }
+
+    // Default: semua terpilih saat data pertama kali muncul.
+    final validIds = items.map((e) => e.idFurnitureWip).toSet();
+    _selectedIds = _selectedIds.intersection(validIds);
+    if (_selectedIds.isEmpty) {
+      _selectedIds = Set<int>.from(validIds);
+      widget.onSelectionChanged?.call(_selectedIds);
+      setState(() {});
+    }
   }
 
   @override
@@ -218,31 +246,52 @@ class _FurnitureWipByInjectSectionState
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: items.map((item) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.blue.shade50,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.blue.shade200, width: 1),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.label, size: 14, color: Colors.blue.shade700),
-              const SizedBox(width: 6),
-              Text(
-                item.namaFurnitureWip,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.blue.shade900,
-                ),
-              ),
-            ],
-          ),
-        );
-      }).toList(),
+      children: [
+        ...items.map((item) {
+          final isSelected = _selectedIds.contains(item.idFurnitureWip);
+          return FilterChip(
+            selected: isSelected,
+            onSelected: (val) {
+              setState(() {
+                if (val) {
+                  _selectedIds.add(item.idFurnitureWip);
+                } else {
+                  _selectedIds.remove(item.idFurnitureWip);
+                }
+              });
+              widget.onSelectionChanged?.call(Set<int>.from(_selectedIds));
+            },
+            showCheckmark: false,
+            avatar: Icon(
+              isSelected ? Icons.check_circle : Icons.label_outline,
+              size: 15,
+              color: isSelected ? Colors.white : Colors.blue.shade700,
+            ),
+            label: Text(
+              item.namaFurnitureWip,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            labelStyle: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: isSelected ? Colors.white : Colors.blue.shade900,
+            ),
+            selectedColor: Colors.blue.shade700,
+            backgroundColor: Colors.blue.shade50,
+            side: BorderSide(
+              color: isSelected ? Colors.blue.shade700 : Colors.blue.shade200,
+              width: 1,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(999),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            visualDensity: VisualDensity.compact,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          );
+        }).toList(),
+      ],
     );
   }
 }

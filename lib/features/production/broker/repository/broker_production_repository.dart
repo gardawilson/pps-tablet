@@ -26,7 +26,13 @@ class BrokerProductionRepository {
   // =========================
   Future<List<BrokerMesinInfo>> fetchBrokerMesin() async {
     final token = await TokenStorage.getToken();
-    final url = Uri.parse('http://192.168.11.153:7500/api/mst-mesin/broker');
+    final apiBaseUri = Uri.parse(ApiConstants.baseUrl);
+    final url = Uri(
+      scheme: apiBaseUri.scheme.isEmpty ? 'http' : apiBaseUri.scheme,
+      host: apiBaseUri.host,
+      port: 7500,
+      path: '/api/mst-mesin/broker',
+    );
 
     late http.Response res;
     try {

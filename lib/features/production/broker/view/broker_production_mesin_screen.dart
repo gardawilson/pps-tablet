@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
 import '../../../../features/mesin/model/mesin_model.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
 import '../model/broker_production_model.dart';
 import '../repository/broker_production_repository.dart';
-import '../view_model/broker_production_view_model.dart';
 import '../widgets/broker_production_form_dialog.dart';
-import '../widgets/broker_production_header_table.dart';
 import 'broker_production_input_screen.dart';
+import 'broker_production_screen.dart';
 
 class BrokerProductionMesinScreen extends StatefulWidget {
   const BrokerProductionMesinScreen({super.key});
@@ -18,36 +16,27 @@ class BrokerProductionMesinScreen extends StatefulWidget {
       _BrokerProductionMesinScreenState();
 }
 
+enum _MesinFilter { semua, aktif, idle }
+
 class _BrokerProductionMesinScreenState
     extends State<BrokerProductionMesinScreen> {
   final _prodRepo = BrokerProductionRepository();
   late Future<List<BrokerMesinInfo>> _future;
-  late final BrokerProductionViewModel _todayViewModel;
-  String? _selectedNoProduksi;
   bool _isLoading = false;
+  _MesinFilter _filter = _MesinFilter.semua;
 
   @override
   void initState() {
     super.initState();
     _future = _prodRepo.fetchBrokerMesin();
-    _todayViewModel = BrokerProductionViewModel();
-    _todayViewModel.applyFilters(date: DateTime.now());
   }
 
-  @override
-  void dispose() {
-    _todayViewModel.dispose();
-    super.dispose();
-  }
-
-  void _refreshAll() {
+  void _refresh() {
     setState(() {
       _future = _prodRepo.fetchBrokerMesin();
     });
-    _todayViewModel.applyFilters(date: DateTime.now());
   }
 
-  /// Parse "HH:mm" string into a [TimeOfDay].
   TimeOfDay? _parseTime(String? s) {
     if (s == null || s.isEmpty) return null;
     final parts = s.split(':');
@@ -58,10 +47,8 @@ class _BrokerProductionMesinScreenState
     return TimeOfDay(hour: h, minute: m);
   }
 
-  /// Returns minutes-since-midnight for a [TimeOfDay].
   int _toMinutes(TimeOfDay t) => t.hour * 60 + t.minute;
 
-  /// Find the [BrokerProduction] entry whose hourStart <= now < hourEnd.
   BrokerProduction? _matchCurrentShift(List<BrokerProduction> list) {
     final now = TimeOfDay.now();
     final nowMin = _toMinutes(now);
@@ -199,7 +186,7 @@ class _BrokerProductionMesinScreenState
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'Gagal memuat data mesin',
+                        'Data mesin belum bisa dimuat',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 6),
@@ -213,50 +200,60 @@ class _BrokerProductionMesinScreenState
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton.icon(
-                        onPressed: () => setState(() {
-                          _future = _prodRepo.fetchBrokerMesin();
-                        }),
+                        onPressed: _refresh,
                         icon: const Icon(Icons.refresh),
-                        label: const Text('Coba Lagi'),
+                        label: const Text('Muat Ulang'),
                       ),
                     ],
                   ),
                 );
               }
 
-              final mesinList = snapshot.data ?? [];
+              final allMesin = snapshot.data ?? [];
+              final activeCount = allMesin.where((m) => m.isActive).length;
+              final idleCount = allMesin.length - activeCount;
 
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ── header ──────────────────────────────────────────
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
-                    child: Row(
-                      children: [
-                        Text(
-                          'Pilih Mesin',
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF1F2937),
-                              ),
+              final filtered = switch (_filter) {
+                _MesinFilter.aktif =>
+                  allMesin.where((m) => m.isActive).toList(),
+                _MesinFilter.idle =>
+                  allMesin.where((m) => !m.isActive).toList(),
+                _MesinFilter.semua => allMesin,
+              };
+
+              return CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: _PageHeader(
+                      activeMesin: activeCount,
+                      idleMesin: idleCount,
+                      onRefresh: _refresh,
+                      onRiwayatProduksi: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const BrokerProductionScreen(),
                         ),
-                        const Spacer(),
-                        IconButton(
-                          tooltip: 'Refresh',
-                          icon: const Icon(Icons.refresh, size: 20),
-                          onPressed: _refreshAll,
-                        ),
-                      ],
+                      ),
                     ),
                   ),
-                  // ── mesin grid ──────────────────────────────────────
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
+                  SliverToBoxAdapter(
+                    child: _FilterTabs(
+                      selected: _filter,
+                      totalCount: allMesin.length,
+                      activeCount: activeCount,
+                      idleCount: idleCount,
+                      onChanged: (f) => setState(() => _filter = f),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                    sliver: SliverGrid(
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        final mesin = filtered[index];
+                        return _MesinCard(
+                          mesin: mesin,
+                          onTap: () => _onMesinTap(mesin),
+                        );
+                      }, childCount: filtered.length),
                       gridDelegate:
                           const SliverGridDelegateWithMaxCrossAxisExtent(
                             maxCrossAxisExtent: 280,
@@ -264,46 +261,7 @@ class _BrokerProductionMesinScreenState
                             crossAxisSpacing: 16,
                             mainAxisSpacing: 16,
                           ),
-                      itemCount: mesinList.length,
-                      itemBuilder: (context, index) {
-                        final mesin = mesinList[index];
-                        return _MesinCard(
-                          mesin: mesin,
-                          onTap: () => _onMesinTap(mesin),
-                        );
-                      },
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  // ── produksi hari ini ────────────────────────────────
-                  Expanded(
-                    child:
-                        ChangeNotifierProvider<BrokerProductionViewModel>.value(
-                          value: _todayViewModel,
-                          child: _TodayProductionSection(
-                            selectedNoProduksi: _selectedNoProduksi,
-                            onRowTap: (prod) {
-                              setState(() {
-                                _selectedNoProduksi = prod.noProduksi;
-                              });
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => BrokerProductionInputScreen(
-                                    noProduksi: prod.noProduksi,
-                                    idMesin: prod.idMesin,
-                                    namaMesin: prod.namaMesin,
-                                    shift: prod.shift,
-                                    tglProduksi: prod.tglProduksi,
-                                    isLocked: prod.isLocked,
-                                    lastClosedDate: prod.lastClosedDate,
-                                    hourStart: prod.hourStart,
-                                    hourEnd: prod.hourEnd,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
                   ),
                 ],
               );
@@ -475,7 +433,7 @@ class _MesinCard extends StatelessWidget {
                 ),
               ] else
                 const Text(
-                  'Tidak ada produksi aktif',
+                  'Belum ada produksi aktif',
                   style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
                 ),
             ],
@@ -486,38 +444,232 @@ class _MesinCard extends StatelessWidget {
   }
 }
 
-class _TodayProductionSection extends StatelessWidget {
-  const _TodayProductionSection({
-    required this.selectedNoProduksi,
-    required this.onRowTap,
+class _PageHeader extends StatelessWidget {
+  const _PageHeader({
+    required this.activeMesin,
+    required this.idleMesin,
+    required this.onRefresh,
+    required this.onRiwayatProduksi,
   });
 
-  final String? selectedNoProduksi;
-  final ValueChanged<BrokerProduction> onRowTap;
+  final int activeMesin;
+  final int idleMesin;
+  final VoidCallback onRefresh;
+  final VoidCallback onRiwayatProduksi;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
-          child: Text(
-            'Daftar Produksi',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF1F2937),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 16, 16, 14),
+      color: Colors.white,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // "Pilih Mesin" label + stats
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Pilih Mesin',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF0D47A1),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  _StatDot(
+                    color: const Color(0xFF16A34A),
+                    value: activeMesin,
+                    label: 'aktif',
+                  ),
+                  const SizedBox(width: 16),
+                  _StatDot(
+                    color: const Color(0xFF94A3B8),
+                    value: idleMesin,
+                    label: 'idle',
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const Spacer(),
+          // actions
+          OutlinedButton.icon(
+            onPressed: onRiwayatProduksi,
+            icon: const Icon(Icons.history, size: 16),
+            label: const Text('Riwayat Produksi'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF0D47A1),
+              side: const BorderSide(color: Color(0xFF0D47A1)),
+              backgroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             ),
           ),
+          const SizedBox(width: 4),
+          IconButton(
+            tooltip: 'Refresh',
+            icon: const Icon(Icons.refresh, size: 20, color: Color(0xFF0D47A1)),
+            onPressed: onRefresh,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatDot extends StatelessWidget {
+  const _StatDot({
+    required this.color,
+    required this.value,
+    required this.label,
+  });
+
+  final Color color;
+  final int value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
-        Expanded(
-          child: BrokerProductionHeaderTable(
-            selectedNoProduksi: selectedNoProduksi,
-            onRowTap: onRowTap,
-            onRowLongPress: (row, _) => onRowTap(row),
+        const SizedBox(width: 6),
+        RichText(
+          text: TextSpan(
+            children: [
+              TextSpan(
+                text: '$value ',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF1F2937),
+                ),
+              ),
+              TextSpan(
+                text: label,
+                style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+              ),
+            ],
           ),
         ),
       ],
+    );
+  }
+}
+
+class _FilterTabs extends StatelessWidget {
+  const _FilterTabs({
+    required this.selected,
+    required this.totalCount,
+    required this.activeCount,
+    required this.idleCount,
+    required this.onChanged,
+  });
+
+  final _MesinFilter selected;
+  final int totalCount;
+  final int activeCount;
+  final int idleCount;
+  final ValueChanged<_MesinFilter> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 10, 24, 10),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1)),
+      ),
+      child: Row(
+        children: [
+          _Tab(
+            label: 'Semua',
+            count: totalCount,
+            selected: selected == _MesinFilter.semua,
+            dotColor: null,
+            onTap: () => onChanged(_MesinFilter.semua),
+          ),
+          const SizedBox(width: 8),
+          _Tab(
+            label: 'Aktif',
+            count: activeCount,
+            selected: selected == _MesinFilter.aktif,
+            dotColor: const Color(0xFF16A34A),
+            onTap: () => onChanged(_MesinFilter.aktif),
+          ),
+          const SizedBox(width: 8),
+          _Tab(
+            label: 'Idle',
+            count: idleCount,
+            selected: selected == _MesinFilter.idle,
+            dotColor: const Color(0xFF94A3B8),
+            onTap: () => onChanged(_MesinFilter.idle),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Tab extends StatelessWidget {
+  const _Tab({
+    required this.label,
+    required this.count,
+    required this.selected,
+    required this.dotColor,
+    required this.onTap,
+  });
+
+  final String label;
+  final int count;
+  final bool selected;
+  final Color? dotColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFF0D47A1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: selected ? null : Border.all(color: const Color(0xFFE5E7EB)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (dotColor != null) ...[
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  color: selected ? Colors.white70 : dotColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 5),
+            ],
+            Text(
+              '$label $count',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : const Color(0xFF374151),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

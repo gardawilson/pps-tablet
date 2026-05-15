@@ -7,12 +7,10 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-import 'package:pps_tablet/features/mesin/widgets/mesin_dropdown.dart';
 import 'package:pps_tablet/features/operator/model/operator_model.dart';
 import 'package:pps_tablet/features/production/shared/widgets/total_hours_pill.dart';
 
 import '../../../../common/widgets/app_number_field.dart';
-import '../../../../common/widgets/app_text_field.dart';
 import '../../../../core/utils/time_formatter.dart';
 import '../../../mesin/model/mesin_model.dart';
 import '../../../operator/widgets/operator_dropdown.dart';
@@ -26,7 +24,9 @@ import '../view_model/broker_production_view_model.dart';
 import '../../../../core/network/endpoints.dart';
 import '../../../../core/services/token_storage.dart';
 import '../../../../core/utils/date_formatter.dart';
-import '../../../../common/widgets/app_date_field.dart';
+import '../../../broker_type/model/broker_type_model.dart';
+import '../../../broker_type/widgets/broker_type_dropdown.dart';
+import '../repository/broker_production_repository.dart';
 
 class BrokerProductionFormDialog extends StatefulWidget {
   final BrokerProduction? header;
@@ -41,6 +41,7 @@ class BrokerProductionFormDialog extends StatefulWidget {
   final int? initialReguId;
   final int? initialHadir;
   final int? initialJmlhAnggota;
+  final List<BrokerProduksiItem> existingProduksiList;
 
   const BrokerProductionFormDialog({
     super.key,
@@ -56,6 +57,7 @@ class BrokerProductionFormDialog extends StatefulWidget {
     this.initialReguId,
     this.initialHadir,
     this.initialJmlhAnggota,
+    this.existingProduksiList = const [],
   });
 
   @override
@@ -81,6 +83,7 @@ class _BrokerProductionFormDialogState
   MstOperator? _selectedOperator;
   int? _selectedShift;
   int? _selectedReguId;
+  BrokerType? _selectedBrokerType;
 
   // hold the preselect id for operator (from mesin.defaultOperatorId)
   int? _operatorPreselectId;
@@ -278,6 +281,31 @@ class _BrokerProductionFormDialogState
         debugPrint(
           '📝 [BROKER_FORM] updateProduksi returned: ${result?.noProduksi}',
         );
+      } else if (_selectedBrokerType != null) {
+        debugPrint('📝 [BROKER_FORM] Calling createProduksiWithJenis...');
+        final computedDur = durationBetweenHHmmWrap(
+          hourStartCtrl.text,
+          hourEndCtrl.text,
+        );
+        final jamHours = computedDur != null
+            ? computedDur.inMinutes / 60.0
+            : 0.0;
+        final repo = BrokerProductionRepository();
+        result = await repo.createProduksiWithJenis(
+          tglProduksi: _selectedDate,
+          idMesin: mesinId,
+          idOperator: operatorId,
+          outputJenisId: _selectedBrokerType!.idBroker,
+          jam: jamHours,
+          shift: _selectedShift!,
+          hourStart: hourStartSql,
+          hourEnd: hourEndSql,
+          hadir: hadir,
+          idRegu: reguId,
+        );
+        debugPrint(
+          '📝 [BROKER_FORM] createProduksiWithJenis returned: ${result?.noProduksi}',
+        );
       } else {
         debugPrint('📝 [BROKER_FORM] Calling createProduksi...');
         result = await prodVm.createProduksi(
@@ -415,21 +443,19 @@ class _BrokerProductionFormDialogState
     return ChangeNotifierProvider(
       create: (_) => OverlapViewModel(repository: OverlapRepository()),
       child: Dialog(
+        backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
+          constraints: const BoxConstraints(maxWidth: 780, maxHeight: 520),
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildHeader(),
-              const SizedBox(height: 12),
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [Expanded(flex: 4, child: _buildLeftColumn())],
-                ),
-              ),
+              _buildForm(),
+              if (widget.existingProduksiList.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _buildProduksiList(),
+              ],
               const SizedBox(height: 16),
               _buildActions(),
             ],
@@ -439,249 +465,324 @@ class _BrokerProductionFormDialogState
     );
   }
 
-  Widget _buildHeader() {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: isEdit ? Colors.orange.shade100 : Colors.green.shade100,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            isEdit ? Icons.edit : Icons.add,
-            color: isEdit ? Colors.orange.shade700 : Colors.green.shade700,
-            size: 24,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Text(
-          isEdit ? 'Edit Produksi' : 'Tambah Produksi',
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLeftColumn() {
+  Widget _buildForm() {
     final vm = context.watch<OverlapViewModel>();
-    // durasi lokal
     final dur = durationBetweenHHmmWrap(hourStartCtrl.text, hourEndCtrl.text);
     final startFilled = hourStartCtrl.text.trim().isNotEmpty;
     final endFilled = hourEndCtrl.text.trim().isNotEmpty;
     final hasDurationError = startFilled && endFilled && dur == null;
-
-    // overlap dari server
     final hasOverlap = vm.hasOverlap;
     final overlapMsg =
         vm.overlapMessage ?? 'Jam ini bentrok dengan dokumen lain';
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
+    final mesinName =
+        _selectedMesin?.namaMesin ??
+        widget.header?.namaMesin ??
+        widget.initialMesin?.namaMesin ??
+        'Produksi';
+
+    return Form(
+      key: _formKey,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Baris header: nama mesin + hadir
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
+                  mesinName,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1F2937),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: AppNumberField(
+                  controller: hadirCtrl,
+                  label: 'Hadir',
+                  icon: Icons.people,
+                  allowDecimal: false,
+                  allowNegative: false,
+                  hintText: '0',
+                  validator: (v) =>
+                      (v == null || v.isEmpty) ? 'Wajib diisi' : null,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
+          // Baris 2: Shift + Jam Mulai + Jam Selesai + Total Jam
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (widget.initialMesin == null) ...[
-                AppDateField(
-                  controller: dateCreatedCtrl,
-                  label: 'Tanggal',
-                  format: DateFormat('EEEE, dd MMM yyyy', 'id_ID'),
-                  initialDate: _selectedDate,
-                  onChanged: (d) async {
-                    if (d != null) {
+              Expanded(
+                flex: 2,
+                child: ShiftDropdown(
+                  preselectId: widget.header?.shift ?? widget.initialShift,
+                  onChangedId: (id) {
+                    setState(() => _selectedShift = id);
+                    if (id != null) _fetchShiftHour(id);
+                  },
+                  validator: (v) => v == null ? 'Wajib pilih shift' : null,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: TimeFormField(
+                  controller: hourStartCtrl,
+                  label: 'Jam Mulai',
+                  hintText: 'HH:mm',
+                  onPick: () async {
+                    final picked = await pickTime24h(
+                      context,
+                      initial: _startTime,
+                    );
+                    if (picked != null) {
                       setState(() {
-                        _selectedDate = d;
-                        dateCreatedCtrl.text = DateFormat(
-                          'EEEE, dd MMM yyyy',
-                          'id_ID',
-                        ).format(d);
+                        _startTime = picked;
+                        hourStartCtrl.text = formatHHmm(picked);
                       });
                       await _checkOverlapIfReadyVM();
                     }
                   },
-                ),
-
-                const SizedBox(height: 16),
-
-                MesinDropdown(
-                  idBagianMesin: 2,
-                  preselectId: widget.header?.idMesin,
-                  label: 'Mesin',
-                  hint: 'Pilih jenis mesin',
-                  autovalidateMode: AutovalidateMode.onUserInteraction,
-                  validator: (v) =>
-                      v == null ? 'Wajib pilih jenis mesin' : null,
-                  onChanged: (m) async {
-                    _selectedMesin = m;
-                    _operatorPreselectId = m?.defaultOperatorId;
-                    setState(() {});
-                    await _checkOverlapIfReadyVM();
+                  validator: (_) {
+                    final s = parseHHmm(hourStartCtrl.text);
+                    if (s == null) return 'Wajib isi (HH:mm)';
+                    final diff = durationBetweenHHmmWrap(
+                      hourStartCtrl.text,
+                      hourEndCtrl.text,
+                    );
+                    if (diff == null && parseHHmm(hourEndCtrl.text) != null) {
+                      return 'Durasi 0';
+                    }
+                    return null;
                   },
                 ),
-
-                const SizedBox(height: 16),
-              ],
-
-              // Baris 1: Shift + Operator
-              Row(
-                children: [
-                  Expanded(
-                    child: ShiftDropdown(
-                      preselectId: widget.header?.shift ?? widget.initialShift,
-                      onChangedId: (id) {
-                        setState(() => _selectedShift = id);
-                        if (id != null) _fetchShiftHour(id);
-                      },
-                      validator: (v) => v == null ? 'Wajib pilih shift' : null,
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OperatorDropdown(
-                      key: ValueKey(
-                        _operatorPreselectId ?? widget.header?.idOperator,
-                      ),
-                      preselectId: isEdit
-                          ? widget.header?.idOperator
-                          : (_operatorPreselectId ?? widget.initialOperatorId),
-                      label: 'Operator',
-                      hint: 'Pilih operator',
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                      validator: (v) =>
-                          v == null ? 'Wajib pilih operator' : null,
-                      onChanged: (op) => setState(() => _selectedOperator = op),
-                    ),
-                  ),
-                ],
               ),
-
-              const SizedBox(height: 16),
-
-              // Baris 2: Jam Mulai + Jam Selesai + badge
-              Row(
-                children: [
-                  Expanded(
-                    child: TimeFormField(
-                      controller: hourStartCtrl,
-                      label: 'Jam Mulai',
-                      hintText: 'HH:mm',
-                      onPick: () async {
-                        final picked = await pickTime24h(
-                          context,
-                          initial: _startTime,
-                        );
-                        if (picked != null) {
-                          setState(() {
-                            _startTime = picked;
-                            hourStartCtrl.text = formatHHmm(picked);
-                          });
-                          await _checkOverlapIfReadyVM();
-                        }
-                      },
-                      validator: (_) {
-                        final s = parseHHmm(hourStartCtrl.text);
-                        if (s == null) return 'Wajib isi jam mulai (HH:mm)';
-                        final diff = durationBetweenHHmmWrap(
-                          hourStartCtrl.text,
-                          hourEndCtrl.text,
-                        );
-                        if (diff == null &&
-                            parseHHmm(hourEndCtrl.text) != null) {
-                          return 'Durasi tidak boleh 0 menit';
-                        }
-                        return null;
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TimeFormField(
-                      controller: hourEndCtrl,
-                      label: 'Jam Selesai',
-                      hintText: 'HH:mm',
-                      onPick: () async {
-                        final picked = await pickTime24h(
-                          context,
-                          initial: _endTime ?? _startTime,
-                        );
-                        if (picked != null) {
-                          setState(() {
-                            _endTime = picked;
-                            hourEndCtrl.text = formatHHmm(picked);
-                          });
-                          await _checkOverlapIfReadyVM();
-                        }
-                      },
-                      validator: (_) {
-                        final e = parseHHmm(hourEndCtrl.text);
-                        if (e == null) return 'Wajib isi jam selesai (HH:mm)';
-                        final s = parseHHmm(hourStartCtrl.text);
-                        if (s != null) {
-                          final diff = durationBetweenHHmmWrap(
-                            hourStartCtrl.text,
-                            hourEndCtrl.text,
-                          );
-                          if (diff == null) return 'Durasi tidak boleh 0 menit';
-                        }
-                        return null;
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  TotalHoursPill(
-                    duration: dur,
-                    isError: hasOverlap || hasDurationError,
-                    errorText: hasOverlap
-                        ? overlapMsg
-                        : 'Durasi tidak boleh 0 menit',
-                  ),
-                ],
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: TimeFormField(
+                  controller: hourEndCtrl,
+                  label: 'Jam Selesai',
+                  hintText: 'HH:mm',
+                  onPick: () async {
+                    final picked = await pickTime24h(
+                      context,
+                      initial: _endTime ?? _startTime,
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        _endTime = picked;
+                        hourEndCtrl.text = formatHHmm(picked);
+                      });
+                      await _checkOverlapIfReadyVM();
+                    }
+                  },
+                  validator: (_) {
+                    final e = parseHHmm(hourEndCtrl.text);
+                    if (e == null) return 'Wajib isi (HH:mm)';
+                    final s = parseHHmm(hourStartCtrl.text);
+                    if (s != null) {
+                      final diff = durationBetweenHHmmWrap(
+                        hourStartCtrl.text,
+                        hourEndCtrl.text,
+                      );
+                      if (diff == null) return 'Durasi 0';
+                    }
+                    return null;
+                  },
+                ),
               ),
-
-              const SizedBox(height: 16),
-
-              // Baris 3: Regu + Hadir
-              Row(
-                children: [
-                  Expanded(
-                    child: ReguDropdown(
-                      preselectId:
-                          widget.header?.idRegu ?? widget.initialReguId,
-                      label: 'Regu',
-                      hint: 'Pilih regu',
-                      onChanged: (regu) =>
-                          setState(() => _selectedReguId = regu?.idRegu),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: AppNumberField(
-                      controller: hadirCtrl,
-                      label: 'Hadir',
-                      icon: Icons.people,
-                      allowDecimal: false,
-                      allowNegative: false,
-                      hintText: '0',
-                      validator: (v) =>
-                          (v == null || v.isEmpty) ? 'Wajib diisi' : null,
-                    ),
-                  ),
-                ],
+              const SizedBox(width: 12),
+              Padding(
+                padding: const EdgeInsets.only(top: 22),
+                child: TotalHoursPill(
+                  duration: dur,
+                  isError: hasOverlap || hasDurationError,
+                  errorText: hasOverlap
+                      ? overlapMsg
+                      : 'Durasi tidak boleh 0 menit',
+                ),
               ),
-
-              const SizedBox(height: 16),
             ],
           ),
-        ),
+
+          const SizedBox(height: 16),
+
+          // Baris 3: Regu + Operator + Jenis Broker
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: ReguDropdown(
+                  preselectId: widget.header?.idRegu ?? widget.initialReguId,
+                  label: 'Regu',
+                  hint: 'Pilih regu',
+                  onChanged: (regu) =>
+                      setState(() => _selectedReguId = regu?.idRegu),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OperatorDropdown(
+                  key: ValueKey(
+                    _operatorPreselectId ?? widget.header?.idOperator,
+                  ),
+                  preselectId: isEdit
+                      ? widget.header?.idOperator
+                      : (_operatorPreselectId ?? widget.initialOperatorId),
+                  label: 'Operator',
+                  hint: 'Pilih operator',
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                  validator: (v) => v == null ? 'Wajib pilih operator' : null,
+                  onChanged: (op) => setState(() => _selectedOperator = op),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: BrokerTypeDropdown(
+                  onChanged: (bt) => setState(() => _selectedBrokerType = bt),
+                  validator: (v) =>
+                      v == null ? 'Wajib pilih jenis broker' : null,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildProduksiList() {
+    final list = widget.existingProduksiList;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            const Text(
+              'Produksi Hari Ini',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF6B7280),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '${list.length}',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF2563EB),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ...list.map(
+          (item) => Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.tag, size: 13, color: Color(0xFF94A3B8)),
+                  const SizedBox(width: 6),
+                  Text(
+                    item.noProduksi,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1E40AF),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Icon(
+                    Icons.category_outlined,
+                    size: 13,
+                    color: Color(0xFF94A3B8),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      item.outputJenisNama ?? '-',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF374151),
+                      ),
+                    ),
+                  ),
+                  if (item.shift != null) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'Shift ${item.shift}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (item.operator_ != null) ...[
+                    const SizedBox(width: 8),
+                    const Icon(
+                      Icons.person_outline,
+                      size: 13,
+                      color: Color(0xFF94A3B8),
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      item.operator_!,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

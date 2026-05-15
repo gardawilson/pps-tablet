@@ -496,6 +496,70 @@ class BrokerProductionRepository {
   }
 
   // =========================
+  //  ADD PRODUKSI (SPLIT) — hanya butuh hourStart + outputJenisId
+  // =========================
+  Future<BrokerProduction> addProduksi({
+    required int idMesin,
+    required DateTime tanggal,
+    required String hourStart,
+    required int outputJenisId,
+  }) async {
+    final token = await TokenStorage.getToken();
+    final tanggalStr = toDbDateString(tanggal);
+    final url = Uri.parse(
+      '$_base/api/production/broker/split-time/$idMesin/$tanggalStr',
+    );
+
+    String normalizeTime(String v) {
+      final t = v.trim();
+      return t.length == 5 ? '$t:00' : t;
+    }
+
+    final body = jsonEncode({
+      'hourStart': normalizeTime(hourStart),
+      'outputJenisId': outputJenisId,
+    });
+
+    final headers = {
+      'Authorization': 'Bearer $token',
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    };
+
+    print('➡️ [POST] $url');
+    print('📦 addProduksi body: $body');
+
+    late http.Response res;
+    try {
+      res = await http.post(url, headers: headers, body: body).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout tambah produksi broker');
+    } catch (e) {
+      print('❌ Request error: $e');
+      rethrow;
+    }
+
+    print('⬅️ [${res.statusCode}] ${res.body}');
+
+    if (res.statusCode != 200 && res.statusCode != 201) {
+      String msg = 'Gagal tambah produksi (${res.statusCode})';
+      try {
+        final decoded = json.decode(utf8.decode(res.bodyBytes));
+        if (decoded is Map<String, dynamic>) {
+          msg = (decoded['message'] ?? msg).toString();
+        }
+      } catch (_) {}
+      throw Exception(msg);
+    }
+
+    final bodyJson = json.decode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    final data = bodyJson['data'] as Map<String, dynamic>?;
+    final header = data?['header'] as Map<String, dynamic>?;
+    if (header == null) throw Exception('Response tidak mengandung data header');
+    return BrokerProduction.fromJson(header);
+  }
+
+  // =========================
   //  SPLIT TIME (POST)
   // =========================
   Future<BrokerProduction> splitTime({
@@ -563,6 +627,88 @@ class BrokerProductionRepository {
       throw Exception('Response split-time tidak mengandung data header');
     }
     return BrokerProduction.fromJson(header);
+  }
+
+  // =========================
+  //  CREATE WITH JENIS BROKER (POST JSON)
+  // =========================
+  Future<BrokerProduction> createProduksiWithJenis({
+    required DateTime tglProduksi,
+    required int idMesin,
+    required int idOperator,
+    required int outputJenisId,
+    required num jam,
+    required int shift,
+    String? hourStart,
+    String? hourEnd,
+    int? hadir,
+    int? idRegu,
+  }) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/production/broker');
+
+    String normalizeTime(String v) {
+      final t = v.trim();
+      return t.length == 5 ? '$t:00' : t;
+    }
+
+    final bodyMap = <String, dynamic>{
+      'tglProduksi': toDbDateString(tglProduksi),
+      'idMesin': idMesin,
+      'idOperator': idOperator,
+      'outputJenisId': outputJenisId,
+      'jam': jam,
+      'shift': shift,
+      if (hourStart != null && hourStart.isNotEmpty) 'hourStart': normalizeTime(hourStart),
+      if (hourEnd != null && hourEnd.isNotEmpty) 'hourEnd': normalizeTime(hourEnd),
+      if (hadir != null) 'hadir': hadir,
+      if (idRegu != null) 'idRegu': idRegu,
+    };
+
+    final body = jsonEncode(bodyMap);
+
+    final headers = {
+      'Authorization': 'Bearer $token',
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    };
+
+    print('➡️ [POST] $url');
+    print('📦 json body: $body');
+
+    late http.Response res;
+    try {
+      res = await http
+          .post(url, headers: headers, body: body)
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout membuat broker produksi');
+    } catch (e) {
+      print('❌ Request error: $e');
+      rethrow;
+    }
+
+    print('⬅️ [${res.statusCode}] ${res.body}');
+
+    if (res.statusCode != 201 && res.statusCode != 200) {
+      try {
+        final decoded = json.decode(utf8.decode(res.bodyBytes));
+        final msg = decoded['message'] ?? 'Gagal membuat broker produksi';
+        throw Exception(msg);
+      } catch (_) {
+        throw Exception('Gagal membuat broker produksi (${res.statusCode})');
+      }
+    }
+
+    final decoded = utf8.decode(res.bodyBytes);
+    final bodyJson = json.decode(decoded) as Map<String, dynamic>;
+    final data = bodyJson['data'] as Map<String, dynamic>?;
+
+    if (data == null) {
+      throw Exception('Response tidak mengandung data header');
+    }
+
+    return BrokerProduction.fromJson(data);
   }
 
   Future<void> deleteProduksi(String noProduksi) async {

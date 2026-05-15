@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../../../core/utils/time_formatter.dart';
 import '../../../../features/mesin/model/mesin_model.dart';
-import '../../../../common/widgets/success_status_dialog.dart';
+import '../../../broker_type/model/broker_type_model.dart';
+import '../../../broker_type/widgets/broker_type_dropdown.dart';
+import '../../shared/widgets/time_form_field.dart';
 import '../model/broker_production_model.dart';
 import '../repository/broker_production_repository.dart';
 import '../widgets/broker_production_form_dialog.dart';
@@ -16,14 +20,10 @@ class BrokerProductionMesinScreen extends StatefulWidget {
       _BrokerProductionMesinScreenState();
 }
 
-enum _MesinFilter { semua, aktif, idle }
-
 class _BrokerProductionMesinScreenState
     extends State<BrokerProductionMesinScreen> {
   final _prodRepo = BrokerProductionRepository();
   late Future<List<BrokerMesinInfo>> _future;
-  bool _isLoading = false;
-  _MesinFilter _filter = _MesinFilter.semua;
 
   @override
   void initState() {
@@ -37,40 +37,6 @@ class _BrokerProductionMesinScreenState
     });
   }
 
-  TimeOfDay? _parseTime(String? s) {
-    if (s == null || s.isEmpty) return null;
-    final parts = s.split(':');
-    if (parts.length < 2) return null;
-    final h = int.tryParse(parts[0]);
-    final m = int.tryParse(parts[1]);
-    if (h == null || m == null) return null;
-    return TimeOfDay(hour: h, minute: m);
-  }
-
-  int _toMinutes(TimeOfDay t) => t.hour * 60 + t.minute;
-
-  BrokerProduction? _matchCurrentShift(List<BrokerProduction> list) {
-    final now = TimeOfDay.now();
-    final nowMin = _toMinutes(now);
-
-    for (final p in list) {
-      final start = _parseTime(p.hourStart);
-      final end = _parseTime(p.hourEnd);
-      if (start == null || end == null) continue;
-
-      final startMin = _toMinutes(start);
-      final endMin = _toMinutes(end);
-
-      // handle overnight ranges (e.g. 22:00 – 06:00)
-      final inRange = startMin <= endMin
-          ? nowMin >= startMin && nowMin < endMin
-          : nowMin >= startMin || nowMin < endMin;
-
-      if (inRange) return p;
-    }
-    return null;
-  }
-
   Future<void> _openCreateDialog({
     required BrokerMesinInfo mesin,
     required DateTime today,
@@ -82,84 +48,67 @@ class _BrokerProductionMesinScreenState
       bagian: mesin.bagian,
       enable: true,
     );
-    final created = await showDialog<BrokerProduction>(
+    await showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (_) => BrokerProductionFormDialog(
         initialMesin: mstMesin,
         initialDate: today,
+        existingProduksiList: mesin.produksiList,
       ),
     );
     if (!mounted) return;
-    if (created != null) {
-      showDialog(
-        context: context,
-        builder: (_) => SuccessStatusDialog(
-          title: 'Berhasil Membuat',
-          message: 'No. Produksi ${created.noProduksi} berhasil dibuat.',
-        ),
-      );
-      await Future.delayed(const Duration(seconds: 1));
-      if (!mounted) return;
-      Navigator.of(context).popUntil((route) => route.isFirst);
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => BrokerProductionInputScreen(
-            noProduksi: created.noProduksi,
-            idMesin: created.idMesin,
-            namaMesin: created.namaMesin,
-            shift: created.shift,
-            tglProduksi: created.tglProduksi,
-            isLocked: created.isLocked,
-            lastClosedDate: created.lastClosedDate,
-            hourStart: created.hourStart,
-            hourEnd: created.hourEnd,
-          ),
-        ),
-      );
-    }
+    _refresh();
   }
 
   Future<void> _onMesinTap(BrokerMesinInfo mesin) async {
-    if (!mounted || _isLoading) return;
-    setState(() => _isLoading = true);
+    if (!mounted) return;
 
-    try {
-      final today = DateTime.now();
-      final list = await _prodRepo.fetchByMesinAndDate(
-        idMesin: mesin.idMesin,
-        tanggal: today,
-      );
-
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-
-      final matched = _matchCurrentShift(list);
-
-      if (matched != null) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => BrokerProductionInputScreen(
-              noProduksi: matched.noProduksi,
-              idMesin: matched.idMesin,
-              namaMesin: matched.namaMesin,
-              shift: matched.shift,
-              tglProduksi: matched.tglProduksi,
-              isLocked: matched.isLocked,
-              lastClosedDate: matched.lastClosedDate,
-              hourStart: matched.hourStart,
-              hourEnd: matched.hourEnd,
-            ),
-          ),
-        );
-      } else {
-        await _openCreateDialog(mesin: mesin, today: today);
-      }
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
+    if (mesin.produksiList.isEmpty) {
       await _openCreateDialog(mesin: mesin, today: DateTime.now());
+      return;
     }
+
+    // show selection dialog — no loading needed, data already in card
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogCtx) => _ProduksiSelectionDialog(
+        mesin: mesin,
+        onTambahBaru: () async {
+          Navigator.of(dialogCtx).pop();
+          if (!mounted) return;
+          final created = await showDialog<bool>(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => _QuickCreateDialog(mesin: mesin),
+          );
+          if (!mounted) return;
+          if (created == true) _refresh();
+        },
+        onSelectProduksi: (item) {
+          Navigator.of(dialogCtx).pop();
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => BrokerProductionInputScreen(
+                noProduksi: item.noProduksi,
+                idMesin: mesin.idMesin,
+                namaMesin: mesin.namaMesin,
+                shift: item.shift ?? 1,
+                tglProduksi: item.tglProduksi,
+                isLocked: false,
+                lastClosedDate: null,
+                hourStart: item.hourStart,
+                hourEnd: item.hourEnd,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    if (!mounted) return;
+    _refresh();
   }
 
   @override
@@ -198,12 +147,6 @@ class _BrokerProductionMesinScreenState
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        onPressed: _refresh,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Muat Ulang'),
-                      ),
                     ],
                   ),
                 );
@@ -213,21 +156,12 @@ class _BrokerProductionMesinScreenState
               final activeCount = allMesin.where((m) => m.isActive).length;
               final idleCount = allMesin.length - activeCount;
 
-              final filtered = switch (_filter) {
-                _MesinFilter.aktif =>
-                  allMesin.where((m) => m.isActive).toList(),
-                _MesinFilter.idle =>
-                  allMesin.where((m) => !m.isActive).toList(),
-                _MesinFilter.semua => allMesin,
-              };
-
               return CustomScrollView(
                 slivers: [
                   SliverToBoxAdapter(
                     child: _PageHeader(
                       activeMesin: activeCount,
                       idleMesin: idleCount,
-                      onRefresh: _refresh,
                       onRiwayatProduksi: () => Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => const BrokerProductionScreen(),
@@ -235,28 +169,19 @@ class _BrokerProductionMesinScreenState
                       ),
                     ),
                   ),
-                  SliverToBoxAdapter(
-                    child: _FilterTabs(
-                      selected: _filter,
-                      totalCount: allMesin.length,
-                      activeCount: activeCount,
-                      idleCount: idleCount,
-                      onChanged: (f) => setState(() => _filter = f),
-                    ),
-                  ),
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
                     sliver: SliverGrid(
                       delegate: SliverChildBuilderDelegate((context, index) {
-                        final mesin = filtered[index];
+                        final mesin = allMesin[index];
                         return _MesinCard(
                           mesin: mesin,
                           onTap: () => _onMesinTap(mesin),
                         );
-                      }, childCount: filtered.length),
+                      }, childCount: allMesin.length),
                       gridDelegate:
-                          const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 280,
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 4,
                             mainAxisExtent: 150,
                             crossAxisSpacing: 16,
                             mainAxisSpacing: 16,
@@ -267,12 +192,412 @@ class _BrokerProductionMesinScreenState
               );
             },
           ),
-          if (_isLoading)
-            const ColoredBox(
-              color: Color(0x55000000),
-              child: Center(child: CircularProgressIndicator()),
-            ),
         ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Quick-create dialog: jenis broker + jam mulai + jam selesai + operator
+// ---------------------------------------------------------------------------
+class _QuickCreateDialog extends StatefulWidget {
+  const _QuickCreateDialog({required this.mesin});
+  final BrokerMesinInfo mesin;
+
+  @override
+  State<_QuickCreateDialog> createState() => _QuickCreateDialogState();
+}
+
+class _QuickCreateDialogState extends State<_QuickCreateDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _repo = BrokerProductionRepository();
+
+  BrokerType? _brokerType;
+  late final TextEditingController _hourStartCtrl;
+  late TimeOfDay _startTime;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = TimeOfDay.now();
+    _startTime = now;
+    _hourStartCtrl = TextEditingController(
+      text:
+          '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
+    );
+  }
+
+  @override
+  void dispose() {
+    _hourStartCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_brokerType == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pilih jenis broker terlebih dahulu')),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      await _repo.addProduksi(
+        idMesin: widget.mesin.idMesin,
+        tanggal: DateTime.now(),
+        hourStart: _hourStartCtrl.text.trim(),
+        outputJenisId: _brokerType!.idBroker,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 480),
+        padding: const EdgeInsets.all(24),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.mesin.namaMesin,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF1F2937),
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Tambah Produksi Baru',
+                style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+              ),
+              const SizedBox(height: 20),
+
+              // Jenis Broker + Jam Mulai dalam satu baris
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: BrokerTypeDropdown(
+                      onChanged: (bt) => setState(() => _brokerType = bt),
+                      validator: (v) =>
+                          v == null ? 'Wajib pilih jenis broker' : null,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: TimeFormField(
+                      controller: _hourStartCtrl,
+                      label: 'Jam Mulai',
+                      hintText: 'HH:mm',
+                      onPick: () async {
+                        final picked = await pickTime24h(
+                          context,
+                          initial: _startTime,
+                        );
+                        if (picked != null) {
+                          setState(() {
+                            _startTime = picked;
+                            _hourStartCtrl.text = formatHHmm(picked);
+                          });
+                        }
+                      },
+                      validator: (_) => parseHHmm(_hourStartCtrl.text) == null
+                          ? 'Wajib isi (HH:mm)'
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: _saving
+                        ? null
+                        : () => Navigator.of(context).pop(false),
+                    child: const Text('BATAL'),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: _saving ? null : _submit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00897B),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 14,
+                      ),
+                    ),
+                    child: Text(
+                      _saving ? 'MENYIMPAN...' : 'SIMPAN',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProduksiSelectionDialog extends StatelessWidget {
+  const _ProduksiSelectionDialog({
+    required this.mesin,
+    required this.onTambahBaru,
+    required this.onSelectProduksi,
+  });
+
+  final BrokerMesinInfo mesin;
+  final VoidCallback onTambahBaru;
+  final void Function(BrokerProduksiItem item) onSelectProduksi;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 520),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        mesin.namaMesin,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1F2937),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${mesin.produksiList.length} produksi hari ini',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(
+                    Icons.close,
+                    size: 20,
+                    color: Color(0xFF9CA3AF),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ...mesin.produksiList.map(
+                      (item) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: InkWell(
+                          onTap: () => onSelectProduksi(item),
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: const Color(0xFFE2E8F0),
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.tag,
+                                            size: 12,
+                                            color: Color(0xFF94A3B8),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            item.noProduksi,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w700,
+                                              color: Color(0xFF1E40AF),
+                                            ),
+                                          ),
+                                          if (item.shift != null) ...[
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 6,
+                                                    vertical: 2,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFEFF6FF),
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                'Shift ${item.shift}',
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Color(0xFF2563EB),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                      if (item.outputJenisNama != null) ...[
+                                        const SizedBox(height: 3),
+                                        Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.category_outlined,
+                                              size: 12,
+                                              color: Color(0xFF94A3B8),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Expanded(
+                                              child: Text(
+                                                item.outputJenisNama!,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  color: Color(0xFF374151),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                      if (item.hourStart != null ||
+                                          item.hourEnd != null) ...[
+                                        const SizedBox(height: 2),
+                                        Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.schedule,
+                                              size: 12,
+                                              color: Color(0xFF94A3B8),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              '${item.hourStart ?? '--:--'} – ${item.hourEnd ?? '--:--'}',
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: Color(0xFF374151),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                      if (item.operator_ != null) ...[
+                                        const SizedBox(height: 2),
+                                        Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.person_outline,
+                                              size: 12,
+                                              color: Color(0xFF94A3B8),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              item.operator_!,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Color(0xFF6B7280),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.chevron_right,
+                                  size: 20,
+                                  color: Color(0xFFCBD5E1),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onTambahBaru,
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('Tambah Produksi Baru'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF00897B),
+                  side: const BorderSide(color: Color(0xFF00897B)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -284,15 +609,39 @@ class _MesinCard extends StatelessWidget {
   final BrokerMesinInfo mesin;
   final VoidCallback onTap;
 
+  BrokerProduksiItem? _currentItem() {
+    final now = TimeOfDay.now();
+    final nowMin = now.hour * 60 + now.minute;
+
+    TimeOfDay? parse(String? s) {
+      if (s == null || s.isEmpty) return null;
+      final parts = s.split(':');
+      if (parts.length < 2) return null;
+      final h = int.tryParse(parts[0]);
+      final m = int.tryParse(parts[1]);
+      if (h == null || m == null) return null;
+      return TimeOfDay(hour: h, minute: m);
+    }
+
+    for (final p in mesin.produksiList) {
+      final start = parse(p.hourStart);
+      final end = parse(p.hourEnd);
+      if (start == null || end == null) continue;
+      final s = start.hour * 60 + start.minute;
+      final e = end.hour * 60 + end.minute;
+      final inRange = s <= e
+          ? nowMin >= s && nowMin < e
+          : nowMin >= s || nowMin < e;
+      if (inRange) return p;
+    }
+    // fallback: no time-matched item, return first if any
+    return mesin.produksiList.isNotEmpty ? mesin.produksiList.first : null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final active = mesin.isActive;
-    final iconBg = active ? const Color(0xFFDCFCE7) : const Color(0xFFEFF6FF);
-    final iconColor = active
-        ? const Color(0xFF15803D)
-        : const Color(0xFF0D47A1);
-    final start = mesin.hourStart ?? '--:--';
-    final end = mesin.hourEnd ?? '--:--';
+    final current = active ? _currentItem() : null;
 
     return Material(
       color: Colors.white,
@@ -312,19 +661,6 @@ class _MesinCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: iconBg,
-                      borderRadius: BorderRadius.circular(9),
-                    ),
-                    child: Icon(
-                      Icons.precision_manufacturing_outlined,
-                      color: iconColor,
-                      size: 18,
-                    ),
-                  ),
                   const Spacer(),
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -362,75 +698,52 @@ class _MesinCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 4),
-              if (active) ...[
-                Row(
-                  children: [
-                    const Icon(Icons.tag, size: 11, color: Color(0xFF64748B)),
-                    const SizedBox(width: 3),
-                    Expanded(
-                      child: Text(
-                        mesin.noProduksi ?? '-',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF334155),
-                        ),
+              if (current != null) ...[
+                if (current.shift != null)
+                  Text(
+                    'Shift ${current.shift}  ${current.hourStart ?? '--:--'} – ${current.hourEnd ?? '--:--'}',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF334155),
+                    ),
+                  ),
+                if (current.outputJenisNama != null) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    current.outputJenisNama!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: Color(0xFF374151),
+                    ),
+                  ),
+                ],
+                if (current.operator_ != null) ...[
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.person_outline,
+                        size: 10,
+                        color: Color(0xFF94A3B8),
                       ),
-                    ),
-                  ],
-                ),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.schedule,
-                      size: 11,
-                      color: Color(0xFF64748B),
-                    ),
-                    const SizedBox(width: 3),
-                    Text(
-                      '$start – $end',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF334155),
-                      ),
-                    ),
-                    if (mesin.shift != null) ...[
-                      const SizedBox(width: 6),
-                      Text(
-                        'Shift ${mesin.shift}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF64748B),
+                      const SizedBox(width: 3),
+                      Expanded(
+                        child: Text(
+                          current.operator_!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Color(0xFF6B7280),
+                          ),
                         ),
                       ),
                     ],
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.person_outline,
-                      size: 11,
-                      color: Color(0xFF64748B),
-                    ),
-                    const SizedBox(width: 3),
-                    Expanded(
-                      child: Text(
-                        mesin.operator_ ?? '-',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF334155),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ] else
                 const Text(
                   'Belum ada produksi aktif',
@@ -448,54 +761,41 @@ class _PageHeader extends StatelessWidget {
   const _PageHeader({
     required this.activeMesin,
     required this.idleMesin,
-    required this.onRefresh,
     required this.onRiwayatProduksi,
   });
 
   final int activeMesin;
   final int idleMesin;
-  final VoidCallback onRefresh;
   final VoidCallback onRiwayatProduksi;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 16, 16, 14),
+      padding: const EdgeInsets.fromLTRB(24, 12, 16, 12),
       color: Colors.white,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // "Pilih Mesin" label + stats
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Pilih Mesin',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF0D47A1),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  _StatDot(
-                    color: const Color(0xFF16A34A),
-                    value: activeMesin,
-                    label: 'aktif',
-                  ),
-                  const SizedBox(width: 16),
-                  _StatDot(
-                    color: const Color(0xFF94A3B8),
-                    value: idleMesin,
-                    label: 'idle',
-                  ),
-                ],
-              ),
-            ],
+          Text(
+            'Pilih Mesin',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF0D47A1),
+            ),
+          ),
+          const SizedBox(width: 16),
+          _StatDot(
+            color: const Color(0xFF16A34A),
+            value: activeMesin,
+            label: 'aktif',
+          ),
+          const SizedBox(width: 12),
+          _StatDot(
+            color: const Color(0xFF94A3B8),
+            value: idleMesin,
+            label: 'idle',
           ),
           const Spacer(),
-          // actions
           OutlinedButton.icon(
             onPressed: onRiwayatProduksi,
             icon: const Icon(Icons.history, size: 16),
@@ -506,12 +806,6 @@ class _PageHeader extends StatelessWidget {
               backgroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             ),
-          ),
-          const SizedBox(width: 4),
-          IconButton(
-            tooltip: 'Refresh',
-            icon: const Icon(Icons.refresh, size: 20, color: Color(0xFF0D47A1)),
-            onPressed: onRefresh,
           ),
         ],
       ),
@@ -560,116 +854,6 @@ class _StatDot extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _FilterTabs extends StatelessWidget {
-  const _FilterTabs({
-    required this.selected,
-    required this.totalCount,
-    required this.activeCount,
-    required this.idleCount,
-    required this.onChanged,
-  });
-
-  final _MesinFilter selected;
-  final int totalCount;
-  final int activeCount;
-  final int idleCount;
-  final ValueChanged<_MesinFilter> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(24, 10, 24, 10),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1)),
-      ),
-      child: Row(
-        children: [
-          _Tab(
-            label: 'Semua',
-            count: totalCount,
-            selected: selected == _MesinFilter.semua,
-            dotColor: null,
-            onTap: () => onChanged(_MesinFilter.semua),
-          ),
-          const SizedBox(width: 8),
-          _Tab(
-            label: 'Aktif',
-            count: activeCount,
-            selected: selected == _MesinFilter.aktif,
-            dotColor: const Color(0xFF16A34A),
-            onTap: () => onChanged(_MesinFilter.aktif),
-          ),
-          const SizedBox(width: 8),
-          _Tab(
-            label: 'Idle',
-            count: idleCount,
-            selected: selected == _MesinFilter.idle,
-            dotColor: const Color(0xFF94A3B8),
-            onTap: () => onChanged(_MesinFilter.idle),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Tab extends StatelessWidget {
-  const _Tab({
-    required this.label,
-    required this.count,
-    required this.selected,
-    required this.dotColor,
-    required this.onTap,
-  });
-
-  final String label;
-  final int count;
-  final bool selected;
-  final Color? dotColor;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFF0D47A1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: selected ? null : Border.all(color: const Color(0xFFE5E7EB)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (dotColor != null) ...[
-              Container(
-                width: 7,
-                height: 7,
-                decoration: BoxDecoration(
-                  color: selected ? Colors.white70 : dotColor,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 5),
-            ],
-            Text(
-              '$label $count',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: selected ? Colors.white : const Color(0xFF374151),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

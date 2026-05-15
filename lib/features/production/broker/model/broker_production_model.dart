@@ -201,56 +201,101 @@ class BrokerProduction {
   }
 }
 
-class BrokerMesinInfo {
-  final int idMesin;
-  final String namaMesin;
-  final String bagian;
-  final String? noProduksi;
+class BrokerProduksiItem {
+  final String noProduksi;
+  final DateTime? tglProduksi;
+  final int? outputJenisId;
+  final String? outputJenisNama;
+  final String? outputJenisItemCode;
+  final int? idOperator;
   final String? operator_;
   final int? shift;
   final String? hourStart;
   final String? hourEnd;
 
-  bool get isActive => noProduksi != null && noProduksi!.isNotEmpty;
-
-  const BrokerMesinInfo({
-    required this.idMesin,
-    required this.namaMesin,
-    required this.bagian,
-    this.noProduksi,
+  const BrokerProduksiItem({
+    required this.noProduksi,
+    this.tglProduksi,
+    this.outputJenisId,
+    this.outputJenisNama,
+    this.outputJenisItemCode,
+    this.idOperator,
     this.operator_,
     this.shift,
     this.hourStart,
     this.hourEnd,
   });
 
+  factory BrokerProduksiItem.fromJson(Map<String, dynamic> j) {
+    String? s(dynamic v) => v == null ? null : v.toString().trim().isEmpty ? null : v.toString().trim();
+    int? i(dynamic v) {
+      if (v == null) return null;
+      if (v is num) return v.toInt();
+      return int.tryParse(v.toString());
+    }
+    String? timeHHmm(dynamic v) {
+      final raw = s(v);
+      if (raw == null) return null;
+      final parts = raw.split(':');
+      if (parts.length < 2) return raw;
+      return '${parts[0].padLeft(2, '0')}:${parts[1].padLeft(2, '0')}';
+    }
+
+    return BrokerProduksiItem(
+      noProduksi: s(j['NoProduksi']) ?? '',
+      tglProduksi: j['TglProduksi'] != null ? DateTime.tryParse(j['TglProduksi'].toString()) : null,
+      outputJenisId: i(j['OutputJenisId']),
+      outputJenisNama: s(j['OutputJenisNama']),
+      outputJenisItemCode: s(j['OutputJenisItemCode']),
+      idOperator: i(j['IdOperator']),
+      operator_: s(j['Operator']),
+      shift: i(j['Shift']),
+      hourStart: timeHHmm(j['HourStart']),
+      hourEnd: timeHHmm(j['HourEnd']),
+    );
+  }
+}
+
+class BrokerMesinInfo {
+  final int idMesin;
+  final String namaMesin;
+  final String bagian;
+  final List<BrokerProduksiItem> produksiList;
+
+  bool get isActive => produksiList.isNotEmpty;
+
+  // backward-compat getters (first item)
+  String? get noProduksi => produksiList.isNotEmpty ? produksiList.first.noProduksi : null;
+  String? get operator_ => produksiList.isNotEmpty ? produksiList.first.operator_ : null;
+  int? get shift => produksiList.isNotEmpty ? produksiList.first.shift : null;
+  String? get hourStart => produksiList.isNotEmpty ? produksiList.first.hourStart : null;
+  String? get hourEnd => produksiList.isNotEmpty ? produksiList.first.hourEnd : null;
+
+  const BrokerMesinInfo({
+    required this.idMesin,
+    required this.namaMesin,
+    required this.bagian,
+    this.produksiList = const [],
+  });
+
   factory BrokerMesinInfo.fromJson(Map<String, dynamic> j) {
-    String? _s(dynamic v) => v == null ? null : v.toString().trim().isEmpty ? null : v.toString().trim();
-    int? _i(dynamic v) {
+    String? s(dynamic v) => v == null ? null : v.toString().trim().isEmpty ? null : v.toString().trim();
+    int? i(dynamic v) {
       if (v == null) return null;
       if (v is num) return v.toInt();
       return int.tryParse(v.toString());
     }
 
-    String? _timeHHmm(dynamic v) {
-      final s = _s(v);
-      if (s == null) return null;
-      final parts = s.split(':');
-      if (parts.length < 2) return s;
-      final h = parts[0].padLeft(2, '0');
-      final m = parts[1].padLeft(2, '0');
-      return '$h:$m';
-    }
+    final rawList = j['produksiList'] as List<dynamic>? ?? [];
+    final items = rawList
+        .map((e) => BrokerProduksiItem.fromJson(e as Map<String, dynamic>))
+        .toList();
 
     return BrokerMesinInfo(
-      idMesin: _i(j['IdMesin']) ?? 0,
-      namaMesin: _s(j['NamaMesin']) ?? '',
-      bagian: _s(j['Bagian']) ?? '',
-      noProduksi: _s(j['NoProduksi']),
-      operator_: _s(j['Operator']),
-      shift: _i(j['Shift']),
-      hourStart: _timeHHmm(j['HourStart']),
-      hourEnd: _timeHHmm(j['HourEnd']),
+      idMesin: i(j['IdMesin']) ?? 0,
+      namaMesin: s(j['NamaMesin']) ?? '',
+      bagian: s(j['Bagian']) ?? '',
+      produksiList: items,
     );
   }
 }

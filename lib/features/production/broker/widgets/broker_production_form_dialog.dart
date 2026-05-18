@@ -446,16 +446,12 @@ class _BrokerProductionFormDialogState
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 780, maxHeight: 520),
+          constraints: const BoxConstraints(maxWidth: 680, maxHeight: 520),
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               _buildForm(),
-              if (widget.existingProduksiList.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                _buildProduksiList(),
-              ],
               const SizedBox(height: 16),
               _buildActions(),
             ],
@@ -487,11 +483,12 @@ class _BrokerProductionFormDialogState
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Baris header: nama mesin + hadir
+          // Baris 1: Nama mesin (judul) + Hadir
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
+                flex: 3,
                 child: Text(
                   mesinName,
                   style: const TextStyle(
@@ -504,6 +501,7 @@ class _BrokerProductionFormDialogState
               ),
               const SizedBox(width: 16),
               Expanded(
+                flex: 1,
                 child: AppNumberField(
                   controller: hadirCtrl,
                   label: 'Hadir',
@@ -524,8 +522,8 @@ class _BrokerProductionFormDialogState
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                flex: 2,
+              SizedBox(
+                width: 200,
                 child: ShiftDropdown(
                   preselectId: widget.header?.shift ?? widget.initialShift,
                   onChangedId: (id) {
@@ -605,15 +603,18 @@ class _BrokerProductionFormDialogState
                   },
                 ),
               ),
-              const SizedBox(width: 12),
-              Padding(
-                padding: const EdgeInsets.only(top: 22),
-                child: TotalHoursPill(
-                  duration: dur,
-                  isError: hasOverlap || hasDurationError,
-                  errorText: hasOverlap
-                      ? overlapMsg
-                      : 'Durasi tidak boleh 0 menit',
+              const SizedBox(width: 16),
+              Align(
+                alignment: Alignment.center,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: TotalHoursPill(
+                    duration: dur,
+                    isError: hasOverlap || hasDurationError,
+                    errorText: hasOverlap
+                        ? overlapMsg
+                        : 'Durasi tidak boleh 0 menit',
+                  ),
                 ),
               ),
             ],
@@ -621,11 +622,12 @@ class _BrokerProductionFormDialogState
 
           const SizedBox(height: 16),
 
-          // Baris 3: Regu + Operator + Jenis Broker
+          // Baris 3: Regu + Operator
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
+                flex: 1,
                 child: ReguDropdown(
                   preselectId: widget.header?.idRegu ?? widget.initialReguId,
                   label: 'Regu',
@@ -636,6 +638,7 @@ class _BrokerProductionFormDialogState
               ),
               const SizedBox(width: 12),
               Expanded(
+                flex: 2,
                 child: OperatorDropdown(
                   key: ValueKey(
                     _operatorPreselectId ?? widget.header?.idOperator,
@@ -650,139 +653,19 @@ class _BrokerProductionFormDialogState
                   onChanged: (op) => setState(() => _selectedOperator = op),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: BrokerTypeDropdown(
-                  onChanged: (bt) => setState(() => _selectedBrokerType = bt),
-                  validator: (v) =>
-                      v == null ? 'Wajib pilih jenis broker' : null,
-                  autovalidateMode: AutovalidateMode.onUserInteraction,
-                ),
-              ),
             ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Baris 4: Jenis Broker (full width)
+          BrokerTypeDropdown(
+            onChanged: (bt) => setState(() => _selectedBrokerType = bt),
+            validator: (v) => v == null ? 'Wajib pilih jenis broker' : null,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildProduksiList() {
-    final list = widget.existingProduksiList;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          children: [
-            const Text(
-              'Produksi Hari Ini',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF6B7280),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEFF6FF),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '${list.length}',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF2563EB),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        ...list.map(
-          (item) => Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.tag, size: 13, color: Color(0xFF94A3B8)),
-                  const SizedBox(width: 6),
-                  Text(
-                    item.noProduksi,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1E40AF),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Icon(
-                    Icons.category_outlined,
-                    size: 13,
-                    color: Color(0xFF94A3B8),
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      item.outputJenisNama ?? '-',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF374151),
-                      ),
-                    ),
-                  ),
-                  if (item.shift != null) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'Shift ${item.shift}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF64748B),
-                        ),
-                      ),
-                    ),
-                  ],
-                  if (item.operator_ != null) ...[
-                    const SizedBox(width: 8),
-                    const Icon(
-                      Icons.person_outline,
-                      size: 13,
-                      color: Color(0xFF94A3B8),
-                    ),
-                    const SizedBox(width: 2),
-                    Text(
-                      item.operator_!,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 

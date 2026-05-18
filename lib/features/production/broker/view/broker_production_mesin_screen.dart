@@ -1,16 +1,21 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
-import '../../../../core/utils/time_formatter.dart';
+import '../../../../common/widgets/atlas_data_table.dart';
+import '../../../../common/widgets/error_status_dialog.dart';
+import '../../../../common/widgets/success_status_dialog.dart';
+import '../../../../core/network/endpoints.dart';
+import '../../../../core/services/token_storage.dart';
 import '../../../../features/mesin/model/mesin_model.dart';
-import '../../../broker_type/model/broker_type_model.dart';
-import '../../../broker_type/widgets/broker_type_dropdown.dart';
-import '../../shared/widgets/time_form_field.dart';
 import '../model/broker_production_model.dart';
 import '../repository/broker_production_repository.dart';
+import '../view_model/broker_production_view_model.dart';
+import '../widgets/broker_delete_dialog.dart';
 import '../widgets/broker_production_form_dialog.dart';
 import 'broker_production_input_screen.dart';
-import 'broker_production_screen.dart';
 
 class BrokerProductionMesinScreen extends StatefulWidget {
   const BrokerProductionMesinScreen({super.key});
@@ -31,6 +36,38 @@ class _BrokerProductionMesinScreenState
     _future = _prodRepo.fetchBrokerMesin();
   }
 
+  Future<({int shift, String hourStart, String hourEnd})?>
+  _fetchCurrentShift() async {
+    try {
+      final base = ApiConstants.baseUrl.replaceFirst(RegExp(r'/*$'), '');
+      final url = Uri.parse('$base/api/mst/shift/current');
+      final token = await TokenStorage.getToken();
+      final res = await http
+          .get(
+            url,
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Accept': 'application/json',
+            },
+          )
+          .timeout(const Duration(seconds: 8));
+      if (res.statusCode != 200) return null;
+      final body =
+          jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      final data = body['data'] as Map<String, dynamic>?;
+      if (data == null) return null;
+      final shift = data['shift'] as int?;
+      String trim(String? v) =>
+          (v != null && v.length >= 5) ? v.substring(0, 5) : (v ?? '');
+      final hourStart = trim(data['hourStart'] as String?);
+      final hourEnd = trim(data['hourEnd'] as String?);
+      if (shift == null) return null;
+      return (shift: shift, hourStart: hourStart, hourEnd: hourEnd);
+    } catch (_) {
+      return null;
+    }
+  }
+
   void _refresh() {
     setState(() {
       _future = _prodRepo.fetchBrokerMesin();
@@ -48,6 +85,8 @@ class _BrokerProductionMesinScreenState
       bagian: mesin.bagian,
       enable: true,
     );
+    final defaultShift = await _fetchCurrentShift();
+    if (!mounted) return;
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -55,6 +94,9 @@ class _BrokerProductionMesinScreenState
         initialMesin: mstMesin,
         initialDate: today,
         existingProduksiList: mesin.produksiList,
+        initialShift: defaultShift?.shift,
+        initialHourStart: defaultShift?.hourStart,
+        initialHourEnd: defaultShift?.hourEnd,
       ),
     );
     if (!mounted) return;
@@ -64,47 +106,42 @@ class _BrokerProductionMesinScreenState
   Future<void> _onMesinTap(BrokerMesinInfo mesin) async {
     if (!mounted) return;
 
-    if (mesin.produksiList.isEmpty) {
+    final item = mesin.produksiList.isNotEmpty
+        ? mesin.produksiList.first
+        : null;
+
+    if (item == null) {
       await _openCreateDialog(mesin: mesin, today: DateTime.now());
       return;
     }
 
-    // show selection dialog — no loading needed, data already in card
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BrokerProductionInputScreen(
+          noProduksi: item.noProduksi,
+          idMesin: mesin.idMesin,
+          namaMesin: mesin.namaMesin,
+          shift: item.shift ?? 1,
+          tglProduksi: item.tglProduksi,
+          isLocked: false,
+          lastClosedDate: null,
+          hourStart: item.hourStart,
+          hourEnd: item.hourEnd,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    _refresh();
+  }
+
+  Future<void> _onMesinLongPress(BrokerMesinInfo mesin) async {
     if (!mounted) return;
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
-      builder: (dialogCtx) => _ProduksiSelectionDialog(
+      builder: (_) => _MesinHistoryDialog(
         mesin: mesin,
-        onTambahBaru: () async {
-          Navigator.of(dialogCtx).pop();
-          if (!mounted) return;
-          final created = await showDialog<bool>(
-            context: context,
-            barrierDismissible: false,
-            builder: (_) => _QuickCreateDialog(mesin: mesin),
-          );
-          if (!mounted) return;
-          if (created == true) _refresh();
-        },
-        onSelectProduksi: (item) {
-          Navigator.of(dialogCtx).pop();
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => BrokerProductionInputScreen(
-                noProduksi: item.noProduksi,
-                idMesin: mesin.idMesin,
-                namaMesin: mesin.namaMesin,
-                shift: item.shift ?? 1,
-                tglProduksi: item.tglProduksi,
-                isLocked: false,
-                lastClosedDate: null,
-                hourStart: item.hourStart,
-                hourEnd: item.hourEnd,
-              ),
-            ),
-          );
-        },
+        fetchCurrentShift: _fetchCurrentShift,
       ),
     );
     if (!mounted) return;
@@ -162,11 +199,6 @@ class _BrokerProductionMesinScreenState
                     child: _PageHeader(
                       activeMesin: activeCount,
                       idleMesin: idleCount,
-                      onRiwayatProduksi: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const BrokerProductionScreen(),
-                        ),
-                      ),
                     ),
                   ),
                   SliverPadding(
@@ -177,6 +209,7 @@ class _BrokerProductionMesinScreenState
                         return _MesinCard(
                           mesin: mesin,
                           onTap: () => _onMesinTap(mesin),
+                          onLongPress: () => _onMesinLongPress(mesin),
                         );
                       }, childCount: allMesin.length),
                       gridDelegate:
@@ -199,401 +232,362 @@ class _BrokerProductionMesinScreenState
 }
 
 // ---------------------------------------------------------------------------
-// Quick-create dialog: jenis broker + jam mulai + jam selesai + operator
+// Input Backdate dialog: shows paginated list of produksi for a mesin
 // ---------------------------------------------------------------------------
-class _QuickCreateDialog extends StatefulWidget {
-  const _QuickCreateDialog({required this.mesin});
+class _MesinHistoryDialog extends StatefulWidget {
+  const _MesinHistoryDialog({
+    required this.mesin,
+    required this.fetchCurrentShift,
+  });
+
   final BrokerMesinInfo mesin;
+  final Future<({int shift, String hourStart, String hourEnd})?> Function()
+  fetchCurrentShift;
 
   @override
-  State<_QuickCreateDialog> createState() => _QuickCreateDialogState();
+  State<_MesinHistoryDialog> createState() => _MesinHistoryDialogState();
 }
 
-class _QuickCreateDialogState extends State<_QuickCreateDialog> {
-  final _formKey = GlobalKey<FormState>();
+class _MesinHistoryDialogState extends State<_MesinHistoryDialog> {
   final _repo = BrokerProductionRepository();
+  final _scrollCtl = ScrollController();
 
-  BrokerType? _brokerType;
-  late final TextEditingController _hourStartCtrl;
-  late TimeOfDay _startTime;
-  bool _saving = false;
+  final List<BrokerProduction> _items = [];
+  bool _isLoading = false;
+  bool _isFetchingMore = false;
+  bool _hasMore = true;
+  int _page = 1;
+  static const _pageSize = 20;
 
   @override
   void initState() {
     super.initState();
-    final now = TimeOfDay.now();
-    _startTime = now;
-    _hourStartCtrl = TextEditingController(
-      text:
-          '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
-    );
+    _loadPage();
+    _scrollCtl.addListener(_onScroll);
   }
 
   @override
   void dispose() {
-    _hourStartCtrl.dispose();
+    _scrollCtl.dispose();
     super.dispose();
   }
 
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_brokerType == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pilih jenis broker terlebih dahulu')),
-      );
-      return;
-    }
-
-    setState(() => _saving = true);
-    try {
-      await _repo.addProduksi(
-        idMesin: widget.mesin.idMesin,
-        tanggal: DateTime.now(),
-        hourStart: _hourStartCtrl.text.trim(),
-        outputJenisId: _brokerType!.idBroker,
-      );
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-      );
-    } finally {
-      if (mounted) setState(() => _saving = false);
+  void _onScroll() {
+    if (_scrollCtl.position.pixels >=
+            _scrollCtl.position.maxScrollExtent - 100 &&
+        !_isFetchingMore &&
+        _hasMore) {
+      _loadMore();
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 480),
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                widget.mesin.namaMesin,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1F2937),
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Tambah Produksi Baru',
-                style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-              ),
-              const SizedBox(height: 20),
+  Future<void> _loadPage() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _items.clear();
+      _page = 1;
+      _hasMore = true;
+    });
+    try {
+      final res = await _repo.fetchAll(
+        page: 1,
+        pageSize: _pageSize,
+        idMesin: widget.mesin.idMesin,
+      );
+      if (!mounted) return;
+      final newItems = res['items'] as List<BrokerProduction>;
+      final totalPages = (res['totalPages'] as int?) ?? 1;
+      setState(() {
+        _items.addAll(newItems);
+        _hasMore = 1 < totalPages;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
-              // Jenis Broker + Jam Mulai dalam satu baris
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: BrokerTypeDropdown(
-                      onChanged: (bt) => setState(() => _brokerType = bt),
-                      validator: (v) =>
-                          v == null ? 'Wajib pilih jenis broker' : null,
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: TimeFormField(
-                      controller: _hourStartCtrl,
-                      label: 'Jam Mulai',
-                      hintText: 'HH:mm',
-                      onPick: () async {
-                        final picked = await pickTime24h(
-                          context,
-                          initial: _startTime,
-                        );
-                        if (picked != null) {
-                          setState(() {
-                            _startTime = picked;
-                            _hourStartCtrl.text = formatHHmm(picked);
-                          });
-                        }
-                      },
-                      validator: (_) => parseHHmm(_hourStartCtrl.text) == null
-                          ? 'Wajib isi (HH:mm)'
-                          : null,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
+  Future<void> _loadMore() async {
+    if (!mounted || _isFetchingMore || !_hasMore) return;
+    setState(() => _isFetchingMore = true);
+    try {
+      final nextPage = _page + 1;
+      final res = await _repo.fetchAll(
+        page: nextPage,
+        pageSize: _pageSize,
+        idMesin: widget.mesin.idMesin,
+      );
+      if (!mounted) return;
+      final newItems = res['items'] as List<BrokerProduction>;
+      final totalPages = (res['totalPages'] as int?) ?? 1;
+      setState(() {
+        _items.addAll(newItems);
+        _page = nextPage;
+        _hasMore = nextPage < totalPages;
+        _isFetchingMore = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _isFetchingMore = false);
+    }
+  }
 
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  OutlinedButton(
-                    onPressed: _saving
-                        ? null
-                        : () => Navigator.of(context).pop(false),
-                    child: const Text('BATAL'),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
-                    onPressed: _saving ? null : _submit,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00897B),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 14,
-                      ),
-                    ),
-                    child: Text(
-                      _saving ? 'MENYIMPAN...' : 'SIMPAN',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+  List<AtlasTableColumn<BrokerProduction>> _buildColumns() {
+    return [
+      AtlasTableColumn(
+        title: 'No. Produksi',
+        width: 160,
+        cellBuilder: (_, r, __) => Text(
+          r.noProduksi,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF1E40AF),
           ),
+        ),
+      ),
+      AtlasTableColumn(
+        title: 'Tanggal',
+        width: 110,
+        cellBuilder: (_, r, __) => Text(
+          r.tglProduksi != null
+              ? '${r.tglProduksi!.day.toString().padLeft(2, '0')}/${r.tglProduksi!.month.toString().padLeft(2, '0')}/${r.tglProduksi!.year}'
+              : '-',
+          style: const TextStyle(fontSize: 12),
+        ),
+      ),
+      AtlasTableColumn(
+        title: 'Shift',
+        width: 70,
+        cellBuilder: (_, r, __) =>
+            Text(r.shift.toString(), style: const TextStyle(fontSize: 12)),
+      ),
+      AtlasTableColumn(
+        title: 'Jam',
+        width: 130,
+        cellBuilder: (_, r, __) => Text(
+          '${r.hourStart ?? '--:--'} – ${r.hourEnd ?? '--:--'}',
+          style: const TextStyle(fontSize: 12),
+        ),
+      ),
+      AtlasTableColumn(
+        title: 'Operator',
+        width: 180,
+        cellBuilder: (_, r, __) => Text(
+          r.namaOperator,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 12),
+        ),
+      ),
+      AtlasTableColumn(
+        title: 'Aksi',
+        width: 120,
+        cellBuilder: (_, r, __) => Row(
+          children: [
+            _ActionBtn(
+              icon: Icons.edit_outlined,
+              color: const Color(0xFF0D47A1),
+              tooltip: 'Edit',
+              onTap: () => _openEdit(r),
+            ),
+            const SizedBox(width: 6),
+            _ActionBtn(
+              icon: Icons.delete_outline,
+              color: const Color(0xFFDC2626),
+              tooltip: 'Hapus',
+              onTap: () => _openDelete(r),
+            ),
+            const SizedBox(width: 6),
+            _ActionBtn(
+              icon: Icons.input_outlined,
+              color: const Color(0xFF00897B),
+              tooltip: 'Input',
+              onTap: () => _openInput(r),
+            ),
+          ],
+        ),
+      ),
+    ];
+  }
+
+  void _openInput(BrokerProduction row) {
+    Navigator.of(context).pop();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => BrokerProductionInputScreen(
+          noProduksi: row.noProduksi,
+          idMesin: row.idMesin,
+          namaMesin: row.namaMesin,
+          shift: row.shift,
+          tglProduksi: row.tglProduksi,
+          isLocked: row.isLocked,
+          lastClosedDate: row.lastClosedDate,
+          hourStart: row.hourStart,
+          hourEnd: row.hourEnd,
         ),
       ),
     );
   }
-}
 
-class _ProduksiSelectionDialog extends StatelessWidget {
-  const _ProduksiSelectionDialog({
-    required this.mesin,
-    required this.onTambahBaru,
-    required this.onSelectProduksi,
-  });
+  Future<void> _openCreate() async {
+    if (!mounted) return;
+    final mstMesin = MstMesin(
+      idMesin: widget.mesin.idMesin,
+      namaMesin: widget.mesin.namaMesin,
+      bagian: widget.mesin.bagian,
+      enable: true,
+    );
+    final defaultShift = await widget.fetchCurrentShift();
+    if (!mounted) return;
 
-  final BrokerMesinInfo mesin;
-  final VoidCallback onTambahBaru;
-  final void Function(BrokerProduksiItem item) onSelectProduksi;
+    final createVm = BrokerProductionViewModel();
+    try {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => ChangeNotifierProvider.value(
+          value: createVm,
+          child: BrokerProductionFormDialog(
+            initialMesin: mstMesin,
+            initialDate: DateTime.now(),
+            existingProduksiList: widget.mesin.produksiList,
+            initialShift: defaultShift?.shift,
+            initialHourStart: defaultShift?.hourStart,
+            initialHourEnd: defaultShift?.hourEnd,
+          ),
+        ),
+      );
+    } finally {
+      createVm.dispose();
+    }
+    if (!mounted) return;
+    _loadPage();
+  }
+
+  Future<void> _openEdit(BrokerProduction row) async {
+    if (!mounted) return;
+    final editVm = BrokerProductionViewModel();
+    try {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => ChangeNotifierProvider.value(
+          value: editVm,
+          child: BrokerProductionFormDialog(header: row),
+        ),
+      );
+    } finally {
+      editVm.dispose();
+    }
+    if (!mounted) return;
+    _loadPage();
+  }
+
+  Future<void> _openDelete(BrokerProduction row) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => BrokerProductionDeleteDialog(
+        header: row,
+        onConfirm: () async {
+          final deleteVm = BrokerProductionViewModel();
+          final success = await deleteVm.deleteProduksi(row.noProduksi);
+          final errMsg = deleteVm.saveError;
+          deleteVm.dispose();
+
+          if (ctx.mounted) Navigator.of(ctx).pop();
+          if (!mounted) return;
+
+          if (success) {
+            showDialog(
+              context: context,
+              builder: (_) => SuccessStatusDialog(
+                title: 'Berhasil Menghapus',
+                message: 'No. Produksi ${row.noProduksi} berhasil dihapus.',
+              ),
+            );
+          } else {
+            showDialog(
+              context: context,
+              builder: (_) => ErrorStatusDialog(
+                title: 'Gagal Menghapus!',
+                message: errMsg ?? 'Gagal menghapus data',
+              ),
+            );
+          }
+          _loadPage();
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 520),
-        padding: const EdgeInsets.all(24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 960,
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        mesin.namaMesin,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1F2937),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${mesin.produksiList.length} produksi hari ini',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF6B7280),
-                        ),
-                      ),
-                    ],
+            // Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 16, 12, 14),
+              decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.edit_calendar_outlined,
+                    size: 18,
+                    color: Color(0xFF0D47A1),
                   ),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(
-                    Icons.close,
-                    size: 20,
-                    color: Color(0xFF9CA3AF),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Flexible(
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ...mesin.produksiList.map(
-                      (item) => Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: InkWell(
-                          onTap: () => onSelectProduksi(item),
-                          borderRadius: BorderRadius.circular(10),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 12,
-                            ),
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: const Color(0xFFE2E8F0),
-                              ),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.tag,
-                                            size: 12,
-                                            color: Color(0xFF94A3B8),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            item.noProduksi,
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w700,
-                                              color: Color(0xFF1E40AF),
-                                            ),
-                                          ),
-                                          if (item.shift != null) ...[
-                                            const SizedBox(width: 8),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 6,
-                                                    vertical: 2,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFEFF6FF),
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                              ),
-                                              child: Text(
-                                                'Shift ${item.shift}',
-                                                style: const TextStyle(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Color(0xFF2563EB),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                      if (item.outputJenisNama != null) ...[
-                                        const SizedBox(height: 3),
-                                        Row(
-                                          children: [
-                                            const Icon(
-                                              Icons.category_outlined,
-                                              size: 12,
-                                              color: Color(0xFF94A3B8),
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Expanded(
-                                              child: Text(
-                                                item.outputJenisNama!,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                  color: Color(0xFF374151),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                      if (item.hourStart != null ||
-                                          item.hourEnd != null) ...[
-                                        const SizedBox(height: 2),
-                                        Row(
-                                          children: [
-                                            const Icon(
-                                              Icons.schedule,
-                                              size: 12,
-                                              color: Color(0xFF94A3B8),
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              '${item.hourStart ?? '--:--'} – ${item.hourEnd ?? '--:--'}',
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w600,
-                                                color: Color(0xFF374151),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                      if (item.operator_ != null) ...[
-                                        const SizedBox(height: 2),
-                                        Row(
-                                          children: [
-                                            const Icon(
-                                              Icons.person_outline,
-                                              size: 12,
-                                              color: Color(0xFF94A3B8),
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              item.operator_!,
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                                color: Color(0xFF6B7280),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                                const Icon(
-                                  Icons.chevron_right,
-                                  size: 20,
-                                  color: Color(0xFFCBD5E1),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Input Backdate – ${widget.mesin.namaMesin}',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1F2937),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  TextButton.icon(
+                    onPressed: _openCreate,
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('Tambah Produksi'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF00897B),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(
+                      Icons.close,
+                      size: 20,
+                      color: Color(0xFF9CA3AF),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: onTambahBaru,
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('Tambah Produksi Baru'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF00897B),
-                  side: const BorderSide(color: Color(0xFF00897B)),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
+            // Table
+            Expanded(
+              child: AtlasDataTable<BrokerProduction>(
+                columns: _buildColumns(),
+                items: _items,
+                scrollController: _scrollCtl,
+                isLoading: _isLoading,
+                isFetchingMore: _isFetchingMore,
+                errorMessage: '',
               ),
             ),
           ],
@@ -603,11 +597,45 @@ class _ProduksiSelectionDialog extends StatelessWidget {
   }
 }
 
+class _ActionBtn extends StatelessWidget {
+  const _ActionBtn({
+    required this.icon,
+    required this.color,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Icon(icon, size: 16, color: color),
+        ),
+      ),
+    );
+  }
+}
+
 class _MesinCard extends StatelessWidget {
-  const _MesinCard({required this.mesin, required this.onTap});
+  const _MesinCard({
+    required this.mesin,
+    required this.onTap,
+    required this.onLongPress,
+  });
 
   final BrokerMesinInfo mesin;
   final VoidCallback onTap;
+  final VoidCallback onLongPress;
 
   BrokerProduksiItem? _currentItem() {
     final now = TimeOfDay.now();
@@ -634,7 +662,6 @@ class _MesinCard extends StatelessWidget {
           : nowMin >= s || nowMin < e;
       if (inRange) return p;
     }
-    // fallback: no time-matched item, return first if any
     return mesin.produksiList.isNotEmpty ? mesin.produksiList.first : null;
   }
 
@@ -649,6 +676,7 @@ class _MesinCard extends StatelessWidget {
       elevation: 0,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(12),
         child: Container(
           decoration: BoxDecoration(
@@ -758,15 +786,10 @@ class _MesinCard extends StatelessWidget {
 }
 
 class _PageHeader extends StatelessWidget {
-  const _PageHeader({
-    required this.activeMesin,
-    required this.idleMesin,
-    required this.onRiwayatProduksi,
-  });
+  const _PageHeader({required this.activeMesin, required this.idleMesin});
 
   final int activeMesin;
   final int idleMesin;
-  final VoidCallback onRiwayatProduksi;
 
   @override
   Widget build(BuildContext context) {
@@ -796,17 +819,6 @@ class _PageHeader extends StatelessWidget {
             label: 'idle',
           ),
           const Spacer(),
-          OutlinedButton.icon(
-            onPressed: onRiwayatProduksi,
-            icon: const Icon(Icons.history, size: 16),
-            label: const Text('Riwayat Produksi'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF0D47A1),
-              side: const BorderSide(color: Color(0xFF0D47A1)),
-              backgroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            ),
-          ),
         ],
       ),
     );

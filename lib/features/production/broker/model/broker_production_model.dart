@@ -286,10 +286,12 @@ class BrokerMesinInfo {
       return int.tryParse(v.toString());
     }
 
-    final rawList = j['produksiList'] as List<dynamic>? ?? [];
-    final items = rawList
-        .map((e) => BrokerProduksiItem.fromJson(e as Map<String, dynamic>))
-        .toList();
+    // API now returns flat structure — one item per mesin row.
+    // Build a produksiList from the flat fields when NoProduksi is present.
+    final List<BrokerProduksiItem> items = [];
+    if (s(j['NoProduksi']) != null) {
+      items.add(BrokerProduksiItem.fromJson(j));
+    }
 
     return BrokerMesinInfo(
       idMesin: i(j['IdMesin']) ?? 0,

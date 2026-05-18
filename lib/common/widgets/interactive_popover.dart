@@ -210,10 +210,13 @@ class _PopoverShellState extends State<_PopoverShell>
               spaceBelow < size.height
         : size.height > spaceBelow && spaceAbove >= size.height;
 
+    final clampMin = margin.top;
+    final clampMax = (screen.height - margin.bottom - size.height)
+        .clamp(clampMin, double.infinity);
     final top = (placeAbove
             ? widget.anchor.dy - size.height - widget.verticalGap
             : widget.anchor.dy + widget.dyOffset)
-        .clamp(margin.top, screen.height - margin.bottom - size.height);
+        .clamp(clampMin, clampMax);
 
     setState(() {
       _showAbove = placeAbove;

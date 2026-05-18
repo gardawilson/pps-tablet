@@ -355,12 +355,19 @@ class _BrokerScreenState extends State<BrokerScreen> {
                       final pending = syncQueue.pendingCountFor('broker');
                       if (pending <= 0) return const SizedBox.shrink();
                       return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
                         child: Align(
                           alignment: Alignment.centerRight,
                           child: Tooltip(
-                            message: 'Sinkronisasi print broker tertunda ($pending)',
-                            child: const Icon(Icons.sync, color: Color(0xFFFFE082)),
+                            message:
+                                'Sinkronisasi print broker tertunda ($pending)',
+                            child: const Icon(
+                              Icons.sync,
+                              color: Color(0xFFFFE082),
+                            ),
                           ),
                         ),
                       );

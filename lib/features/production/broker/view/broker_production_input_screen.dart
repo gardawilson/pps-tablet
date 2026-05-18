@@ -675,32 +675,11 @@ class _BrokerProductionInputScreenState
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(1, 1, 1, 1),
+            padding: const EdgeInsets.fromLTRB(12, 1, 1, 1),
             child: Row(
               children: [
                 _brokerSectionHeader(Icons.input_rounded, 'Label Input'),
                 const Spacer(),
-                if (labelCount > 0) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _kBrokerPrimary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '$labelCount label',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: _kBrokerPrimary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
                 Material(
                   color: locked || isLookupLoading
                       ? Colors.grey.shade100
@@ -897,24 +876,6 @@ class _BrokerProductionInputScreenState
                   iconColor: _kBrokerOutput,
                 ),
                 const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _kBrokerOutput.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '$totalLabel label',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: _kBrokerOutput,
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
@@ -2686,41 +2647,50 @@ class _OutputGrandTotalBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: _kBrokerOutput.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _kBrokerOutput.withValues(alpha: 0.22)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.summarize_outlined, size: 13, color: _kBrokerOutput),
-          const SizedBox(width: 5),
-          const Text(
-            'Total',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: _kBrokerOutput,
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Divider(height: 1, thickness: 1),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.summarize_outlined,
+                size: 13,
+                color: _kBrokerOutput,
+              ),
+              const SizedBox(width: 5),
+              const Text(
+                'Total',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: _kBrokerOutput,
+                ),
+              ),
+              const SizedBox(width: 10),
+              _InlineStat(
+                label: 'Label',
+                value: '$totalLabel',
+                color: _kBrokerOutput,
+              ),
+              const SizedBox(width: 10),
+              _InlineStat(
+                label: 'Sak',
+                value: '$totalSak',
+                color: _kBrokerOutput,
+              ),
+              const SizedBox(width: 10),
+              _InlineStat(
+                label: 'Berat',
+                value: '${num2(totalBerat)} kg',
+                color: _kBrokerOutput,
+              ),
+            ],
           ),
-          const SizedBox(width: 10),
-          _InlineStat(
-            label: 'Label',
-            value: '$totalLabel',
-            color: _kBrokerOutput,
-          ),
-          const SizedBox(width: 10),
-          _InlineStat(label: 'Sak', value: '$totalSak', color: _kBrokerOutput),
-          const SizedBox(width: 10),
-          _InlineStat(
-            label: 'Berat',
-            value: '${num2(totalBerat)} kg',
-            color: _kBrokerOutput,
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -2859,37 +2829,38 @@ class _InputGrandTotalBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const color = _kBrokerPrimary;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.15)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.summarize_outlined, size: 13, color: color),
-          const SizedBox(width: 5),
-          const Text(
-            'Total',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Divider(height: 1, thickness: 1),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          child: Row(
+            children: [
+              const Icon(Icons.summarize_outlined, size: 13, color: color),
+              const SizedBox(width: 5),
+              const Text(
+                'Total',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+              const SizedBox(width: 10),
+              _InlineStat(label: 'Label', value: '$totalLabel', color: color),
+              const SizedBox(width: 10),
+              _InlineStat(label: 'Sak', value: '$totalSak', color: color),
+              const SizedBox(width: 10),
+              _InlineStat(
+                label: 'Berat',
+                value: '${num2(totalBerat)} kg',
+                color: color,
+              ),
+            ],
           ),
-          const SizedBox(width: 10),
-          _InlineStat(label: 'Label', value: '$totalLabel', color: color),
-          const SizedBox(width: 10),
-          _InlineStat(label: 'Sak', value: '$totalSak', color: color),
-          const SizedBox(width: 10),
-          _InlineStat(
-            label: 'Berat',
-            value: '${num2(totalBerat)} kg',
-            color: color,
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -3287,41 +3258,33 @@ class _BrokerOutputDetailDialog extends StatelessWidget {
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 380, maxHeight: 500),
+        constraints: const BoxConstraints(maxWidth: 640, maxHeight: 520),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              decoration: const BoxDecoration(
-                color: Color(0xFF1565C0),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-              ),
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 12, 14),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.list_alt_rounded,
-                    color: Colors.white,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          output.noBroker ?? '-',
+                          output.namaJenis ?? '-',
                           style: const TextStyle(
-                            color: Colors.white,
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
+                            color: Color(0xFF1F2937),
                           ),
                         ),
                         Text(
-                          output.namaJenis ?? '-',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
+                          output.noBroker ?? '-',
+                          style: const TextStyle(
                             fontSize: 11,
+                            color: Color(0xFF6B7280),
                           ),
                         ),
                       ],
@@ -3331,121 +3294,106 @@ class _BrokerOutputDetailDialog extends StatelessWidget {
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(
                       Icons.close,
-                      color: Colors.white,
-                      size: 16,
+                      size: 18,
+                      color: Color(0xFF9CA3AF),
                     ),
                   ),
                 ],
               ),
             ),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              color: const Color(0xFFF0F7FF),
-              child: Row(
-                children: [
-                  _MiniMetric(
-                    icon: Icons.inventory_2_outlined,
-                    text: '${output.totalSak} Sak',
-                  ),
-                  const SizedBox(width: 16),
-                  _MiniMetric(
-                    icon: Icons.scale_outlined,
-                    text: '${num2(output.totalBerat)} kg total',
-                  ),
-                ],
-              ),
-            ),
             const Divider(height: 1, color: _kBrokerBorder),
+            // Grid sak
             Flexible(
               child: output.detailSak.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.all(20),
+                  ? const Padding(
+                      padding: EdgeInsets.all(24),
                       child: Text(
                         'Tidak ada detail sak',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey.shade500,
+                          color: Color(0xFF9CA3AF),
                         ),
                       ),
                     )
-                  : ListView.separated(
-                      shrinkWrap: true,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: output.detailSak.length,
-                      separatorBuilder: (_, __) => const Divider(
-                        height: 1,
-                        indent: 20,
-                        endIndent: 20,
-                        color: _kBrokerBorder,
-                      ),
-                      itemBuilder: (_, i) {
-                        final s = output.detailSak[i];
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 10,
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 36,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFE3F2FD),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    '${s.noSak ?? '-'}',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w800,
-                                      color: Color(0xFF1565C0),
-                                    ),
-                                  ),
-                                ),
+                  : Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: GridView.builder(
+                        shrinkWrap: true,
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 7,
+                              crossAxisSpacing: 5,
+                              mainAxisSpacing: 5,
+                              childAspectRatio: 1.6,
+                            ),
+                        itemCount: output.detailSak.length,
+                        itemBuilder: (_, i) {
+                          final s = output.detailSak[i];
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF0F7FF),
+                              borderRadius: BorderRadius.circular(7),
+                              border: Border.all(
+                                color: const Color(0xFFBFDBFE),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
                                   'Sak ${s.noSak ?? '-'}',
                                   style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF1A1D23),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF1D4ED8),
                                   ),
                                 ),
-                              ),
-                              Text(
-                                '${num2(s.berat)} kg',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF1A1D23),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${num2(s.berat)} kg',
+                                  style: const TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF374151),
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
+                              ],
+                            ),
+                          );
+                        },
+                      ),
                     ),
             ),
             const Divider(height: 1, color: _kBrokerBorder),
+            // Footer total
             Padding(
-              padding: const EdgeInsets.all(14),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: _kBrokerBorder),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                children: [
+                  Text(
+                    '${output.totalSak} sak',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1D4ED8),
                     ),
                   ),
-                  child: const Text('Tutup'),
-                ),
+                  const SizedBox(width: 12),
+                  Text(
+                    '${num2(output.totalBerat)} kg',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF374151),
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Tutup'),
+                  ),
+                ],
               ),
             ),
           ],

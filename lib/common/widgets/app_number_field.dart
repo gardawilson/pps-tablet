@@ -21,6 +21,11 @@ class AppNumberField extends StatelessWidget {
   final Widget? suffixIcon;
   final String? suffixText;
   final String? prefixText;
+  final bool isDense;
+  final EdgeInsetsGeometry contentPadding;
+  final double iconSize;
+  final double fontSize;
+  final double labelFontSize;
 
   // Form
   final String? Function(String?)? validator;
@@ -43,6 +48,14 @@ class AppNumberField extends StatelessWidget {
     this.suffixIcon,
     this.suffixText,
     this.prefixText,
+    this.isDense = false,
+    this.contentPadding = const EdgeInsets.symmetric(
+      horizontal: 16,
+      vertical: 14,
+    ),
+    this.iconSize = 22,
+    this.fontSize = 16,
+    this.labelFontSize = 15,
     this.validator,
     this.onChanged,
     this.onSubmitted,
@@ -87,24 +100,22 @@ class AppNumberField extends StatelessWidget {
       inputFormatters: _formatters(),
       maxLength: maxLength,
       textInputAction: textInputAction,
-      style: const TextStyle(fontSize: 16), // non-bold
+      style: TextStyle(fontSize: fontSize), // non-bold
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(fontSize: 15),
+        labelStyle: TextStyle(fontSize: labelFontSize),
         hintText: hintText,
+        isDense: isDense,
         prefixIcon: Icon(
           icon,
-          size: 22,
+          size: iconSize,
           color: enabled ? null : Theme.of(context).disabledColor,
         ),
         prefixText: prefixText,
         suffixIcon: suffixIcon,
         suffixText: suffixText,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
-        ),
+        contentPadding: contentPadding,
       ),
       validator: validator,
       onChanged: onChanged,

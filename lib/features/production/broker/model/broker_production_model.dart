@@ -6,6 +6,7 @@ class BrokerProduction {
   final int idMesin;
   final String namaMesin;
   final String namaOperator;
+  final String? outputJenisNama;
   final DateTime? tglProduksi;
   final int jamKerja;
   final int shift;
@@ -33,6 +34,7 @@ class BrokerProduction {
     required this.idMesin,
     required this.namaMesin,
     required this.namaOperator,
+    this.outputJenisNama,
     required this.tglProduksi,
     required this.jamKerja,
     required this.shift,
@@ -125,6 +127,9 @@ class BrokerProduction {
       idMesin: _asIntRequired(j['IdMesin']),
       namaMesin: _asString(j['NamaMesin']),
       namaOperator: _asString(j['NamaOperator']),
+      outputJenisNama: (j['OutputJenisNama'] == null || _asString(j['OutputJenisNama']).trim().isEmpty)
+          ? null
+          : _asString(j['OutputJenisNama']),
       tglProduksi: _asDateTime(j['TglProduksi']),
       jamKerja: _asIntRequired(j['JamKerja']),
       shift: _asIntRequired(j['Shift']),
@@ -152,6 +157,7 @@ class BrokerProduction {
     'IdMesin': idMesin,
     'NamaMesin': namaMesin,
     'NamaOperator': namaOperator,
+    'OutputJenisNama': outputJenisNama,
     'TglProduksi': tglProduksi == null
         ? null
         : (asDateOnly

@@ -41,6 +41,7 @@ class BrokerProductionFormDialog extends StatefulWidget {
   final int? initialReguId;
   final int? initialHadir;
   final int? initialJmlhAnggota;
+  final bool isBackdateInput;
   final List<BrokerProduksiItem> existingProduksiList;
 
   const BrokerProductionFormDialog({
@@ -57,6 +58,7 @@ class BrokerProductionFormDialog extends StatefulWidget {
     this.initialReguId,
     this.initialHadir,
     this.initialJmlhAnggota,
+    this.isBackdateInput = false,
     this.existingProduksiList = const [],
   });
 
@@ -172,6 +174,28 @@ class _BrokerProductionFormDialogState
     final end = hourEndCtrl.text.trim();
     if (start.isEmpty || end.isEmpty) return null;
     return '$start-$end';
+  }
+
+  Future<void> _pickTanggal() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+      locale: const Locale('id', 'ID'),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _selectedDate = picked;
+      dateCreatedCtrl.text = DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(
+        picked,
+      );
+    });
+    if (_selectedShift != null) {
+      await _fetchShiftHour(_selectedShift!);
+    } else {
+      await _checkOverlapIfReadyVM();
+    }
   }
 
   Future<void> _submit() async {
@@ -440,21 +464,44 @@ class _BrokerProductionFormDialogState
       '📝 [BROKER_FORM] Controller from VM: hash=${vm.pagingController.hashCode}',
     );
 
+    final mq = MediaQuery.of(context);
+    final keyboardInset = mq.viewInsets.bottom;
+    final isLandscape = mq.orientation == Orientation.landscape;
+    final maxDialogHeight = mq.size.height - 24;
+    final dialogMaxWidth = isLandscape ? 680.0 : 620.0;
+    final dialogInsets = isLandscape
+        ? const EdgeInsets.symmetric(horizontal: 72, vertical: 12)
+        : const EdgeInsets.symmetric(horizontal: 24, vertical: 16);
+
     return ChangeNotifierProvider(
       create: (_) => OverlapViewModel(repository: OverlapRepository()),
       child: Dialog(
         backgroundColor: Colors.white,
+        insetPadding: dialogInsets,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 680, maxHeight: 520),
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildForm(),
-              const SizedBox(height: 16),
-              _buildActions(),
-            ],
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: dialogMaxWidth,
+            maxHeight: maxDialogHeight.clamp(260, isLandscape ? 560 : 680),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  fit: FlexFit.loose,
+                  child: SingleChildScrollView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: EdgeInsets.only(bottom: keyboardInset),
+                    child: _buildForm(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildActions(),
+              ],
+            ),
           ),
         ),
       ),
@@ -483,7 +530,7 @@ class _BrokerProductionFormDialogState
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Baris 1: Nama mesin (judul) + Hadir
+          // Baris 1: Nama mesin (judul) + Tanggal (khusus backdate)
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -499,20 +546,35 @@ class _BrokerProductionFormDialogState
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                flex: 1,
-                child: AppNumberField(
-                  controller: hadirCtrl,
-                  label: 'Hadir',
-                  icon: Icons.people,
-                  allowDecimal: false,
-                  allowNegative: false,
-                  hintText: '0',
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Wajib diisi' : null,
+              if (widget.isBackdateInput) ...[
+                const SizedBox(width: 16),
+                Expanded(
+                  flex: 2,
+                  child: TextFormField(
+                    controller: dateCreatedCtrl,
+                    readOnly: true,
+                    onTap: _pickTanggal,
+                    decoration: InputDecoration(
+                      labelText: 'Tanggal',
+                      hintText: 'Pilih tanggal',
+                      prefixIcon: const Icon(
+                        Icons.calendar_today_outlined,
+                        size: 20,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                    ),
+                    validator: (v) =>
+                        (v == null || v.isEmpty) ? 'Wajib pilih tanggal' : null,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
 
@@ -622,7 +684,7 @@ class _BrokerProductionFormDialogState
 
           const SizedBox(height: 16),
 
-          // Baris 3: Regu + Operator
+          // Baris 3: Regu + Operator + Hadir
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -638,7 +700,7 @@ class _BrokerProductionFormDialogState
               ),
               const SizedBox(width: 12),
               Expanded(
-                flex: 2,
+                flex: 1,
                 child: OperatorDropdown(
                   key: ValueKey(
                     _operatorPreselectId ?? widget.header?.idOperator,
@@ -651,6 +713,28 @@ class _BrokerProductionFormDialogState
                   autovalidateMode: AutovalidateMode.onUserInteraction,
                   validator: (v) => v == null ? 'Wajib pilih operator' : null,
                   onChanged: (op) => setState(() => _selectedOperator = op),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 1,
+                child: AppNumberField(
+                  controller: hadirCtrl,
+                  label: 'Hadir',
+                  icon: Icons.people,
+                  allowDecimal: false,
+                  allowNegative: false,
+                  hintText: '0',
+                  isDense: true,
+                  iconSize: 20,
+                  fontSize: 14,
+                  labelFontSize: 14,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  validator: (v) =>
+                      (v == null || v.isEmpty) ? 'Wajib diisi' : null,
                 ),
               ),
             ],

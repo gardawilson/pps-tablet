@@ -87,7 +87,7 @@ class _BrokerProductionMesinScreenState
     );
     final defaultShift = await _fetchCurrentShift();
     if (!mounted) return;
-    await showDialog<void>(
+    final created = await showDialog<BrokerProduction>(
       context: context,
       barrierDismissible: false,
       builder: (_) => BrokerProductionFormDialog(
@@ -100,6 +100,24 @@ class _BrokerProductionMesinScreenState
       ),
     );
     if (!mounted) return;
+    if (created != null) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => BrokerProductionInputScreen(
+            noProduksi: created.noProduksi,
+            idMesin: created.idMesin,
+            namaMesin: created.namaMesin,
+            shift: created.shift,
+            tglProduksi: created.tglProduksi,
+            isLocked: created.isLocked,
+            lastClosedDate: created.lastClosedDate,
+            hourStart: created.hourStart,
+            hourEnd: created.hourEnd,
+          ),
+        ),
+      );
+      if (!mounted) return;
+    }
     _refresh();
   }
 
@@ -142,6 +160,24 @@ class _BrokerProductionMesinScreenState
       builder: (_) => _MesinHistoryDialog(
         mesin: mesin,
         fetchCurrentShift: _fetchCurrentShift,
+        onOpenInput: (row) async {
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => BrokerProductionInputScreen(
+                noProduksi: row.noProduksi,
+                idMesin: row.idMesin,
+                namaMesin: row.namaMesin,
+                shift: row.shift,
+                tglProduksi: row.tglProduksi,
+                isLocked: row.isLocked,
+                lastClosedDate: row.lastClosedDate,
+                hourStart: row.hourStart,
+                hourEnd: row.hourEnd,
+              ),
+            ),
+          );
+          if (mounted) _refresh();
+        },
       ),
     );
     if (!mounted) return;
@@ -238,11 +274,13 @@ class _MesinHistoryDialog extends StatefulWidget {
   const _MesinHistoryDialog({
     required this.mesin,
     required this.fetchCurrentShift,
+    required this.onOpenInput,
   });
 
   final BrokerMesinInfo mesin;
   final Future<({int shift, String hourStart, String hourEnd})?> Function()
   fetchCurrentShift;
+  final Future<void> Function(BrokerProduction row) onOpenInput;
 
   @override
   State<_MesinHistoryDialog> createState() => _MesinHistoryDialogState();
@@ -336,7 +374,7 @@ class _MesinHistoryDialogState extends State<_MesinHistoryDialog> {
     return [
       AtlasTableColumn(
         title: 'No. Produksi',
-        width: 160,
+        width: 120,
         cellBuilder: (_, r, __) => Text(
           r.noProduksi,
           style: const TextStyle(
@@ -372,7 +410,7 @@ class _MesinHistoryDialogState extends State<_MesinHistoryDialog> {
       ),
       AtlasTableColumn(
         title: 'Operator',
-        width: 180,
+        flex: 2,
         cellBuilder: (_, r, __) => Text(
           r.namaOperator,
           maxLines: 1,
@@ -381,31 +419,70 @@ class _MesinHistoryDialogState extends State<_MesinHistoryDialog> {
         ),
       ),
       AtlasTableColumn(
+        title: 'Jenis Output',
+        flex: 2,
+        cellBuilder: (_, r, __) {
+          final jenis = (r.outputJenisNama ?? '').trim();
+          return Text(
+            jenis.isEmpty ? '-' : jenis,
+            maxLines: 3,
+            softWrap: true,
+            style: const TextStyle(fontSize: 12),
+          );
+        },
+      ),
+      AtlasTableColumn(
         title: 'Aksi',
-        width: 120,
-        cellBuilder: (_, r, __) => Row(
-          children: [
-            _ActionBtn(
-              icon: Icons.edit_outlined,
-              color: const Color(0xFF0D47A1),
-              tooltip: 'Edit',
-              onTap: () => _openEdit(r),
-            ),
-            const SizedBox(width: 6),
-            _ActionBtn(
-              icon: Icons.delete_outline,
-              color: const Color(0xFFDC2626),
-              tooltip: 'Hapus',
-              onTap: () => _openDelete(r),
-            ),
-            const SizedBox(width: 6),
-            _ActionBtn(
-              icon: Icons.input_outlined,
-              color: const Color(0xFF00897B),
-              tooltip: 'Input',
-              onTap: () => _openInput(r),
-            ),
-          ],
+        width: 70,
+        showDivider: false,
+        cellBuilder: (context, r, __) => LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 110;
+            if (isNarrow) {
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: PopupMenuButton<String>(
+                  tooltip: 'Aksi',
+                  icon: const Icon(Icons.more_vert, size: 18),
+                  onSelected: (value) {
+                    if (value == 'edit') _openEdit(r);
+                    if (value == 'hapus') _openDelete(r);
+                    if (value == 'input') _openInput(r);
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: 'edit', child: Text('Edit')),
+                    PopupMenuItem(value: 'hapus', child: Text('Hapus')),
+                    PopupMenuItem(value: 'input', child: Text('Input')),
+                  ],
+                ),
+              );
+            }
+
+            return Row(
+              children: [
+                _ActionBtn(
+                  icon: Icons.edit_outlined,
+                  color: const Color(0xFF0D47A1),
+                  tooltip: 'Edit',
+                  onTap: () => _openEdit(r),
+                ),
+                const SizedBox(width: 4),
+                _ActionBtn(
+                  icon: Icons.delete_outline,
+                  color: const Color(0xFFDC2626),
+                  tooltip: 'Hapus',
+                  onTap: () => _openDelete(r),
+                ),
+                const SizedBox(width: 4),
+                _ActionBtn(
+                  icon: Icons.input_outlined,
+                  color: const Color(0xFF00897B),
+                  tooltip: 'Input',
+                  onTap: () => _openInput(r),
+                ),
+              ],
+            );
+          },
         ),
       ),
     ];
@@ -413,21 +490,7 @@ class _MesinHistoryDialogState extends State<_MesinHistoryDialog> {
 
   void _openInput(BrokerProduction row) {
     Navigator.of(context).pop();
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => BrokerProductionInputScreen(
-          noProduksi: row.noProduksi,
-          idMesin: row.idMesin,
-          namaMesin: row.namaMesin,
-          shift: row.shift,
-          tglProduksi: row.tglProduksi,
-          isLocked: row.isLocked,
-          lastClosedDate: row.lastClosedDate,
-          hourStart: row.hourStart,
-          hourEnd: row.hourEnd,
-        ),
-      ),
-    );
+    widget.onOpenInput(row);
   }
 
   Future<void> _openCreate() async {
@@ -443,14 +506,15 @@ class _MesinHistoryDialogState extends State<_MesinHistoryDialog> {
 
     final createVm = BrokerProductionViewModel();
     try {
-      await showDialog<void>(
+      final created = await showDialog<BrokerProduction>(
         context: context,
         barrierDismissible: false,
         builder: (_) => ChangeNotifierProvider.value(
           value: createVm,
           child: BrokerProductionFormDialog(
             initialMesin: mstMesin,
-            initialDate: DateTime.now(),
+            initialDate: DateTime.now().subtract(const Duration(days: 1)),
+            isBackdateInput: true,
             existingProduksiList: widget.mesin.produksiList,
             initialShift: defaultShift?.shift,
             initialHourStart: defaultShift?.hourStart,
@@ -458,6 +522,12 @@ class _MesinHistoryDialogState extends State<_MesinHistoryDialog> {
           ),
         ),
       );
+      if (!mounted) return;
+      if (created != null) {
+        Navigator.of(context).pop();
+        await widget.onOpenInput(created);
+        return;
+      }
     } finally {
       createVm.dispose();
     }
@@ -531,8 +601,8 @@ class _MesinHistoryDialogState extends State<_MesinHistoryDialog> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: 960,
-          maxHeight: MediaQuery.of(context).size.height * 0.85,
+          maxWidth: MediaQuery.of(context).size.width * 0.75,
+          maxHeight: MediaQuery.of(context).size.height * 0.82,
         ),
         child: Column(
           children: [
@@ -542,52 +612,72 @@ class _MesinHistoryDialogState extends State<_MesinHistoryDialog> {
               decoration: const BoxDecoration(
                 border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
               ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.edit_calendar_outlined,
-                    size: 18,
-                    color: Color(0xFF0D47A1),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Input Backdate – ${widget.mesin.namaMesin}',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF1F2937),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isNarrow = constraints.maxWidth < 760;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.edit_calendar_outlined,
+                            size: 18,
+                            color: Color(0xFF0D47A1),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              widget.mesin.namaMesin,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF1F2937),
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            icon: const Icon(
+                              Icons.close,
+                              size: 20,
+                              color: Color(0xFF9CA3AF),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ),
-                  TextButton.icon(
-                    onPressed: _openCreate,
-                    icon: const Icon(Icons.add, size: 16),
-                    label: const Text('Tambah Produksi'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF00897B),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(
-                      Icons.close,
-                      size: 20,
-                      color: Color(0xFF9CA3AF),
-                    ),
-                  ),
-                ],
+                      if (isNarrow) const SizedBox(height: 2),
+                    ],
+                  );
+                },
               ),
             ),
             // Table
             Expanded(
-              child: AtlasDataTable<BrokerProduction>(
-                columns: _buildColumns(),
-                items: _items,
-                scrollController: _scrollCtl,
-                isLoading: _isLoading,
-                isFetchingMore: _isFetchingMore,
-                errorMessage: '',
+              child: Stack(
+                children: [
+                  AtlasDataTable<BrokerProduction>(
+                    columns: _buildColumns(),
+                    items: _items,
+                    scrollController: _scrollCtl,
+                    isLoading: _isLoading,
+                    isFetchingMore: _isFetchingMore,
+                    errorMessage: '',
+                  ),
+                  Positioned(
+                    right: 14,
+                    bottom: 14,
+                    child: FloatingActionButton.extended(
+                      heroTag: null,
+                      backgroundColor: const Color(0xFF0A7349),
+                      foregroundColor: Colors.white,
+                      elevation: 2,
+                      onPressed: _openCreate,
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Input Backdate'),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -671,143 +761,111 @@ class _MesinCard extends StatelessWidget {
     final current = active ? _currentItem() : null;
 
     const activeAccent = Color(0xFF16A34A);
-    const idleAccent = Color(0xFF94A3B8);
-    final accent = active ? activeAccent : idleAccent;
-
+    const inactiveAccent = Color(0xFFDC2626);
+    final accent = active ? activeAccent : inactiveAccent;
+    final borderColor = active
+        ? const Color(0xFF86EFAC)
+        : const Color(0xFFFCA5A5);
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(14),
-      elevation: active ? 3 : 1,
-      shadowColor: active
-          ? const Color(0xFF16A34A).withValues(alpha: 0.18)
-          : Colors.black12,
+      borderRadius: BorderRadius.circular(16),
+      elevation: 0,
       child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: active ? const Color(0xFF86EFAC) : const Color(0xFFE5E7EB),
-              width: active ? 1.5 : 1,
-            ),
+            borderRadius: BorderRadius.circular(16),
+            color: Colors.white,
+            border: Border.all(color: borderColor, width: 1.2),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Top colour strip + status badge ──
-              Container(
-                height: 6,
-                decoration: BoxDecoration(
-                  color: accent,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(13),
-                  ),
-                ),
-              ),
-
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ── Machine name + status pill ──
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: 30,
-                            height: 30,
-                            decoration: BoxDecoration(
-                              color: active
-                                  ? const Color(0xFFDCFCE7)
-                                  : const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              Icons.precision_manufacturing_outlined,
-                              size: 16,
-                              color: accent,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   mesin.namaMesin,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                    fontSize: 12,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.w700,
                                     color: Color(0xFF1F2937),
-                                    height: 1.2,
+                                    height: 1.25,
                                   ),
                                 ),
-                                const SizedBox(height: 2),
+                                const SizedBox(height: 6),
                                 _StatusPill(active: active),
                               ],
                             ),
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 10),
-                      const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                      const Divider(height: 1, color: Color(0xFFE2E8F0)),
                       const SizedBox(height: 8),
-
-                      // ── Detail section ──
-                      if (current != null) ...[
-                        if (current.shift != null)
-                          _InfoRow(
-                            icon: Icons.access_time_outlined,
-                            iconColor: const Color(0xFF0D47A1),
-                            text:
-                                'Shift ${current.shift}  •  ${current.hourStart ?? '--:--'} – ${current.hourEnd ?? '--:--'}',
-                            bold: true,
-                          ),
-                        if (current.outputJenisNama != null) ...[
-                          const SizedBox(height: 4),
-                          _InfoRow(
-                            icon: Icons.inventory_2_outlined,
-                            iconColor: const Color(0xFF7C3AED),
-                            text: current.outputJenisNama!,
-                            maxLines: 2,
-                          ),
-                        ],
-                        if (current.operator_ != null) ...[
-                          const SizedBox(height: 4),
-                          _InfoRow(
-                            icon: Icons.person_outline,
-                            iconColor: const Color(0xFF0369A1),
-                            text: current.operator_!,
-                          ),
-                        ],
-                      ] else ...[
-                        const SizedBox(height: 2),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.pause_circle_outline,
-                              size: 13,
-                              color: Color(0xFFCBD5E1),
-                            ),
-                            const SizedBox(width: 5),
-                            const Text(
-                              'Belum ada produksi aktif',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Color(0xFFADB5BD),
-                                fontStyle: FontStyle.italic,
+                      Column(
+                        children: [
+                          if (current != null) ...[
+                            if (current.shift != null)
+                              _InfoRow(
+                                icon: Icons.access_time_outlined,
+                                iconColor: const Color(0xFF0D47A1),
+                                text:
+                                    'Shift ${current.shift}  |  ${current.hourStart ?? '--:--'} - ${current.hourEnd ?? '--:--'}',
+                                bold: true,
                               ),
+                            if (current.outputJenisNama != null) ...[
+                              const SizedBox(height: 4),
+                              _InfoRow(
+                                icon: Icons.inventory_2_outlined,
+                                iconColor: const Color(0xFF7C3AED),
+                                text: current.outputJenisNama!,
+                                maxLines: 2,
+                              ),
+                            ],
+                            if (current.operator_ != null) ...[
+                              const SizedBox(height: 4),
+                              _InfoRow(
+                                icon: Icons.person_outline,
+                                iconColor: const Color(0xFF0369A1),
+                                text: current.operator_!,
+                              ),
+                            ],
+                          ] else ...[
+                            const SizedBox(height: 2),
+                            const Row(
+                              children: [
+                                Icon(
+                                  Icons.pause_circle_outline,
+                                  size: 13,
+                                  color: Color(0xFFF87171),
+                                ),
+                                SizedBox(width: 5),
+                                Text(
+                                  'Mesin belum aktif produksi',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Color(0xFFB91C1C),
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
-                        ),
-                      ],
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -826,10 +884,16 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bg = active ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2);
+    final dot = active ? const Color(0xFF16A34A) : const Color(0xFFDC2626);
+    final textColor = active
+        ? const Color(0xFF15803D)
+        : const Color(0xFFB91C1C);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: active ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
+        color: bg,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -838,18 +902,15 @@ class _StatusPill extends StatelessWidget {
           Container(
             width: 5,
             height: 5,
-            decoration: BoxDecoration(
-              color: active ? const Color(0xFF16A34A) : const Color(0xFF94A3B8),
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
           ),
           const SizedBox(width: 4),
           Text(
-            active ? 'Aktif' : 'Idle',
+            active ? 'Aktif' : 'Tidak Aktif',
             style: TextStyle(
               fontSize: 9,
               fontWeight: FontWeight.w700,
-              color: active ? const Color(0xFF15803D) : const Color(0xFF64748B),
+              color: textColor,
               letterSpacing: 0.3,
             ),
           ),
@@ -865,14 +926,14 @@ class _InfoRow extends StatelessWidget {
     required this.iconColor,
     required this.text,
     this.bold = false,
-    this.maxLines = 1,
+    this.maxLines,
   });
 
   final IconData icon;
   final Color iconColor;
   final String text;
   final bool bold;
-  final int maxLines;
+  final int? maxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -888,7 +949,8 @@ class _InfoRow extends StatelessWidget {
           child: Text(
             text,
             maxLines: maxLines,
-            overflow: TextOverflow.ellipsis,
+            overflow: maxLines != null ? TextOverflow.ellipsis : null,
+            softWrap: true,
             style: TextStyle(
               fontSize: 10,
               fontWeight: bold ? FontWeight.w600 : FontWeight.w400,
@@ -911,78 +973,94 @@ class _PageHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 12, 16, 12),
-      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            'Pilih Mesin',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF0D47A1),
+          const Expanded(
+            child: Text(
+              'Mesin Broker Hari Ini',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1F2937),
+                height: 1.2,
+              ),
             ),
           ),
-          const SizedBox(width: 16),
-          _StatDot(
-            color: const Color(0xFF16A34A),
-            value: activeMesin,
-            label: 'aktif',
-          ),
           const SizedBox(width: 12),
-          _StatDot(
-            color: const Color(0xFF94A3B8),
-            value: idleMesin,
-            label: 'idle',
+          _StatChip(
+            icon: Icons.check_circle,
+            color: const Color(0xFF16A34A),
+            bgColor: const Color(0xFFDCFCE7),
+            value: activeMesin,
+            label: 'Mesin Aktif',
           ),
-          const Spacer(),
+          const SizedBox(width: 10),
+          _StatChip(
+            icon: Icons.cancel,
+            color: const Color(0xFFDC2626),
+            bgColor: const Color(0xFFFEE2E2),
+            value: idleMesin,
+            label: 'Mesin Tidak Aktif',
+          ),
         ],
       ),
     );
   }
 }
 
-class _StatDot extends StatelessWidget {
-  const _StatDot({
+class _StatChip extends StatelessWidget {
+  const _StatChip({
+    required this.icon,
     required this.color,
+    required this.bgColor,
     required this.value,
     required this.label,
   });
 
+  final IconData icon;
   final Color color;
+  final Color bgColor;
   final int value;
   final String label;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 6),
-        RichText(
-          text: TextSpan(
-            children: [
-              TextSpan(
-                text: '$value ',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1F2937),
-                ),
-              ),
-              TextSpan(
-                text: label,
-                style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-              ),
-            ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 6),
+          Text(
+            '$value',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
           ),
-        ),
-      ],
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: color,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

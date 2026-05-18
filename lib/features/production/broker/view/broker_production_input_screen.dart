@@ -32,6 +32,8 @@ import '../../../../core/utils/pdf_print_service.dart';
 import '../../../../core/view_model/label_print_lock_socket_manager.dart';
 import '../../../label/broker/repository/broker_repository.dart';
 import '../../../label/bonggolan/repository/bonggolan_repository.dart';
+import '../../../broker_type/model/broker_type_model.dart';
+import '../../../broker_type/widgets/broker_type_dropdown.dart';
 
 const _kBrokerPrimary = Color(0xFF1E6FD9);
 const _kBrokerSurface = Color(0xFFF8F9FB);
@@ -161,6 +163,47 @@ class _BrokerProductionInputScreenState
 
     // selain itu (Batal / Simpan Dulu) -> jangan keluar
     return false;
+  }
+
+  Future<void> _openSplitDialog() async {
+    if (!mounted) return;
+    final idMesin = widget.idMesin;
+    final tgl = widget.tglProduksi;
+    if (idMesin == null || tgl == null) {
+      _showSnack(
+        'Data mesin/tanggal tidak tersedia',
+        backgroundColor: Colors.orange,
+      );
+      return;
+    }
+
+    final newProd = await showDialog<BrokerProduction>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _SplitProduksiDialog(
+        idMesin: idMesin,
+        tanggal: tgl,
+        currentNoProduksi: widget.noProduksi,
+      ),
+    );
+
+    if (newProd == null || !mounted) return;
+
+    await Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => BrokerProductionInputScreen(
+          noProduksi: newProd.noProduksi,
+          idMesin: newProd.idMesin,
+          namaMesin: widget.namaMesin,
+          shift: newProd.shift,
+          tglProduksi: newProd.tglProduksi,
+          isLocked: false,
+          lastClosedDate: null,
+          hourStart: newProd.hourStart,
+          hourEnd: newProd.hourEnd,
+        ),
+      ),
+    );
   }
 
   void _showSnack(String msg, {Color? backgroundColor}) {
@@ -333,6 +376,30 @@ class _BrokerProductionInputScreenState
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
               ),
             ),
+            if (widget.idMesin != null && widget.tglProduksi != null) ...[
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                onPressed: locked ? null : _openSplitDialog,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00897B),
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.grey.shade200,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  elevation: 0,
+                ),
+                icon: const Icon(Icons.add_box_outlined, size: 16),
+                label: const Text(
+                  'Ganti Produksi',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -3832,6 +3899,335 @@ class _OutputPrintButton extends StatelessWidget {
             Icons.print_outlined,
             size: 14,
             color: _kBrokerOutput,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Dialog: Ganti Produksi (split-time)
+// ---------------------------------------------------------------------------
+class _SplitProduksiDialog extends StatefulWidget {
+  const _SplitProduksiDialog({
+    required this.idMesin,
+    required this.tanggal,
+    required this.currentNoProduksi,
+  });
+
+  final int idMesin;
+  final DateTime tanggal;
+  final String currentNoProduksi;
+
+  @override
+  State<_SplitProduksiDialog> createState() => _SplitProduksiDialogState();
+}
+
+class _SplitProduksiDialogState extends State<_SplitProduksiDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _hourCtrl = TextEditingController(
+    text: () {
+      final now = DateTime.now();
+      return '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    }(),
+  );
+  BrokerType? _selectedJenis;
+  bool _isLoading = false;
+  String? _errorMsg;
+
+  @override
+  void dispose() {
+    _hourCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickTime() async {
+    final now = TimeOfDay.now();
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: now,
+      builder: (ctx, child) => MediaQuery(
+        data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true),
+        child: child!,
+      ),
+    );
+    if (picked == null) return;
+    final h = picked.hour.toString().padLeft(2, '0');
+    final m = picked.minute.toString().padLeft(2, '0');
+    _hourCtrl.text = '$h:$m';
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_selectedJenis == null) {
+      setState(() => _errorMsg = 'Pilih jenis broker terlebih dahulu');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMsg = null;
+    });
+
+    try {
+      final repo = BrokerProductionRepository();
+      final result = await repo.addProduksi(
+        idMesin: widget.idMesin,
+        tanggal: widget.tanggal,
+        hourStart: _hourCtrl.text.trim(),
+        outputJenisId: _selectedJenis!.idBroker,
+      );
+      if (mounted) Navigator.of(context).pop(result);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMsg = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 80, vertical: 80),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Header
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00897B).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.add_box_outlined,
+                        size: 18,
+                        color: Color(0xFF00897B),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Ganti Produksi',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF1F2937),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _isLoading
+                          ? null
+                          : () => Navigator.of(context).pop(),
+                      icon: const Icon(
+                        Icons.close,
+                        size: 20,
+                        color: Color(0xFF9CA3AF),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+                const Divider(height: 1, color: Color(0xFFE5E7EB)),
+                const SizedBox(height: 20),
+
+                // Jam Mulai + Jenis Broker (1 baris)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 130,
+                      child: TextFormField(
+                        controller: _hourCtrl,
+                        readOnly: true,
+                        onTap: _pickTime,
+                        decoration: InputDecoration(
+                          labelText: 'Jam Mulai',
+                          hintText: '08:00',
+                          suffixIcon: const Icon(
+                            Icons.access_time,
+                            size: 18,
+                            color: Color(0xFF6B7280),
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFD1D5DB),
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFD1D5DB),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF00897B),
+                              width: 1.5,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                          isDense: true,
+                        ),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return 'Wajib diisi';
+                          }
+                          final parts = v.trim().split(':');
+                          if (parts.length < 2) return 'Format HH:mm';
+                          final h = int.tryParse(parts[0]);
+                          final m = int.tryParse(parts[1]);
+                          if (h == null || m == null || h > 23 || m > 59) {
+                            return 'Format tidak valid';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: BrokerTypeDropdown(
+                        onChanged: (bt) {
+                          setState(() {
+                            _selectedJenis = bt;
+                            _errorMsg = null;
+                          });
+                        },
+                        validator: (v) =>
+                            v == null ? 'Wajib pilih jenis broker' : null,
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Error message
+                if (_errorMsg != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          size: 16,
+                          color: Color(0xFFDC2626),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _errorMsg!,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFFDC2626),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 24),
+
+                // Actions
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    OutlinedButton(
+                      onPressed: _isLoading
+                          ? null
+                          : () => Navigator.of(context).pop(),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF6B7280),
+                        side: const BorderSide(color: Color(0xFFD1D5DB)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text(
+                        'Batal',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: _isLoading ? null : _submit,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00897B),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        elevation: 0,
+                      ),
+                      icon: _isLoading
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.check, size: 16),
+                      label: Text(
+                        _isLoading ? 'Menyimpan...' : 'Ganti Produksi',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

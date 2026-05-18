@@ -670,117 +670,234 @@ class _MesinCard extends StatelessWidget {
     final active = mesin.isActive;
     final current = active ? _currentItem() : null;
 
+    const activeAccent = Color(0xFF16A34A);
+    const idleAccent = Color(0xFF94A3B8);
+    final accent = active ? activeAccent : idleAccent;
+
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      elevation: 0,
+      borderRadius: BorderRadius.circular(14),
+      elevation: active ? 3 : 1,
+      shadowColor: active
+          ? const Color(0xFF16A34A).withValues(alpha: 0.18)
+          : Colors.black12,
       child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         child: Container(
           decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: active ? const Color(0xFF86EFAC) : const Color(0xFFE5E7EB),
+              width: active ? 1.5 : 1,
+            ),
           ),
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: active
-                          ? const Color(0xFFDCFCE7)
-                          : const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      active ? 'Aktif' : 'Idle',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: active
-                            ? const Color(0xFF15803D)
-                            : const Color(0xFF64748B),
-                      ),
-                    ),
+              // ── Top colour strip + status badge ──
+              Container(
+                height: 6,
+                decoration: BoxDecoration(
+                  color: accent,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(13),
                   ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                mesin.namaMesin,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1F2937),
                 ),
               ),
-              const SizedBox(height: 4),
-              if (current != null) ...[
-                if (current.shift != null)
-                  Text(
-                    'Shift ${current.shift}  ${current.hourStart ?? '--:--'} – ${current.hourEnd ?? '--:--'}',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF334155),
-                    ),
-                  ),
-                if (current.outputJenisNama != null) ...[
-                  const SizedBox(height: 3),
-                  Text(
-                    current.outputJenisNama!,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: Color(0xFF374151),
-                    ),
-                  ),
-                ],
-                if (current.operator_ != null) ...[
-                  const SizedBox(height: 3),
-                  Row(
+
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
-                        Icons.person_outline,
-                        size: 10,
-                        color: Color(0xFF94A3B8),
-                      ),
-                      const SizedBox(width: 3),
-                      Expanded(
-                        child: Text(
-                          current.operator_!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Color(0xFF6B7280),
+                      // ── Machine name + status pill ──
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 30,
+                            height: 30,
+                            decoration: BoxDecoration(
+                              color: active
+                                  ? const Color(0xFFDCFCE7)
+                                  : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.precision_manufacturing_outlined,
+                              size: 16,
+                              color: accent,
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  mesin.namaMesin,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF1F2937),
+                                    height: 1.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                _StatusPill(active: active),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
+
+                      const SizedBox(height: 10),
+                      const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                      const SizedBox(height: 8),
+
+                      // ── Detail section ──
+                      if (current != null) ...[
+                        if (current.shift != null)
+                          _InfoRow(
+                            icon: Icons.access_time_outlined,
+                            iconColor: const Color(0xFF0D47A1),
+                            text:
+                                'Shift ${current.shift}  •  ${current.hourStart ?? '--:--'} – ${current.hourEnd ?? '--:--'}',
+                            bold: true,
+                          ),
+                        if (current.outputJenisNama != null) ...[
+                          const SizedBox(height: 4),
+                          _InfoRow(
+                            icon: Icons.inventory_2_outlined,
+                            iconColor: const Color(0xFF7C3AED),
+                            text: current.outputJenisNama!,
+                            maxLines: 2,
+                          ),
+                        ],
+                        if (current.operator_ != null) ...[
+                          const SizedBox(height: 4),
+                          _InfoRow(
+                            icon: Icons.person_outline,
+                            iconColor: const Color(0xFF0369A1),
+                            text: current.operator_!,
+                          ),
+                        ],
+                      ] else ...[
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.pause_circle_outline,
+                              size: 13,
+                              color: Color(0xFFCBD5E1),
+                            ),
+                            const SizedBox(width: 5),
+                            const Text(
+                              'Belum ada produksi aktif',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Color(0xFFADB5BD),
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
-                ],
-              ] else
-                const Text(
-                  'Belum ada produksi aktif',
-                  style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
                 ),
+              ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.active});
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: active ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 5,
+            height: 5,
+            decoration: BoxDecoration(
+              color: active ? const Color(0xFF16A34A) : const Color(0xFF94A3B8),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            active ? 'Aktif' : 'Idle',
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              color: active ? const Color(0xFF15803D) : const Color(0xFF64748B),
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({
+    required this.icon,
+    required this.iconColor,
+    required this.text,
+    this.bold = false,
+    this.maxLines = 1,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String text;
+  final bool bold;
+  final int maxLines;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 1),
+          child: Icon(icon, size: 11, color: iconColor),
+        ),
+        const SizedBox(width: 5),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: maxLines,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: bold ? FontWeight.w600 : FontWeight.w400,
+              color: bold ? const Color(0xFF1E3A5F) : const Color(0xFF4B5563),
+              height: 1.3,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

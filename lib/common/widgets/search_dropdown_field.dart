@@ -28,6 +28,8 @@ class SearchDropdownField<T> extends StatefulWidget {
   final bool showSearchBox;
   final String searchHint;
   final double popupMaxHeight;
+  final bool useDialogPopup;
+  final String? dialogTitle;
 
   // validasi form
   final String? Function(T?)? validator;
@@ -66,6 +68,8 @@ class SearchDropdownField<T> extends StatefulWidget {
     this.showSearchBox = true,
     this.searchHint = 'Cari...',
     this.popupMaxHeight = 500,
+    this.useDialogPopup = false,
+    this.dialogTitle,
     this.validator,
     this.autovalidateMode,
     this.helperText,
@@ -90,6 +94,9 @@ class _SearchDropdownFieldState<T> extends State<SearchDropdownField<T>>
     with SingleTickerProviderStateMixin {
   late AnimationController _animController;
   late Animation<double> _rotationAnim;
+  final ScrollController _listScrollCtrl = ScrollController();
+
+  static const double _itemExtent = 49.0; // tinggi tiap item (padding 14*2 + text ~21)
 
   @override
   void initState() {
@@ -106,7 +113,25 @@ class _SearchDropdownFieldState<T> extends State<SearchDropdownField<T>>
   @override
   void dispose() {
     _animController.dispose();
+    _listScrollCtrl.dispose();
     super.dispose();
+  }
+
+  void _scrollToSelected() {
+    if (widget.value == null || widget.items.isEmpty) return;
+    final idx = widget.items.indexWhere((e) {
+      if (widget.compareFn != null) return widget.compareFn!(e, widget.value as T);
+      return e == widget.value;
+    });
+    if (idx < 0) return;
+    final offset = idx * _itemExtent;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_listScrollCtrl.hasClients) {
+        _listScrollCtrl.jumpTo(
+          offset.clamp(0.0, _listScrollCtrl.position.maxScrollExtent),
+        );
+      }
+    });
   }
 
   @override
@@ -202,61 +227,90 @@ class _SearchDropdownFieldState<T> extends State<SearchDropdownField<T>>
                   alignment: Alignment.center,
                 ),
 
-                popupProps: PopupProps.menu(
-                  fit: FlexFit.loose,
-                  showSearchBox: widget.showSearchBox,
-                  searchDelay: Duration.zero,
-                  constraints: BoxConstraints(maxHeight: widget.popupMaxHeight),
-                  onDismissed: () {
-                    if (mounted) _animController.reverse();
-                  },
-                  menuProps: MenuProps(
-                    backgroundColor: Colors.white,
-                    elevation: 8,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  itemBuilder: (context, item, isSelected) =>
-                      _buildPopupItem(context, item, isSelected),
-                  searchFieldProps: TextFieldProps(
-                    decoration: InputDecoration(
-                      hintText: widget.searchHint,
-                      hintStyle: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
-                      ),
-                      prefixIcon: Icon(
-                        Icons.search,
-                        color: Colors.grey.shade600,
-                        size: 20,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(
-                          color: Colors.blue.shade400,
-                          width: 1.5,
+                popupProps: widget.useDialogPopup
+                    ? PopupProps.dialog(
+                        showSearchBox: widget.showSearchBox,
+                        searchDelay: Duration.zero,
+                        title: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                          child: Row(
+                            children: [
+                              Text(
+                                widget.dialogTitle ?? widget.label,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF1F2937),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE5E7EB),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '${widget.items.length}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF6B7280),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
+                        constraints: BoxConstraints.tightFor(width: 400)
+                            .copyWith(maxHeight: widget.popupMaxHeight),
+                        onDismissed: () {
+                          if (mounted) _animController.reverse();
+                        },
+                        dialogProps: DialogProps(
+                          backgroundColor: Colors.white,
+                          elevation: 8,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        listViewProps: ListViewProps(
+                          controller: _listScrollCtrl,
+                          itemExtent: _itemExtent,
+                        ),
+                        itemBuilder: (context, item, isSelected) =>
+                            _buildPopupItem(context, item, isSelected),
+                        searchFieldProps: _buildSearchFieldProps(),
+                      )
+                    : PopupProps.menu(
+                        fit: FlexFit.loose,
+                        showSearchBox: widget.showSearchBox,
+                        searchDelay: Duration.zero,
+                        constraints: BoxConstraints(maxHeight: widget.popupMaxHeight),
+                        onDismissed: () {
+                          if (mounted) _animController.reverse();
+                        },
+                        menuProps: MenuProps(
+                          backgroundColor: Colors.white,
+                          elevation: 8,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        itemBuilder: (context, item, isSelected) =>
+                            _buildPopupItem(context, item, isSelected),
+                        searchFieldProps: _buildSearchFieldProps(),
                       ),
-                      filled: true,
-                      fillColor: Colors.grey.shade50,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 12,
-                      ),
-                    ),
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                ),
 
                 onBeforePopupOpening: (selected) async {
                   _animController.forward();
+                  if (widget.useDialogPopup) {
+                    Future.delayed(
+                      const Duration(milliseconds: 150),
+                      _scrollToSelected,
+                    );
+                  }
                   return true;
                 },
 
@@ -339,25 +393,52 @@ class _SearchDropdownFieldState<T> extends State<SearchDropdownField<T>>
     );
   }
 
+  TextFieldProps _buildSearchFieldProps() {
+    return TextFieldProps(
+      decoration: InputDecoration(
+        hintText: widget.searchHint,
+        hintStyle: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+        prefixIcon: Icon(Icons.search, color: Colors.grey.shade600, size: 20),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.blue.shade400, width: 1.5),
+        ),
+        filled: true,
+        fillColor: Colors.grey.shade50,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      ),
+      style: const TextStyle(fontSize: 14),
+    );
+  }
+
   Widget _buildPopupItem(BuildContext context, T item, bool isSelected) {
     final text = widget.itemAsString?.call(item) ?? '$item';
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-      decoration: BoxDecoration(
-        color: isSelected ? Colors.grey.shade100 : Colors.transparent,
-        border: const Border(
-          bottom: BorderSide(color: Color(0xFFE5E7EB), width: 0.5),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+          color: isSelected ? Colors.blue.shade50 : Colors.transparent,
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              color: isSelected ? Colors.blue.shade700 : Colors.black87,
+            ),
+          ),
         ),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
-          color: isSelected ? Colors.blue.shade700 : Colors.black87,
-        ),
-      ),
+        const Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
+      ],
     );
   }
 }

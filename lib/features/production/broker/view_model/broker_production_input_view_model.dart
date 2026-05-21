@@ -1199,6 +1199,26 @@ class BrokerProductionInputViewModel extends ChangeNotifier {
   bool isInTempKeys(String key) => _tempKeys.contains(key);
   Set<String> getTempKeysForDebug() => Set.unmodifiable(_tempKeys);
 
+  void deleteTempItemsForLabel(String labelCode) {
+    final t = getTemporaryDataForLabel(labelCode);
+    if (t == null || t.isEmpty) return;
+    final allItems = [
+      ...t.brokerItems,
+      ...t.brokerPartials,
+      ...t.bbItems,
+      ...t.bbPartials,
+      ...t.washingItems,
+      ...t.crusherItems,
+      ...t.gilinganItems,
+      ...t.gilinganPartials,
+      ...t.mixerItems,
+      ...t.mixerPartials,
+      ...t.rejectItems,
+      ...t.rejectPartials,
+    ];
+    removeTemporaryItemsForLabel(labelCode, allItems);
+  }
+
   void clearAllTempItems() {
     tempBroker.clear();
     tempBrokerPartial.clear(); // TAMBAHKAN

@@ -31,6 +31,22 @@ class OperatorRepository {
     }
   }
 
+  /// Ambil operator berdasarkan idRegu dari /api/mst-operator/regu/{idRegu}
+  Future<List<MstOperator>> fetchByRegu(int idRegu) async {
+    final uri = Uri.parse('$_base/api/mst-operator/regu/$idRegu');
+    final res = await _get(uri);
+
+    if (res.statusCode != 200) {
+      throw Exception('Gagal mengambil operator regu $idRegu (${res.statusCode})');
+    }
+
+    final decoded = utf8.decode(res.bodyBytes);
+    final body = json.decode(decoded) as Map<String, dynamic>;
+    final List list = (body['data'] ?? []) as List;
+
+    return list.map((e) => MstOperator.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
   /// Ambil semua operator (tanpa pagination) dari /api/mst-operator
   /// includeDisabled: true => sertakan Enable = 0
   /// q: opsional, search by NamaOperator (LIKE %q%)

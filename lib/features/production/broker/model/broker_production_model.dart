@@ -7,6 +7,7 @@ class BrokerProduction {
   final String namaMesin;
   final String namaOperator;
   final String? outputJenisNama;
+  final int? outputJenisId;
   final DateTime? tglProduksi;
   final int jamKerja;
   final int shift;
@@ -24,8 +25,8 @@ class BrokerProduction {
   final String? hourStart; // "HH:mm"
   final String? hourEnd;   // "HH:mm"
 
-  // ✅ NEW: tutup transaksi flags
-  final DateTime? lastClosedDate; // date only
+  // tutup transaksi flags
+  final DateTime? lastClosedDate;
   final bool isLocked;
 
   const BrokerProduction({
@@ -35,6 +36,7 @@ class BrokerProduction {
     required this.namaMesin,
     required this.namaOperator,
     this.outputJenisNama,
+    this.outputJenisId,
     required this.tglProduksi,
     required this.jamKerja,
     required this.shift,
@@ -49,8 +51,6 @@ class BrokerProduction {
     this.namaRegu,
     this.hourStart,
     this.hourEnd,
-
-    // ✅ NEW
     this.lastClosedDate,
     this.isLocked = false,
   });
@@ -97,7 +97,7 @@ class BrokerProduction {
     if (v == null) return null;
 
     if (v is DateTime) {
-      return DateFormat('HH:mm').format(v.toLocal());
+      return DateFormat('HH:mm').format(v.isUtc ? v : v.toUtc());
     }
 
     if (v is String) {
@@ -106,7 +106,9 @@ class BrokerProduction {
 
       final asDt = DateTime.tryParse(s);
       if (asDt != null) {
-        return DateFormat('HH:mm').format(asDt.toLocal());
+        // Server stores TIME as epoch datetime in UTC (e.g. 1970-01-01T08:00:00.000Z).
+        // Always read the UTC hour to avoid timezone shift.
+        return DateFormat('HH:mm').format(asDt.toUtc());
       }
 
       final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(s);
@@ -130,6 +132,7 @@ class BrokerProduction {
       outputJenisNama: (j['OutputJenisNama'] == null || _asString(j['OutputJenisNama']).trim().isEmpty)
           ? null
           : _asString(j['OutputJenisNama']),
+      outputJenisId: _asInt(j['OutputJenisId']),
       tglProduksi: _asDateTime(j['TglProduksi']),
       jamKerja: _asIntRequired(j['JamKerja']),
       shift: _asIntRequired(j['Shift']),
@@ -145,7 +148,6 @@ class BrokerProduction {
       hourStart: _asTimeHHmm(j['HourStart']),
       hourEnd: _asTimeHHmm(j['HourEnd']),
 
-      // ✅ NEW: mapping dari backend
       lastClosedDate: _asDateTime(j['LastClosedDate']),
       isLocked: _asBool(j['IsLocked']),
     );

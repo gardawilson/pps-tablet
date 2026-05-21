@@ -113,6 +113,8 @@ class _BrokerProductionMesinScreenState
             lastClosedDate: created.lastClosedDate,
             hourStart: created.hourStart,
             hourEnd: created.hourEnd,
+            namaJenis: created.outputJenisNama,
+            outputJenisId: created.outputJenisId,
           ),
         ),
       );
@@ -145,6 +147,8 @@ class _BrokerProductionMesinScreenState
           lastClosedDate: null,
           hourStart: item.hourStart,
           hourEnd: item.hourEnd,
+          namaJenis: item.outputJenisNama,
+          outputJenisId: item.outputJenisId,
         ),
       ),
     );
@@ -173,6 +177,8 @@ class _BrokerProductionMesinScreenState
                 lastClosedDate: row.lastClosedDate,
                 hourStart: row.hourStart,
                 hourEnd: row.hourEnd,
+                namaJenis: row.outputJenisNama,
+                outputJenisId: row.outputJenisId,
               ),
             ),
           );
@@ -826,6 +832,14 @@ class _MesinCard extends StatelessWidget {
                                     'Shift ${current.shift}  |  ${current.hourStart ?? '--:--'} - ${current.hourEnd ?? '--:--'}',
                                 bold: true,
                               ),
+                            if (current.operator_ != null) ...[
+                              const SizedBox(height: 4),
+                              _InfoRow(
+                                icon: Icons.person_outline,
+                                iconColor: const Color(0xFF0369A1),
+                                text: current.operator_!,
+                              ),
+                            ],
                             if (current.outputJenisNama != null) ...[
                               const SizedBox(height: 4),
                               _InfoRow(
@@ -833,14 +847,6 @@ class _MesinCard extends StatelessWidget {
                                 iconColor: const Color(0xFF7C3AED),
                                 text: current.outputJenisNama!,
                                 maxLines: 2,
-                              ),
-                            ],
-                            if (current.operator_ != null) ...[
-                              const SizedBox(height: 4),
-                              _InfoRow(
-                                icon: Icons.person_outline,
-                                iconColor: const Color(0xFF0369A1),
-                                text: current.operator_!,
                               ),
                             ],
                           ] else ...[

@@ -33,6 +33,9 @@ class BrokerFormDialog extends StatefulWidget {
   final String? preselectNamaMesin;
   final DateTime? preselectDate;
 
+  /// Jika diisi, jenis broker di-preselect dan di-disable (tidak bisa diubah).
+  final int? preselectOutputJenisId;
+
   const BrokerFormDialog({
     super.key,
     this.header,
@@ -41,6 +44,7 @@ class BrokerFormDialog extends StatefulWidget {
     this.preselectNoProduksi,
     this.preselectNamaMesin,
     this.preselectDate,
+    this.preselectOutputJenisId,
   });
 
   @override
@@ -294,7 +298,8 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                 ),
                 const SizedBox(height: 16),
                 BrokerTypeDropdown(
-                  preselectId: widget.header?.idJenisPlastik,
+                  preselectId: widget.preselectOutputJenisId ?? widget.header?.idJenisPlastik,
+                  enabled: widget.preselectOutputJenisId == null,
                   hintText: 'Pilih jenis broker',
                   validator: (v) =>
                       v == null ? 'Wajib pilih jenis broker' : null,

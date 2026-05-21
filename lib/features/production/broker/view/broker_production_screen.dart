@@ -86,6 +86,8 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
                           lastClosedDate: row.lastClosedDate,
                           hourStart: row.hourStart,
                           hourEnd: row.hourEnd,
+                          namaJenis: row.outputJenisNama,
+                          outputJenisId: row.outputJenisId,
                         ),
                       ),
                     );

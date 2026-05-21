@@ -40,10 +40,21 @@ import 'package:pps_tablet/features/sortir_reject_v2/view/sr_v2_list_screen.dart
 import 'package:pps_tablet/features/stock_opname/view/stock_opname_list_screen.dart';
 import 'package:provider/provider.dart';
 
+class BreadcrumbSegment {
+  final String label;
+  final VoidCallback? onTap;
+  const BreadcrumbSegment(this.label, {this.onTap});
+}
+
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
 
   static final shellNavigatorKey = GlobalKey<NavigatorState>();
+
+  /// Global breadcrumb — screens can push/pop segments to show navigation flow.
+  static final breadcrumb = ValueNotifier<List<BreadcrumbSegment>>(
+    [const BreadcrumbSegment('Dashboard')],
+  );
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -51,11 +62,20 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   bool _sidebarCollapsed = false;
-  final _activeTitle = ValueNotifier<String>('Dashboard');
+
+  @override
+  void initState() {
+    super.initState();
+    AppShell.breadcrumb.addListener(_onBreadcrumbChanged);
+  }
+
+  void _onBreadcrumbChanged() {
+    if (mounted) setState(() {});
+  }
 
   @override
   void dispose() {
-    _activeTitle.dispose();
+    AppShell.breadcrumb.removeListener(_onBreadcrumbChanged);
     super.dispose();
   }
 
@@ -65,7 +85,7 @@ class _AppShellState extends State<AppShell> {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
         if (AppShell.shellNavigatorKey.currentState?.canPop() ?? false) {
-          AppShell.shellNavigatorKey.currentState?.pop();
+          AppShell.shellNavigatorKey.currentState?.maybePop();
           return;
         }
         if (!context.mounted) return;
@@ -83,7 +103,7 @@ class _AppShellState extends State<AppShell> {
                 isCollapsed: _sidebarCollapsed,
                 onToggleCollapse: () =>
                     setState(() => _sidebarCollapsed = !_sidebarCollapsed),
-                onNavigate: (title) => _activeTitle.value = title,
+                onNavigate: (title) => AppShell.breadcrumb.value = [BreadcrumbSegment(title)],
               ),
               Expanded(
                 child: Column(
@@ -122,19 +142,7 @@ class _AppShellState extends State<AppShell> {
       ),
       child: Row(
         children: [
-          ValueListenableBuilder<String>(
-            valueListenable: _activeTitle,
-            builder: (_, title, __) => Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFF1F2937),
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
+          _BreadcrumbRow(segments: AppShell.breadcrumb.value),
           const Spacer(),
           _buildUserMenu(context),
           const SizedBox(width: 10),
@@ -483,3 +491,60 @@ class _AppShellState extends State<AppShell> {
 }
 
 enum _UserMenuAction { account, logout }
+
+class _BreadcrumbRow extends StatelessWidget {
+  final List<BreadcrumbSegment> segments;
+  const _BreadcrumbRow({required this.segments});
+
+  @override
+  Widget build(BuildContext context) {
+    if (segments.isEmpty) return const SizedBox.shrink();
+
+    final items = <Widget>[];
+    for (var i = 0; i < segments.length; i++) {
+      final seg = segments[i];
+      final isLast = i == segments.length - 1;
+      final label = Text(
+        seg.label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: isLast ? const Color(0xFF1F2937) : const Color(0xFF6B7280),
+          fontSize: 15,
+          fontWeight: isLast ? FontWeight.w700 : FontWeight.w500,
+        ),
+      );
+
+      items.add(
+        !isLast && seg.onTap != null
+            ? InkWell(
+                onTap: seg.onTap,
+                borderRadius: BorderRadius.circular(4),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 2,
+                  ),
+                  child: label,
+                ),
+              )
+            : label,
+      );
+
+      if (!isLast) {
+        items.add(
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: Icon(
+              Icons.chevron_right_rounded,
+              size: 16,
+              color: Color(0xFFD1D5DB),
+            ),
+          ),
+        );
+      }
+    }
+
+    return Row(mainAxisSize: MainAxisSize.min, children: items);
+  }
+}

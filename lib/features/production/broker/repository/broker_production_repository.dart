@@ -53,6 +53,43 @@ class BrokerProductionRepository {
   }
 
   // =========================
+  //  BY MESIN + TANGGAL + SHIFT
+  // =========================
+  Future<List<BrokerProduction>> fetchByMesinTanggalShift({
+    required int idMesin,
+    required DateTime tanggal,
+    required int shift,
+  }) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/production/broker').replace(
+      queryParameters: {
+        'idMesin': '$idMesin',
+        'tanggal': toDbDateString(tanggal),
+        'shift': '$shift',
+      },
+    );
+
+    late http.Response res;
+    try {
+      res = await http.get(url, headers: _headers(token)).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout mengambil data produksi shift');
+    } catch (e) {
+      rethrow;
+    }
+
+    if (res.statusCode != 200) {
+      throw Exception('Gagal mengambil data produksi shift (${res.statusCode})');
+    }
+
+    final body = json.decode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    final List list = (body['data'] ?? []) as List;
+    return list
+        .map((e) => BrokerProduction.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  // =========================
   //  BY MESIN + TANGGAL
   // =========================
   Future<List<BrokerProduction>> fetchByMesinAndDate({
@@ -357,13 +394,12 @@ class BrokerProductionRepository {
     print('⬅️ [${res.statusCode}] ${res.body}');
 
     if (res.statusCode != 201 && res.statusCode != 200) {
+      String msg = 'Gagal membuat broker produksi (${res.statusCode})';
       try {
         final decoded = json.decode(utf8.decode(res.bodyBytes));
-        final msg = decoded['message'] ?? 'Gagal membuat broker produksi';
-        throw Exception(msg);
-      } catch (_) {
-        throw Exception('Gagal membuat broker produksi (${res.statusCode})');
-      }
+        msg = (decoded['message'] as String?) ?? msg;
+      } catch (_) {}
+      throw Exception(msg);
     }
 
     final decoded = utf8.decode(res.bodyBytes);
@@ -639,6 +675,7 @@ class BrokerProductionRepository {
     required int outputJenisId,
     required num jam,
     required int shift,
+    String? outputJenisNama,
     String? hourStart,
     String? hourEnd,
     int? hadir,
@@ -691,13 +728,12 @@ class BrokerProductionRepository {
     print('⬅️ [${res.statusCode}] ${res.body}');
 
     if (res.statusCode != 201 && res.statusCode != 200) {
+      String msg = 'Gagal membuat broker produksi (${res.statusCode})';
       try {
         final decoded = json.decode(utf8.decode(res.bodyBytes));
-        final msg = decoded['message'] ?? 'Gagal membuat broker produksi';
-        throw Exception(msg);
-      } catch (_) {
-        throw Exception('Gagal membuat broker produksi (${res.statusCode})');
-      }
+        msg = (decoded['message'] as String?) ?? msg;
+      } catch (_) {}
+      throw Exception(msg);
     }
 
     final decoded = utf8.decode(res.bodyBytes);
@@ -706,6 +742,11 @@ class BrokerProductionRepository {
 
     if (data == null) {
       throw Exception('Response tidak mengandung data header');
+    }
+
+    // Server doesn't return OutputJenisNama on create — inject from caller.
+    if (outputJenisNama != null && data['OutputJenisNama'] == null) {
+      data['OutputJenisNama'] = outputJenisNama;
     }
 
     return BrokerProduction.fromJson(data);

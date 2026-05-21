@@ -19,6 +19,7 @@ class ReguDropdown extends StatefulWidget {
   final bool showSearchBox;
   final String searchHint;
   final double popupMaxHeight;
+  final bool useDialogPopup;
   final EdgeInsetsGeometry contentPadding;
 
   const ReguDropdown({
@@ -33,9 +34,10 @@ class ReguDropdown extends StatefulWidget {
     this.helperText,
     this.errorText,
     this.prefixIcon,
-    this.showSearchBox = true,
+    this.showSearchBox = false,
     this.searchHint = 'Cari regu…',
     this.popupMaxHeight = 500,
+    this.useDialogPopup = true,
     this.contentPadding = const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
   });
 
@@ -105,6 +107,7 @@ class _ReguDropdownState extends State<ReguDropdown> {
           showSearchBox: widget.showSearchBox,
           searchHint: widget.searchHint,
           popupMaxHeight: widget.popupMaxHeight,
+          useDialogPopup: widget.useDialogPopup,
           contentPadding: widget.contentPadding,
           isLoading: vm.isLoading,
           fetchError: vm.error.isNotEmpty,

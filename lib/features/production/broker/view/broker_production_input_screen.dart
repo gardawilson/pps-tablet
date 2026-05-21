@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import 'package:pps_tablet/core/view/app_shell.dart';
 import 'package:pps_tablet/features/production/broker/view_model/broker_production_input_view_model.dart';
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/scan_label_dialog.dart';
@@ -21,7 +22,8 @@ import 'package:pps_tablet/features/production/shared/shared.dart';
 import '../widgets/broker_lookup_label_dialog.dart';
 import '../widgets/broker_lookup_label_partial_dialog.dart';
 import '../../../label/broker/widgets/broker_form_dialog.dart';
-import '../../../label/bonggolan/widgets/bonggolan_form_dialog.dart';
+import '../../../label/broker/widgets/broker_production_output_form_dialog.dart';
+import '../../../label/bonggolan/widgets/bonggolan_production_output_form_dialog.dart';
 import '../widgets/broker_move_output_dialog.dart';
 import '../widgets/broker_move_bonggolan_output_dialog.dart';
 import '../../../../core/network/api_client.dart';
@@ -90,6 +92,8 @@ class BrokerProductionInputScreen extends StatefulWidget {
   final DateTime? lastClosedDate;
   final String? hourStart;
   final String? hourEnd;
+  final String? namaJenis;
+  final int? outputJenisId;
 
   const BrokerProductionInputScreen({
     super.key,
@@ -102,6 +106,8 @@ class BrokerProductionInputScreen extends StatefulWidget {
     this.lastClosedDate,
     this.hourStart,
     this.hourEnd,
+    this.namaJenis,
+    this.outputJenisId,
   });
 
   @override
@@ -115,11 +121,26 @@ class _BrokerProductionInputScreenState
   String _selectedInputTab = 'broker';
   String _selectedOutputTab = 'broker';
 
+  List<BreadcrumbSegment> _prevBreadcrumb = [];
+
   @override
   void initState() {
     super.initState();
+    _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      AppShell.breadcrumb.value = [
+        ..._prevBreadcrumb.map(
+          (s) => BreadcrumbSegment(
+            s.label,
+            onTap: () {
+              AppShell.breadcrumb.value = _prevBreadcrumb;
+              AppShell.shellNavigatorKey.currentState?.pop();
+            },
+          ),
+        ),
+        BreadcrumbSegment(widget.namaMesin ?? widget.noProduksi),
+      ];
       context.read<BrokerProductionInputViewModel>().loadInputs(
         widget.noProduksi,
         force: true,
@@ -130,12 +151,19 @@ class _BrokerProductionInputScreenState
     });
   }
 
+  @override
+  void dispose() {
+    AppShell.breadcrumb.value = _prevBreadcrumb;
+    super.dispose();
+  }
+
   // ✅ TAMBAHKAN: Method untuk handle back button
   Future<bool> _onWillPop() async {
     final vm = context.read<BrokerProductionInputViewModel>();
 
     // Tidak ada temp data, boleh keluar langsung
     if (vm.totalTempCount == 0) {
+      AppShell.breadcrumb.value = _prevBreadcrumb;
       return true;
     }
 
@@ -147,9 +175,7 @@ class _BrokerProductionInputScreenState
         totalTempCount: vm.totalTempCount,
         submitSummary: vm.getSubmitSummary(),
         onSavePressed: () {
-          // Tutup dialog dengan hasil false (tidak pop dulu)
           Navigator.of(dialogContext).pop(false);
-          // Trigger flow save yang sudah ada
           _handleSave(context);
         },
       ),
@@ -158,10 +184,11 @@ class _BrokerProductionInputScreenState
     // Jika user pilih "Keluar & Hapus"
     if (shouldPop == true) {
       vm.clearAllTempItems();
+      AppShell.breadcrumb.value = _prevBreadcrumb;
       return true;
     }
 
-    // selain itu (Batal / Simpan Dulu) -> jangan keluar
+    // Batal / Simpan Dulu -> jangan keluar
     return false;
   }
 
@@ -177,17 +204,27 @@ class _BrokerProductionInputScreenState
       return;
     }
 
-    final newProd = await showDialog<BrokerProduction>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => _SplitProduksiDialog(
-        idMesin: idMesin,
-        tanggal: tgl,
-        currentNoProduksi: widget.noProduksi,
-      ),
-    );
+    final splitResult =
+        await showDialog<({BrokerProduction prod, String namaJenis})>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => _SplitProduksiDialog(
+            idMesin: idMesin,
+            tanggal: tgl,
+            currentNoProduksi: widget.noProduksi,
+          ),
+        );
 
-    if (newProd == null || !mounted) return;
+    if (splitResult == null || !mounted) return;
+
+    final newProd = splitResult.prod;
+    final namaJenis = splitResult.namaJenis.isNotEmpty
+        ? splitResult.namaJenis
+        : newProd.outputJenisNama;
+
+    // Restore breadcrumb to parent level before replacing route so the new
+    // screen's initState captures the correct _prevBreadcrumb (not doubled).
+    AppShell.breadcrumb.value = _prevBreadcrumb;
 
     await Navigator.of(context).pushReplacement(
       MaterialPageRoute(
@@ -201,6 +238,8 @@ class _BrokerProductionInputScreenState
           lastClosedDate: null,
           hourStart: newProd.hourStart,
           hourEnd: newProd.hourEnd,
+          namaJenis: namaJenis,
+          outputJenisId: newProd.outputJenisId,
         ),
       ),
     );
@@ -217,18 +256,8 @@ class _BrokerProductionInputScreenState
     );
   }
 
-  Future<void> _openModePopup(BuildContext buttonContext) async {
-    final mode = await showDialog<String>(
-      context: context,
-      builder: (_) => const _BrokerInputModeDialog(),
-    );
-
-    if (mode == null || !mounted) return;
+  Future<void> _openScanDialog({String mode = 'full'}) async {
     setState(() => _selectedMode = mode);
-    await _openScanDialog();
-  }
-
-  Future<void> _openScanDialog() async {
     await showDialog<void>(
       context: context,
       builder: (_) => ScanLabelDialog(
@@ -271,7 +300,7 @@ class _BrokerProductionInputScreenState
         : const SizedBox.shrink();
   }
 
-  Widget _buildWorkspaceToolbar({required bool locked}) {
+  Widget _buildWorkspaceToolbar({required bool locked, String? namaJenis}) {
     final tglText = widget.tglProduksi == null
         ? null
         : DateFormat(
@@ -279,155 +308,285 @@ class _BrokerProductionInputScreenState
             'id_ID',
           ).format(widget.tglProduksi!.toLocal());
 
+    final now = DateTime.now();
+
+    final isToday =
+        widget.idMesin != null &&
+        widget.tglProduksi != null &&
+        () {
+          final t = widget.tglProduksi!;
+          return t.year == now.year && t.month == now.month && t.day == now.day;
+        }();
+
+    final hStart = (widget.hourStart ?? '').trim();
+    final hEnd = (widget.hourEnd ?? '').trim();
+
+    bool isWithinTimeRange() {
+      if (!isToday) return false;
+      if (hStart.isEmpty && hEnd.isEmpty) return false;
+      int toMin(String hhmm) {
+        final p = hhmm.split(':');
+        if (p.length < 2) return -1;
+        final h = int.tryParse(p[0]) ?? -1;
+        final m = int.tryParse(p[1]) ?? -1;
+        if (h < 0 || m < 0) return -1;
+        return h * 60 + m;
+      }
+
+      final nowMin = now.hour * 60 + now.minute;
+      final startMin = hStart.isNotEmpty ? toMin(hStart) : 0;
+      final endMin = hEnd.isNotEmpty ? toMin(hEnd) : 23 * 60 + 59;
+      if (startMin < 0 || endMin < 0) return false;
+      // Overnight shift: end time wraps past midnight (e.g. 16:08 – 00:01)
+      if (endMin < startMin) {
+        return nowMin >= startMin || nowMin <= endMin;
+      }
+      return nowMin >= startMin && nowMin <= endMin;
+    }
+
+    final isActive = !locked && isWithinTimeRange();
+
+    const kActiveAccent = Color(0xFF00897B);
+    const kPastAccent = Color(0xFFF59E0B);
+    const kLockedAccent = Color(0xFFF97316);
+
+    final accentColor = locked
+        ? kLockedAccent
+        : (isActive ? kActiveAccent : kPastAccent);
+
+    final hasJenis = (namaJenis ?? '').trim().isNotEmpty;
+    final canChangeJenis = isToday && !locked;
+
+    final statusLabel = locked
+        ? 'Locked'
+        : (isActive ? 'Sedang Berlangsung' : 'Sudah Lewat');
+    final statusIcon = locked
+        ? Icons.lock_outline
+        : (isActive ? Icons.play_circle_outline : Icons.history_rounded);
+
+    final jamText = (hStart.isNotEmpty || hEnd.isNotEmpty)
+        ? '${hStart.isNotEmpty ? hStart : "--:--"} – ${hEnd.isNotEmpty ? hEnd : "--:--"}'
+        : '-- : --';
+
+    // Segmen info: ikon kecil + teks inline
+    Widget infoTag(IconData icon, String text) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 11, color: Colors.grey.shade400),
+        const SizedBox(width: 3),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 11,
+            color: Colors.grey.shade600,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+
+    Widget dot() => Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Text(
+        '·',
+        style: TextStyle(
+          fontSize: 12,
+          color: Colors.grey.shade300,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+
+    Widget vline() => Container(
+      width: 1,
+      height: 18,
+      color: Colors.grey.shade200,
+      margin: const EdgeInsets.symmetric(horizontal: 10),
+    );
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: _brokerPanelDecoration(),
-        child: Row(
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: _kBrokerPrimary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.confirmation_number_outlined,
-                size: 18,
-                color: _kBrokerPrimary,
-              ),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border(left: BorderSide(color: accentColor, width: 4)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    widget.noProduksi,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF1A1D23),
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if ((widget.namaMesin ?? '').trim().isNotEmpty ||
-                      widget.shift != null ||
-                      tglText != null) ...[
-                    const SizedBox(height: 4),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              // Status badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: accentColor.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(statusIcon, size: 10, color: accentColor),
+                    const SizedBox(width: 4),
                     Text(
-                      _buildHeaderMetaLine(tglText: tglText),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      statusLabel,
                       style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade700,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: accentColor,
                       ),
                     ),
                   ],
-                ],
-              ),
-            ),
-            if (locked) ...[
-              const SizedBox(width: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
                 ),
+              ),
+              vline(),
+              // Jenis produksi — teks saja
+              Flexible(
                 child: Text(
-                  'Locked',
+                  hasJenis ? namaJenis!.trim() : 'Belum ada jenis',
                   style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.orange.shade800,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: hasJenis ? accentColor : Colors.grey.shade400,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              // Tombol ganti + list produksi shift — berdekatan
+              if (canChangeJenis ||
+                  (widget.idMesin != null &&
+                      widget.shift != null &&
+                      widget.tglProduksi != null)) ...[
+                const SizedBox(width: 6),
+                if (canChangeJenis)
+                  SizedBox(
+                    height: 26,
+                    child: TextButton.icon(
+                      onPressed: _openSplitDialog,
+                      style: TextButton.styleFrom(
+                        foregroundColor: accentColor,
+                        backgroundColor: accentColor.withValues(alpha: 0.08),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                      icon: const Icon(Icons.swap_horiz_rounded, size: 13),
+                      label: const Text(
+                        'Ganti',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                if (widget.idMesin != null &&
+                    widget.shift != null &&
+                    widget.tglProduksi != null) ...[
+                  const SizedBox(width: 4),
+                  Tooltip(
+                    message: 'Produksi lain shift ini',
+                    child: SizedBox(
+                      height: 26,
+                      child: TextButton.icon(
+                        onPressed: _showSameDateShiftDialog,
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.grey.shade600,
+                          backgroundColor: Colors.grey.shade100,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        icon: const Icon(Icons.view_list_rounded, size: 13),
+                        label: const Text(
+                          'Timeline',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+              vline(),
+              // Shift · Jam · Tanggal
+              if (widget.shift != null) ...[
+                infoTag(Icons.group_outlined, 'Shift ${widget.shift}'),
+                dot(),
+              ],
+              infoTag(Icons.schedule_outlined, jamText),
+              if (tglText != null) ...[
+                dot(),
+                infoTag(Icons.calendar_today_outlined, tglText),
+              ],
+              const Spacer(),
+              // noProduksi + refresh
+              Text(
+                widget.noProduksi,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Colors.grey.shade400,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0.4,
+                ),
+              ),
+              const SizedBox(width: 2),
+              SizedBox(
+                width: 26,
+                height: 26,
+                child: IconButton(
+                  tooltip: 'Refresh',
+                  padding: EdgeInsets.zero,
+                  onPressed: () {
+                    final vm = context.read<BrokerProductionInputViewModel>();
+                    vm.loadInputs(widget.noProduksi, force: true);
+                    vm.loadOutputs(widget.noProduksi);
+                    _showSnack('Data di-refresh');
+                  },
+                  icon: Icon(
+                    Icons.refresh,
+                    size: 15,
+                    color: Colors.grey.shade400,
                   ),
                 ),
               ),
             ],
-            const SizedBox(width: 10),
-            OutlinedButton.icon(
-              onPressed: () {
-                final vm = context.read<BrokerProductionInputViewModel>();
-                vm.loadInputs(widget.noProduksi, force: true);
-                vm.loadOutputs(widget.noProduksi);
-                _showSnack('Data di-refresh');
-              },
-              style: OutlinedButton.styleFrom(
-                foregroundColor: _kBrokerPrimary,
-                side: const BorderSide(color: _kBrokerBorder),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              icon: const Icon(Icons.refresh, size: 16),
-              label: const Text(
-                'Refresh',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-              ),
-            ),
-            if (widget.idMesin != null && widget.tglProduksi != null) ...[
-              const SizedBox(width: 8),
-              ElevatedButton.icon(
-                onPressed: locked ? null : _openSplitDialog,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00897B),
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: Colors.grey.shade200,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  elevation: 0,
-                ),
-                icon: const Icon(Icons.add_box_outlined, size: 16),
-                label: const Text(
-                  'Ganti Produksi',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                ),
-              ),
-            ],
-          ],
+          ),
         ),
       ),
     );
   }
 
-  String _buildHeaderMetaLine({String? tglText}) {
-    final parts = <String>[];
-
-    final namaMesin = (widget.namaMesin ?? '').trim();
-    if (namaMesin.isNotEmpty) {
-      parts.add(namaMesin);
-    }
-    if (tglText != null && tglText.isNotEmpty) {
-      parts.add(tglText);
-    }
-    if (widget.shift != null) {
-      parts.add('Shift ${widget.shift}');
-    }
-    final start = (widget.hourStart ?? '').trim();
-    final end = (widget.hourEnd ?? '').trim();
-    if (start.isNotEmpty || end.isNotEmpty) {
-      parts.add(
-        '${start.isNotEmpty ? start : '--:--'} – ${end.isNotEmpty ? end : '--:--'}',
-      );
-    }
-
-    return parts.join('  •  ');
+  Future<void> _showSameDateShiftDialog() async {
+    if (widget.idMesin == null ||
+        widget.shift == null ||
+        widget.tglProduksi == null)
+      return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _SameDateShiftProductionsDialog(
+        idMesin: widget.idMesin!,
+        tanggal: widget.tglProduksi!,
+        shift: widget.shift!,
+        currentNoProduksi: widget.noProduksi,
+      ),
+    );
   }
 
   /// ✅ Handler untuk bulk delete
@@ -446,6 +605,72 @@ class _BrokerProductionInputScreenState
     }
 
     return success;
+  }
+
+  Future<void> _showTempCardOptions(String labelTitle) async {
+    final vm = context.read<BrokerProductionInputViewModel>();
+
+    final tempData = vm.getTemporaryDataForLabel(labelTitle);
+    final isSakBased =
+        tempData != null &&
+        (tempData.brokerItems.isNotEmpty ||
+            tempData.brokerPartials.isNotEmpty ||
+            tempData.bbItems.isNotEmpty ||
+            tempData.bbPartials.isNotEmpty ||
+            tempData.washingItems.isNotEmpty ||
+            tempData.mixerItems.isNotEmpty ||
+            tempData.mixerPartials.isNotEmpty);
+    // Partial not supported for Washing (B.) and Crusher (F.)
+    final supportsPartial =
+        tempData != null &&
+        (tempData.brokerItems.isNotEmpty ||
+            tempData.brokerPartials.isNotEmpty ||
+            tempData.bbItems.isNotEmpty ||
+            tempData.bbPartials.isNotEmpty ||
+            tempData.gilinganItems.isNotEmpty ||
+            tempData.gilinganPartials.isNotEmpty ||
+            tempData.mixerItems.isNotEmpty ||
+            tempData.mixerPartials.isNotEmpty ||
+            tempData.rejectItems.isNotEmpty ||
+            tempData.rejectPartials.isNotEmpty);
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => _TempCardOptionsDialog(
+        labelTitle: labelTitle,
+        showSebagian: isSakBased,
+        showPartial: supportsPartial,
+      ),
+    );
+    if (result == null || !mounted) return;
+
+    if (result == 'delete') {
+      vm.deleteTempItemsForLabel(labelTitle);
+    } else if (result == 'select' || result == 'partial') {
+      // Delete existing temp for this label so user can choose a subset/partial
+      vm.deleteTempItemsForLabel(labelTitle);
+      setState(() => _selectedMode = result);
+
+      if (!mounted) return;
+
+      // Reload lookup for this label (uses cache, no new scan needed)
+      final lookupResult = await vm.lookupLabel(labelTitle);
+      if (!mounted) return;
+
+      if (lookupResult == null) {
+        _showSnack(
+          'Gagal memuat data label: ${vm.lookupError ?? "error tidak diketahui"}',
+          backgroundColor: Colors.red,
+        );
+        return;
+      }
+
+      if (result == 'partial') {
+        await _handlePartialMode(context, vm, lookupResult);
+      } else {
+        await _handleSelectMode(context, vm, lookupResult);
+      }
+    }
   }
 
   Future<void> _handleSave(BuildContext context) async {
@@ -688,7 +913,7 @@ class _BrokerProductionInputScreenState
                   child: InkWell(
                     onTap: locked || isLookupLoading
                         ? null
-                        : () => _openModePopup(buttonContext),
+                        : () => _openScanDialog(),
                     borderRadius: BorderRadius.circular(10),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
@@ -744,14 +969,15 @@ class _BrokerProductionInputScreenState
                       ? () {
                           showDialog(
                             context: context,
-                            builder: (_) => AlertDialog(
+                            builder: (dialogContext) => AlertDialog(
                               title: const Text('Hapus Semua Temp?'),
                               content: Text(
                                 'Apakah Anda yakin ingin menghapus ${vm.totalTempCount} item temp?',
                               ),
                               actions: [
                                 TextButton(
-                                  onPressed: () => Navigator.pop(context),
+                                  onPressed: () =>
+                                      Navigator.of(dialogContext).pop(),
                                   child: const Text('Batal'),
                                 ),
                                 ElevatedButton(
@@ -761,7 +987,7 @@ class _BrokerProductionInputScreenState
                                   ),
                                   onPressed: () {
                                     vm.clearAllTempItems();
-                                    Navigator.pop(context);
+                                    Navigator.of(dialogContext).pop();
                                     _showSnack('Semua temp items dihapus');
                                   },
                                   child: const Text('Hapus'),
@@ -825,15 +1051,19 @@ class _BrokerProductionInputScreenState
             ),
             child: brokerOutputs.isEmpty
                 ? const _EmptyOutputCategory(message: 'Belum ada output broker')
-                : GridView.count(
-                    padding: const EdgeInsets.all(8),
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                    childAspectRatio: 1.65,
-                    children: brokerOutputs
-                        .map((output) => _BrokerOutputTile(output: output))
-                        .toList(),
+                : LayoutBuilder(
+                    builder: (_, c) => GridView(
+                      padding: const EdgeInsets.all(6),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+                        crossAxisSpacing: 6,
+                        mainAxisSpacing: 6,
+                        mainAxisExtent: 78,
+                      ),
+                      children: brokerOutputs
+                          .map((output) => _BrokerOutputTile(output: output))
+                          .toList(),
+                    ),
                   ),
           )
         : _OutputCategoryContent(
@@ -845,17 +1075,19 @@ class _BrokerProductionInputScreenState
                 ? const _EmptyOutputCategory(
                     message: 'Belum ada output bonggolan',
                   )
-                : GridView.count(
-                    padding: const EdgeInsets.all(8),
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                    // Make bonggolan cards taller to avoid bottom overflow
-                    // when content includes metrics + action buttons.
-                    childAspectRatio: 1.45,
-                    children: bonggolanOutputs
-                        .map((output) => _BonggolanOutputTile(output: output))
-                        .toList(),
+                : LayoutBuilder(
+                    builder: (_, c) => GridView(
+                      padding: const EdgeInsets.all(6),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+                        crossAxisSpacing: 6,
+                        mainAxisSpacing: 6,
+                        mainAxisExtent: 72,
+                      ),
+                      children: bonggolanOutputs
+                          .map((output) => _BonggolanOutputTile(output: output))
+                          .toList(),
+                    ),
                   ),
           );
 
@@ -1027,26 +1259,45 @@ class _BrokerProductionInputScreenState
                                         }
 
                                         if (isBrokerOutputTab) {
-                                          await showDialog<void>(
-                                            context: context,
-                                            builder: (_) => BrokerFormDialog(
-                                              preselectNoProduksi:
-                                                  widget.noProduksi,
-                                              preselectNamaMesin:
-                                                  widget.namaMesin,
-                                              preselectDate: widget.tglProduksi,
-                                            ),
-                                          );
+                                          if (widget.outputJenisId != null) {
+                                            await showDialog<void>(
+                                              context: context,
+                                              builder: (_) =>
+                                                  BrokerProductionOutputFormDialog(
+                                                    noProduksi:
+                                                        widget.noProduksi,
+                                                    tglProduksi:
+                                                        widget.tglProduksi,
+                                                    outputJenisId:
+                                                        widget.outputJenisId!,
+                                                    outputJenisNama:
+                                                        widget.namaJenis ?? '',
+                                                    namaMesin: widget.namaMesin,
+                                                  ),
+                                            );
+                                          } else {
+                                            await showDialog<void>(
+                                              context: context,
+                                              builder: (_) => BrokerFormDialog(
+                                                preselectNoProduksi:
+                                                    widget.noProduksi,
+                                                preselectNamaMesin:
+                                                    widget.namaMesin,
+                                                preselectDate:
+                                                    widget.tglProduksi,
+                                              ),
+                                            );
+                                          }
                                         } else {
                                           await showDialog<void>(
                                             context: context,
-                                            builder: (_) => BonggolanFormDialog(
-                                              preselectBrokerNoProduksi:
-                                                  widget.noProduksi,
-                                              preselectBrokerNamaMesin:
-                                                  widget.namaMesin,
-                                              preselectDate: widget.tglProduksi,
-                                            ),
+                                            builder: (_) =>
+                                                BonggolanProductionOutputFormDialog(
+                                                  noProduksi: widget.noProduksi,
+                                                  tglProduksi:
+                                                      widget.tglProduksi,
+                                                  namaMesin: widget.namaMesin,
+                                                ),
                                           );
                                         }
 
@@ -1183,88 +1434,81 @@ class _BrokerProductionInputScreenState
           ? const Center(
               child: Text('Tidak ada data', style: TextStyle(fontSize: 11)),
             )
-          : GridView.count(
-              padding: const EdgeInsets.all(8),
-              crossAxisCount: 2,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-              childAspectRatio: 1.8,
-              children: brokerGroups.entries.map((entry) {
-                final hasPartial = entry.value.any((x) => x.isPartialRow);
-                final List<int> columnFlexes = hasPartial
-                    ? const [3, 1, 2]
-                    : const [1, 2];
-                return _InputGroupExpansionTile(
-                  title: entry.key,
-                  headerSubtitle:
-                      (entry.value.isNotEmpty
-                          ? entry.value.first.namaJenis
-                          : '-') ??
-                      '-',
-                  tileMetrics: [
-                    (Icons.inventory_2_outlined, '${entry.value.length} sak'),
-                    (
-                      Icons.scale_outlined,
-                      '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
-                    ),
-                  ],
-                  color: Colors.blue,
-                  expandable: !hasPartial,
-                  isPartialGroup: hasPartial,
-                  partialReference: hasPartial
-                      ? (entry.value
-                                .firstWhere((x) => x.isPartialRow)
-                                .noBroker
-                                ?.toString() ??
-                            '-')
-                      : null,
-                  detailsBuilder: () {
-                    final currentInputs = vm.inputsOf(widget.noProduksi);
-                    final dbItems = currentInputs == null
-                        ? <BrokerItem>[]
-                        : currentInputs.broker.where(
-                            (x) => brokerTitleKey(x) == entry.key,
-                          );
-                    final tempFull = vm.tempBroker.where(
-                      (x) => brokerTitleKey(x) == entry.key,
-                    );
-                    final tempPart = vm.tempBrokerPartial.where(
-                      (x) => brokerTitleKey(x) == entry.key,
-                    );
-                    final items = <BrokerItem>[
-                      ...tempPart,
-                      ...dbItems,
-                      ...tempFull,
-                    ];
-                    return items.map((item) {
-                      final bool isTemp =
-                          vm.tempBroker.contains(item) ||
-                          vm.tempBrokerPartial.contains(item);
-                      final List<String> columns = hasPartial
-                          ? [
-                              item.isPartialRow
-                                  ? item.noBroker.toString()
-                                  : '-',
-                              '${item.noSak ?? '-'}',
-                              '${num2(item.berat)} kg',
-                            ]
-                          : ['${item.noSak ?? '-'}', '${num2(item.berat)} kg'];
-                      return TooltipTableRow(
-                        columns: columns,
-                        columnFlexes: columnFlexes,
-                        showDelete: isTemp,
-                        onDelete: isTemp
-                            ? () => vm.deleteTempBrokerItem(item)
-                            : null,
-                        isTempRow: isTemp,
-                        isHighlighted: isTemp,
-                        isDisabled: !isTemp && !canDelete,
-                        itemData: item,
+          : LayoutBuilder(
+              builder: (_, c) => GridView(
+                padding: const EdgeInsets.all(6),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+                  crossAxisSpacing: 6,
+                  mainAxisSpacing: 6,
+                  mainAxisExtent: 72,
+                ),
+                children: brokerGroups.entries.map((entry) {
+                  final hasPartial = entry.value.any((x) => x.isPartialRow);
+                  return _InputGroupExpansionTile(
+                    title: entry.key,
+                    headerSubtitle:
+                        (entry.value.isNotEmpty
+                            ? entry.value.first.namaJenis
+                            : '-') ??
+                        '-',
+                    tileMetrics: [
+                      (Icons.inventory_2_outlined, '${entry.value.length} sak'),
+                      (
+                        Icons.scale_outlined,
+                        '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
+                      ),
+                    ],
+                    color: Colors.blue,
+                    onLongPress: vm.hasTemporaryDataForLabel(entry.key)
+                        ? () => _showTempCardOptions(entry.key)
+                        : null,
+                    expandable: !hasPartial,
+                    isPartialGroup: hasPartial,
+                    partialReference: hasPartial
+                        ? (entry.value
+                                  .firstWhere((x) => x.isPartialRow)
+                                  .noBroker
+                                  ?.toString() ??
+                              '-')
+                        : null,
+                    detailsBuilder: () => [],
+                    chipItemsBuilder: () {
+                      final currentInputs = vm.inputsOf(widget.noProduksi);
+                      final dbItems = currentInputs == null
+                          ? <BrokerItem>[]
+                          : currentInputs.broker.where(
+                              (x) => brokerTitleKey(x) == entry.key,
+                            );
+                      final tempFull = vm.tempBroker.where(
+                        (x) => brokerTitleKey(x) == entry.key,
                       );
-                    }).toList();
-                  },
-                );
-              }).toList(),
+                      final tempPart = vm.tempBrokerPartial.where(
+                        (x) => brokerTitleKey(x) == entry.key,
+                      );
+                      final items = <BrokerItem>[
+                        ...tempPart,
+                        ...dbItems,
+                        ...tempFull,
+                      ];
+                      return items.map((item) {
+                        final isTemp =
+                            vm.tempBroker.contains(item) ||
+                            vm.tempBrokerPartial.contains(item);
+                        return _InputSakChip(
+                          label: 'Sak ${item.noSak ?? '-'}',
+                          berat: item.berat,
+                          isTemp: isTemp,
+                          isPartial: item.isPartialRow,
+                          onDelete: isTemp
+                              ? () => vm.deleteTempBrokerItem(item)
+                              : null,
+                        );
+                      }).toList();
+                    },
+                  );
+                }).toList(),
+              ),
             );
     } else if (_selectedInputTab == 'bb') {
       int totalSak = 0;
@@ -1284,80 +1528,75 @@ class _BrokerProductionInputScreenState
           ? const Center(
               child: Text('Tidak ada data', style: TextStyle(fontSize: 11)),
             )
-          : GridView.count(
-              padding: const EdgeInsets.all(8),
-              crossAxisCount: 2,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-              childAspectRatio: 1.8,
-              children: bbGroups.entries.map((entry) {
-                final hasPartial = entry.value.any((x) => x.isPartialRow);
-                final List<int> columnFlexes = hasPartial
-                    ? const [3, 1, 2]
-                    : const [1, 2];
-                return _InputGroupExpansionTile(
-                  title: entry.key,
-                  headerSubtitle:
-                      (entry.value.isNotEmpty
-                          ? entry.value.first.namaJenis
-                          : '-') ??
-                      '-',
-                  tileMetrics: [
-                    (Icons.inventory_2_outlined, '${entry.value.length} sak'),
-                    (
-                      Icons.scale_outlined,
-                      '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
-                    ),
-                  ],
-                  color: Colors.blue,
-                  expandable: !hasPartial,
-                  isPartialGroup: hasPartial,
-                  partialReference: hasPartial
-                      ? bbPairLabel(
-                          entry.value.firstWhere((x) => x.isPartialRow),
-                        )
-                      : null,
-                  detailsBuilder: () {
-                    final currentInputs = vm.inputsOf(widget.noProduksi);
-                    final dbItems = currentInputs == null
-                        ? <BbItem>[]
-                        : currentInputs.bb.where(
-                            (x) => bbTitleKey(x) == entry.key,
-                          );
-                    final tempFull = vm.tempBb.where(
-                      (x) => bbTitleKey(x) == entry.key,
-                    );
-                    final tempPart = vm.tempBbPartial.where(
-                      (x) => bbTitleKey(x) == entry.key,
-                    );
-                    final items = [...tempPart, ...dbItems, ...tempFull];
-                    return items.map((item) {
-                      final isTemp =
-                          vm.tempBb.contains(item) ||
-                          vm.tempBbPartial.contains(item);
-                      final List<String> columns = hasPartial
-                          ? [
-                              item.isPartialRow ? bbPairLabel(item) : '-',
-                              '${item.noSak ?? '-'}',
-                              '${num2(item.berat)} kg',
-                            ]
-                          : ['${item.noSak ?? '-'}', '${num2(item.berat)} kg'];
-                      return TooltipTableRow(
-                        columns: columns,
-                        columnFlexes: columnFlexes,
-                        showDelete: isTemp,
-                        onDelete: isTemp
-                            ? () => vm.deleteTempBbItem(item)
-                            : null,
-                        isTempRow: isTemp,
-                        isHighlighted: isTemp,
-                        isDisabled: !isTemp && !canDelete,
-                        itemData: item,
+          : LayoutBuilder(
+              builder: (_, c) => GridView(
+                padding: const EdgeInsets.all(6),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+                  crossAxisSpacing: 6,
+                  mainAxisSpacing: 6,
+                  mainAxisExtent: 72,
+                ),
+                children: bbGroups.entries.map((entry) {
+                  final hasPartial = entry.value.any((x) => x.isPartialRow);
+                  return _InputGroupExpansionTile(
+                    title: entry.key,
+                    headerSubtitle:
+                        (entry.value.isNotEmpty
+                            ? entry.value.first.namaJenis
+                            : '-') ??
+                        '-',
+                    tileMetrics: [
+                      (Icons.inventory_2_outlined, '${entry.value.length} sak'),
+                      (
+                        Icons.scale_outlined,
+                        '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
+                      ),
+                    ],
+                    color: Colors.blue,
+                    onLongPress: vm.hasTemporaryDataForLabel(entry.key)
+                        ? () => _showTempCardOptions(entry.key)
+                        : null,
+                    expandable: !hasPartial,
+                    isPartialGroup: hasPartial,
+                    partialReference: hasPartial
+                        ? bbPairLabel(
+                            entry.value.firstWhere((x) => x.isPartialRow),
+                          )
+                        : null,
+                    detailsBuilder: () => [],
+                    chipItemsBuilder: () {
+                      final currentInputs = vm.inputsOf(widget.noProduksi);
+                      final dbItems = currentInputs == null
+                          ? <BbItem>[]
+                          : currentInputs.bb.where(
+                              (x) => bbTitleKey(x) == entry.key,
+                            );
+                      final tempFull = vm.tempBb.where(
+                        (x) => bbTitleKey(x) == entry.key,
                       );
-                    }).toList();
-                  },
-                );
-              }).toList(),
+                      final tempPart = vm.tempBbPartial.where(
+                        (x) => bbTitleKey(x) == entry.key,
+                      );
+                      final items = [...tempPart, ...dbItems, ...tempFull];
+                      return items.map((item) {
+                        final isTemp =
+                            vm.tempBb.contains(item) ||
+                            vm.tempBbPartial.contains(item);
+                        return _InputSakChip(
+                          label: 'Sak ${item.noSak ?? '-'}',
+                          berat: item.berat,
+                          isTemp: isTemp,
+                          isPartial: item.isPartialRow,
+                          onDelete: isTemp
+                              ? () => vm.deleteTempBbItem(item)
+                              : null,
+                        );
+                      }).toList();
+                    },
+                  );
+                }).toList(),
+              ),
             );
     } else if (_selectedInputTab == 'washing') {
       int totalSak = 0;
@@ -1377,60 +1616,61 @@ class _BrokerProductionInputScreenState
           ? const Center(
               child: Text('Tidak ada data', style: TextStyle(fontSize: 11)),
             )
-          : GridView.count(
-              padding: const EdgeInsets.all(8),
-              crossAxisCount: 2,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-              childAspectRatio: 1.8,
-              children: washingGroups.entries.map((entry) {
-                return _InputGroupExpansionTile(
-                  title: entry.key,
-                  headerSubtitle:
-                      (entry.value.isNotEmpty
-                          ? entry.value.first.namaJenis
-                          : '-') ??
-                      '-',
-                  tileMetrics: [
-                    (Icons.inventory_2_outlined, '${entry.value.length} sak'),
-                    (
-                      Icons.scale_outlined,
-                      '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
-                    ),
-                  ],
-                  color: Colors.blue,
-                  detailsBuilder: () {
-                    final currentInputs = vm.inputsOf(widget.noProduksi);
-                    final items = [
-                      if (currentInputs != null)
-                        ...currentInputs.washing.where(
+          : LayoutBuilder(
+              builder: (_, c) => GridView(
+                padding: const EdgeInsets.all(6),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+                  crossAxisSpacing: 6,
+                  mainAxisSpacing: 6,
+                  mainAxisExtent: 72,
+                ),
+                children: washingGroups.entries.map((entry) {
+                  return _InputGroupExpansionTile(
+                    title: entry.key,
+                    headerSubtitle:
+                        (entry.value.isNotEmpty
+                            ? entry.value.first.namaJenis
+                            : '-') ??
+                        '-',
+                    tileMetrics: [
+                      (Icons.inventory_2_outlined, '${entry.value.length} sak'),
+                      (
+                        Icons.scale_outlined,
+                        '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
+                      ),
+                    ],
+                    color: Colors.blue,
+                    onLongPress: vm.hasTemporaryDataForLabel(entry.key)
+                        ? () => _showTempCardOptions(entry.key)
+                        : null,
+                    detailsBuilder: () => [],
+                    chipItemsBuilder: () {
+                      final currentInputs = vm.inputsOf(widget.noProduksi);
+                      final items = [
+                        if (currentInputs != null)
+                          ...currentInputs.washing.where(
+                            (x) => (x.noWashing ?? '-') == entry.key,
+                          ),
+                        ...vm.tempWashing.where(
                           (x) => (x.noWashing ?? '-') == entry.key,
                         ),
-                      ...vm.tempWashing.where(
-                        (x) => (x.noWashing ?? '-') == entry.key,
-                      ),
-                    ];
-                    return items.map((item) {
-                      final isTemp = vm.tempWashing.contains(item);
-                      return TooltipTableRow(
-                        columns: [
-                          item.noSak?.toString() ?? '-',
-                          '${num2(item.berat)} kg',
-                        ],
-                        columnFlexes: const [1, 2],
-                        showDelete: isTemp,
-                        onDelete: isTemp
-                            ? () => vm.deleteTempWashingItem(item)
-                            : null,
-                        isTempRow: isTemp,
-                        isHighlighted: isTemp,
-                        isDisabled: !isTemp && !canDelete,
-                        itemData: item,
-                      );
-                    }).toList();
-                  },
-                );
-              }).toList(),
+                      ];
+                      return items.map((item) {
+                        final isTemp = vm.tempWashing.contains(item);
+                        return _InputSakChip(
+                          label: 'Sak ${item.noSak ?? '-'}',
+                          berat: item.berat,
+                          isTemp: isTemp,
+                          onDelete: isTemp
+                              ? () => vm.deleteTempWashingItem(item)
+                              : null,
+                        );
+                      }).toList();
+                    },
+                  );
+                }).toList(),
+              ),
             );
     } else if (_selectedInputTab == 'crusher') {
       double totalBerat = 0.0;
@@ -1448,55 +1688,62 @@ class _BrokerProductionInputScreenState
           ? const Center(
               child: Text('Tidak ada data', style: TextStyle(fontSize: 11)),
             )
-          : GridView.count(
-              padding: const EdgeInsets.all(8),
-              crossAxisCount: 2,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-              childAspectRatio: 1.8,
-              children: crusherGroups.entries.map((entry) {
-                return _InputGroupExpansionTile(
-                  title: entry.key,
-                  headerSubtitle:
-                      (entry.value.isNotEmpty
-                          ? entry.value.first.namaJenis
-                          : '-') ??
-                      '-',
-                  tileMetrics: [
-                    (
-                      Icons.scale_outlined,
-                      '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
-                    ),
-                  ],
-                  color: Colors.blue,
-                  detailsBuilder: () {
-                    final currentInputs = vm.inputsOf(widget.noProduksi);
-                    final items = [
-                      if (currentInputs != null)
-                        ...currentInputs.crusher.where(
+          : LayoutBuilder(
+              builder: (_, c) => GridView(
+                padding: const EdgeInsets.all(6),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+                  crossAxisSpacing: 6,
+                  mainAxisSpacing: 6,
+                  mainAxisExtent: 72,
+                ),
+                children: crusherGroups.entries.map((entry) {
+                  return _InputGroupExpansionTile(
+                    title: entry.key,
+                    headerSubtitle:
+                        (entry.value.isNotEmpty
+                            ? entry.value.first.namaJenis
+                            : '-') ??
+                        '-',
+                    tileMetrics: [
+                      (
+                        Icons.scale_outlined,
+                        '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
+                      ),
+                    ],
+                    color: Colors.blue,
+                    onLongPress: vm.hasTemporaryDataForLabel(entry.key)
+                        ? () => _showTempCardOptions(entry.key)
+                        : null,
+                    detailsBuilder: () {
+                      final currentInputs = vm.inputsOf(widget.noProduksi);
+                      final items = [
+                        if (currentInputs != null)
+                          ...currentInputs.crusher.where(
+                            (x) => (x.noCrusher ?? '-') == entry.key,
+                          ),
+                        ...vm.tempCrusher.where(
                           (x) => (x.noCrusher ?? '-') == entry.key,
                         ),
-                      ...vm.tempCrusher.where(
-                        (x) => (x.noCrusher ?? '-') == entry.key,
-                      ),
-                    ];
-                    return items.map((item) {
-                      final isTemp = vm.tempCrusher.contains(item);
-                      return TooltipTableRow(
-                        columns: ['${num2(item.berat)} kg'],
-                        showDelete: isTemp,
-                        onDelete: isTemp
-                            ? () => vm.deleteTempCrusherItem(item)
-                            : null,
-                        isTempRow: isTemp,
-                        isHighlighted: isTemp,
-                        isDisabled: !isTemp && !canDelete,
-                        itemData: item,
-                      );
-                    }).toList();
-                  },
-                );
-              }).toList(),
+                      ];
+                      return items.map((item) {
+                        final isTemp = vm.tempCrusher.contains(item);
+                        return TooltipTableRow(
+                          columns: ['${num2(item.berat)} kg'],
+                          showDelete: isTemp,
+                          onDelete: isTemp
+                              ? () => vm.deleteTempCrusherItem(item)
+                              : null,
+                          isTempRow: isTemp,
+                          isHighlighted: isTemp,
+                          isDisabled: !isTemp && !canDelete,
+                          itemData: item,
+                        );
+                      }).toList();
+                    },
+                  );
+                }).toList(),
+              ),
             );
     } else if (_selectedInputTab == 'gilingan') {
       double totalBerat = 0.0;
@@ -1514,75 +1761,82 @@ class _BrokerProductionInputScreenState
           ? const Center(
               child: Text('Tidak ada data', style: TextStyle(fontSize: 11)),
             )
-          : GridView.count(
-              padding: const EdgeInsets.all(8),
-              crossAxisCount: 2,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-              childAspectRatio: 1.8,
-              children: gilinganGroups.entries.map((entry) {
-                final hasPartial = entry.value.any((x) => x.isPartialRow);
-                return _InputGroupExpansionTile(
-                  title: entry.key,
-                  headerSubtitle:
-                      (entry.value.isNotEmpty
-                          ? entry.value.first.namaJenis
-                          : '-') ??
-                      '-',
-                  tileMetrics: [
-                    (
-                      Icons.scale_outlined,
-                      '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
-                    ),
-                  ],
-                  color: Colors.blue,
-                  expandable: !hasPartial,
-                  isPartialGroup: hasPartial,
-                  partialReference: hasPartial
-                      ? (entry.value
-                                .firstWhere((x) => x.isPartialRow)
-                                .noGilingan ??
-                            '-')
-                      : null,
-                  detailsBuilder: () {
-                    final currentInputs = vm.inputsOf(widget.noProduksi);
-                    final dbItems = currentInputs == null
-                        ? <GilinganItem>[]
-                        : currentInputs.gilingan.where(
-                            (x) => gilinganTitleKey(x) == entry.key,
-                          );
-                    final tempFull = vm.tempGilingan.where(
-                      (x) => gilinganTitleKey(x) == entry.key,
-                    );
-                    final tempPart = vm.tempGilinganPartial.where(
-                      (x) => gilinganTitleKey(x) == entry.key,
-                    );
-                    final items = [...tempPart, ...dbItems, ...tempFull];
-                    return items.map((item) {
-                      final isTemp =
-                          vm.tempGilingan.contains(item) ||
-                          vm.tempGilinganPartial.contains(item);
-                      final columns = item.isPartialRow
-                          ? <String>[
-                              (item.noGilingan ?? '-'),
-                              '${num2(item.berat)} kg',
-                            ]
-                          : <String>['${num2(item.berat)} kg'];
-                      return TooltipTableRow(
-                        columns: columns,
-                        showDelete: isTemp,
-                        onDelete: isTemp
-                            ? () => vm.deleteTempGilinganItem(item)
-                            : null,
-                        isTempRow: isTemp,
-                        isHighlighted: isTemp,
-                        isDisabled: !isTemp && !canDelete,
-                        itemData: item,
+          : LayoutBuilder(
+              builder: (_, c) => GridView(
+                padding: const EdgeInsets.all(6),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+                  crossAxisSpacing: 6,
+                  mainAxisSpacing: 6,
+                  mainAxisExtent: 72,
+                ),
+                children: gilinganGroups.entries.map((entry) {
+                  final hasPartial = entry.value.any((x) => x.isPartialRow);
+                  return _InputGroupExpansionTile(
+                    title: entry.key,
+                    headerSubtitle:
+                        (entry.value.isNotEmpty
+                            ? entry.value.first.namaJenis
+                            : '-') ??
+                        '-',
+                    tileMetrics: [
+                      (
+                        Icons.scale_outlined,
+                        '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
+                      ),
+                    ],
+                    color: Colors.blue,
+                    onLongPress: vm.hasTemporaryDataForLabel(entry.key)
+                        ? () => _showTempCardOptions(entry.key)
+                        : null,
+                    expandable: !hasPartial,
+                    isPartialGroup: hasPartial,
+                    partialReference: hasPartial
+                        ? (entry.value
+                                  .firstWhere((x) => x.isPartialRow)
+                                  .noGilingan ??
+                              '-')
+                        : null,
+                    detailsBuilder: () {
+                      final currentInputs = vm.inputsOf(widget.noProduksi);
+                      final dbItems = currentInputs == null
+                          ? <GilinganItem>[]
+                          : currentInputs.gilingan.where(
+                              (x) => gilinganTitleKey(x) == entry.key,
+                            );
+                      final tempFull = vm.tempGilingan.where(
+                        (x) => gilinganTitleKey(x) == entry.key,
                       );
-                    }).toList();
-                  },
-                );
-              }).toList(),
+                      final tempPart = vm.tempGilinganPartial.where(
+                        (x) => gilinganTitleKey(x) == entry.key,
+                      );
+                      final items = [...tempPart, ...dbItems, ...tempFull];
+                      return items.map((item) {
+                        final isTemp =
+                            vm.tempGilingan.contains(item) ||
+                            vm.tempGilinganPartial.contains(item);
+                        final columns = item.isPartialRow
+                            ? <String>[
+                                (item.noGilingan ?? '-'),
+                                '${num2(item.berat)} kg',
+                              ]
+                            : <String>['${num2(item.berat)} kg'];
+                        return TooltipTableRow(
+                          columns: columns,
+                          showDelete: isTemp,
+                          onDelete: isTemp
+                              ? () => vm.deleteTempGilinganItem(item)
+                              : null,
+                          isTempRow: isTemp,
+                          isHighlighted: isTemp,
+                          isDisabled: !isTemp && !canDelete,
+                          itemData: item,
+                        );
+                      }).toList();
+                    },
+                  );
+                }).toList(),
+              ),
             );
     } else if (_selectedInputTab == 'mixer') {
       int totalSak = 0;
@@ -1602,81 +1856,76 @@ class _BrokerProductionInputScreenState
           ? const Center(
               child: Text('Tidak ada data', style: TextStyle(fontSize: 11)),
             )
-          : GridView.count(
-              padding: const EdgeInsets.all(8),
-              crossAxisCount: 2,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-              childAspectRatio: 1.8,
-              children: mixerGroups.entries.map((entry) {
-                final hasPartial = entry.value.any((x) => x.isPartialRow);
-                final List<int> columnFlexes = hasPartial
-                    ? const [3, 1, 2]
-                    : const [1, 2];
-                return _InputGroupExpansionTile(
-                  title: entry.key,
-                  headerSubtitle:
-                      (entry.value.isNotEmpty
-                          ? entry.value.first.namaJenis
-                          : '-') ??
-                      '-',
-                  tileMetrics: [
-                    (Icons.inventory_2_outlined, '${entry.value.length} sak'),
-                    (
-                      Icons.scale_outlined,
-                      '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
-                    ),
-                  ],
-                  color: Colors.blue,
-                  expandable: !hasPartial,
-                  isPartialGroup: hasPartial,
-                  partialReference: hasPartial
-                      ? (entry.value
-                                .firstWhere((x) => x.isPartialRow)
-                                .noMixer ??
-                            '-')
-                      : null,
-                  detailsBuilder: () {
-                    final currentInputs = vm.inputsOf(widget.noProduksi);
-                    final dbItems = currentInputs == null
-                        ? <MixerItem>[]
-                        : currentInputs.mixer
-                              .where((x) => mixerTitleKey(x) == entry.key)
-                              .toList();
-                    final tempFull = vm.tempMixer
-                        .where((x) => mixerTitleKey(x) == entry.key)
-                        .toList();
-                    final tempPart = vm.tempMixerPartial
-                        .where((x) => mixerTitleKey(x) == entry.key)
-                        .toList();
-                    final items = [...tempPart, ...dbItems, ...tempFull];
-                    return items.map((item) {
-                      final isTemp =
-                          vm.tempMixer.contains(item) ||
-                          vm.tempMixerPartial.contains(item);
-                      final columns = item.isPartialRow
-                          ? [
-                              item.noMixer ?? '-',
-                              '${item.noSak ?? '-'}',
-                              '${num2(item.berat)} kg',
-                            ]
-                          : ['${item.noSak ?? '-'}', '${num2(item.berat)} kg'];
-                      return TooltipTableRow(
-                        columns: columns,
-                        columnFlexes: columnFlexes,
-                        showDelete: isTemp,
-                        onDelete: isTemp
-                            ? () => vm.deleteTempMixerItem(item)
-                            : null,
-                        isTempRow: isTemp,
-                        isHighlighted: isTemp,
-                        isDisabled: !isTemp && !canDelete,
-                        itemData: item,
-                      );
-                    }).toList();
-                  },
-                );
-              }).toList(),
+          : LayoutBuilder(
+              builder: (_, c) => GridView(
+                padding: const EdgeInsets.all(6),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+                  crossAxisSpacing: 6,
+                  mainAxisSpacing: 6,
+                  mainAxisExtent: 72,
+                ),
+                children: mixerGroups.entries.map((entry) {
+                  final hasPartial = entry.value.any((x) => x.isPartialRow);
+                  return _InputGroupExpansionTile(
+                    title: entry.key,
+                    headerSubtitle:
+                        (entry.value.isNotEmpty
+                            ? entry.value.first.namaJenis
+                            : '-') ??
+                        '-',
+                    tileMetrics: [
+                      (Icons.inventory_2_outlined, '${entry.value.length} sak'),
+                      (
+                        Icons.scale_outlined,
+                        '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
+                      ),
+                    ],
+                    color: Colors.blue,
+                    onLongPress: vm.hasTemporaryDataForLabel(entry.key)
+                        ? () => _showTempCardOptions(entry.key)
+                        : null,
+                    expandable: !hasPartial,
+                    isPartialGroup: hasPartial,
+                    partialReference: hasPartial
+                        ? (entry.value
+                                  .firstWhere((x) => x.isPartialRow)
+                                  .noMixer ??
+                              '-')
+                        : null,
+                    detailsBuilder: () => [],
+                    chipItemsBuilder: () {
+                      final currentInputs = vm.inputsOf(widget.noProduksi);
+                      final dbItems = currentInputs == null
+                          ? <MixerItem>[]
+                          : currentInputs.mixer
+                                .where((x) => mixerTitleKey(x) == entry.key)
+                                .toList();
+                      final tempFull = vm.tempMixer
+                          .where((x) => mixerTitleKey(x) == entry.key)
+                          .toList();
+                      final tempPart = vm.tempMixerPartial
+                          .where((x) => mixerTitleKey(x) == entry.key)
+                          .toList();
+                      final items = [...tempPart, ...dbItems, ...tempFull];
+                      return items.map((item) {
+                        final isTemp =
+                            vm.tempMixer.contains(item) ||
+                            vm.tempMixerPartial.contains(item);
+                        return _InputSakChip(
+                          label: 'Sak ${item.noSak ?? '-'}',
+                          berat: item.berat,
+                          isTemp: isTemp,
+                          isPartial: item.isPartialRow,
+                          onDelete: isTemp
+                              ? () => vm.deleteTempMixerItem(item)
+                              : null,
+                        );
+                      }).toList();
+                    },
+                  );
+                }).toList(),
+              ),
             );
     } else {
       // reject
@@ -1695,74 +1944,81 @@ class _BrokerProductionInputScreenState
           ? const Center(
               child: Text('Tidak ada data', style: TextStyle(fontSize: 11)),
             )
-          : GridView.count(
-              padding: const EdgeInsets.all(8),
-              crossAxisCount: 2,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-              childAspectRatio: 1.8,
-              children: rejectGroups.entries.map((entry) {
-                final hasPartial = entry.value.any((x) => x.isPartialRow);
-                return _InputGroupExpansionTile(
-                  title: entry.key,
-                  headerSubtitle:
-                      (entry.value.isNotEmpty
-                          ? entry.value.first.namaJenis
-                          : '-') ??
-                      '-',
-                  tileMetrics: [
-                    (
-                      Icons.scale_outlined,
-                      '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
-                    ),
-                  ],
-                  color: Colors.blue,
-                  isPartialGroup: hasPartial,
-                  partialReference: hasPartial
-                      ? (entry.value
-                                .firstWhere((x) => x.isPartialRow)
-                                .noReject ??
-                            '-')
-                      : null,
-                  detailsBuilder: () {
-                    final currentInputs = vm.inputsOf(widget.noProduksi);
-                    final dbItems = currentInputs == null
-                        ? <RejectItem>[]
-                        : currentInputs.reject.where(
-                            (x) => rejectTitleKey(x) == entry.key,
-                          );
-                    final tempFull = vm.tempReject.where(
-                      (x) => rejectTitleKey(x) == entry.key,
-                    );
-                    final tempPart = vm.tempRejectPartial.where(
-                      (x) => rejectTitleKey(x) == entry.key,
-                    );
-                    final items = [...tempPart, ...dbItems, ...tempFull];
-                    return items.map((item) {
-                      final isTemp =
-                          vm.tempReject.contains(item) ||
-                          vm.tempRejectPartial.contains(item);
-                      final columns = item.isPartialRow
-                          ? <String>[
-                              (item.noReject ?? '-'),
-                              '${num2(item.berat)} kg',
-                            ]
-                          : <String>['${num2(item.berat)} kg'];
-                      return TooltipTableRow(
-                        columns: columns,
-                        showDelete: isTemp,
-                        onDelete: isTemp
-                            ? () => vm.deleteTempRejectItem(item)
-                            : null,
-                        isTempRow: isTemp,
-                        isHighlighted: isTemp,
-                        isDisabled: !isTemp && !canDelete,
-                        itemData: item,
+          : LayoutBuilder(
+              builder: (_, c) => GridView(
+                padding: const EdgeInsets.all(6),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+                  crossAxisSpacing: 6,
+                  mainAxisSpacing: 6,
+                  mainAxisExtent: 72,
+                ),
+                children: rejectGroups.entries.map((entry) {
+                  final hasPartial = entry.value.any((x) => x.isPartialRow);
+                  return _InputGroupExpansionTile(
+                    title: entry.key,
+                    headerSubtitle:
+                        (entry.value.isNotEmpty
+                            ? entry.value.first.namaJenis
+                            : '-') ??
+                        '-',
+                    tileMetrics: [
+                      (
+                        Icons.scale_outlined,
+                        '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
+                      ),
+                    ],
+                    color: Colors.blue,
+                    onLongPress: vm.hasTemporaryDataForLabel(entry.key)
+                        ? () => _showTempCardOptions(entry.key)
+                        : null,
+                    isPartialGroup: hasPartial,
+                    partialReference: hasPartial
+                        ? (entry.value
+                                  .firstWhere((x) => x.isPartialRow)
+                                  .noReject ??
+                              '-')
+                        : null,
+                    detailsBuilder: () {
+                      final currentInputs = vm.inputsOf(widget.noProduksi);
+                      final dbItems = currentInputs == null
+                          ? <RejectItem>[]
+                          : currentInputs.reject.where(
+                              (x) => rejectTitleKey(x) == entry.key,
+                            );
+                      final tempFull = vm.tempReject.where(
+                        (x) => rejectTitleKey(x) == entry.key,
                       );
-                    }).toList();
-                  },
-                );
-              }).toList(),
+                      final tempPart = vm.tempRejectPartial.where(
+                        (x) => rejectTitleKey(x) == entry.key,
+                      );
+                      final items = [...tempPart, ...dbItems, ...tempFull];
+                      return items.map((item) {
+                        final isTemp =
+                            vm.tempReject.contains(item) ||
+                            vm.tempRejectPartial.contains(item);
+                        final columns = item.isPartialRow
+                            ? <String>[
+                                (item.noReject ?? '-'),
+                                '${num2(item.berat)} kg',
+                              ]
+                            : <String>['${num2(item.berat)} kg'];
+                        return TooltipTableRow(
+                          columns: columns,
+                          showDelete: isTemp,
+                          onDelete: isTemp
+                              ? () => vm.deleteTempRejectItem(item)
+                              : null,
+                          isTempRow: isTemp,
+                          isHighlighted: isTemp,
+                          isDisabled: !isTemp && !canDelete,
+                          itemData: item,
+                        );
+                      }).toList();
+                    },
+                  );
+                }).toList(),
+              ),
             );
     }
 
@@ -1861,7 +2117,10 @@ class _BrokerProductionInputScreenState
 
                 return Column(
                   children: [
-                    _buildWorkspaceToolbar(locked: locked),
+                    _buildWorkspaceToolbar(
+                      locked: locked,
+                      namaJenis: widget.namaJenis,
+                    ),
                     Expanded(
                       child: LayoutBuilder(
                         builder: (context, outerConstraints) {
@@ -2186,66 +2445,77 @@ class _BrokerOutputTile extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
-        onTap: null,
+        onTap: () {
+          showDialog<void>(
+            context: context,
+            builder: (_) => _BrokerOutputDetailDialog(
+              output: output,
+              onPrint: () => _handlePrint(context),
+            ),
+          );
+        },
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
+              // Title row: noBroker + print count
               Row(
                 children: [
                   Expanded(
                     child: Text(
                       output.noBroker ?? '-',
                       style: const TextStyle(
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight: FontWeight.w800,
                         color: Color(0xFF1A1D23),
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  _PrintCountBadge(count: output.printedCount),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.print_outlined,
+                    size: 11,
+                    color: output.printedCount > 0
+                        ? _kBrokerOutput
+                        : Colors.grey.shade400,
+                  ),
+                  const SizedBox(width: 2),
+                  Text(
+                    'x${output.printedCount}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: output.printedCount > 0
+                          ? _kBrokerOutput
+                          : Colors.grey.shade400,
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 3),
+              const SizedBox(height: 1),
               Text(
                 output.namaJenis ?? '-',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
               ),
-              const SizedBox(height: 5),
-              Row(
+              const SizedBox(height: 4),
+              // Metrics
+              Wrap(
+                spacing: 6,
+                runSpacing: 2,
                 children: [
                   _MiniMetric(
                     icon: Icons.inventory_2_outlined,
                     text: '${output.totalSak} sak',
                   ),
-                  const SizedBox(width: 8),
                   _MiniMetric(
                     icon: Icons.scale_outlined,
                     text: '${num2(output.totalBerat)} kg',
                   ),
-                ],
-              ),
-              const Spacer(),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  _OutputActionTextButton(
-                    icon: Icons.visibility_outlined,
-                    onTap: () {
-                      showDialog<void>(
-                        context: context,
-                        builder: (_) =>
-                            _BrokerOutputDetailDialog(output: output),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  _OutputPrintButton(onPressed: () => _handlePrint(context)),
                 ],
               ),
             ],
@@ -2337,208 +2607,74 @@ class _BonggolanOutputTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: _kBrokerBorder),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  output.noBonggolan ?? '-',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF1A1D23),
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 8),
-              _PrintCountBadge(count: output.printedCount),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Text(
-            output.namaBonggolan ?? '-',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-          ),
-          const SizedBox(height: 4),
-          _MiniMetric(
-            icon: Icons.scale_outlined,
-            text: '${num2(output.berat)} kg',
-          ),
-          const SizedBox(height: 4),
-          const Spacer(),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              _OutputActionTextButton(
-                icon: Icons.visibility_outlined,
-                onTap: () {
-                  showDialog<void>(
-                    context: context,
-                    builder: (_) =>
-                        _BonggolanOutputDetailDialog(output: output),
-                  );
-                },
-              ),
-              const SizedBox(width: 8),
-              _OutputPrintButton(onPressed: () => _handlePrint(context)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BrokerInputModeDialog extends StatelessWidget {
-  const _BrokerInputModeDialog();
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.white,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 360),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              padding: const EdgeInsets.fromLTRB(18, 16, 14, 14),
-              decoration: const BoxDecoration(
-                color: _kBrokerPrimary,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.tune_rounded, color: Colors.white, size: 18),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'Pilih Mode Input',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close, color: Colors.white),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                children: const [
-                  _BrokerInputModeOption(
-                    value: 'full',
-                    title: 'FULL PALLET',
-                    subtitle: 'Masukkan semua item label yang valid.',
-                    icon: Icons.inventory_2_outlined,
-                  ),
-                  SizedBox(height: 10),
-                  _BrokerInputModeOption(
-                    value: 'select',
-                    title: 'SEBAGIAN PALLET',
-                    subtitle: 'Pilih item tertentu dari hasil lookup label.',
-                    icon: Icons.checklist_rounded,
-                  ),
-                  SizedBox(height: 10),
-                  _BrokerInputModeOption(
-                    value: 'partial',
-                    title: 'PARTIAL',
-                    subtitle: 'Input sebagian berat untuk label tertentu.',
-                    icon: Icons.call_split_rounded,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _BrokerInputModeOption extends StatelessWidget {
-  final String value;
-  final String title;
-  final String subtitle;
-  final IconData icon;
-
-  const _BrokerInputModeOption({
-    required this.value,
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: _kBrokerSurface,
-      borderRadius: BorderRadius.circular(12),
       child: InkWell(
-        onTap: () => Navigator.of(context).pop(value),
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _kBrokerBorder),
-          ),
-          child: Row(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () {
+          showDialog<void>(
+            context: context,
+            builder: (_) => _BonggolanOutputDetailDialog(
+              output: output,
+              onPrint: () => _handlePrint(context),
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: _kBrokerPrimary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: _kBrokerPrimary, size: 18),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      output.noBonggolan ?? '-',
                       style: const TextStyle(
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight: FontWeight.w800,
                         color: Color(0xFF1A1D23),
                       ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade600,
-                      ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.print_outlined,
+                    size: 11,
+                    color: output.printedCount > 0
+                        ? _kBrokerOutput
+                        : Colors.grey.shade400,
+                  ),
+                  const SizedBox(width: 2),
+                  Text(
+                    'x${output.printedCount}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: output.printedCount > 0
+                          ? _kBrokerOutput
+                          : Colors.grey.shade400,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const Icon(Icons.chevron_right_rounded, color: _kBrokerPrimary),
+              const SizedBox(height: 1),
+              Text(
+                output.namaBonggolan ?? '-',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 4),
+              _MiniMetric(
+                icon: Icons.scale_outlined,
+                text: '${num2(output.berat)} kg',
+              ),
             ],
           ),
         ),
@@ -2777,11 +2913,7 @@ class _InputCategoryBlock extends StatelessWidget {
           bottomLeft: Radius.circular(12),
           bottomRight: Radius.circular(12),
         ),
-        border: Border(
-          bottom: BorderSide(color: color.withValues(alpha: 0.32), width: 1.1),
-          left: BorderSide(color: color.withValues(alpha: 0.32), width: 1.1),
-          right: BorderSide(color: color.withValues(alpha: 0.32), width: 1.1),
-        ),
+        border: Border.all(color: color.withValues(alpha: 0.32), width: 1.1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.015),
@@ -2947,30 +3079,50 @@ class _InputCategorySummaryTile extends StatelessWidget {
   }
 }
 
+class _InputSakChip {
+  final String label;
+  final double? berat;
+  final bool isTemp;
+  final bool isPartial;
+  final VoidCallback? onDelete;
+
+  const _InputSakChip({
+    required this.label,
+    this.berat,
+    this.isTemp = false,
+    this.isPartial = false,
+    this.onDelete,
+  });
+}
+
 class _InputGroupExpansionTile extends StatelessWidget {
   final String title;
   final String? headerSubtitle;
   final List<(IconData, String)> tileMetrics;
   final Color color;
   final List<Widget> Function() detailsBuilder;
+  final List<_InputSakChip> Function()? chipItemsBuilder;
   final bool expandable;
   final bool isPartialGroup;
   final String? partialReference;
+  final VoidCallback? onLongPress;
 
   const _InputGroupExpansionTile({
     required this.title,
     required this.color,
     required this.detailsBuilder,
+    this.chipItemsBuilder,
     this.headerSubtitle,
     this.tileMetrics = const [],
     this.expandable = true,
     this.isPartialGroup = false,
     this.partialReference,
+    this.onLongPress,
   });
 
   Widget _buildHeader(bool hasTempForThis) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: Row(
         children: [
           Expanded(
@@ -2983,7 +3135,7 @@ class _InputGroupExpansionTile extends StatelessWidget {
                       child: Text(
                         title,
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           fontWeight: FontWeight.w800,
                           color: hasTempForThis
                               ? Colors.brown.shade800
@@ -2993,18 +3145,18 @@ class _InputGroupExpansionTile extends StatelessWidget {
                       ),
                     ),
                     if (isPartialGroup) ...[
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 4),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
+                          horizontal: 5,
+                          vertical: 2,
                         ),
                         decoration: BoxDecoration(
                           color: Colors.deepOrange.withValues(alpha: 0.14),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: const Text(
-                          'PARTIAL',
+                          'P',
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w800,
@@ -3013,54 +3165,19 @@ class _InputGroupExpansionTile extends StatelessWidget {
                         ),
                       ),
                     ],
-                    if (hasTempForThis) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Text(
-                          'Temp',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.orange,
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
-                if (isPartialGroup &&
-                    (partialReference ?? '').trim().isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    '-> ${partialReference!.trim()}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.grey.shade800,
-                    ),
-                  ),
-                ],
                 if ((headerSubtitle ?? '').trim().isNotEmpty) ...[
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 2),
                   Text(
                     headerSubtitle!.trim(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
                   ),
                 ],
                 if (tileMetrics.isNotEmpty) ...[
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Wrap(
                     spacing: 12,
                     runSpacing: 6,
@@ -3079,7 +3196,6 @@ class _InputGroupExpansionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final details = detailsBuilder();
     final vm = context.watch<BrokerProductionInputViewModel>();
     final hasTempForThis = vm.hasTemporaryDataForLabel(title);
 
@@ -3087,7 +3203,6 @@ class _InputGroupExpansionTile extends StatelessWidget {
     final borderColor = hasTempForThis ? Colors.amber.shade200 : _kBrokerBorder;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(10),
@@ -3096,17 +3211,406 @@ class _InputGroupExpansionTile extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
         onTap: () {
-          showDialog<void>(
-            context: context,
-            builder: (_) => _InputGroupDetailDialog(
-              title: title,
-              subtitle: headerSubtitle ?? '-',
-              metrics: tileMetrics,
-              details: details,
-            ),
-          );
+          if (chipItemsBuilder != null) {
+            showDialog<void>(
+              context: context,
+              builder: (_) => _SakChipDetailDialog(
+                title: title,
+                subtitle: headerSubtitle ?? '-',
+                metrics: tileMetrics,
+                chips: chipItemsBuilder!(),
+              ),
+            );
+          } else {
+            showDialog<void>(
+              context: context,
+              builder: (_) => _InputGroupDetailDialog(
+                title: title,
+                subtitle: headerSubtitle ?? '-',
+                metrics: tileMetrics,
+                details: detailsBuilder(),
+              ),
+            );
+          }
         },
+        onLongPress: onLongPress,
         child: _buildHeader(hasTempForThis),
+      ),
+    );
+  }
+}
+
+class _SakChipDetailDialog extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final List<(IconData, String)> metrics;
+  final List<_InputSakChip> chips;
+
+  const _SakChipDetailDialog({
+    required this.title,
+    required this.subtitle,
+    required this.metrics,
+    required this.chips,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520, maxHeight: 520),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              decoration: const BoxDecoration(
+                color: Color(0xFF1565C0),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.list_alt_rounded,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          subtitle.isNotEmpty ? subtitle : title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (subtitle.isNotEmpty)
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 11,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Chip grid
+            Flexible(
+              child: chips.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                        'Tidak ada detail',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF9CA3AF),
+                        ),
+                      ),
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: GridView.builder(
+                        shrinkWrap: true,
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 6,
+                              crossAxisSpacing: 5,
+                              mainAxisSpacing: 5,
+                              childAspectRatio: 1.5,
+                            ),
+                        itemCount: chips.length,
+                        itemBuilder: (_, i) {
+                          final chip = chips[i];
+                          final bgColor = chip.isTemp
+                              ? Colors.amber.shade50
+                              : chip.isPartial
+                              ? Colors.deepOrange.shade50
+                              : const Color(0xFFF0F7FF);
+                          final borderColor = chip.isTemp
+                              ? Colors.amber.shade300
+                              : chip.isPartial
+                              ? Colors.deepOrange.shade200
+                              : const Color(0xFFBFDBFE);
+                          final textColor = chip.isPartial
+                              ? Colors.deepOrange.shade800
+                              : const Color(0xFF1D4ED8);
+                          return Stack(
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: bgColor,
+                                  borderRadius: BorderRadius.circular(7),
+                                  border: Border.all(color: borderColor),
+                                ),
+                                child: Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(4),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          chip.label,
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                            color: textColor,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '${num2(chip.berat)} kg',
+                                          style: const TextStyle(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF374151),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              if (chip.isPartial)
+                                Positioned(
+                                  top: 2,
+                                  left: 2,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 3,
+                                      vertical: 1,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.deepOrange,
+                                      borderRadius: BorderRadius.circular(3),
+                                    ),
+                                    child: const Text(
+                                      'P',
+                                      style: TextStyle(
+                                        fontSize: 7,
+                                        fontWeight: FontWeight.w900,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              if (chip.isTemp && chip.onDelete != null)
+                                Positioned(
+                                  top: 1,
+                                  right: 1,
+                                  child: GestureDetector(
+                                    onTap: chip.onDelete,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(1),
+                                      decoration: BoxDecoration(
+                                        color: Colors.amber.shade300,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.close,
+                                        size: 9,
+                                        color: Colors.brown,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+            ),
+            const Divider(height: 1, color: _kBrokerBorder),
+            // Footer
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: _kBrokerBorder),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text('Tutup'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TempCardOptionsDialog extends StatelessWidget {
+  final String labelTitle;
+  final bool showSebagian;
+  final bool showPartial;
+  const _TempCardOptionsDialog({
+    required this.labelTitle,
+    this.showSebagian = true,
+    this.showPartial = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 340),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+              decoration: const BoxDecoration(
+                color: _kBrokerPrimary,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.touch_app_rounded,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      labelTitle,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  if (showSebagian) ...[
+                    _TempOptionTile(
+                      icon: Icons.checklist_rounded,
+                      title: 'Sebagian Pallet',
+                      value: 'select',
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  if (showPartial) ...[
+                    _TempOptionTile(
+                      icon: Icons.call_split_rounded,
+                      title: 'Partial',
+                      value: 'partial',
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  _TempOptionTile(
+                    icon: Icons.delete_outline_rounded,
+                    title: 'Hapus Temp',
+                    value: 'delete',
+                    isDestructive: true,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TempOptionTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String value;
+  final bool isDestructive;
+
+  const _TempOptionTile({
+    required this.icon,
+    required this.title,
+    required this.value,
+    this.isDestructive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isDestructive ? Colors.red.shade600 : _kBrokerPrimary;
+    return Material(
+      color: isDestructive ? Colors.red.shade50 : _kBrokerSurface,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: () => Navigator.of(context).pop(value),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isDestructive ? Colors.red.shade200 : _kBrokerBorder,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: color, size: 16),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -3135,7 +3639,9 @@ class _InputGroupDetailDialog extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 420, maxHeight: 560),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Header
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               decoration: const BoxDecoration(
@@ -3155,20 +3661,21 @@ class _InputGroupDetailDialog extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          title,
+                          subtitle.isNotEmpty ? subtitle : title,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        Text(
-                          subtitle,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            fontSize: 11,
+                        if (subtitle.isNotEmpty)
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 11,
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -3183,28 +3690,17 @@ class _InputGroupDetailDialog extends StatelessWidget {
                 ],
               ),
             ),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              color: const Color(0xFFF0F7FF),
-              child: Wrap(
-                spacing: 16,
-                runSpacing: 6,
-                children: metrics
-                    .map((m) => _MiniMetric(icon: m.$1, text: m.$2))
-                    .toList(),
-              ),
-            ),
-            const Divider(height: 1, color: _kBrokerBorder),
+            // Detail rows
             Flexible(
               child: details.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.all(20),
+                  ? const Padding(
+                      padding: EdgeInsets.all(24),
                       child: Text(
                         'Tidak ada detail',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey.shade500,
+                          color: Color(0xFF9CA3AF),
                         ),
                       ),
                     )
@@ -3223,20 +3719,23 @@ class _InputGroupDetailDialog extends StatelessWidget {
                     ),
             ),
             const Divider(height: 1, color: _kBrokerBorder),
+            // Footer
             Padding(
               padding: const EdgeInsets.all(14),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: _kBrokerBorder),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: _kBrokerBorder),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
+                    child: const Text('Tutup'),
                   ),
-                  child: const Text('Tutup'),
-                ),
+                ],
               ),
             ),
           ],
@@ -3248,8 +3747,9 @@ class _InputGroupDetailDialog extends StatelessWidget {
 
 class _BrokerOutputDetailDialog extends StatelessWidget {
   final BrokerOutput output;
+  final VoidCallback? onPrint;
 
-  const _BrokerOutputDetailDialog({required this.output});
+  const _BrokerOutputDetailDialog({required this.output, this.onPrint});
 
   @override
   Widget build(BuildContext context) {
@@ -3264,10 +3764,20 @@ class _BrokerOutputDetailDialog extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 12, 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              decoration: const BoxDecoration(
+                color: Color(0xFF1565C0),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              ),
               child: Row(
                 children: [
+                  const Icon(
+                    Icons.list_alt_rounded,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3275,16 +3785,16 @@ class _BrokerOutputDetailDialog extends StatelessWidget {
                         Text(
                           output.namaJenis ?? '-',
                           style: const TextStyle(
+                            color: Colors.white,
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF1F2937),
                           ),
                         ),
                         Text(
                           output.noBroker ?? '-',
                           style: const TextStyle(
+                            color: Colors.white70,
                             fontSize: 11,
-                            color: Color(0xFF6B7280),
                           ),
                         ),
                       ],
@@ -3294,8 +3804,8 @@ class _BrokerOutputDetailDialog extends StatelessWidget {
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(
                       Icons.close,
-                      size: 18,
-                      color: Color(0xFF9CA3AF),
+                      color: Colors.white,
+                      size: 16,
                     ),
                   ),
                 ],
@@ -3368,29 +3878,28 @@ class _BrokerOutputDetailDialog extends StatelessWidget {
             const Divider(height: 1, color: _kBrokerBorder),
             // Footer total
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.all(14),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  Text(
-                    '${output.totalSak} sak',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF1D4ED8),
+                  if (onPrint != null)
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        onPrint!();
+                      },
+                      icon: const Icon(Icons.print_outlined, size: 15),
+                      label: const Text('Print'),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    '${num2(output.totalBerat)} kg',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF374151),
-                    ),
-                  ),
-                  const Spacer(),
-                  TextButton(
+                  const SizedBox(width: 8),
+                  OutlinedButton(
                     onPressed: () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: _kBrokerBorder),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
                     child: const Text('Tutup'),
                   ),
                 ],
@@ -3405,8 +3914,9 @@ class _BrokerOutputDetailDialog extends StatelessWidget {
 
 class _BonggolanOutputDetailDialog extends StatelessWidget {
   final BonggolanOutput output;
+  final VoidCallback? onPrint;
 
-  const _BonggolanOutputDetailDialog({required this.output});
+  const _BonggolanOutputDetailDialog({required this.output, this.onPrint});
 
   @override
   Widget build(BuildContext context) {
@@ -3435,7 +3945,7 @@ class _BonggolanOutputDetailDialog extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      output.noBonggolan ?? '-',
+                      output.namaBonggolan ?? '-',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
@@ -3460,7 +3970,7 @@ class _BonggolanOutputDetailDialog extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    output.namaBonggolan ?? '-',
+                    output.noBonggolan ?? '-',
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
@@ -3483,18 +3993,30 @@ class _BonggolanOutputDetailDialog extends StatelessWidget {
             const Divider(height: 1, color: _kBrokerBorder),
             Padding(
               padding: const EdgeInsets.all(14),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: _kBrokerBorder),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (onPrint != null)
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        onPrint!();
+                      },
+                      icon: const Icon(Icons.print_outlined, size: 15),
+                      label: const Text('Print'),
                     ),
+                  const SizedBox(width: 8),
+                  OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: _kBrokerBorder),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text('Tutup'),
                   ),
-                  child: const Text('Tutup'),
-                ),
+                ],
               ),
             ),
           ],
@@ -3628,15 +4150,13 @@ class _FolderTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final borderSide = BorderSide(
-      color: accentColor.withValues(alpha: 0.32),
-      width: 1.1,
-    );
-
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFECEFF3),
-        border: Border(top: borderSide, left: borderSide, right: borderSide),
+        border: Border.all(
+          color: accentColor.withValues(alpha: 0.32),
+          width: 1.1,
+        ),
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(10),
           topRight: Radius.circular(10),
@@ -3654,71 +4174,85 @@ class _FolderTabBar extends StatelessWidget {
               padding: const EdgeInsets.only(right: 4),
               child: GestureDetector(
                 onTap: () => onChanged(tab.value),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  curve: Curves.easeOut,
-                  // unselected tabs sit lower; selected tab is taller and
-                  // its bottom padding overlaps 1px into the content border
-                  margin: EdgeInsets.only(top: isSelected ? 0 : 4),
-                  padding: EdgeInsets.fromLTRB(
-                    10,
-                    isSelected ? 7 : 5,
-                    10,
-                    isSelected ? 9 : 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isSelected ? Colors.white : const Color(0xFFDDE1E7),
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(7),
-                      topRight: Radius.circular(7),
-                    ),
-                    border: isSelected
-                        ? Border(
-                            top: borderSide,
-                            left: borderSide,
-                            right: borderSide,
-                          )
-                        : Border.all(color: const Color(0xFFC5CAD3), width: 1),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        tab.label,
-                        maxLines: 1,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: isSelected
-                              ? accentColor
-                              : const Color(0xFF64748B),
-                        ),
+                child: Stack(
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      curve: Curves.easeOut,
+                      margin: EdgeInsets.only(top: isSelected ? 0 : 4),
+                      padding: EdgeInsets.fromLTRB(
+                        10,
+                        isSelected ? 7 : 5,
+                        10,
+                        isSelected ? 9 : 5,
                       ),
-                      const SizedBox(width: 5),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 1,
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? Colors.white
+                            : const Color(0xFFDDE1E7),
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(7),
+                          topRight: Radius.circular(7),
                         ),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? accentColor.withValues(alpha: 0.1)
-                              : const Color(0xFFC5CAD3),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          '${tab.count}',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                            color: isSelected
-                                ? accentColor
-                                : const Color(0xFF64748B),
+                        border: isSelected
+                            ? Border.all(
+                                color: accentColor.withValues(alpha: 0.32),
+                                width: 1.1,
+                              )
+                            : Border.all(
+                                color: const Color(0xFFC5CAD3),
+                                width: 1,
+                              ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            tab.label,
+                            maxLines: 1,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: isSelected
+                                  ? accentColor
+                                  : const Color(0xFF64748B),
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 5),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? accentColor.withValues(alpha: 0.1)
+                                  : const Color(0xFFC5CAD3),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              '${tab.count}',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: isSelected
+                                    ? accentColor
+                                    : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                    // Strip putih menutupi border bawah tab yang selected
+                    if (isSelected)
+                      Positioned(
+                        bottom: 0,
+                        left: 1.1,
+                        right: 1.1,
+                        child: Container(height: 2, color: Colors.white),
+                      ),
+                  ],
                 ),
               ),
             );
@@ -3769,33 +4303,6 @@ class _OutputErrorBanner extends StatelessWidget {
   }
 }
 
-class _PrintCountBadge extends StatelessWidget {
-  final int count;
-
-  const _PrintCountBadge({required this.count});
-
-  @override
-  Widget build(BuildContext context) {
-    final hasPrinted = count > 0;
-    final color = hasPrinted ? _kBrokerOutput : Colors.orange.shade700;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        hasPrinted ? 'Print ${count}x' : 'Belum Print',
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
-          color: color,
-        ),
-      ),
-    );
-  }
-}
-
 class _MiniMetric extends StatelessWidget {
   final IconData icon;
   final String text;
@@ -3818,38 +4325,6 @@ class _MiniMetric extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _OutputPrintButton extends StatelessWidget {
-  final VoidCallback onPressed;
-
-  const _OutputPrintButton({required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: 'Print',
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(6),
-        child: Container(
-          width: 26,
-          height: 24,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: _kBrokerOutput.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: _kBrokerOutput.withValues(alpha: 0.18)),
-          ),
-          child: const Icon(
-            Icons.print_outlined,
-            size: 14,
-            color: _kBrokerOutput,
-          ),
-        ),
-      ),
     );
   }
 }
@@ -3926,7 +4401,10 @@ class _SplitProduksiDialogState extends State<_SplitProduksiDialog> {
         hourStart: _hourCtrl.text.trim(),
         outputJenisId: _selectedJenis!.idBroker,
       );
-      if (mounted) Navigator.of(context).pop(result);
+      if (mounted)
+        Navigator.of(
+          context,
+        ).pop((prod: result, namaJenis: _selectedJenis!.nama));
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -4183,29 +4661,449 @@ class _SplitProduksiDialogState extends State<_SplitProduksiDialog> {
   }
 }
 
-class _OutputActionTextButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
+// ---------------------------------------------------------------------------
+// Dialog: Daftar produksi pada mesin + tanggal + shift yang sama
+// ---------------------------------------------------------------------------
+class _SameDateShiftProductionsDialog extends StatefulWidget {
+  final int idMesin;
+  final DateTime tanggal;
+  final int shift;
+  final String currentNoProduksi;
 
-  const _OutputActionTextButton({required this.icon, required this.onTap});
+  const _SameDateShiftProductionsDialog({
+    required this.idMesin,
+    required this.tanggal,
+    required this.shift,
+    required this.currentNoProduksi,
+  });
+
+  @override
+  State<_SameDateShiftProductionsDialog> createState() =>
+      _SameDateShiftProductionsDialogState();
+}
+
+class _SameDateShiftProductionsDialogState
+    extends State<_SameDateShiftProductionsDialog> {
+  late Future<List<BrokerProduction>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = BrokerProductionRepository().fetchByMesinTanggalShift(
+      idMesin: widget.idMesin,
+      tanggal: widget.tanggal,
+      shift: widget.shift,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        height: 24,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: _kBrokerPrimary.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: _kBrokerPrimary.withValues(alpha: 0.18)),
-        ),
-        child: Row(
+    final tglLabel = DateFormat(
+      'dd MMM yyyy',
+      'id_ID',
+    ).format(widget.tanggal.toLocal());
+
+    return Dialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 520),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: [Icon(icon, size: 14, color: _kBrokerPrimary)],
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(18, 14, 12, 14),
+              decoration: const BoxDecoration(
+                color: _kBrokerPrimary,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.view_list_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Produksi Shift Ini',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Text(
+                          '$tglLabel  ·  Shift ${widget.shift}',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.75),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close, color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+            // Body
+            Flexible(
+              child: FutureBuilder<List<BrokerProduction>>(
+                future: _future,
+                builder: (context, snap) {
+                  if (snap.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.all(40),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  if (snap.hasError) {
+                    return Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            color: Colors.red.shade400,
+                            size: 32,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            snap.error.toString().replaceFirst(
+                              'Exception: ',
+                              '',
+                            ),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.red.shade600,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          TextButton.icon(
+                            onPressed: () => setState(() {
+                              _future = BrokerProductionRepository()
+                                  .fetchByMesinTanggalShift(
+                                    idMesin: widget.idMesin,
+                                    tanggal: widget.tanggal,
+                                    shift: widget.shift,
+                                  );
+                            }),
+                            icon: const Icon(Icons.refresh, size: 16),
+                            label: const Text('Coba lagi'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  final list = snap.data ?? [];
+                  if (list.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.all(32),
+                      child: Center(
+                        child: Text(
+                          'Belum ada produksi pada shift ini.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF9CA3AF),
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+
+                  // Urutkan berdasarkan HourStart ascending
+                  final sorted = [...list]
+                    ..sort((a, b) {
+                      int toMin(String? hhmm) {
+                        if (hhmm == null || hhmm.isEmpty) return 0;
+                        final p = hhmm.split(':');
+                        if (p.length < 2) return 0;
+                        return (int.tryParse(p[0]) ?? 0) * 60 +
+                            (int.tryParse(p[1]) ?? 0);
+                      }
+
+                      return toMin(a.hourStart).compareTo(toMin(b.hourStart));
+                    });
+
+                  // Ambil waktu akhir dari produksi terakhir
+                  final lastEnd = (sorted.last.hourEnd ?? '').trim();
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    itemCount: sorted.length + 1, // +1 untuk end marker
+                    itemBuilder: (context, i) {
+                      // End marker
+                      if (i == sorted.length) {
+                        return Row(
+                          children: [
+                            SizedBox(
+                              width: 52,
+                              child: Text(
+                                lastEnd.isNotEmpty ? lastEnd : '',
+                                textAlign: TextAlign.right,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade500,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.grey.shade300,
+                                border: Border.all(
+                                  color: Colors.grey.shade400,
+                                  width: 1.5,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Selesai',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey.shade400,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+
+                      final prod = sorted[i];
+                      final isCurrent =
+                          prod.noProduksi == widget.currentNoProduksi;
+                      final isLast = i == sorted.length - 1;
+                      final jamStart = (prod.hourStart ?? '').trim();
+                      final nodeColor = isCurrent
+                          ? _kBrokerPrimary
+                          : prod.isLocked
+                          ? const Color(0xFFF97316)
+                          : Colors.grey.shade400;
+
+                      return IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Kolom kiri: label waktu (lebar tetap)
+                            SizedBox(
+                              width: 52,
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Text(
+                                  jamStart.isNotEmpty ? jamStart : '--:--',
+                                  textAlign: TextAlign.right,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: isCurrent
+                                        ? _kBrokerPrimary
+                                        : Colors.grey.shade600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            // Kolom tengah: dot + garis vertikal
+                            Column(
+                              children: [
+                                Container(
+                                  width: 12,
+                                  height: 12,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: isCurrent
+                                        ? _kBrokerPrimary
+                                        : Colors.white,
+                                    border: Border.all(
+                                      color: nodeColor,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: isCurrent
+                                      ? Center(
+                                          child: Container(
+                                            width: 4,
+                                            height: 4,
+                                            decoration: const BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        )
+                                      : null,
+                                ),
+                                if (!isLast)
+                                  Expanded(
+                                    child: Container(
+                                      width: 2,
+                                      margin: const EdgeInsets.symmetric(
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade200,
+                                        borderRadius: BorderRadius.circular(1),
+                                      ),
+                                    ),
+                                  ),
+                                if (isLast) const SizedBox(height: 4),
+                              ],
+                            ),
+                            const SizedBox(width: 12),
+                            // Kolom kanan: card produksi
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 9,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isCurrent
+                                        ? _kBrokerPrimary.withValues(
+                                            alpha: 0.06,
+                                          )
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: isCurrent
+                                          ? _kBrokerPrimary.withValues(
+                                              alpha: 0.4,
+                                            )
+                                          : _kBrokerBorder,
+                                      width: isCurrent ? 1.5 : 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              prod.outputJenisNama ??
+                                                  'Belum ada jenis',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w700,
+                                                color:
+                                                    prod.outputJenisNama != null
+                                                    ? const Color(0xFF1A1D23)
+                                                    : Colors.grey.shade400,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 3),
+                                            Text(
+                                              prod.noProduksi,
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.grey.shade500,
+                                                fontWeight: FontWeight.w500,
+                                                letterSpacing: 0.3,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      if (isCurrent) ...[
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 7,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: _kBrokerPrimary.withValues(
+                                              alpha: 0.12,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'Dibuka',
+                                            style: TextStyle(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w800,
+                                              color: _kBrokerPrimary,
+                                            ),
+                                          ),
+                                        ),
+                                      ] else if (prod.isLocked) ...[
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 7,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: const Color(
+                                              0xFFF97316,
+                                            ).withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'Locked',
+                                            style: TextStyle(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w800,
+                                              color: Color(0xFFF97316),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+            // Footer
+            const Divider(height: 1, color: _kBrokerBorder),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Tutup'),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

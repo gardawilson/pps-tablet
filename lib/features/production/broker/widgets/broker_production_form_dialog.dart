@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 
 import 'package:pps_tablet/features/operator/model/operator_model.dart';
 import 'package:pps_tablet/features/production/shared/widgets/total_hours_pill.dart';
+import '../../../../common/widgets/error_status_dialog.dart';
 
 import '../../../../common/widgets/app_number_field.dart';
 import '../../../../core/utils/time_formatter.dart';
@@ -105,6 +106,8 @@ class _BrokerProductionFormDialogState
   // kind untuk endpoint overlap (dialog ini broker)
   static const String _kind = 'broker';
 
+  String? _directError;
+
   @override
   void initState() {
     super.initState();
@@ -187,9 +190,10 @@ class _BrokerProductionFormDialogState
     if (picked == null || !mounted) return;
     setState(() {
       _selectedDate = picked;
-      dateCreatedCtrl.text = DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(
-        picked,
-      );
+      dateCreatedCtrl.text = DateFormat(
+        'EEEE, dd MMM yyyy',
+        'id_ID',
+      ).format(picked);
     });
     if (_selectedShift != null) {
       await _fetchShiftHour(_selectedShift!);
@@ -320,6 +324,7 @@ class _BrokerProductionFormDialogState
           idMesin: mesinId,
           idOperator: operatorId,
           outputJenisId: _selectedBrokerType!.idBroker,
+          outputJenisNama: _selectedBrokerType!.nama,
           jam: jamHours,
           shift: _selectedShift!,
           hourStart: hourStartSql,
@@ -351,6 +356,7 @@ class _BrokerProductionFormDialogState
       }
     } catch (e) {
       debugPrint('❌ [BROKER_FORM] Exception during save: $e');
+      _directError = e.toString();
     } finally {
       debugPrint('📝 [BROKER_FORM] Popping loading dialog...');
       if (mounted) {
@@ -373,15 +379,19 @@ class _BrokerProductionFormDialogState
 
       Navigator.of(context).pop(result);
     } else {
-      debugPrint('❌ [BROKER_FORM] Result is null, showing error');
-      debugPrint('❌ [BROKER_FORM] Error message: ${prodVm.saveError}');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(prodVm.saveError ?? 'Gagal menyimpan data'),
-          backgroundColor: Colors.red,
-        ),
+      final rawErr = _directError ?? prodVm.saveError ?? 'Gagal menyimpan data';
+      final errMsg = rawErr.startsWith('Exception: ')
+          ? rawErr.substring('Exception: '.length)
+          : rawErr;
+      _directError = null;
+
+      debugPrint('❌ [BROKER_FORM] Result is null, showing error: $errMsg');
+
+      showDialog(
+        context: context,
+        builder: (_) =>
+            ErrorStatusDialog(title: 'Gagal Menyimpan', message: errMsg),
       );
-      debugPrint('❌ [BROKER_FORM] SnackBar shown, keeping dialog open');
     }
 
     debugPrint('📝 [BROKER_FORM] _submit() completed');
@@ -584,85 +594,104 @@ class _BrokerProductionFormDialogState
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(
-                width: 200,
-                child: ShiftDropdown(
-                  preselectId: widget.header?.shift ?? widget.initialShift,
-                  onChangedId: (id) {
-                    setState(() => _selectedShift = id);
-                    if (id != null) _fetchShiftHour(id);
-                  },
-                  validator: (v) => v == null ? 'Wajib pilih shift' : null,
-                  autovalidateMode: AutovalidateMode.onUserInteraction,
+              AbsorbPointer(
+                absorbing: !widget.isBackdateInput,
+                child: Opacity(
+                  opacity: widget.isBackdateInput ? 1.0 : 0.45,
+                  child: SizedBox(
+                    width: 200,
+                    child: ShiftDropdown(
+                      preselectId: widget.header?.shift ?? widget.initialShift,
+                      onChangedId: (id) {
+                        setState(() => _selectedShift = id);
+                        if (id != null) _fetchShiftHour(id);
+                      },
+                      validator: (v) => v == null ? 'Wajib pilih shift' : null,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 flex: 2,
-                child: TimeFormField(
-                  controller: hourStartCtrl,
-                  label: 'Jam Mulai',
-                  hintText: 'HH:mm',
-                  onPick: () async {
-                    final picked = await pickTime24h(
-                      context,
-                      initial: _startTime,
-                    );
-                    if (picked != null) {
-                      setState(() {
-                        _startTime = picked;
-                        hourStartCtrl.text = formatHHmm(picked);
-                      });
-                      await _checkOverlapIfReadyVM();
-                    }
-                  },
-                  validator: (_) {
-                    final s = parseHHmm(hourStartCtrl.text);
-                    if (s == null) return 'Wajib isi (HH:mm)';
-                    final diff = durationBetweenHHmmWrap(
-                      hourStartCtrl.text,
-                      hourEndCtrl.text,
-                    );
-                    if (diff == null && parseHHmm(hourEndCtrl.text) != null) {
-                      return 'Durasi 0';
-                    }
-                    return null;
-                  },
+                child: AbsorbPointer(
+                  absorbing: !widget.isBackdateInput,
+                  child: Opacity(
+                    opacity: widget.isBackdateInput ? 1.0 : 0.45,
+                    child: TimeFormField(
+                      controller: hourStartCtrl,
+                      label: 'Jam Mulai',
+                      hintText: 'HH:mm',
+                      onPick: () async {
+                        final picked = await pickTime24h(
+                          context,
+                          initial: _startTime,
+                        );
+                        if (picked != null) {
+                          setState(() {
+                            _startTime = picked;
+                            hourStartCtrl.text = formatHHmm(picked);
+                          });
+                          await _checkOverlapIfReadyVM();
+                        }
+                      },
+                      validator: (_) {
+                        final s = parseHHmm(hourStartCtrl.text);
+                        if (s == null) return 'Wajib isi (HH:mm)';
+                        final diff = durationBetweenHHmmWrap(
+                          hourStartCtrl.text,
+                          hourEndCtrl.text,
+                        );
+                        if (diff == null &&
+                            parseHHmm(hourEndCtrl.text) != null) {
+                          return 'Durasi 0';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 flex: 2,
-                child: TimeFormField(
-                  controller: hourEndCtrl,
-                  label: 'Jam Selesai',
-                  hintText: 'HH:mm',
-                  onPick: () async {
-                    final picked = await pickTime24h(
-                      context,
-                      initial: _endTime ?? _startTime,
-                    );
-                    if (picked != null) {
-                      setState(() {
-                        _endTime = picked;
-                        hourEndCtrl.text = formatHHmm(picked);
-                      });
-                      await _checkOverlapIfReadyVM();
-                    }
-                  },
-                  validator: (_) {
-                    final e = parseHHmm(hourEndCtrl.text);
-                    if (e == null) return 'Wajib isi (HH:mm)';
-                    final s = parseHHmm(hourStartCtrl.text);
-                    if (s != null) {
-                      final diff = durationBetweenHHmmWrap(
-                        hourStartCtrl.text,
-                        hourEndCtrl.text,
-                      );
-                      if (diff == null) return 'Durasi 0';
-                    }
-                    return null;
-                  },
+                child: AbsorbPointer(
+                  absorbing: !widget.isBackdateInput,
+                  child: Opacity(
+                    opacity: widget.isBackdateInput ? 1.0 : 0.45,
+                    child: TimeFormField(
+                      controller: hourEndCtrl,
+                      label: 'Jam Selesai',
+                      hintText: 'HH:mm',
+                      onPick: () async {
+                        final picked = await pickTime24h(
+                          context,
+                          initial: _endTime ?? _startTime,
+                        );
+                        if (picked != null) {
+                          setState(() {
+                            _endTime = picked;
+                            hourEndCtrl.text = formatHHmm(picked);
+                          });
+                          await _checkOverlapIfReadyVM();
+                        }
+                      },
+                      validator: (_) {
+                        final e = parseHHmm(hourEndCtrl.text);
+                        if (e == null) return 'Wajib isi (HH:mm)';
+                        final s = parseHHmm(hourStartCtrl.text);
+                        if (s != null) {
+                          final diff = durationBetweenHHmmWrap(
+                            hourStartCtrl.text,
+                            hourEndCtrl.text,
+                          );
+                          if (diff == null) return 'Durasi 0';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 16),
@@ -689,27 +718,34 @@ class _BrokerProductionFormDialogState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                flex: 1,
+                flex: 2,
                 child: ReguDropdown(
                   preselectId: widget.header?.idRegu ?? widget.initialReguId,
-                  label: 'Regu',
-                  hint: 'Pilih regu',
-                  onChanged: (regu) =>
-                      setState(() => _selectedReguId = regu?.idRegu),
+                  onChanged: (regu) {
+                    setState(() {
+                      _selectedReguId = regu?.idRegu;
+                      _selectedOperator = null;
+                    });
+                  },
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                flex: 1,
+                flex: 2,
                 child: OperatorDropdown(
-                  key: ValueKey(
-                    _operatorPreselectId ?? widget.header?.idOperator,
-                  ),
-                  preselectId: isEdit
-                      ? widget.header?.idOperator
-                      : (_operatorPreselectId ?? widget.initialOperatorId),
+                  key: ValueKey(_selectedReguId),
+                  idRegu: _selectedReguId,
+                  preselectId: _selectedReguId != null
+                      ? null
+                      : (isEdit
+                            ? widget.header?.idOperator
+                            : (_operatorPreselectId ??
+                                  widget.initialOperatorId)),
                   label: 'Operator',
-                  hint: 'Pilih operator',
+                  hint: _selectedReguId == null
+                      ? 'Pilih regu dulu'
+                      : 'Pilih operator',
+                  enabled: _selectedReguId != null,
                   autovalidateMode: AutovalidateMode.onUserInteraction,
                   validator: (v) => v == null ? 'Wajib pilih operator' : null,
                   onChanged: (op) => setState(() => _selectedOperator = op),

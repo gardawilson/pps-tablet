@@ -106,7 +106,7 @@ class _BrokerProductionMesinScreenState
           builder: (_) => BrokerProductionInputScreen(
             noProduksi: created.noProduksi,
             idMesin: created.idMesin,
-            namaMesin: created.namaMesin,
+            namaMesin: created.namaMesin.isNotEmpty ? created.namaMesin : mesin.namaMesin,
             shift: created.shift,
             tglProduksi: created.tglProduksi,
             isLocked: created.isLocked,

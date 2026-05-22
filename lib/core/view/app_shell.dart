@@ -52,9 +52,9 @@ class AppShell extends StatefulWidget {
   static final shellNavigatorKey = GlobalKey<NavigatorState>();
 
   /// Global breadcrumb — screens can push/pop segments to show navigation flow.
-  static final breadcrumb = ValueNotifier<List<BreadcrumbSegment>>(
-    [const BreadcrumbSegment('Dashboard')],
-  );
+  static final breadcrumb = ValueNotifier<List<BreadcrumbSegment>>([
+    const BreadcrumbSegment('Dashboard'),
+  ]);
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -103,7 +103,8 @@ class _AppShellState extends State<AppShell> {
                 isCollapsed: _sidebarCollapsed,
                 onToggleCollapse: () =>
                     setState(() => _sidebarCollapsed = !_sidebarCollapsed),
-                onNavigate: (title) => AppShell.breadcrumb.value = [BreadcrumbSegment(title)],
+                onNavigate: (title) =>
+                    AppShell.breadcrumb.value = [BreadcrumbSegment(title)],
               ),
               Expanded(
                 child: Column(

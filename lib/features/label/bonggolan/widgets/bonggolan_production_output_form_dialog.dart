@@ -121,9 +121,14 @@ class _BonggolanProductionOutputFormDialogState
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: 40,
+        vertical: MediaQuery.of(context).viewInsets.bottom > 0 ? 16 : 40,
+      ),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
-        child: Column(
+        child: SingleChildScrollView(
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -351,6 +356,7 @@ class _BonggolanProductionOutputFormDialogState
               ),
             ),
           ],
+          ),
         ),
       ),
     );

@@ -15,6 +15,7 @@ import '../model/broker_production_model.dart';
 import '../repository/broker_production_repository.dart';
 import '../widgets/broker_input_group_popover.dart';
 import '../../shared/widgets/partial_mode_not_supported_dialog.dart';
+import '../../shared/widgets/weight_input_dialog.dart';
 import '../../shared/widgets/save_button_with_badge.dart';
 import '../model/broker_inputs_model.dart';
 
@@ -24,8 +25,6 @@ import '../widgets/broker_lookup_label_partial_dialog.dart';
 import '../../../label/broker/widgets/broker_form_dialog.dart';
 import '../../../label/broker/widgets/broker_production_output_form_dialog.dart';
 import '../../../label/bonggolan/widgets/bonggolan_production_output_form_dialog.dart';
-import '../widgets/broker_move_output_dialog.dart';
-import '../widgets/broker_move_bonggolan_output_dialog.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/endpoints.dart';
 import '../../../../core/network/label_print_lock_api.dart';
@@ -122,6 +121,7 @@ class _BrokerProductionInputScreenState
   String _selectedOutputTab = 'broker';
 
   List<BreadcrumbSegment> _prevBreadcrumb = [];
+  bool _isReplacing = false;
 
   @override
   void initState() {
@@ -153,7 +153,7 @@ class _BrokerProductionInputScreenState
 
   @override
   void dispose() {
-    AppShell.breadcrumb.value = _prevBreadcrumb;
+    if (!_isReplacing) AppShell.breadcrumb.value = _prevBreadcrumb;
     super.dispose();
   }
 
@@ -192,6 +192,25 @@ class _BrokerProductionInputScreenState
     return false;
   }
 
+  Future<void> _openTimelineDialog() async {
+    if (!mounted) return;
+    final idMesin = widget.idMesin;
+    final tgl = widget.tglProduksi;
+    final namaMesin = widget.namaMesin;
+    if (idMesin == null || tgl == null) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => _ShiftTimelineDialog(
+        idMesin: idMesin,
+        namaMesin: namaMesin,
+        tanggal: tgl,
+        shift: widget.shift ?? 1,
+        currentNoProduksi: widget.noProduksi,
+      ),
+    );
+  }
+
   Future<void> _openSplitDialog() async {
     if (!mounted) return;
     final idMesin = widget.idMesin;
@@ -207,10 +226,11 @@ class _BrokerProductionInputScreenState
     final splitResult =
         await showDialog<({BrokerProduction prod, String namaJenis})>(
           context: context,
-          barrierDismissible: false,
-          builder: (_) => _SplitProduksiDialog(
+          barrierDismissible: true,
+          builder: (_) => _GantiProduksiDialog(
             idMesin: idMesin,
             tanggal: tgl,
+            shift: widget.shift ?? 1,
             currentNoProduksi: widget.noProduksi,
           ),
         );
@@ -222,8 +242,7 @@ class _BrokerProductionInputScreenState
         ? splitResult.namaJenis
         : newProd.outputJenisNama;
 
-    // Restore breadcrumb to parent level before replacing route so the new
-    // screen's initState captures the correct _prevBreadcrumb (not doubled).
+    _isReplacing = true;
     AppShell.breadcrumb.value = _prevBreadcrumb;
 
     await Navigator.of(context).pushReplacement(
@@ -460,81 +479,77 @@ class _BrokerProductionInputScreenState
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              // Tombol ganti + list produksi shift — berdekatan
-              if (canChangeJenis ||
-                  (widget.idMesin != null &&
-                      widget.shift != null &&
-                      widget.tglProduksi != null)) ...[
-                const SizedBox(width: 6),
-                if (canChangeJenis)
-                  SizedBox(
-                    height: 26,
-                    child: TextButton.icon(
-                      onPressed: _openSplitDialog,
-                      style: TextButton.styleFrom(
-                        foregroundColor: accentColor,
-                        backgroundColor: accentColor.withValues(alpha: 0.08),
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(6),
-                        ),
+              // Tombol Timeline + Ganti
+              if (widget.idMesin != null &&
+                  widget.shift != null &&
+                  widget.tglProduksi != null) ...[
+                const SizedBox(width: 4),
+                SizedBox(
+                  height: 26,
+                  child: TextButton.icon(
+                    onPressed: _openSplitDialog,
+                    style: TextButton.styleFrom(
+                      foregroundColor: accentColor,
+                      backgroundColor: accentColor.withValues(alpha: 0.08),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
                       ),
-                      icon: const Icon(Icons.swap_horiz_rounded, size: 13),
-                      label: const Text(
-                        'Ganti',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                        ),
+                    ),
+                    icon: const Icon(Icons.swap_horiz_rounded, size: 13),
+                    label: const Text(
+                      'Ganti',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
-                if (widget.idMesin != null &&
-                    widget.shift != null &&
-                    widget.tglProduksi != null) ...[
-                  const SizedBox(width: 4),
-                  Tooltip(
-                    message: 'Produksi lain shift ini',
-                    child: SizedBox(
-                      height: 26,
-                      child: TextButton.icon(
-                        onPressed: _showSameDateShiftDialog,
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.grey.shade600,
-                          backgroundColor: Colors.grey.shade100,
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                        ),
-                        icon: const Icon(Icons.view_list_rounded, size: 13),
-                        label: const Text(
-                          'Timeline',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ],
+              const SizedBox(width: 6),
+              SizedBox(
+                height: 26,
+                child: TextButton.icon(
+                  onPressed: _openTimelineDialog,
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.grey.shade600,
+                    backgroundColor: Colors.grey.shade100,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                  icon: Icon(
+                    Icons.timeline_rounded,
+                    size: 13,
+                    color: Colors.grey.shade600,
+                  ),
+                  label: Text(
+                    'Riwayat',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+              ),
               vline(),
               // Shift · Jam · Tanggal
+              if (tglText != null) ...[
+                infoTag(Icons.calendar_today_outlined, tglText),
+                dot(),
+              ],
               if (widget.shift != null) ...[
                 infoTag(Icons.group_outlined, 'Shift ${widget.shift}'),
                 dot(),
               ],
               infoTag(Icons.schedule_outlined, jamText),
-              if (tglText != null) ...[
-                dot(),
-                infoTag(Icons.calendar_today_outlined, tglText),
-              ],
               const Spacer(),
               // noProduksi + refresh
               Text(
@@ -569,22 +584,6 @@ class _BrokerProductionInputScreenState
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Future<void> _showSameDateShiftDialog() async {
-    if (widget.idMesin == null ||
-        widget.shift == null ||
-        widget.tglProduksi == null)
-      return;
-    await showDialog<void>(
-      context: context,
-      builder: (_) => _SameDateShiftProductionsDialog(
-        idMesin: widget.idMesin!,
-        tanggal: widget.tglProduksi!,
-        shift: widget.shift!,
-        currentNoProduksi: widget.noProduksi,
       ),
     );
   }
@@ -752,6 +751,12 @@ class _BrokerProductionInputScreenState
       return 'Label "$code" tidak memiliki data yang tersedia.';
     }
 
+    // Auto-switch ke tab sesuai tipe label yang discan
+    final tab = _tabForLookupResult(res);
+    if (tab != null && tab != _selectedInputTab) {
+      setState(() => _selectedInputTab = tab);
+    }
+
     // ===== ROUTING BERDASARKAN MODE =====
     if (_selectedMode == 'full') {
       await _handleFullMode(context, vm, res);
@@ -808,8 +813,50 @@ class _BrokerProductionInputScreenState
     BrokerProductionInputViewModel vm,
     ProductionLabelLookupResult res,
   ) async {
-    // ⬇️ PERBAIKAN: Tidak perlu filter karena dialog sudah menampilkan semua
-    // Langsung tampilkan dialog
+    // Non-sak items (gilingan/reject): langsung tanya berat saja
+    final firstItem = res.typedItems.isNotEmpty ? res.typedItems.first : null;
+    final isNonSak = firstItem is GilinganItem || firstItem is RejectItem;
+
+    if (isNonSak && res.data.isNotEmpty) {
+      final row = res.data.first;
+      final beratRaw = row['berat'] ?? row['Berat'];
+      final originalBerat = beratRaw != null
+          ? (beratRaw as num).toDouble()
+          : null;
+      if (originalBerat == null || originalBerat <= 0) return;
+
+      final newWeight = await WeightInputDialog.show(
+        context,
+        maxWeight: originalBerat,
+        currentWeight: null,
+      );
+      if (!mounted || newWeight == null) return;
+
+      final originalIsPartial = row['isPartial'];
+      row['isPartial'] = true;
+      row['IsPartial'] = true;
+      row['berat'] = newWeight;
+      row['Berat'] = newWeight;
+
+      vm.clearPicks();
+      vm.togglePick(row);
+      final r = vm.commitPickedToTemp(noProduksi: widget.noProduksi);
+
+      row['berat'] = originalBerat;
+      row['Berat'] = originalBerat;
+      row['isPartial'] = originalIsPartial;
+      row['IsPartial'] = originalIsPartial;
+
+      _showSnack(
+        r.added > 0
+            ? '✅ Ditambahkan ${r.added} item partial'
+            : 'Item sudah ada atau gagal ditambahkan',
+        backgroundColor: r.added > 0 ? Colors.green : Colors.orange,
+      );
+      return;
+    }
+
+    // Sak-based: tampilkan dialog partial normal
     await showDialog(
       context: context,
       barrierDismissible: true,
@@ -850,6 +897,19 @@ class _BrokerProductionInputScreenState
         selectedMode: _selectedMode,
       ),
     );
+  }
+
+  String? _tabForLookupResult(ProductionLabelLookupResult res) {
+    if (res.typedItems.isEmpty) return null;
+    final item = res.typedItems.first;
+    if (item is BrokerItem) return 'broker';
+    if (item is BbItem) return 'bb';
+    if (item is WashingItem) return 'washing';
+    if (item is CrusherItem) return 'crusher';
+    if (item is GilinganItem) return 'gilingan';
+    if (item is MixerItem) return 'mixer';
+    if (item is RejectItem) return 'reject';
+    return null;
   }
 
   String? _labelCodeOfFirst(ProductionLabelLookupResult res) {
@@ -1039,9 +1099,6 @@ class _BrokerProductionInputScreenState
     final totalLabel = brokerOutputs.length + bonggolanOutputs.length;
     final isBrokerOutputTab = _selectedOutputTab == 'broker';
     final activeOutputLabel = isBrokerOutputTab ? 'Broker' : 'Bonggolan';
-    final canMoveActiveOutput = isBrokerOutputTab
-        ? brokerOutputs.isNotEmpty
-        : bonggolanOutputs.isNotEmpty;
     final selectedTabChild = _selectedOutputTab == 'broker'
         ? _OutputCategoryContent(
             footer: _BrokerOutputSummaryTile(
@@ -1159,68 +1216,6 @@ class _BrokerProductionInputScreenState
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.end,
                                   children: [
-                                    if (canMoveActiveOutput) ...[
-                                      _OutputActionButton(
-                                        icon: Icons.swap_horiz_rounded,
-                                        label: 'Pindah $activeOutputLabel',
-                                        color: _kBrokerPrimary,
-                                        onTap: () async {
-                                          if (isBrokerOutputTab) {
-                                            final moved =
-                                                await showDialog<bool>(
-                                                  context: context,
-                                                  barrierDismissible: false,
-                                                  builder: (_) =>
-                                                      BrokerMoveOutputDialog(
-                                                        noProduksi:
-                                                            widget.noProduksi,
-                                                        outputs: brokerOutputs,
-                                                      ),
-                                                );
-                                            if (moved == true && mounted) {
-                                              ScaffoldMessenger.of(
-                                                context,
-                                              ).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text(
-                                                    'Output berhasil dipindahkan',
-                                                  ),
-                                                  behavior:
-                                                      SnackBarBehavior.floating,
-                                                  backgroundColor: Colors.green,
-                                                ),
-                                              );
-                                            }
-                                          } else {
-                                            final moved = await showDialog<bool>(
-                                              context: context,
-                                              barrierDismissible: false,
-                                              builder: (_) =>
-                                                  BrokerMoveBonggolanOutputDialog(
-                                                    noProduksi:
-                                                        widget.noProduksi,
-                                                    outputs: bonggolanOutputs,
-                                                  ),
-                                            );
-                                            if (moved == true && mounted) {
-                                              ScaffoldMessenger.of(
-                                                context,
-                                              ).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text(
-                                                    'Output bonggolan berhasil dipindahkan',
-                                                  ),
-                                                  behavior:
-                                                      SnackBarBehavior.floating,
-                                                  backgroundColor: Colors.green,
-                                                ),
-                                              );
-                                            }
-                                          }
-                                        },
-                                      ),
-                                      const SizedBox(width: 8),
-                                    ],
                                     _OutputActionButton(
                                       icon: Icons.add,
                                       label: 'Tambah $activeOutputLabel',
@@ -4330,24 +4325,26 @@ class _MiniMetric extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Dialog: Ganti Produksi (split-time)
+// Dialog: Ganti Produksi — timeline shift + form buat produksi baru
 // ---------------------------------------------------------------------------
-class _SplitProduksiDialog extends StatefulWidget {
-  const _SplitProduksiDialog({
+class _GantiProduksiDialog extends StatefulWidget {
+  const _GantiProduksiDialog({
     required this.idMesin,
     required this.tanggal,
+    required this.shift,
     required this.currentNoProduksi,
   });
 
   final int idMesin;
   final DateTime tanggal;
+  final int shift;
   final String currentNoProduksi;
 
   @override
-  State<_SplitProduksiDialog> createState() => _SplitProduksiDialogState();
+  State<_GantiProduksiDialog> createState() => _GantiProduksiDialogState();
 }
 
-class _SplitProduksiDialogState extends State<_SplitProduksiDialog> {
+class _GantiProduksiDialogState extends State<_GantiProduksiDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _hourCtrl = TextEditingController(
     text: () {
@@ -4358,6 +4355,11 @@ class _SplitProduksiDialogState extends State<_SplitProduksiDialog> {
   BrokerType? _selectedJenis;
   bool _isLoading = false;
   String? _errorMsg;
+
+  @override
+  void initState() {
+    super.initState();
+  }
 
   @override
   void dispose() {
@@ -4387,12 +4389,10 @@ class _SplitProduksiDialogState extends State<_SplitProduksiDialog> {
       setState(() => _errorMsg = 'Pilih jenis broker terlebih dahulu');
       return;
     }
-
     setState(() {
       _isLoading = true;
       _errorMsg = null;
     });
-
     try {
       final repo = BrokerProductionRepository();
       final result = await repo.addProduksi(
@@ -4406,47 +4406,48 @@ class _SplitProduksiDialogState extends State<_SplitProduksiDialog> {
           context,
         ).pop((prod: result, namaJenis: _selectedJenis!.nama));
     } catch (e) {
-      if (mounted) {
+      if (mounted)
         setState(() {
           _isLoading = false;
           _errorMsg = e.toString().replaceFirst('Exception: ', '');
         });
-      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final tglLabel = DateFormat(
+      'dd MMM yyyy',
+      'id_ID',
+    ).format(widget.tanggal.toLocal());
+
     return Dialog(
       backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 80, vertical: 80),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 60, vertical: 40),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Header
-                Row(
+        constraints: const BoxConstraints(maxWidth: 540),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.fromLTRB(18, 14, 12, 14),
+                decoration: const BoxDecoration(
+                  color: _kBrokerPrimary,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+                ),
+                child: Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF00897B).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.add_box_outlined,
-                        size: 18,
-                        color: Color(0xFF00897B),
-                      ),
+                    const Icon(
+                      Icons.swap_horiz_rounded,
+                      color: Colors.white,
+                      size: 18,
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -4454,113 +4455,122 @@ class _SplitProduksiDialogState extends State<_SplitProduksiDialog> {
                           const Text(
                             'Ganti Produksi',
                             style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF1F2937),
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          Text(
+                            '$tglLabel  ·  Shift ${widget.shift}',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.75),
+                              fontSize: 11,
                             ),
                           ),
                         ],
                       ),
                     ),
                     IconButton(
+                      visualDensity: VisualDensity.compact,
                       onPressed: _isLoading
                           ? null
                           : () => Navigator.of(context).pop(),
                       icon: const Icon(
                         Icons.close,
-                        size: 20,
-                        color: Color(0xFF9CA3AF),
+                        color: Colors.white,
+                        size: 18,
                       ),
                     ),
                   ],
                 ),
+              ),
 
-                const SizedBox(height: 20),
-                const Divider(height: 1, color: Color(0xFFE5E7EB)),
-                const SizedBox(height: 20),
-
-                // Jam Mulai + Jenis Broker (1 baris)
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              // Form — jam + jenis
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    SizedBox(
-                      width: 130,
-                      child: TextFormField(
-                        controller: _hourCtrl,
-                        readOnly: true,
-                        onTap: _pickTime,
-                        decoration: InputDecoration(
-                          labelText: 'Jam Mulai',
-                          hintText: '08:00',
-                          suffixIcon: const Icon(
-                            Icons.access_time,
-                            size: 18,
-                            color: Color(0xFF6B7280),
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFD1D5DB),
+                    const SizedBox(height: 10),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: 120,
+                          child: TextFormField(
+                            controller: _hourCtrl,
+                            readOnly: true,
+                            onTap: _pickTime,
+                            decoration: InputDecoration(
+                              labelText: 'Jam Mulai',
+                              hintText: '08:00',
+                              suffixIcon: const Icon(
+                                Icons.access_time,
+                                size: 16,
+                                color: Color(0xFF6B7280),
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(9),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(9),
+                                borderSide: const BorderSide(
+                                  color: _kBrokerBorder,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(9),
+                                borderSide: const BorderSide(
+                                  color: _kBrokerPrimary,
+                                  width: 1.5,
+                                ),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 10,
+                              ),
+                              isDense: true,
                             ),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty)
+                                return 'Wajib diisi';
+                              final p = v.trim().split(':');
+                              if (p.length < 2) return 'HH:mm';
+                              final h = int.tryParse(p[0]);
+                              final m = int.tryParse(p[1]);
+                              if (h == null || m == null || h > 23 || m > 59)
+                                return 'Tidak valid';
+                              return null;
+                            },
                           ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFD1D5DB),
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(
-                              color: Color(0xFF00897B),
-                              width: 1.5,
-                            ),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 12,
-                          ),
-                          isDense: true,
                         ),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) {
-                            return 'Wajib diisi';
-                          }
-                          final parts = v.trim().split(':');
-                          if (parts.length < 2) return 'Format HH:mm';
-                          final h = int.tryParse(parts[0]);
-                          final m = int.tryParse(parts[1]);
-                          if (h == null || m == null || h > 23 || m > 59) {
-                            return 'Format tidak valid';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: BrokerTypeDropdown(
-                        onChanged: (bt) {
-                          setState(() {
-                            _selectedJenis = bt;
-                            _errorMsg = null;
-                          });
-                        },
-                        validator: (v) =>
-                            v == null ? 'Wajib pilih jenis broker' : null,
-                        autovalidateMode: AutovalidateMode.onUserInteraction,
-                      ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: BrokerTypeDropdown(
+                            onChanged: (bt) => setState(() {
+                              _selectedJenis = bt;
+                              _errorMsg = null;
+                            }),
+                            validator: (v) =>
+                                v == null ? 'Wajib pilih jenis' : null,
+                            autovalidateMode:
+                                AutovalidateMode.onUserInteraction,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
+              ),
 
-                // Error message
-                if (_errorMsg != null) ...[
-                  const SizedBox(height: 12),
-                  Container(
+              // Error banner
+              if (_errorMsg != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
-                      vertical: 10,
+                      vertical: 8,
                     ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFEE2E2),
@@ -4570,7 +4580,7 @@ class _SplitProduksiDialogState extends State<_SplitProduksiDialog> {
                       children: [
                         const Icon(
                           Icons.error_outline,
-                          size: 16,
+                          size: 14,
                           color: Color(0xFFDC2626),
                         ),
                         const SizedBox(width: 8),
@@ -4578,7 +4588,7 @@ class _SplitProduksiDialogState extends State<_SplitProduksiDialog> {
                           child: Text(
                             _errorMsg!,
                             style: const TextStyle(
-                              fontSize: 12,
+                              fontSize: 11,
                               color: Color(0xFFDC2626),
                             ),
                           ),
@@ -4586,12 +4596,17 @@ class _SplitProduksiDialogState extends State<_SplitProduksiDialog> {
                       ],
                     ),
                   ),
-                ],
+                ),
 
-                const SizedBox(height: 24),
-
-                // Actions
-                Row(
+              // Footer
+              const SizedBox(height: 12),
+              const Divider(height: 1, color: _kBrokerBorder),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     OutlinedButton(
@@ -4600,13 +4615,13 @@ class _SplitProduksiDialogState extends State<_SplitProduksiDialog> {
                           : () => Navigator.of(context).pop(),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF6B7280),
-                        side: const BorderSide(color: Color(0xFFD1D5DB)),
+                        side: const BorderSide(color: _kBrokerBorder),
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
+                          horizontal: 18,
+                          vertical: 10,
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
                       child: const Text(
@@ -4617,31 +4632,31 @@ class _SplitProduksiDialogState extends State<_SplitProduksiDialog> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 10),
                     ElevatedButton.icon(
                       onPressed: _isLoading ? null : _submit,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00897B),
+                        backgroundColor: _kBrokerPrimary,
                         foregroundColor: Colors.white,
+                        elevation: 0,
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
+                          horizontal: 18,
+                          vertical: 10,
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        elevation: 0,
                       ),
                       icon: _isLoading
                           ? const SizedBox(
-                              width: 14,
-                              height: 14,
+                              width: 13,
+                              height: 13,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
                                 color: Colors.white,
                               ),
                             )
-                          : const Icon(Icons.check, size: 16),
+                          : const Icon(Icons.check, size: 15),
                       label: Text(
                         _isLoading ? 'Menyimpan...' : 'Ganti Produksi',
                         style: const TextStyle(
@@ -4652,8 +4667,8 @@ class _SplitProduksiDialogState extends State<_SplitProduksiDialog> {
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -4662,28 +4677,28 @@ class _SplitProduksiDialogState extends State<_SplitProduksiDialog> {
 }
 
 // ---------------------------------------------------------------------------
-// Dialog: Daftar produksi pada mesin + tanggal + shift yang sama
+// Dialog: Timeline produksi shift
 // ---------------------------------------------------------------------------
-class _SameDateShiftProductionsDialog extends StatefulWidget {
-  final int idMesin;
-  final DateTime tanggal;
-  final int shift;
-  final String currentNoProduksi;
-
-  const _SameDateShiftProductionsDialog({
+class _ShiftTimelineDialog extends StatefulWidget {
+  const _ShiftTimelineDialog({
     required this.idMesin,
+    required this.namaMesin,
     required this.tanggal,
     required this.shift,
     required this.currentNoProduksi,
   });
 
+  final int idMesin;
+  final String? namaMesin;
+  final DateTime tanggal;
+  final int shift;
+  final String currentNoProduksi;
+
   @override
-  State<_SameDateShiftProductionsDialog> createState() =>
-      _SameDateShiftProductionsDialogState();
+  State<_ShiftTimelineDialog> createState() => _ShiftTimelineDialogState();
 }
 
-class _SameDateShiftProductionsDialogState
-    extends State<_SameDateShiftProductionsDialog> {
+class _ShiftTimelineDialogState extends State<_ShiftTimelineDialog> {
   late Future<List<BrokerProduction>> _future;
 
   @override
@@ -4693,6 +4708,227 @@ class _SameDateShiftProductionsDialogState
       idMesin: widget.idMesin,
       tanggal: widget.tanggal,
       shift: widget.shift,
+    );
+  }
+
+  Widget _buildTimeline(List<BrokerProduction> list) {
+    final sorted = [...list]
+      ..sort((a, b) {
+        int toMin(String? hhmm) {
+          if (hhmm == null || hhmm.isEmpty) return 0;
+          final p = hhmm.split(':');
+          return (int.tryParse(p[0]) ?? 0) * 60 + (int.tryParse(p[1]) ?? 0);
+        }
+
+        return toMin(a.hourStart).compareTo(toMin(b.hourStart));
+      });
+    final lastEnd = (sorted.isEmpty ? '' : sorted.last.hourEnd ?? '').trim();
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: sorted.length + 1,
+      itemBuilder: (_, i) {
+        if (i == sorted.length) {
+          return Row(
+            children: [
+              SizedBox(
+                width: 52,
+                child: Text(
+                  lastEnd,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.grey.shade300,
+                  border: Border.all(color: Colors.grey.shade400, width: 1.5),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Selesai',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade400,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          );
+        }
+        final prod = sorted[i];
+        final isCurrent = prod.noProduksi == widget.currentNoProduksi;
+        final isLast = i == sorted.length - 1;
+        final jamStart = (prod.hourStart ?? '').trim();
+        final nodeColor = isCurrent
+            ? _kBrokerPrimary
+            : prod.isLocked
+            ? const Color(0xFFF97316)
+            : Colors.grey.shade400;
+
+        return IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                width: 52,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    jamStart.isNotEmpty ? jamStart : '--:--',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: isCurrent ? _kBrokerPrimary : Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                children: [
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isCurrent ? _kBrokerPrimary : Colors.white,
+                      border: Border.all(color: nodeColor, width: 2),
+                    ),
+                    child: isCurrent
+                        ? Center(
+                            child: Container(
+                              width: 4,
+                              height: 4,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white,
+                              ),
+                            ),
+                          )
+                        : null,
+                  ),
+                  if (!isLast)
+                    Expanded(
+                      child: Container(
+                        width: 2,
+                        margin: const EdgeInsets.symmetric(vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(1),
+                        ),
+                      ),
+                    ),
+                  if (isLast) const SizedBox(height: 4),
+                ],
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 9,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isCurrent
+                          ? _kBrokerPrimary.withValues(alpha: 0.06)
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isCurrent
+                            ? _kBrokerPrimary.withValues(alpha: 0.4)
+                            : _kBrokerBorder,
+                        width: isCurrent ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                prod.outputJenisNama ?? 'Belum ada jenis',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: prod.outputJenisNama != null
+                                      ? const Color(0xFF1A1D23)
+                                      : Colors.grey.shade400,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                prod.noProduksi,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey.shade500,
+                                  fontWeight: FontWeight.w500,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (isCurrent)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _kBrokerPrimary.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Text(
+                              'Sedang berlangsung',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: _kBrokerPrimary,
+                              ),
+                            ),
+                          )
+                        else if (prod.isLocked)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(
+                                0xFFF97316,
+                              ).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Text(
+                              'Locked',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFFF97316),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -4713,7 +4949,6 @@ class _SameDateShiftProductionsDialogState
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Header
             Container(
               padding: const EdgeInsets.fromLTRB(18, 14, 12, 14),
               decoration: const BoxDecoration(
@@ -4732,8 +4967,8 @@ class _SameDateShiftProductionsDialogState
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Produksi Shift Ini',
+                        Text(
+                          'Riwayat Produksi ${widget.namaMesin} (Shift ${widget.shift})',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 14,
@@ -4741,7 +4976,7 @@ class _SameDateShiftProductionsDialogState
                           ),
                         ),
                         Text(
-                          '$tglLabel  ·  Shift ${widget.shift}',
+                          tglLabel,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.75),
                             fontSize: 11,
@@ -4758,7 +4993,6 @@ class _SameDateShiftProductionsDialogState
                 ],
               ),
             ),
-            // Body
             Flexible(
               child: FutureBuilder<List<BrokerProduction>>(
                 future: _future,
@@ -4809,7 +5043,6 @@ class _SameDateShiftProductionsDialogState
                       ),
                     );
                   }
-
                   final list = snap.data ?? [];
                   if (list.isEmpty) {
                     return const Padding(
@@ -4825,271 +5058,13 @@ class _SameDateShiftProductionsDialogState
                       ),
                     );
                   }
-
-                  // Urutkan berdasarkan HourStart ascending
-                  final sorted = [...list]
-                    ..sort((a, b) {
-                      int toMin(String? hhmm) {
-                        if (hhmm == null || hhmm.isEmpty) return 0;
-                        final p = hhmm.split(':');
-                        if (p.length < 2) return 0;
-                        return (int.tryParse(p[0]) ?? 0) * 60 +
-                            (int.tryParse(p[1]) ?? 0);
-                      }
-
-                      return toMin(a.hourStart).compareTo(toMin(b.hourStart));
-                    });
-
-                  // Ambil waktu akhir dari produksi terakhir
-                  final lastEnd = (sorted.last.hourEnd ?? '').trim();
-
-                  return ListView.builder(
+                  return SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    itemCount: sorted.length + 1, // +1 untuk end marker
-                    itemBuilder: (context, i) {
-                      // End marker
-                      if (i == sorted.length) {
-                        return Row(
-                          children: [
-                            SizedBox(
-                              width: 52,
-                              child: Text(
-                                lastEnd.isNotEmpty ? lastEnd : '',
-                                textAlign: TextAlign.right,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.grey.shade500,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Container(
-                              width: 10,
-                              height: 10,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.grey.shade300,
-                                border: Border.all(
-                                  color: Colors.grey.shade400,
-                                  width: 1.5,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Selesai',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey.shade400,
-                                fontStyle: FontStyle.italic,
-                              ),
-                            ),
-                          ],
-                        );
-                      }
-
-                      final prod = sorted[i];
-                      final isCurrent =
-                          prod.noProduksi == widget.currentNoProduksi;
-                      final isLast = i == sorted.length - 1;
-                      final jamStart = (prod.hourStart ?? '').trim();
-                      final nodeColor = isCurrent
-                          ? _kBrokerPrimary
-                          : prod.isLocked
-                          ? const Color(0xFFF97316)
-                          : Colors.grey.shade400;
-
-                      return IntrinsicHeight(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // Kolom kiri: label waktu (lebar tetap)
-                            SizedBox(
-                              width: 52,
-                              child: Padding(
-                                padding: const EdgeInsets.only(top: 2),
-                                child: Text(
-                                  jamStart.isNotEmpty ? jamStart : '--:--',
-                                  textAlign: TextAlign.right,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: isCurrent
-                                        ? _kBrokerPrimary
-                                        : Colors.grey.shade600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            // Kolom tengah: dot + garis vertikal
-                            Column(
-                              children: [
-                                Container(
-                                  width: 12,
-                                  height: 12,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: isCurrent
-                                        ? _kBrokerPrimary
-                                        : Colors.white,
-                                    border: Border.all(
-                                      color: nodeColor,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  child: isCurrent
-                                      ? Center(
-                                          child: Container(
-                                            width: 4,
-                                            height: 4,
-                                            decoration: const BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        )
-                                      : null,
-                                ),
-                                if (!isLast)
-                                  Expanded(
-                                    child: Container(
-                                      width: 2,
-                                      margin: const EdgeInsets.symmetric(
-                                        vertical: 3,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey.shade200,
-                                        borderRadius: BorderRadius.circular(1),
-                                      ),
-                                    ),
-                                  ),
-                                if (isLast) const SizedBox(height: 4),
-                              ],
-                            ),
-                            const SizedBox(width: 12),
-                            // Kolom kanan: card produksi
-                            Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 9,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isCurrent
-                                        ? _kBrokerPrimary.withValues(
-                                            alpha: 0.06,
-                                          )
-                                        : Colors.white,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: isCurrent
-                                          ? _kBrokerPrimary.withValues(
-                                              alpha: 0.4,
-                                            )
-                                          : _kBrokerBorder,
-                                      width: isCurrent ? 1.5 : 1,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              prod.outputJenisNama ??
-                                                  'Belum ada jenis',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w700,
-                                                color:
-                                                    prod.outputJenisNama != null
-                                                    ? const Color(0xFF1A1D23)
-                                                    : Colors.grey.shade400,
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                            const SizedBox(height: 3),
-                                            Text(
-                                              prod.noProduksi,
-                                              style: TextStyle(
-                                                fontSize: 10,
-                                                color: Colors.grey.shade500,
-                                                fontWeight: FontWeight.w500,
-                                                letterSpacing: 0.3,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      if (isCurrent) ...[
-                                        const SizedBox(width: 8),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 7,
-                                            vertical: 3,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: _kBrokerPrimary.withValues(
-                                              alpha: 0.12,
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              20,
-                                            ),
-                                          ),
-                                          child: const Text(
-                                            'Dibuka',
-                                            style: TextStyle(
-                                              fontSize: 9,
-                                              fontWeight: FontWeight.w800,
-                                              color: _kBrokerPrimary,
-                                            ),
-                                          ),
-                                        ),
-                                      ] else if (prod.isLocked) ...[
-                                        const SizedBox(width: 8),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 7,
-                                            vertical: 3,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: const Color(
-                                              0xFFF97316,
-                                            ).withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(
-                                              20,
-                                            ),
-                                          ),
-                                          child: const Text(
-                                            'Locked',
-                                            style: TextStyle(
-                                              fontSize: 9,
-                                              fontWeight: FontWeight.w800,
-                                              color: Color(0xFFF97316),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                    child: _buildTimeline(list),
                   );
                 },
               ),
             ),
-            // Footer
             const Divider(height: 1, color: _kBrokerBorder),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),

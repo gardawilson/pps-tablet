@@ -68,20 +68,30 @@ class _LookupLabelPartialDialogState extends State<LookupLabelPartialDialog> {
     return _Presence.none;
   }
 
-  // ❌ HAPUS method _showWeightInputDialog - tidak perlu lagi
-
-  void _toggleRow(int index, Map<String, dynamic> row, bool isDisabled) {
+  Future<void> _toggleRow(
+    int index,
+    Map<String, dynamic> row,
+    bool isDisabled,
+    BrokerProductionInputViewModel vm,
+    ProductionLabelLookupResult result,
+  ) async {
     if (isDisabled) return;
 
-    setState(() {
-      if (_selectedIndex == index) {
-        _selectedIndex = null;
-        _editedWeight = null;
-      } else {
-        _selectedIndex = index;
-        _editedWeight = _beratFromRow(row);
-      }
-    });
+    final originalBerat = _beratFromRow(row);
+    if (originalBerat == null) return;
+
+    final newWeight = await WeightInputDialog.show(
+      context,
+      maxWeight: originalBerat,
+      currentWeight: null,
+    );
+
+    if (!mounted || newWeight == null) return;
+
+    // Langsung commit — tidak perlu kembali ke dialog grid
+    _editedWeight = newWeight;
+    _selectedIndex = index;
+    _commitSelection(vm, result);
   }
 
   void _commitSelection(BrokerProductionInputViewModel vm, ProductionLabelLookupResult result) {
@@ -258,12 +268,14 @@ class _LookupLabelPartialDialogState extends State<LookupLabelPartialDialog> {
                           children: [
                             Row(
                               children: [
-                                Text(
-                                  labelCode,
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                Flexible(
+                                  child: Text(
+                                    namaJenis,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 10),
@@ -287,10 +299,10 @@ class _LookupLabelPartialDialogState extends State<LookupLabelPartialDialog> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              namaJenis,
+                              labelCode,
                               style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.white.withOpacity(0.9),
+                                fontSize: 13,
+                                color: Colors.white.withOpacity(0.85),
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -316,409 +328,160 @@ class _LookupLabelPartialDialogState extends State<LookupLabelPartialDialog> {
                   ),
                 ),
 
-                // INFO BOX
-                Container(
-                  margin: const EdgeInsets.all(16),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.blue.shade50,
-                        Colors.blue.shade100,
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue.shade200),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade200,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(Icons.lightbulb_outline, size: 20, color: Colors.blue.shade700),
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Text(
-                          'Pilih SATU item, lalu klik Edit untuk mengubah berat',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    ],
+                // HINT
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                  child: Text(
+                    'Ketuk sak untuk memilih berat partial yang akan diinput',
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                   ),
                 ),
 
-                // COLUMN HEADERS
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    border: Border(
-                      bottom: BorderSide(color: Colors.grey.shade200),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const SizedBox(width: 40),
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          _getDetailHeader(prefixType),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                            color: Colors.black87,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                      const Expanded(
-                        flex: 2,
-                        child: Text(
-                          'BERAT (KG)',
-                          textAlign: TextAlign.right,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                            color: Colors.black87,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const SizedBox(
-                        width: 140,
-                        child: Text(
-                          'STATUS',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                            color: Colors.black87,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // LIST
+                // GRID
                 Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(12),
-                    itemCount: allTypedItems.length,
-                    itemBuilder: (_, idx) {
-                      final item = allTypedItems[idx];
-                      final rawRow = allData[idx];
+                  child: LayoutBuilder(
+                    builder: (_, constraints) {
+                      final crossCount = constraints.maxWidth < 300
+                          ? 4
+                          : constraints.maxWidth < 400
+                              ? 6
+                              : constraints.maxWidth < 600
+                                  ? 7
+                                  : 8;
+                      return GridView.builder(
+                        padding: const EdgeInsets.all(12),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossCount,
+                          crossAxisSpacing: 6,
+                          mainAxisSpacing: 6,
+                          childAspectRatio: 1.3,
+                        ),
+                        itemCount: allTypedItems.length,
+                        itemBuilder: (_, idx) {
+                          final item = allTypedItems[idx];
+                          final rawRow = allData[idx];
 
-                      final presence = _presenceForRow(vm, rawRow, result);
-                      final isDisabled = presence == _Presence.temp;
+                          final presence = _presenceForRow(vm, rawRow, result);
+                          final isDisabled = presence == _Presence.temp;
+                          final isSelected = _selectedIndex == idx;
+                          final detail = _getDetailText(item, prefixType);
+                          final originalWeight = _beratOf(item);
+                          final displayWeight = isSelected && _editedWeight != null
+                              ? _editedWeight!
+                              : originalWeight;
+                          final weightText = displayWeight == null ? '-' : num2(displayWeight);
+                          final isOriginalPartial = _isPartialOf(item, rawRow);
+                          final isWeightEdited = isSelected &&
+                              _editedWeight != null &&
+                              _editedWeight != originalWeight;
 
-                      final isSelected = _selectedIndex == idx;
-                      final detail = _getDetailText(item, prefixType);
-                      final originalWeight = _beratOf(item);
+                          Color cardBg;
+                          Color borderColor;
+                          Color titleColor;
+                          if (isDisabled) {
+                            cardBg = Colors.orange.shade50;
+                            borderColor = Colors.orange.shade300;
+                            titleColor = Colors.orange.shade700;
+                          } else if (isSelected) {
+                            cardBg = Colors.amber.shade50;
+                            borderColor = Colors.amber.shade500;
+                            titleColor = Colors.amber.shade800;
+                          } else {
+                            cardBg = const Color(0xFFF0F7FF);
+                            borderColor = const Color(0xFFBFDBFE);
+                            titleColor = const Color(0xFF1D4ED8);
+                          }
 
-                      final displayWeight = isSelected && _editedWeight != null
-                          ? _editedWeight!
-                          : originalWeight;
-                      final weightText = displayWeight == null ? '-' : num2(displayWeight);
-
-                      final isOriginalPartial = _isPartialOf(item, rawRow);
-
-                      final isWeightEdited = isSelected &&
-                          _editedWeight != null &&
-                          _editedWeight != originalWeight;
-
-                      String? statusText;
-                      Color? statusColor;
-                      if (presence == _Presence.temp) {
-                        statusText = 'Sudah Input';
-                        statusColor = Colors.orange;
-                      }
-
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: IgnorePointer(
-                          ignoring: isDisabled,
-                          child: AnimatedOpacity(
+                          return AnimatedOpacity(
                             duration: const Duration(milliseconds: 200),
-                            opacity: isDisabled ? 0.4 : 1.0,
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(12),
-                                onTap: isDisabled ? null : () => _toggleRow(idx, rawRow, isDisabled),
-                                child: Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: isSelected && !isDisabled
-                                        ? Colors.amber.shade50
-                                        : Colors.white,
-                                    border: Border.all(
-                                      color: isSelected && !isDisabled
-                                          ? Colors.amber.shade400
-                                          : Colors.grey.shade200,
-                                      width: isSelected && !isDisabled ? 2 : 1,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: isSelected && !isDisabled
-                                        ? [
-                                      BoxShadow(
-                                        color: Colors.amber.withOpacity(0.2),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ]
-                                        : null,
+                            opacity: isDisabled ? 0.45 : 1.0,
+                            child: GestureDetector(
+                              onTap: isDisabled ? null : () => _toggleRow(idx, rawRow, isDisabled, vm, result),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: cardBg,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: borderColor,
+                                    width: isSelected ? 2 : 1,
                                   ),
-                                  child: Row(
-                                    children: [
-                                      // Radio button
-                                      Container(
-                                        width: 40,
-                                        height: 40,
-                                        alignment: Alignment.center,
-                                        child: Radio<int>(
-                                          value: idx,
-                                          groupValue: _selectedIndex,
-                                          activeColor: Colors.amber,
-                                          onChanged: isDisabled
-                                              ? null
-                                              : (_) => _toggleRow(idx, rawRow, isDisabled),
-                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                        ),
+                                ),
+                                child: Stack(
+                                  children: [
+                                    Center(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            detail,
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w800,
+                                              color: titleColor,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            '$weightText kg',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: isWeightEdited
+                                                  ? Colors.amber.shade800
+                                                  : const Color(0xFF374151),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-
-                                      // Detail
-                                      Expanded(
-                                        flex: 2,
-                                        child: Row(
-                                          children: [
-                                            if (isOriginalPartial) ...[
-                                              Container(
-                                                padding: const EdgeInsets.all(4),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.orange.withOpacity(0.2),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                ),
-                                                child: const Icon(
-                                                  Icons.content_cut,
-                                                  size: 14,
-                                                  color: Colors.orange,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                            ],
-                                            Expanded(
-                                              child: Text(
-                                                detail,
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: 15,
-                                                  color: isDisabled
-                                                      ? Colors.grey.shade400
-                                                      : Colors.black87,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
+                                    ),
+                                    // Checkmark (top-left) saat terpilih
+                                    if (isSelected && !isDisabled)
+                                      Positioned(
+                                        top: 3,
+                                        left: 3,
+                                        child: Icon(Icons.check_circle, size: 12, color: Colors.amber.shade700),
                                       ),
-
-                                      // Berat
-                                      Expanded(
-                                        flex: 2,
-                                        child: Align(
-                                          alignment: Alignment.centerRight,
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 12,
-                                              vertical: 6,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              gradient: LinearGradient(
-                                                colors: isWeightEdited
-                                                    ? [
-                                                  Colors.amber.shade300,
-                                                  Colors.amber.shade400,
-                                                ]
-                                                    : statusText != null
-                                                    ? [
-                                                  statusColor!.withOpacity(0.2),
-                                                  statusColor.withOpacity(0.3),
-                                                ]
-                                                    : [
-                                                  Colors.green.shade100,
-                                                  Colors.green.shade200,
-                                                ],
-                                              ),
-                                              borderRadius: BorderRadius.circular(20),
-                                            ),
-                                            child: Text(
-                                              '$weightText kg',
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.bold,
-                                                color: isWeightEdited
-                                                    ? Colors.amber.shade900
-                                                    : statusText != null
-                                                    ? statusColor
-                                                    : Colors.green.shade800,
-                                              ),
-                                            ),
+                                    // "P" badge untuk partial asli
+                                    if (isOriginalPartial && !isSelected)
+                                      Positioned(
+                                        top: 3,
+                                        right: 3,
+                                        child: Container(
+                                          width: 14,
+                                          height: 14,
+                                          decoration: BoxDecoration(
+                                            color: Colors.orange.shade400,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Center(
+                                            child: Text('P', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w900, color: Colors.white)),
                                           ),
                                         ),
                                       ),
-
-                                      const SizedBox(width: 12),
-
-                                      // Status & Button
-                                      SizedBox(
-                                        width: 140,
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.end,
-                                          children: [
-                                            // ✅ Edit button - GUNAKAN WeightInputDialog.show
-                                            if (isSelected && !isDisabled)
-                                              Container(
-                                                height: 32,
-                                                child: OutlinedButton.icon(
-                                                  style: OutlinedButton.styleFrom(
-                                                    padding: const EdgeInsets.symmetric(
-                                                      horizontal: 10,
-                                                      vertical: 4,
-                                                    ),
-                                                    side: BorderSide(
-                                                      color: Colors.amber.shade600,
-                                                      width: 1.5,
-                                                    ),
-                                                    shape: RoundedRectangleBorder(
-                                                      borderRadius: BorderRadius.circular(8),
-                                                    ),
-                                                  ),
-                                                  icon: Icon(
-                                                    Icons.edit_outlined,
-                                                    size: 14,
-                                                    color: Colors.amber.shade700,
-                                                  ),
-                                                  label: Text(
-                                                    'Edit',
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      fontWeight: FontWeight.w600,
-                                                      color: Colors.amber.shade700,
-                                                    ),
-                                                  ),
-                                                  onPressed: () async {
-                                                    final originalWeight = _beratOf(item);
-                                                    if (originalWeight != null) {
-                                                      // ✅ GUNAKAN WeightInputDialog
-                                                      final newWeight = await WeightInputDialog.show(
-                                                        context,
-                                                        maxWeight: originalWeight,
-                                                        currentWeight: _editedWeight,
-                                                      );
-
-                                                      if (newWeight != null && mounted) {
-                                                        setState(() {
-                                                          _editedWeight = newWeight;
-                                                        });
-                                                      }
-                                                    }
-                                                  },
-                                                ),
-                                              ),
-
-                                            if (isSelected && !isDisabled) const SizedBox(width: 8),
-
-                                            // Status badges
-                                            if (statusText != null)
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(
-                                                  horizontal: 10,
-                                                  vertical: 4,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  color: statusColor!.withOpacity(0.15),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                  border: Border.all(
-                                                    color: statusColor.withOpacity(0.4),
-                                                  ),
-                                                ),
-                                                child: Text(
-                                                  statusText,
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: statusColor,
-                                                    letterSpacing: 0.3,
-                                                  ),
-                                                ),
-                                              )
-                                            else if (isWeightEdited)
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(
-                                                  horizontal: 10,
-                                                  vertical: 4,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.amber.withOpacity(0.15),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                  border: Border.all(
-                                                    color: Colors.amber.shade400,
-                                                  ),
-                                                ),
-                                                child: Text(
-                                                  'EDITED',
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w800,
-                                                    color: Colors.amber.shade700,
-                                                    letterSpacing: 0.5,
-                                                  ),
-                                                ),
-                                              )
-                                            else if (isOriginalPartial)
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(
-                                                    horizontal: 10,
-                                                    vertical: 4,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.orange.withOpacity(0.15),
-                                                    borderRadius: BorderRadius.circular(6),
-                                                    border: Border.all(
-                                                      color: Colors.orange.shade400,
-                                                    ),
-                                                  ),
-                                                  child: Text(
-                                                    'PARTIAL',
-                                                    style: TextStyle(
-                                                      fontSize: 10,
-                                                      fontWeight: FontWeight.w800,
-                                                      color: Colors.orange.shade700,
-                                                      letterSpacing: 0.5,
-                                                    ),
-                                                  ),
-                                                ),
-                                          ],
+                                    // "Input" badge untuk sudah diinput
+                                    if (isDisabled)
+                                      Positioned(
+                                        top: 3,
+                                        right: 3,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                          decoration: BoxDecoration(
+                                            color: Colors.orange.shade100,
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(color: Colors.orange.shade400),
+                                          ),
+                                          child: Text(
+                                            'Input',
+                                            style: TextStyle(fontSize: 8, fontWeight: FontWeight.w800, color: Colors.orange.shade700),
+                                          ),
                                         ),
                                       ),
-                                    ],
-                                  ),
+                                  ],
                                 ),
                               ),
                             ),
-                          ),
-                        ),
+                          );
+                        },
                       );
                     },
                   ),
@@ -808,26 +571,7 @@ class _LookupLabelPartialDialogState extends State<LookupLabelPartialDialog> {
 
   // ===== HELPERS =====
 
-  String _getDetailHeader(PrefixType type) {
-    switch (type) {
-      case PrefixType.bb:
-        return 'SAK';
-      case PrefixType.gilingan:
-        return 'NO GILINGAN';
-      case PrefixType.mixer:
-        return 'SAK';
-      case PrefixType.reject:
-        return 'NO REJECT';
-      case PrefixType.broker:
-        return 'SAK';
-      case PrefixType.washing:
-        return 'SAK';
-      case PrefixType.crusher:
-        return 'NO CRUSHER';
-      default:
-        return 'DETAIL';
-    }
-  }
+
 
   String _getDetailText(dynamic item, PrefixType type) {
     if (item is BbItem) return '${item.noSak ?? '-'}';

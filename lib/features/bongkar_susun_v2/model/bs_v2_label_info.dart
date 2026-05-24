@@ -1,10 +1,17 @@
 class BsV2LabelSak {
   final int noSak;
   final double berat;
+  final bool isPartial;
 
-  const BsV2LabelSak({required this.noSak, required this.berat});
+  const BsV2LabelSak({
+    required this.noSak,
+    required this.berat,
+    this.isPartial = false,
+  });
 
   factory BsV2LabelSak.fromJson(Map<String, dynamic> j) {
+    final raw = j['isPartial'];
+    final isPartial = raw == true || raw == 1;
     return BsV2LabelSak(
       noSak: j['noSak'] is int
           ? j['noSak'] as int
@@ -14,6 +21,7 @@ class BsV2LabelSak {
           : (j['berat'] is int
                 ? (j['berat'] as int).toDouble()
                 : double.tryParse(j['berat']?.toString() ?? '0') ?? 0.0),
+      isPartial: isPartial,
     );
   }
 }
@@ -28,6 +36,7 @@ class BsV2LabelInfo {
   final List<BsV2LabelSak> saks;
   // bahanBaku only — base number without pallet suffix (e.g. "A.0000002509")
   final String? noBahanBaku;
+  final bool isPartial;
 
   const BsV2LabelInfo({
     required this.labelCode,
@@ -38,6 +47,7 @@ class BsV2LabelInfo {
     this.jumlahSak = 0,
     this.saks = const [],
     this.noBahanBaku,
+    this.isPartial = false,
   });
 
   bool get isWashing => category == 'washing';
@@ -68,6 +78,8 @@ class BsV2LabelInfo {
   }
 
   factory BsV2LabelInfo.fromJson(Map<String, dynamic> j) {
+    final raw = j['isPartial'];
+    final isPartial = raw == true || raw == 1;
     final category = _s(j['category']);
     final isGilingan = category == 'gilingan';
     final isFurnitureWip = category == 'furnitureWip';
@@ -82,6 +94,7 @@ class BsV2LabelInfo {
     return BsV2LabelInfo(
       labelCode: _s(j['labelCode']),
       category: category,
+      isPartial: isPartial,
       idJenis: isGilingan ? _i(j['idGilingan']) : _i(j['idJenis']),
       namaJenis: _s(j['namaJenis']),
       noBahanBaku: isBahanBaku

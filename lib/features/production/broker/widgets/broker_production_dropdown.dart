@@ -73,8 +73,8 @@ class _BrokerProductionDropdownState extends State<BrokerProductionDropdown> {
       // === EDIT MODE: siapkan item lokal, JANGAN utak-atik VM ===
       final wp = BrokerProduction(
         noProduksi: pre,
-        idOperator: 0,
-        namaOperator: "",
+        idOperators: const [],
+        namaOperators: "",
         idMesin: 0,
         namaMesin: widget.preselectNamaMesin ?? '',
         tglProduksi: DateTime.now().toUtc(),

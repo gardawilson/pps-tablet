@@ -484,57 +484,64 @@ class _BrokerProductionInputScreenState
                   widget.shift != null &&
                   widget.tglProduksi != null) ...[
                 const SizedBox(width: 4),
-                SizedBox(
-                  height: 26,
-                  child: TextButton.icon(
-                    onPressed: _openSplitDialog,
-                    style: TextButton.styleFrom(
-                      foregroundColor: accentColor,
-                      backgroundColor: accentColor.withValues(alpha: 0.08),
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                    ),
-                    icon: const Icon(Icons.swap_horiz_rounded, size: 13),
-                    label: const Text(
-                      'Ganti',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
+                Material(
+                  color: accentColor,
+                  borderRadius: BorderRadius.circular(6),
+                  child: InkWell(
+                    onTap: _openSplitDialog,
+                    borderRadius: BorderRadius.circular(6),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.swap_horiz_rounded,
+                            size: 13,
+                            color: Colors.white,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            'Ganti',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
               ],
               const SizedBox(width: 6),
-              SizedBox(
-                height: 26,
-                child: TextButton.icon(
-                  onPressed: _openTimelineDialog,
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.grey.shade600,
-                    backgroundColor: Colors.grey.shade100,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                  ),
-                  icon: Icon(
-                    Icons.timeline_rounded,
-                    size: 13,
-                    color: Colors.grey.shade600,
-                  ),
-                  label: Text(
-                    'Riwayat',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.grey.shade600,
+              Material(
+                color: _kBrokerPrimary,
+                borderRadius: BorderRadius.circular(6),
+                child: InkWell(
+                  onTap: _openTimelineDialog,
+                  borderRadius: BorderRadius.circular(6),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.timeline_rounded,
+                          size: 13,
+                          color: Colors.white,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          'Riwayat',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

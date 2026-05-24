@@ -671,7 +671,7 @@ class BrokerProductionRepository {
   Future<BrokerProduction> createProduksiWithJenis({
     required DateTime tglProduksi,
     required int idMesin,
-    required int idOperator,
+    required List<int> idOperators,
     required int outputJenisId,
     required num jam,
     required int shift,
@@ -692,7 +692,7 @@ class BrokerProductionRepository {
     final bodyMap = <String, dynamic>{
       'tglProduksi': toDbDateString(tglProduksi),
       'idMesin': idMesin,
-      'idOperator': idOperator,
+      'idOperators': idOperators,
       'outputJenisId': outputJenisId,
       'jam': jam,
       'shift': shift,

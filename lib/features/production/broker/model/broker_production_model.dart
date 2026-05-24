@@ -2,10 +2,12 @@ import 'package:intl/intl.dart';
 
 class BrokerProduction {
   final String noProduksi;
-  final int idOperator;
+  /// List of operator IDs (multi-operator support)
+  final List<int> idOperators;
   final int idMesin;
   final String namaMesin;
-  final String namaOperator;
+  /// Comma-separated operator names e.g. "ABDUL HAKIM, RAMOT"
+  final String namaOperators;
   final String? outputJenisNama;
   final int? outputJenisId;
   final DateTime? tglProduksi;
@@ -31,10 +33,10 @@ class BrokerProduction {
 
   const BrokerProduction({
     required this.noProduksi,
-    required this.idOperator,
+    required this.idOperators,
     required this.idMesin,
     required this.namaMesin,
-    required this.namaOperator,
+    required this.namaOperators,
     this.outputJenisNama,
     this.outputJenisId,
     required this.tglProduksi,
@@ -54,6 +56,12 @@ class BrokerProduction {
     this.lastClosedDate,
     this.isLocked = false,
   });
+
+  // ── Backward-compat getters ──────────────────────────────────────────────
+  /// First operator ID (or 0 if empty). Use `idOperators` for full list.
+  int get idOperator => idOperators.isNotEmpty ? idOperators.first : 0;
+  /// Comma-separated operator names. Alias for `namaOperators`.
+  String get namaOperator => namaOperators;
 
   // ---------- tolerant parsers ----------
   static String _asString(dynamic v) => v?.toString() ?? '';
@@ -125,10 +133,13 @@ class BrokerProduction {
   factory BrokerProduction.fromJson(Map<String, dynamic> j) {
     return BrokerProduction(
       noProduksi: _asString(j['NoProduksi']),
-      idOperator: _asIntRequired(j['IdOperator']),
+      idOperators: (j['IdOperators'] as List?)
+              ?.map((e) => _asIntRequired(e))
+              .toList() ??
+          [],
       idMesin: _asIntRequired(j['IdMesin']),
       namaMesin: _asString(j['NamaMesin']),
-      namaOperator: _asString(j['NamaOperator']),
+      namaOperators: _asString(j['NamaOperators']),
       outputJenisNama: (j['OutputJenisNama'] == null || _asString(j['OutputJenisNama']).trim().isEmpty)
           ? null
           : _asString(j['OutputJenisNama']),
@@ -155,10 +166,10 @@ class BrokerProduction {
 
   Map<String, dynamic> toJson({bool asDateOnly = true}) => {
     'NoProduksi': noProduksi,
-    'IdOperator': idOperator,
+    'IdOperators': idOperators,
     'IdMesin': idMesin,
     'NamaMesin': namaMesin,
-    'NamaOperator': namaOperator,
+    'NamaOperators': namaOperators,
     'OutputJenisNama': outputJenisNama,
     'TglProduksi': tglProduksi == null
         ? null
@@ -215,8 +226,10 @@ class BrokerProduksiItem {
   final int? outputJenisId;
   final String? outputJenisNama;
   final String? outputJenisItemCode;
-  final int? idOperator;
-  final String? operator_;
+  /// List of operator IDs (multi-operator)
+  final List<int> idOperators;
+  /// Comma-separated operator names e.g. "ABDUL HAKIM, RAMOT"
+  final String? operators;
   final int? shift;
   final String? hourStart;
   final String? hourEnd;
@@ -227,12 +240,16 @@ class BrokerProduksiItem {
     this.outputJenisId,
     this.outputJenisNama,
     this.outputJenisItemCode,
-    this.idOperator,
-    this.operator_,
+    this.idOperators = const [],
+    this.operators,
     this.shift,
     this.hourStart,
     this.hourEnd,
   });
+
+  // ── Backward-compat getters ──────────────────────────────────────────────
+  int? get idOperator => idOperators.isNotEmpty ? idOperators.first : null;
+  String? get operator_ => operators;
 
   factory BrokerProduksiItem.fromJson(Map<String, dynamic> j) {
     String? s(dynamic v) => v == null ? null : v.toString().trim().isEmpty ? null : v.toString().trim();
@@ -249,14 +266,21 @@ class BrokerProduksiItem {
       return '${parts[0].padLeft(2, '0')}:${parts[1].padLeft(2, '0')}';
     }
 
+    // Parse IdOperators — support both array (new) and single int (legacy)
+    List<int> parseIdOperators(dynamic v) {
+      if (v is List) return v.map((e) => i(e) ?? 0).where((e) => e != 0).toList();
+      final single = i(v);
+      return single != null ? [single] : [];
+    }
+
     return BrokerProduksiItem(
       noProduksi: s(j['NoProduksi']) ?? '',
       tglProduksi: j['TglProduksi'] != null ? DateTime.tryParse(j['TglProduksi'].toString()) : null,
       outputJenisId: i(j['OutputJenisId']),
       outputJenisNama: s(j['OutputJenisNama']),
       outputJenisItemCode: s(j['OutputJenisItemCode']),
-      idOperator: i(j['IdOperator']),
-      operator_: s(j['Operator']),
+      idOperators: parseIdOperators(j['IdOperators'] ?? j['IdOperator']),
+      operators: s(j['Operators']) ?? s(j['Operator']),
       shift: i(j['Shift']),
       hourStart: timeHHmm(j['HourStart']),
       hourEnd: timeHHmm(j['HourEnd']),

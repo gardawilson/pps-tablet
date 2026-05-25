@@ -103,8 +103,16 @@ class _AppShellState extends State<AppShell> {
                 isCollapsed: _sidebarCollapsed,
                 onToggleCollapse: () =>
                     setState(() => _sidebarCollapsed = !_sidebarCollapsed),
-                onNavigate: (title) =>
-                    AppShell.breadcrumb.value = [BreadcrumbSegment(title)],
+                onNavigate: (title, {String? parentTitle}) {
+                  if (parentTitle != null) {
+                    AppShell.breadcrumb.value = [
+                      BreadcrumbSegment(parentTitle),
+                      BreadcrumbSegment(title),
+                    ];
+                  } else {
+                    AppShell.breadcrumb.value = [BreadcrumbSegment(title)];
+                  }
+                },
               ),
               Expanded(
                 child: Column(

@@ -294,7 +294,7 @@ class _BrokerProductionMesinScreenState
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 3,
-                              mainAxisExtent: 130,
+                              mainAxisExtent: 110,
                               crossAxisSpacing: 10,
                               mainAxisSpacing: 10,
                             ),
@@ -344,6 +344,7 @@ class _BrokerProductionMesinScreenState
                       isLoading: _produksiLoading,
                       isFetchingMore: _produksiFetchingMore,
                       scrollController: _produksiScrollCtl,
+                      filterIdMesin: _filterIdMesin,
                       onTap: (row) async {
                         await Navigator.of(context).push(
                           MaterialPageRoute(
@@ -581,7 +582,7 @@ class _RiwayatSectionHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Title row — same height as left header (44px)
+          // Title row + chip "Semua" sejajar (44px)
           SizedBox(
             height: 44,
             child: Padding(
@@ -596,35 +597,37 @@ class _RiwayatSectionHeader extends StatelessWidget {
                       color: Color(0xFF1F2937),
                     ),
                   ),
+                  const SizedBox(width: 10),
+                  _FilterChip(
+                    label: 'Semua',
+                    selected: selectedIdMesin == null,
+                    onTap: () => onFilterChanged(null),
+                  ),
                 ],
               ),
             ),
           ),
-          // Chips row
-          SizedBox(
-            height: 30,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
-              children: [
-                _FilterChip(
-                  label: 'Semua',
-                  selected: selectedIdMesin == null,
-                  onTap: () => onFilterChanged(null),
-                ),
-                ...mesinList.map(
-                  (m) => Padding(
-                    padding: const EdgeInsets.only(left: 6),
-                    child: _FilterChip(
-                      label: m.namaMesin,
-                      selected: selectedIdMesin == m.idMesin,
-                      onTap: () => onFilterChanged(m.idMesin),
-                    ),
-                  ),
-                ),
-              ],
+          // Chips mesin di bawah
+          if (mesinList.isNotEmpty)
+            SizedBox(
+              height: 30,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
+                children: mesinList
+                    .map(
+                      (m) => Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: _FilterChip(
+                          label: m.namaMesin,
+                          selected: selectedIdMesin == m.idMesin,
+                          onTap: () => onFilterChanged(m.idMesin),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -681,6 +684,7 @@ class _ProduksiList extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onInput,
+    this.filterIdMesin,
   });
 
   final List<BrokerProduction> items;
@@ -691,6 +695,7 @@ class _ProduksiList extends StatelessWidget {
   final Future<void> Function(BrokerProduction) onEdit;
   final Future<void> Function(BrokerProduction) onDelete;
   final Future<void> Function(BrokerProduction) onInput;
+  final int? filterIdMesin;
 
   @override
   Widget build(BuildContext context) {
@@ -719,6 +724,7 @@ class _ProduksiList extends StatelessWidget {
         final row = items[index];
         return _ProduksiRow(
           row: row,
+          showRegu: filterIdMesin != null,
           onTap: () => onTap(row),
           onEdit: () => onEdit(row),
           onDelete: () => onDelete(row),
@@ -736,6 +742,7 @@ class _ProduksiRow extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onInput,
+    this.showRegu = false,
   });
 
   final BrokerProduction row;
@@ -743,6 +750,7 @@ class _ProduksiRow extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onInput;
+  final bool showRegu;
 
   String _fmtDate(DateTime? d) {
     if (d == null) return '-';
@@ -800,12 +808,16 @@ class _ProduksiRow extends StatelessWidget {
                 ],
               ),
               const SizedBox(width: 10),
-              // Mesin name
+              // Mesin / Regu name
               Expanded(
                 flex: 2,
                 child: Text(
-                  row.namaMesin,
-                  maxLines: 1,
+                  showRegu
+                      ? (row.namaRegu?.trim().isNotEmpty == true
+                            ? row.namaRegu!.trim()
+                            : '-')
+                      : row.namaMesin,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 11,
@@ -983,20 +995,17 @@ class _MesinCard extends StatelessWidget {
               const Divider(height: 1, color: Color(0xFFE2E8F0)),
               const SizedBox(height: 6),
               if (current != null) ...[
-                if (current.shift != null)
+                if (current.shift != null ||
+                    current.hourStart != null ||
+                    current.hourEnd != null)
                   _SmallInfo(
                     icon: Icons.access_time_outlined,
-                    text: 'Shift ${current.shift}',
+                    text: [
+                      if (current.shift != null) 'Shift ${current.shift}',
+                      '${current.hourStart ?? '--:--'} – ${current.hourEnd ?? '--:--'}',
+                    ].join('  |  '),
                     bold: true,
                   ),
-                if (current.hourStart != null || current.hourEnd != null) ...[
-                  const SizedBox(height: 2),
-                  _SmallInfo(
-                    icon: Icons.schedule_outlined,
-                    text:
-                        '${current.hourStart ?? '--:--'} – ${current.hourEnd ?? '--:--'}',
-                  ),
-                ],
                 if (current.operator_ != null) ...[
                   const SizedBox(height: 2),
                   _SmallInfo(

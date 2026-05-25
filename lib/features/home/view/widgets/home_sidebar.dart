@@ -4,7 +4,7 @@ class HomeSidebar extends StatefulWidget {
   final GlobalKey<NavigatorState> navigatorKey;
   final bool isCollapsed;
   final VoidCallback onToggleCollapse;
-  final void Function(String title) onNavigate;
+  final void Function(String title, {String? parentTitle}) onNavigate;
 
   const HomeSidebar({
     super.key,
@@ -27,7 +27,7 @@ class _HomeSidebarState extends State<HomeSidebar> {
 
   static List<_MenuGroup> get _menuGroups => <_MenuGroup>[
     _MenuGroup(
-      title: 'Buat Label',
+      title: 'Label',
       icon: Icons.label_outlined,
       children: [
         _SubItem(
@@ -195,9 +195,9 @@ class _HomeSidebarState extends State<HomeSidebar> {
     ),
   ];
 
-  void _navigateTo(String route, String title) {
+  void _navigateTo(String route, String title, {String? parentTitle}) {
     setState(() => _selectedRoute = route);
-    widget.onNavigate(title);
+    widget.onNavigate(title, parentTitle: parentTitle);
     widget.navigatorKey.currentState?.pushNamedAndRemoveUntil(
       route,
       (r) => false,
@@ -438,7 +438,9 @@ class _HomeSidebarState extends State<HomeSidebar> {
             child: isExpanded
                 ? Column(
                     children: group.children
-                        .map((sub) => _buildSubItem(sub))
+                        .map(
+                          (sub) => _buildSubItem(sub, parentTitle: group.title),
+                        )
                         .toList(),
                   )
                 : const SizedBox.shrink(),
@@ -448,7 +450,7 @@ class _HomeSidebarState extends State<HomeSidebar> {
     );
   }
 
-  Widget _buildSubItem(_SubItem sub) {
+  Widget _buildSubItem(_SubItem sub, {required String parentTitle}) {
     final isSelected = _selectedRoute == sub.route;
     return Padding(
       padding: const EdgeInsets.only(left: 16, top: 2),
@@ -457,7 +459,8 @@ class _HomeSidebarState extends State<HomeSidebar> {
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
-          onTap: () => _navigateTo(sub.route, sub.title),
+          onTap: () =>
+              _navigateTo(sub.route, sub.title, parentTitle: parentTitle),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),

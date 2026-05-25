@@ -127,20 +127,21 @@ class _BrokerProductionInputScreenState
   void initState() {
     super.initState();
     _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
+    // Set breadcrumb synchronously so app bar doesn't jump on first frame
+    AppShell.breadcrumb.value = [
+      ..._prevBreadcrumb.map(
+        (s) => BreadcrumbSegment(
+          s.label,
+          onTap: () {
+            AppShell.breadcrumb.value = _prevBreadcrumb;
+            AppShell.shellNavigatorKey.currentState?.pop();
+          },
+        ),
+      ),
+      BreadcrumbSegment(widget.namaMesin ?? widget.noProduksi),
+    ];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      AppShell.breadcrumb.value = [
-        ..._prevBreadcrumb.map(
-          (s) => BreadcrumbSegment(
-            s.label,
-            onTap: () {
-              AppShell.breadcrumb.value = _prevBreadcrumb;
-              AppShell.shellNavigatorKey.currentState?.pop();
-            },
-          ),
-        ),
-        BreadcrumbSegment(widget.namaMesin ?? widget.noProduksi),
-      ];
       context.read<BrokerProductionInputViewModel>().loadInputs(
         widget.noProduksi,
         force: true,
@@ -378,7 +379,7 @@ class _BrokerProductionInputScreenState
 
     final statusLabel = locked
         ? 'Locked'
-        : (isActive ? 'Sedang Berlangsung' : 'Sudah Lewat');
+        : (isActive ? 'Real-Time' : 'Backdate');
     final statusIcon = locked
         ? Icons.lock_outline
         : (isActive ? Icons.play_circle_outline : Icons.history_rounded);

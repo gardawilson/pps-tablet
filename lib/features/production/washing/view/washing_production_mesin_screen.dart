@@ -1,42 +1,40 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
-import '../../../../core/network/endpoints.dart';
-import '../../../../core/services/token_storage.dart';
-import '../../../../features/mesin/model/mesin_model.dart';
+import '../../../mesin/model/mesin_model.dart';
 import '../../shared/widgets/mesin_section_header.dart';
-import '../model/broker_production_model.dart';
-import '../repository/broker_production_repository.dart';
-import '../view_model/broker_production_view_model.dart';
-import '../widgets/broker_delete_dialog.dart';
-import '../widgets/broker_mesin_card.dart';
-import '../widgets/broker_produksi_list.dart';
-import '../widgets/broker_production_form_dialog.dart';
-import '../widgets/broker_riwayat_section_header.dart';
-import 'broker_production_input_screen.dart';
+import '../model/washing_production_model.dart';
+import '../repository/washing_production_repository.dart';
+import '../view_model/washing_production_view_model.dart';
+import '../widgets/washing_delete_dialog.dart';
+import '../widgets/washing_mesin_card.dart';
+import '../widgets/washing_produksi_list.dart';
+import '../widgets/washing_production_form_dialog.dart';
+import '../widgets/washing_riwayat_section_header.dart';
+import 'washing_production_input_screen.dart';
 
-class BrokerProductionMesinScreen extends StatefulWidget {
-  const BrokerProductionMesinScreen({super.key});
+class WashingProductionMesinScreen extends StatefulWidget {
+  const WashingProductionMesinScreen({super.key});
 
   @override
-  State<BrokerProductionMesinScreen> createState() =>
-      _BrokerProductionMesinScreenState();
+  State<WashingProductionMesinScreen> createState() =>
+      _WashingProductionMesinScreenState();
 }
 
-class _BrokerProductionMesinScreenState
-    extends State<BrokerProductionMesinScreen> {
-  final _prodRepo = BrokerProductionRepository();
-  Future<List<BrokerMesinInfo>> _mesinFuture = Future.value(
-    <BrokerMesinInfo>[],
-  );
+class _WashingProductionMesinScreenState
+    extends State<WashingProductionMesinScreen> {
+  final _repo = WashingProductionRepository();
 
-  // Right panel state — all produksi (paginated)
-  final List<BrokerProduction> _produksiItems = [];
+  // Left panel — mesin grid
+  Future<WashingMesinResult> _mesinFuture = Future.value(
+    (mesinList: <WashingMesinInfo>[], activeShift: null),
+  );
+  WashingActiveShift? _activeShift;
+
+  // Right panel — riwayat produksi (paginated)
+  final List<WashingProduction> _produksiItems = [];
   bool _produksiLoading = false;
   bool _produksiFetchingMore = false;
   bool _produksiHasMore = true;
@@ -53,15 +51,23 @@ class _BrokerProductionMesinScreenState
     _produksiScrollCtl.addListener(_onProduksiScroll);
   }
 
-  Future<void> _loadMesin() async {
-    final future = _prodRepo.fetchBrokerMesin();
-    if (mounted) setState(() => _mesinFuture = future);
-  }
-
   @override
   void dispose() {
     _produksiScrollCtl.dispose();
     super.dispose();
+  }
+
+  // ── Data loading ──────────────────────────────────────────────────────────
+
+  Future<void> _loadMesin() async {
+    final future = _repo.fetchWashingMesin();
+    if (!mounted) return;
+    setState(() => _mesinFuture = future);
+    // Simpan activeShift setelah resolved
+    try {
+      final result = await future;
+      if (mounted) setState(() => _activeShift = result.activeShift);
+    } catch (_) {}
   }
 
   void _onProduksiScroll() {
@@ -82,13 +88,12 @@ class _BrokerProductionMesinScreenState
       _produksiHasMore = true;
     });
     try {
-      final res = await _prodRepo.fetchAll(
+      final res = await _repo.fetchAll(
         page: 1,
         pageSize: _pageSize,
-        idMesin: _filterIdMesin,
       );
       if (!mounted) return;
-      final newItems = res['items'] as List<BrokerProduction>;
+      final newItems = res['items'] as List<WashingProduction>;
       final totalPages = (res['totalPages'] as int?) ?? 1;
       setState(() {
         _produksiItems.addAll(newItems);
@@ -105,13 +110,12 @@ class _BrokerProductionMesinScreenState
     setState(() => _produksiFetchingMore = true);
     try {
       final nextPage = _produksiPage + 1;
-      final res = await _prodRepo.fetchAll(
+      final res = await _repo.fetchAll(
         page: nextPage,
         pageSize: _pageSize,
-        idMesin: _filterIdMesin,
       );
       if (!mounted) return;
-      final newItems = res['items'] as List<BrokerProduction>;
+      final newItems = res['items'] as List<WashingProduction>;
       final totalPages = (res['totalPages'] as int?) ?? 1;
       setState(() {
         _produksiItems.addAll(newItems);
@@ -124,86 +128,44 @@ class _BrokerProductionMesinScreenState
     }
   }
 
-  Future<({int shift, String hourStart, String hourEnd})?>
-  _fetchCurrentShift() async {
-    try {
-      final base = ApiConstants.baseUrl.replaceFirst(RegExp(r'/*$'), '');
-      final url = Uri.parse('$base/api/mst/shift/current');
-      final token = await TokenStorage.getToken();
-      final res = await http
-          .get(
-            url,
-            headers: {
-              'Authorization': 'Bearer $token',
-              'Accept': 'application/json',
-            },
-          )
-          .timeout(const Duration(seconds: 8));
-      if (res.statusCode != 200) return null;
-      final body =
-          jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
-      final data = body['data'] as Map<String, dynamic>?;
-      if (data == null) return null;
-      final shift = data['shift'] as int?;
-      String trim(String? v) =>
-          (v != null && v.length >= 5) ? v.substring(0, 5) : (v ?? '');
-      final hourStart = trim(data['hourStart'] as String?);
-      final hourEnd = trim(data['hourEnd'] as String?);
-      if (shift == null) return null;
-      return (shift: shift, hourStart: hourStart, hourEnd: hourEnd);
-    } catch (_) {
-      return null;
-    }
-  }
-
   void _refreshAll() {
     _loadMesin();
     _loadProduksiPage();
   }
 
-  Future<void> _openCreateDialog({
-    required BrokerMesinInfo mesin,
-    required DateTime today,
-  }) async {
+  // ── Navigation helpers ────────────────────────────────────────────────────
+
+  Future<void> _openCreateDialog({required WashingMesinInfo mesin}) async {
     if (!mounted) return;
+
     final mstMesin = MstMesin(
       idMesin: mesin.idMesin,
       namaMesin: mesin.namaMesin,
-      bagian: mesin.bagian,
+      bagian: mesin.bagian ?? '',
       enable: true,
     );
-    final defaultShift = await _fetchCurrentShift();
-    if (!mounted) return;
-    final created = await showDialog<BrokerProduction>(
+
+    final created = await showDialog<WashingProduction>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => BrokerProductionFormDialog(
+      builder: (_) => WashingProductionFormDialog(
         initialMesin: mstMesin,
-        initialDate: today,
-        existingProduksiList: mesin.produksiList,
-        initialShift: defaultShift?.shift,
-        initialHourStart: defaultShift?.hourStart,
-        initialHourEnd: defaultShift?.hourEnd,
+        initialDate: DateTime.now(),
+        initialShift: _activeShift?.shift,
+        initialHourStart: _activeShift?.hourStart,
+        initialHourEnd: _activeShift?.hourEnd,
+        onSave: (p) => Navigator.of(context).pop(p),
       ),
     );
+
     if (!mounted) return;
     if (created != null) {
       await Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => BrokerProductionInputScreen(
+          builder: (_) => WashingProductionInputScreen(
             noProduksi: created.noProduksi,
-            idMesin: created.idMesin,
-            namaMesin: created.namaMesin.isNotEmpty
-                ? created.namaMesin
-                : mesin.namaMesin,
-            shift: created.shift,
-            tglProduksi: created.tglProduksi,
             isLocked: created.isLocked,
             lastClosedDate: created.lastClosedDate,
-            hourStart: created.hourStart,
-            hourEnd: created.hourEnd,
-            namaJenis: created.outputJenisNama,
-            outputJenisId: created.outputJenisId,
           ),
         ),
       );
@@ -212,29 +174,20 @@ class _BrokerProductionMesinScreenState
     _refreshAll();
   }
 
-  Future<void> _onMesinTap(BrokerMesinInfo mesin) async {
+  Future<void> _onMesinTap(WashingMesinInfo mesin) async {
     if (!mounted) return;
-    final item = mesin.produksiList.isNotEmpty
-        ? mesin.produksiList.first
-        : null;
-    if (item == null) {
-      await _openCreateDialog(mesin: mesin, today: DateTime.now());
+
+    if (!mesin.isActive) {
+      await _openCreateDialog(mesin: mesin);
       return;
     }
+
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => BrokerProductionInputScreen(
-          noProduksi: item.noProduksi,
-          idMesin: mesin.idMesin,
-          namaMesin: mesin.namaMesin,
-          shift: item.shift ?? 1,
-          tglProduksi: item.tglProduksi,
+        builder: (_) => WashingProductionInputScreen(
+          noProduksi: mesin.noProduksi!,
           isLocked: false,
           lastClosedDate: null,
-          hourStart: item.hourStart,
-          hourEnd: item.hourEnd,
-          namaJenis: item.outputJenisNama,
-          outputJenisId: item.outputJenisId,
         ),
       ),
     );
@@ -242,41 +195,44 @@ class _BrokerProductionMesinScreenState
     _refreshAll();
   }
 
+  // ── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Row(
         children: [
-          // ── LEFT: mesin grid (3/5) ──────────────────────────────
+          // ── LEFT: mesin grid (3/5) ────────────────────────────
           Expanded(
             flex: 3,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                FutureBuilder<List<BrokerMesinInfo>>(
+                FutureBuilder<WashingMesinResult>(
                   future: _mesinFuture,
                   builder: (context, snapshot) {
-                    final allMesin = snapshot.data ?? [];
-                    final activeCount = allMesin
-                        .where((m) => m.isActive)
-                        .length;
+                    final allMesin = snapshot.data?.mesinList ?? [];
+                    final activeCount =
+                        allMesin.where((m) => m.isActive).length;
                     final inactiveCount = allMesin.length - activeCount;
                     return MesinSectionHeader(
-                      title: 'Status Mesin Broker',
+                      title: 'Status Mesin Washing',
                       onRefresh: _refreshAll,
                       activeCount: activeCount,
                       inactiveCount: inactiveCount,
-                      isLoading:
-                          snapshot.connectionState == ConnectionState.waiting,
+                      isLoading: snapshot.connectionState ==
+                          ConnectionState.waiting,
                     );
                   },
                 ),
                 Expanded(
-                  child: FutureBuilder<List<BrokerMesinInfo>>(
+                  child: FutureBuilder<WashingMesinResult>(
                     future: _mesinFuture,
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
+                        return const Center(
+                          child: CircularProgressIndicator(),
+                        );
                       }
                       if (snapshot.hasError) {
                         return Center(
@@ -293,7 +249,7 @@ class _BrokerProductionMesinScreenState
                           ),
                         );
                       }
-                      final allMesin = snapshot.data ?? [];
+                      final allMesin = snapshot.data?.mesinList ?? [];
                       return GridView.builder(
                         padding: const EdgeInsets.all(12),
                         gridDelegate:
@@ -306,7 +262,7 @@ class _BrokerProductionMesinScreenState
                         itemCount: allMesin.length,
                         itemBuilder: (context, index) {
                           final mesin = allMesin[index];
-                          return BrokerMesinCard(
+                          return WashingMesinCard(
                             mesin: mesin,
                             onTap: () => _onMesinTap(mesin),
                           );
@@ -322,17 +278,17 @@ class _BrokerProductionMesinScreenState
           // ── DIVIDER ─────────────────────────────────────────────
           const VerticalDivider(width: 1, color: Color(0xFFE5E7EB)),
 
-          // ── RIGHT: riwayat produksi (2/5) ───────────────────────
+          // ── RIGHT: riwayat produksi (2/5) ────────────────────────
           Expanded(
             flex: 2,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                FutureBuilder<List<BrokerMesinInfo>>(
+                FutureBuilder<WashingMesinResult>(
                   future: _mesinFuture,
                   builder: (context, snapshot) {
-                    return BrokerRiwayatSectionHeader(
-                      mesinList: snapshot.data ?? [],
+                    return WashingRiwayatSectionHeader(
+                      mesinList: snapshot.data?.mesinList ?? [],
                       selectedIdMesin: _filterIdMesin,
                       onFilterChanged: (id) {
                         setState(() => _filterIdMesin = id);
@@ -344,7 +300,7 @@ class _BrokerProductionMesinScreenState
                 Expanded(
                   child: RefreshIndicator(
                     onRefresh: _loadProduksiPage,
-                    child: BrokerProduksiList(
+                    child: WashingProduksiList(
                       items: _produksiItems,
                       isLoading: _produksiLoading,
                       isFetchingMore: _produksiFetchingMore,
@@ -353,32 +309,26 @@ class _BrokerProductionMesinScreenState
                       onTap: (row) async {
                         await Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => BrokerProductionInputScreen(
+                            builder: (_) => WashingProductionInputScreen(
                               noProduksi: row.noProduksi,
-                              idMesin: row.idMesin,
-                              namaMesin: row.namaMesin,
-                              shift: row.shift,
-                              tglProduksi: row.tglProduksi,
                               isLocked: row.isLocked,
                               lastClosedDate: row.lastClosedDate,
-                              hourStart: row.hourStart,
-                              hourEnd: row.hourEnd,
-                              namaJenis: row.outputJenisNama,
-                              outputJenisId: row.outputJenisId,
                             ),
                           ),
                         );
                         if (mounted) _refreshAll();
                       },
                       onEdit: (row) async {
-                        final editVm = BrokerProductionViewModel();
+                        final editVm = WashingProductionViewModel(
+                          repository: _repo,
+                        );
                         try {
                           await showDialog<void>(
                             context: context,
                             barrierDismissible: false,
                             builder: (_) => ChangeNotifierProvider.value(
                               value: editVm,
-                              child: BrokerProductionFormDialog(header: row),
+                              child: WashingProductionFormDialog(header: row),
                             ),
                           );
                         } finally {
@@ -387,24 +337,26 @@ class _BrokerProductionMesinScreenState
                         if (mounted) _refreshAll();
                       },
                       onDelete: (row) async {
+                        final screenCtx = context;
                         await showDialog<void>(
-                          context: context,
+                          context: screenCtx,
                           barrierDismissible: false,
-                          builder: (ctx) => BrokerProductionDeleteDialog(
+                          builder: (ctx) => WashingProductionDeleteDialog(
                             header: row,
                             onConfirm: () async {
-                              final deleteVm = BrokerProductionViewModel();
-                              final success = await deleteVm.deleteProduksi(
-                                row.noProduksi,
-                              );
-                              final errMsg = deleteVm.saveError;
-                              deleteVm.dispose();
+                              bool success = false;
+                              String? errMsg;
+                              try {
+                                await _repo.deleteProduksi(row.noProduksi);
+                                success = true;
+                              } catch (e) {
+                                errMsg = e.toString();
+                              }
                               if (ctx.mounted) Navigator.of(ctx).pop();
-                              if (!mounted) return;
+                              if (!screenCtx.mounted) return;
                               if (success) {
-                                // ignore: use_build_context_synchronously
                                 showDialog(
-                                  context: context,
+                                  context: screenCtx,
                                   builder: (_) => SuccessStatusDialog(
                                     title: 'Berhasil Menghapus',
                                     message:
@@ -412,12 +364,12 @@ class _BrokerProductionMesinScreenState
                                   ),
                                 );
                               } else {
-                                // ignore: use_build_context_synchronously
                                 showDialog(
-                                  context: context,
+                                  context: screenCtx,
                                   builder: (_) => ErrorStatusDialog(
                                     title: 'Gagal Menghapus!',
-                                    message: errMsg ?? 'Gagal menghapus data',
+                                    message:
+                                        errMsg ?? 'Gagal menghapus data',
                                   ),
                                 );
                               }
@@ -429,18 +381,10 @@ class _BrokerProductionMesinScreenState
                       onInput: (row) async {
                         await Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => BrokerProductionInputScreen(
+                            builder: (_) => WashingProductionInputScreen(
                               noProduksi: row.noProduksi,
-                              idMesin: row.idMesin,
-                              namaMesin: row.namaMesin,
-                              shift: row.shift,
-                              tglProduksi: row.tglProduksi,
                               isLocked: row.isLocked,
                               lastClosedDate: row.lastClosedDate,
-                              hourStart: row.hourStart,
-                              hourEnd: row.hourEnd,
-                              namaJenis: row.outputJenisNama,
-                              outputJenisId: row.outputJenisId,
                             ),
                           ),
                         );

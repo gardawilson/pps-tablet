@@ -34,7 +34,7 @@ import 'package:pps_tablet/features/production/return/view/return_production_scr
 import 'package:pps_tablet/features/production/selection/view/production_selection_screen.dart';
 import 'package:pps_tablet/features/production/sortir_reject/view/sortir_reject_production_screen.dart';
 import 'package:pps_tablet/features/production/spanner/view/spanner_production_screen.dart';
-import 'package:pps_tablet/features/production/washing/view/washing_production_screen.dart';
+import 'package:pps_tablet/features/production/washing/view/washing_production_mesin_screen.dart';
 import 'package:pps_tablet/features/report/view/report_list_screen.dart';
 import 'package:pps_tablet/features/sortir_reject_v2/view/sr_v2_list_screen.dart';
 import 'package:pps_tablet/features/stock_opname/view/stock_opname_list_screen.dart';
@@ -424,7 +424,7 @@ class _AppShellState extends State<AppShell> {
       case '/production':
         return ProductionSelectionScreen();
       case '/production/washing':
-        return WashingProductionScreen();
+        return const WashingProductionMesinScreen();
       case '/production/broker':
         return const BrokerProductionMesinScreen();
       case '/production/crusher':

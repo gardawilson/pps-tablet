@@ -29,7 +29,23 @@ class WashingProductionFormDialog extends StatefulWidget {
   final WashingProduction? header;
   final Function(WashingProduction)? onSave;
 
-  const WashingProductionFormDialog({super.key, this.header, this.onSave});
+  // Pre-fill saat create baru dari mesin card
+  final MstMesin? initialMesin;
+  final DateTime? initialDate;
+  final int? initialShift;
+  final String? initialHourStart;
+  final String? initialHourEnd;
+
+  const WashingProductionFormDialog({
+    super.key,
+    this.header,
+    this.onSave,
+    this.initialMesin,
+    this.initialDate,
+    this.initialShift,
+    this.initialHourStart,
+    this.initialHourEnd,
+  });
 
   @override
   State<WashingProductionFormDialog> createState() =>
@@ -52,8 +68,9 @@ class _WashingProductionFormDialogState
   // State
   MstMesin? _selectedMesin;
   MstOperator? _selectedOperator;
-  int? _selectedShift; // ← sama seperti washing
+  int? _selectedShift;
   bool _isBlower = false;
+  int? _selectedIdRegu;
 
   // hold the preselect id for operator (from mesin.defaultOperatorId)
   int? _operatorPreselectId;
@@ -80,14 +97,19 @@ class _WashingProductionFormDialogState
 
     final DateTime seededDate = widget.header != null
         ? (parseAnyToDateTime(widget.header!.tglProduksi) ?? DateTime.now())
-        : DateTime.now();
+        : (widget.initialDate ?? DateTime.now());
 
     _selectedDate = seededDate;
     dateCreatedCtrl = TextEditingController(
       text: DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(seededDate),
     );
 
-    mesinCtrl = TextEditingController(text: widget.header?.namaMesin ?? '');
+    // Pre-fill mesin dari mesin card (create baru)
+    _selectedMesin = widget.initialMesin;
+    mesinCtrl = TextEditingController(
+      text: widget.header?.namaMesin ?? widget.initialMesin?.namaMesin ?? '',
+    );
+
     operatorCtrl = TextEditingController(
       text: widget.header?.namaOperator ?? '',
     );
@@ -102,9 +124,16 @@ class _WashingProductionFormDialogState
     );
     _isBlower = widget.header?.isBlower ?? false;
 
-    // washing sudah punya hourStart/hourEnd di model
-    hourStartCtrl = TextEditingController(text: widget.header?.hourStart);
-    hourEndCtrl = TextEditingController(text: widget.header?.hourEnd);
+    // Pre-fill shift & jam dari activeShift
+    _selectedShift = widget.header?.shift ?? widget.initialShift;
+
+    final initStart = widget.header?.hourStart ?? widget.initialHourStart;
+    final initEnd = widget.header?.hourEnd ?? widget.initialHourEnd;
+    hourStartCtrl = TextEditingController(text: initStart);
+    hourEndCtrl = TextEditingController(text: initEnd);
+
+    // Pre-fill idRegu dari header (edit mode)
+    _selectedIdRegu = widget.header?.idRegu;
   }
 
   @override
@@ -212,7 +241,7 @@ class _WashingProductionFormDialogState
           tglProduksi: _selectedDate,
           idMesin: mesinId,
           idOperator: operatorId,
-          jamKerja: jamRange, // ⚠️ PERBEDAAN: jamKerja (bukan jam)
+          jamKerja: jamRange,
           shift: _selectedShift!,
           isBlower: _isBlower,
           hourStart: hourStartSql,
@@ -220,6 +249,7 @@ class _WashingProductionFormDialogState
           jmlhAnggota: jlhAnggota,
           hadir: hadir,
           hourMeter: hourMeter,
+          idRegu: _selectedIdRegu,
         );
       } else {
         // 🆕 CREATE
@@ -235,6 +265,7 @@ class _WashingProductionFormDialogState
           jmlhAnggota: jlhAnggota,
           hadir: hadir,
           hourMeter: hourMeter,
+          idRegu: _selectedIdRegu,
         );
       }
     } finally {

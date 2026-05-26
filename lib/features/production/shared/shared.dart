@@ -10,3 +10,10 @@ export 'utils/title_keys/mixer.dart';
 export 'utils/title_keys/reject.dart';
 export 'utils/title_keys/broker.dart';
 export 'models/input_enums.dart';
+
+// ── Shared UI widgets untuk semua modul production ──────────────────────────
+export 'widgets/production_stat_badge.dart';
+export 'widgets/production_filter_chip.dart';
+export 'widgets/production_status_dot.dart';
+export 'widgets/production_small_info_row.dart';
+export 'widgets/mesin_section_header.dart';

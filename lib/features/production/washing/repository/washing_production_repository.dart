@@ -9,6 +9,12 @@ import '../model/washing_inputs_model.dart';
 import '../model/washing_production_model.dart';
 import 'package:pps_tablet/core/utils/date_formatter.dart';
 
+// result dari fetchWashingMesin
+typedef WashingMesinResult = ({
+  List<WashingMesinInfo> mesinList,
+  WashingActiveShift? activeShift,
+});
+
 class WashingProductionRepository {
   static const _timeout = Duration(seconds: 25);
 
@@ -23,6 +29,42 @@ class WashingProductionRepository {
     'Authorization': 'Bearer $token',
     'Accept': 'application/json',
   };
+
+  // ==========================================
+  //  MESIN STATUS (untuk mesin screen baru)
+  //  GET /api/mst-mesin/washing
+  // ==========================================
+  Future<WashingMesinResult> fetchWashingMesin() async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/mst-mesin/washing');
+
+    late http.Response res;
+    try {
+      res = await http.get(url, headers: _headers(token)).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout mengambil data mesin washing');
+    }
+
+    if (res.statusCode != 200) {
+      throw Exception('Gagal mengambil data mesin washing (${res.statusCode})');
+    }
+
+    final body =
+        json.decode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+
+    final List dataList = (body['data'] ?? []) as List;
+    final mesinList = dataList
+        .map((e) => WashingMesinInfo.fromJson(e as Map<String, dynamic>))
+        .toList();
+
+    WashingActiveShift? activeShift;
+    final shiftRaw = body['activeShift'] as Map<String, dynamic>?;
+    if (shiftRaw != null) {
+      activeShift = WashingActiveShift.fromJson(shiftRaw);
+    }
+
+    return (mesinList: mesinList, activeShift: activeShift);
+  }
 
   // =========================
   //  BY DATE (tetap ada)
@@ -169,6 +211,7 @@ class WashingProductionRepository {
     // ⬇️ baru: ikutkan jam mulai & selesai
     String? hourStart,   // format kirim: 'HH:mm:00' atau 'HH:mm'
     String? hourEnd,     // format kirim: 'HH:mm:00' atau 'HH:mm'
+    int? idRegu,
   }) async {
     final token = await TokenStorage.getToken();
     final url = Uri.parse('$_base/api/production/washing');
@@ -186,9 +229,9 @@ class WashingProductionRepository {
       if (jmlhAnggota != null) 'jmlhAnggota': jmlhAnggota,
       if (hadir != null) 'hadir': hadir,
       if (hourMeter != null) 'hourMeter': hourMeter,
-      // ⬇️ baru: ikutkan ke body kalau ada
       if (hourStart != null) 'hourStart': hourStart,
       if (hourEnd != null) 'hourEnd': hourEnd,
+      if (idRegu != null) 'idRegu': idRegu,
     };
 
     final started = DateTime.now();
@@ -255,6 +298,7 @@ class WashingProductionRepository {
     int? jmlhAnggota,
     int? hadir,
     double? hourMeter,
+    int? idRegu,
   }) async {
     final token = await TokenStorage.getToken();
     final url = Uri.parse('$_base/api/production/washing/$noProduksi');
@@ -310,6 +354,9 @@ class WashingProductionRepository {
     }
     if (hadir != null) {
       body['hadir'] = hadir.toString();
+    }
+    if (idRegu != null) {
+      body['idRegu'] = idRegu.toString();
     }
     if (hourMeter != null) {
       body['hourMeter'] = hourMeter.toString();

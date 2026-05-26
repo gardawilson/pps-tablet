@@ -25,6 +25,9 @@ class WashingProduction {
   final bool isLocked;            // dari SQL: IsLocked (bit)
   final DateTime? lastClosedDate; // dari SQL: LastClosedDate (date)
 
+  // ✅ Regu (sama seperti broker)
+  final int? idRegu;
+
   const WashingProduction({
     required this.noProduksi,
     required this.idOperator,
@@ -46,6 +49,7 @@ class WashingProduction {
     this.hourEnd,
     required this.isLocked,
     this.lastClosedDate,
+    this.idRegu,
   });
 
   // ---------- Tolerant parsers ----------
@@ -163,6 +167,7 @@ class WashingProduction {
       // ✅ new fields
       isLocked: _asBool(j['IsLocked'], fallback: false),
       lastClosedDate: _asDateTime(j['LastClosedDate']),
+      idRegu: _asInt(j['IdRegu']),
     );
   }
 
@@ -189,6 +194,7 @@ class WashingProduction {
     'HourMeter': hourMeter,
     'HourStart': hourStart,
     'HourEnd': hourEnd,
+    'IdRegu': idRegu,
 
     // biasanya tidak perlu dikirim ke server,
     // tapi aman kalau disertakan untuk cache/local state
@@ -235,5 +241,143 @@ class WashingProduction {
     if (tglProduksi == null) return '';
     final d = tglProduksi!.toUtc();
     return DateFormat('dd MMM yyyy', 'id_ID').format(d);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WashingMesinInfo — hasil dari GET /api/mst-mesin/washing
+// Satu baris = satu mesin, dengan info produksi hari ini (jika ada).
+// ─────────────────────────────────────────────────────────────────────────────
+class WashingMesinInfo {
+  final int idMesin;
+  final String namaMesin;
+  final String? bagian;
+  final int? target;
+
+  // produksi hari ini (null = mesin belum aktif)
+  final String? noProduksi;
+  final DateTime? tglProduksi;
+  final int? outputJenisId;
+  final String? outputJenisNama;
+  final String? outputJenisItemCode;
+  final int? idOperator;
+  final String? namaOperator;
+  final int? shift;
+  final String? hourStart; // “HH:mm”
+  final String? hourEnd;   // “HH:mm”
+  final bool? isBlower;
+
+  bool get isActive => noProduksi != null && noProduksi!.isNotEmpty;
+
+  const WashingMesinInfo({
+    required this.idMesin,
+    required this.namaMesin,
+    this.bagian,
+    this.target,
+    this.noProduksi,
+    this.tglProduksi,
+    this.outputJenisId,
+    this.outputJenisNama,
+    this.outputJenisItemCode,
+    this.idOperator,
+    this.namaOperator,
+    this.shift,
+    this.hourStart,
+    this.hourEnd,
+    this.isBlower,
+  });
+
+  static String? _s(dynamic v) {
+    final t = v?.toString().trim();
+    return (t == null || t.isEmpty) ? null : t;
+  }
+
+  static int? _i(dynamic v) {
+    if (v == null) return null;
+    if (v is num) return v.toInt();
+    return int.tryParse(v.toString());
+  }
+
+  static DateTime? _dt(dynamic v) {
+    if (v == null) return null;
+    if (v is DateTime) return v;
+    if (v is String) return DateTime.tryParse(v.trim());
+    return null;
+  }
+
+  static bool? _b(dynamic v) {
+    if (v == null) return null;
+    if (v is bool) return v;
+    if (v is num) return v != 0;
+    if (v is String) {
+      final s = v.trim().toLowerCase();
+      if (s == 'true' || s == '1') return true;
+      if (s == 'false' || s == '0') return false;
+    }
+    return null;
+  }
+
+  /// Normalisasi TIME server ke “HH:mm”
+  static String? _time(dynamic v) {
+    if (v == null) return null;
+    if (v is DateTime) return DateFormat('HH:mm').format(v.toUtc());
+    if (v is String) {
+      final s = v.trim();
+      if (s.isEmpty) return null;
+      final dt = DateTime.tryParse(s);
+      if (dt != null) return DateFormat('HH:mm').format(dt.toUtc());
+      final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(s);
+      if (m != null) {
+        return '${m.group(1)!.padLeft(2, '0')}:${m.group(2)!}';
+      }
+    }
+    return null;
+  }
+
+  factory WashingMesinInfo.fromJson(Map<String, dynamic> j) {
+    return WashingMesinInfo(
+      idMesin: _i(j['IdMesin']) ?? 0,
+      namaMesin: _s(j['NamaMesin']) ?? '',
+      bagian: _s(j['Bagian']),
+      target: _i(j['Target']),
+      noProduksi: _s(j['NoProduksi']),
+      tglProduksi: _dt(j['TglProduksi']),
+      outputJenisId: _i(j['OutputJenisId']),
+      outputJenisNama: _s(j['OutputJenisNama']),
+      outputJenisItemCode: _s(j['OutputJenisItemCode']),
+      idOperator: _i(j['IdOperator']),
+      namaOperator: _s(j['NamaOperator']),
+      shift: _i(j['Shift']),
+      hourStart: _time(j['HourStart']),
+      hourEnd: _time(j['HourEnd']),
+      isBlower: _b(j['IsBlower']),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WashingActiveShift — info shift aktif dari endpoint mst-mesin/washing
+// ─────────────────────────────────────────────────────────────────────────────
+class WashingActiveShift {
+  final int shift;
+  final String hourStart; // “HH:mm:ss” or “HH:mm”
+  final String hourEnd;
+
+  const WashingActiveShift({
+    required this.shift,
+    required this.hourStart,
+    required this.hourEnd,
+  });
+
+  /// Ambil hanya “HH:mm” dari string jam
+  static String _trim5(String v) =>
+      v.length >= 5 ? v.substring(0, 5) : v;
+
+  factory WashingActiveShift.fromJson(Map<String, dynamic> j) {
+    return WashingActiveShift(
+      shift: (j['shift'] as num?)?.toInt() ?? 1,
+      hourStart: _trim5((j['hourStart'] ?? '').toString()),
+      hourEnd: _trim5((j['hourEnd'] ?? '').toString()),
+    );
   }
 }

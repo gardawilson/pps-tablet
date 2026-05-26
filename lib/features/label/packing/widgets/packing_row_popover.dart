@@ -94,6 +94,31 @@ class _PackingRowPopoverState extends State<PackingRowPopover> {
     _runAndClose(widget.onEdit);
   }
 
+  Future<bool> _confirmResetPrintStatus() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Reset Status Print'),
+          content: Text(
+            'Yakin reset status print untuk label ${widget.header.noBJ} ke 0?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Batal'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Reset'),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
+  }
+
   @override
   void dispose() {
     _copiedResetTimer?.cancel();
@@ -312,6 +337,36 @@ class _PackingRowPopoverState extends State<PackingRowPopover> {
                     }
                   }
                 }),
+              ),
+              divider,
+              LabelPopoverMenuTile(
+                icon: Icons.restart_alt_rounded,
+                label: 'Reset Status Print',
+                enabled: canDelete,
+                tooltipWhenDisabled: 'Tidak punya izin reset status print',
+                onTap: () async {
+                  final isConfirmed = await _confirmResetPrintStatus();
+                  if (!isConfirmed) return;
+
+                  final messenger = ScaffoldMessenger.of(context);
+                  final noBJ = widget.header.noBJ;
+                  final repo = PackingRepository(api: ApiClient());
+                  final lockVm = context.read<LabelPrintLockSocketManager>();
+                  widget.onClose();
+
+                  try {
+                    final count = await repo.resetPrintStatus(noBJ);
+                    lockVm.setPrintCount(noBJ, count ?? 0);
+                    messenger.showSnackBar(
+                      const SnackBar(
+                        content: Text('Status print berhasil direset'),
+                      ),
+                    );
+                  } catch (e) {
+                    final msg = e.toString().replaceFirst('Exception: ', '');
+                    messenger.showSnackBar(SnackBar(content: Text(msg)));
+                  }
+                },
               ),
               divider,
               LabelPopoverMenuTile(

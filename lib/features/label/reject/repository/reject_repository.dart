@@ -302,6 +302,26 @@ class RejectRepository {
   }
 
   // =======================================================================
+  // PATCH /api/labels/reject/:noReject/reset-print
+  // =======================================================================
+  Future<int?> resetPrintStatus(String noReject) async {
+    try {
+      final body = await api.patchJson(
+        '/api/labels/reject/${Uri.encodeComponent(noReject)}/reset-print',
+      );
+      final data = body['data'];
+      if (data is Map<String, dynamic>) {
+        final raw = data['HasBeenPrinted'] ?? data['hasBeenPrinted'];
+        if (raw is num) return raw.toInt();
+        if (raw != null) return int.tryParse('$raw');
+      }
+      return null;
+    } on ApiException catch (e) {
+      throw Exception(_friendlyError(e, 'Gagal reset status print reject'));
+    }
+  }
+
+  // =======================================================================
   // GET /api/labels/reject/partials/:noreject
   // =======================================================================
   Future<RejectPartialInfo> fetchPartialInfo({

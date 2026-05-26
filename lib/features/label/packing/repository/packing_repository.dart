@@ -227,6 +227,23 @@ class PackingRepository {
     }
   }
 
+  Future<int?> resetPrintStatus(String noBJ) async {
+    try {
+      final body = await api.patchJson(
+        '/api/labels/packing/${Uri.encodeComponent(noBJ)}/reset-print',
+      );
+      final data = body['data'];
+      if (data is Map<String, dynamic>) {
+        final raw = data['HasBeenPrinted'] ?? data['hasBeenPrinted'];
+        if (raw is num) return raw.toInt();
+        if (raw != null) return int.tryParse('$raw');
+      }
+      return null;
+    } on ApiException catch (e) {
+      throw Exception(_friendlyError(e, 'Gagal reset status print packing'));
+    }
+  }
+
   // =======================================================================
   // GET /api/labels/packing/partials/:noBJ
   // =======================================================================

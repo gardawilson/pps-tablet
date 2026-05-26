@@ -76,7 +76,8 @@ flutter:
     - assets/animations/error.json
     - assets/animations/scan.json
     - assets/animations/scanner.json
-    - .env
+    - .env.development
+    - .env.production
 
 flutter_launcher_icons:
   android: true

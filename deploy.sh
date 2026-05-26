@@ -108,27 +108,20 @@ echo "[1/5] Updating version in pubspec.yaml..."
 sed -i "s/^version: .*/version: $NEXT_VERSION+$NEXT_BUILD/" pubspec.yaml
 echo "      Done: $CURRENT_VERSION → $NEXT_VERSION+$NEXT_BUILD"
 
-# --- Step 2: Set .env ---
+# --- Step 2: Select APP_ENV ---
 echo ""
-echo "[2/5] Setting .env ($MODE)..."
+echo "[2/5] Selecting APP_ENV ($MODE)..."
 if [ "$MODE" == "dev" ]; then
-  DEVICE_API_URL="http://192.168.11.153:3000"
+  APP_ENV="development"
 else
-  DEVICE_API_URL="http://192.168.11.79:3000"
+  APP_ENV="production"
 fi
-cat > .env << EOF
-API_BASE_URL=$API_BASE_URL
-SOCKET_BASE_URL=$API_BASE_URL
-UPDATE_BASE_URL=$API_BASE_URL
-DEVICE_API_URL=$DEVICE_API_URL
-APP_ID=tablet
-EOF
-echo "      Done: .env → $API_BASE_URL | device → $DEVICE_API_URL"
+echo "      Done: APP_ENV=$APP_ENV"
 
 # --- Step 3: Build APK release ---
 echo ""
 echo "[3/5] Building APK release (this may take a few minutes)..."
-flutter build apk --release
+flutter build apk --release --dart-define=APP_ENV=$APP_ENV
 echo "      Done: APK built"
 
 # --- Step 4: Show APK info ---

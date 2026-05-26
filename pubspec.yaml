@@ -2,7 +2,7 @@ name: pps_tablet
 description: "A new Flutter project."
 publish_to: "none"
 
-version: 1.0.78+24
+version: 1.0.79+25
 
 environment:
   sdk: ^3.8.0
@@ -76,7 +76,8 @@ flutter:
     - assets/animations/error.json
     - assets/animations/scan.json
     - assets/animations/scanner.json
-    - .env
+    - .env.development
+    - .env.production
 
 flutter_launcher_icons:
   android: true

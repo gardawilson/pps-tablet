@@ -170,8 +170,15 @@ import 'features/stock_opname/view_model/label_detail_view_model.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Env
-  await dotenv.load(fileName: ".env");
+  // Env by mode: development (default) | production
+  const appEnv = String.fromEnvironment(
+    'APP_ENV',
+    defaultValue: 'development',
+  );
+  final envFile = appEnv == 'production'
+      ? '.env.production'
+      : '.env.development';
+  await dotenv.load(fileName: envFile);
   await Hive.initFlutter();
 
   // Locale Indonesia untuk nama hari/bulan (Intl)

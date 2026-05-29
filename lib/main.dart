@@ -171,10 +171,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Env by mode: development (default) | production
-  const appEnv = String.fromEnvironment(
-    'APP_ENV',
-    defaultValue: 'development',
-  );
+  const appEnv = String.fromEnvironment('APP_ENV', defaultValue: 'development');
   final envFile = appEnv == 'production'
       ? '.env.production'
       : '.env.development';
@@ -557,7 +554,8 @@ class MyApp extends StatelessWidget {
           '/label/mixer': (context) => MixerScreen(),
           '/label/furniture_wip': (context) => FurnitureWipScreen(),
           '/production': (context) => ProductionSelectionScreen(),
-          '/production/washing': (context) => const WashingProductionMesinScreen(),
+          '/production/washing': (context) =>
+              const WashingProductionMesinScreen(),
           '/production/broker': (context) => BrokerProductionScreen(),
           '/production/crusher': (context) => CrusherProductionScreen(),
           '/label/packing': (context) => PackingScreen(),

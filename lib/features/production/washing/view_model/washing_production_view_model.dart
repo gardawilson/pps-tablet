@@ -176,7 +176,8 @@ class WashingProductionViewModel extends ChangeNotifier {
   Future<WashingProduction?> createProduksi({
     required DateTime tglProduksi,
     required int idMesin,
-    required int idOperator,
+    required List<int> idOperators,
+    int? outputJenisId,
     /// Bisa int (jam) atau 'HH:mm-HH:mm'
     required dynamic jamKerja,
     required int shift,
@@ -187,8 +188,6 @@ class WashingProductionViewModel extends ChangeNotifier {
     int? hadir,
     double? hourMeter,
     bool isBlower = false,
-
-    // ⬇️ baru: ikuti repository
     String? hourStart,
     String? hourEnd,
     int? idRegu,
@@ -201,7 +200,8 @@ class WashingProductionViewModel extends ChangeNotifier {
       final created = await repository.createProduksi(
         tglProduksi: tglProduksi,
         idMesin: idMesin,
-        idOperator: idOperator,
+        idOperators: idOperators,
+        outputJenisId: outputJenisId,
         jamKerja: jamKerja,
         shift: shift,
         checkBy1: checkBy1,

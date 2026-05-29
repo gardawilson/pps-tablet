@@ -67,6 +67,51 @@ class WashingProductionRepository {
   }
 
   // =========================
+  //  BY MESIN + TANGGAL + SHIFT (RIWAYAT)
+  // =========================
+  Future<List<WashingProduction>> fetchByMesinTanggalShift({
+    required int idMesin,
+    required DateTime tanggal,
+    required int shift,
+  }) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/production/washing').replace(
+      queryParameters: {
+        'idMesin': '$idMesin',
+        'tanggal': toDbDateString(tanggal),
+        'shift': '$shift',
+      },
+    );
+
+    print('➡️ [GET] (riwayat washing) $url');
+    final started = DateTime.now();
+    late http.Response res;
+    try {
+      res = await http.get(url, headers: _headers(token)).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout mengambil data produksi washing shift');
+    } catch (e) {
+      print('❌ Request error (riwayat washing): $e');
+      rethrow;
+    }
+    print(
+      '⬅️ [${res.statusCode}] (riwayat washing) in ${DateTime.now().difference(started).inMilliseconds}ms',
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception(
+        'Gagal mengambil data produksi washing shift (${res.statusCode})',
+      );
+    }
+
+    final body = json.decode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    final List list = (body['data'] ?? []) as List;
+    return list
+        .map((e) => WashingProduction.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  // =========================
   //  BY DATE (tetap ada)
   // =========================
   Future<List<WashingProduction>> fetchByDate(DateTime date) async {
@@ -110,11 +155,11 @@ class WashingProductionRepository {
   Future<Map<String, dynamic>> fetchAll({
     required int page,
     int pageSize = 20,
-
-    // opsi filter tambahan (opsional, siap pakai kalau backend mendukung)
     String? search,
     int? shift,
-    DateTime? date, // misal filter per tanggal
+    DateTime? date,
+    int? idMesin,
+    DateTime? tanggal,
   }) async {
     final token = await TokenStorage.getToken();
 
@@ -124,6 +169,8 @@ class WashingProductionRepository {
       if (search != null && search.isNotEmpty) 'search': search,
       if (shift != null) 'shift': '$shift',
       if (date != null) 'date': toDbDateString(date),
+      if (idMesin != null) 'idMesin': '$idMesin',
+      if (tanggal != null) 'tanggal': toDbDateString(tanggal),
     };
 
     final url = Uri.parse('$_base/api/production/washing')
@@ -179,6 +226,8 @@ class WashingProductionRepository {
     String? search,
     int? shift,
     DateTime? date,
+    int? idMesin,
+    DateTime? tanggal,
   }) async {
     final r = await fetchAll(
       page: page,
@@ -186,6 +235,8 @@ class WashingProductionRepository {
       search: search,
       shift: shift,
       date: date,
+      idMesin: idMesin,
+      tanggal: tanggal,
     );
     return (r['items'] as List<WashingProduction>);
   }
@@ -196,7 +247,8 @@ class WashingProductionRepository {
   Future<WashingProduction> createProduksi({
     required DateTime tglProduksi,
     required int idMesin,
-    required int idOperator,
+    required List<int> idOperators,
+    int? outputJenisId,
     /// Bisa int (jam) atau string "HH:mm-HH:mm"
     required dynamic jamKerja,
     required int shift,
@@ -219,7 +271,8 @@ class WashingProductionRepository {
     final payload = <String, dynamic>{
       'tglProduksi': toDbDateString(tglProduksi), // 'YYYY-MM-DD'
       'idMesin': idMesin,
-      'idOperator': idOperator,
+      'idOperators': idOperators,
+      if (outputJenisId != null) 'outputJenisId': outputJenisId,
       'jamKerja': jamKerja,
       'shift': shift,
       'isBlower': isBlower ? 1 : 0,
@@ -471,6 +524,70 @@ class WashingProductionRepository {
 
     // kalau sebelumnya kita sudah pernah ambil inputs untuk noProduksi ini, buang dari cache
     _inputsCache.remove(noProduksi);
+  }
+
+  // =========================
+  //  ADD PRODUKSI (SPLIT TIME)
+  // =========================
+  Future<WashingProduction> addProduksi({
+    required int idMesin,
+    required DateTime tanggal,
+    required String hourStart,
+    required int outputJenisId,
+  }) async {
+    final token = await TokenStorage.getToken();
+    final tanggalStr = toDbDateString(tanggal);
+    final url = Uri.parse(
+      '$_base/api/production/washing/split-time/$idMesin/$tanggalStr',
+    );
+
+    String normalizeTime(String v) {
+      final t = v.trim();
+      return t.length == 5 ? '$t:00' : t;
+    }
+
+    final body = jsonEncode({
+      'hourStart': normalizeTime(hourStart),
+      'outputJenisId': outputJenisId,
+    });
+
+    final headers = {
+      'Authorization': 'Bearer $token',
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    };
+
+    print('➡️ [POST] $url');
+    print('📦 addProduksi washing body: $body');
+
+    late http.Response res;
+    try {
+      res = await http.post(url, headers: headers, body: body).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout tambah produksi washing');
+    } catch (e) {
+      print('❌ Request error: $e');
+      rethrow;
+    }
+
+    print('⬅️ [${res.statusCode}] ${res.body}');
+
+    if (res.statusCode != 200 && res.statusCode != 201) {
+      String msg = 'Gagal tambah produksi washing (${res.statusCode})';
+      try {
+        final decoded = json.decode(utf8.decode(res.bodyBytes));
+        if (decoded is Map<String, dynamic>) {
+          msg = (decoded['message'] ?? msg).toString();
+        }
+      } catch (_) {}
+      throw Exception(msg);
+    }
+
+    final bodyJson = json.decode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    final data = bodyJson['data'] as Map<String, dynamic>?;
+    final header = data?['header'] as Map<String, dynamic>?;
+    if (header == null) throw Exception('Response tidak mengandung data header');
+    return WashingProduction.fromJson(header);
   }
 
 

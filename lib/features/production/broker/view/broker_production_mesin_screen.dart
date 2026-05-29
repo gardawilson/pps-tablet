@@ -129,6 +129,7 @@ class _BrokerProductionMesinScreenState
     try {
       final base = ApiConstants.baseUrl.replaceFirst(RegExp(r'/*$'), '');
       final url = Uri.parse('$base/api/mst/shift/current');
+      debugPrint('➡️ [GET] $url');
       final token = await TokenStorage.getToken();
       final res = await http
           .get(
@@ -139,6 +140,7 @@ class _BrokerProductionMesinScreenState
             },
           )
           .timeout(const Duration(seconds: 8));
+      debugPrint('⬅️ [${res.statusCode}] shift/current → ${res.body}');
       if (res.statusCode != 200) return null;
       final body =
           jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
@@ -150,8 +152,10 @@ class _BrokerProductionMesinScreenState
       final hourStart = trim(data['hourStart'] as String?);
       final hourEnd = trim(data['hourEnd'] as String?);
       if (shift == null) return null;
+      debugPrint('✅ activeShift: shift=$shift, start=$hourStart, end=$hourEnd');
       return (shift: shift, hourStart: hourStart, hourEnd: hourEnd);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('❌ _fetchCurrentShift error: $e');
       return null;
     }
   }

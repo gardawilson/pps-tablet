@@ -9,6 +9,9 @@ import 'package:pps_tablet/features/production/washing/repository/washing_produc
 
 import '../model/washing_production_model.dart';
 import '../model/washing_inputs_model.dart';
+import '../model/washing_output_model.dart';
+
+export '../model/washing_output_model.dart';
 
 // shared lookup result model
 import 'package:pps_tablet/features/production/shared/models/production_label_lookup_result.dart';
@@ -279,6 +282,43 @@ class WashingProductionInputViewModel extends ChangeNotifier {
       _inputsError.remove(noProduksi);
     }
     notifyListeners();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Outputs per noProduksi
+  // ---------------------------------------------------------------------------
+  final Map<String, List<WashingOutput>> _outputsCache = {};
+  final Map<String, bool> _outputsLoading = {};
+  final Map<String, String?> _outputsError = {};
+
+  bool isOutputsLoading(String noProduksi) =>
+      _outputsLoading[noProduksi] == true;
+  String? outputsError(String noProduksi) => _outputsError[noProduksi];
+  List<WashingOutput>? outputsOf(String noProduksi) =>
+      _outputsCache[noProduksi];
+
+  Future<void> loadOutputs(String noProduksi, {bool force = false}) async {
+    if (!force && _outputsCache.containsKey(noProduksi)) return;
+
+    _outputsLoading[noProduksi] = true;
+    _outputsError[noProduksi] = null;
+    notifyListeners();
+
+    try {
+      final result = await repository.fetchOutputs(noProduksi);
+      _outputsCache[noProduksi] = result;
+    } catch (e) {
+      _outputsError[noProduksi] = e.toString();
+    } finally {
+      _outputsLoading[noProduksi] = false;
+      notifyListeners();
+    }
+  }
+
+  void invalidateOutputs(String noProduksi) {
+    _outputsCache.remove(noProduksi);
+    _outputsLoading.remove(noProduksi);
+    _outputsError.remove(noProduksi);
   }
 
   // ---------------------------------------------------------------------------
@@ -966,9 +1006,9 @@ class WashingProductionInputViewModel extends ChangeNotifier {
           .toList();
     }
 
-    // NEW partials to create
+    // NEW partials to create — key harus sesuai yang dibaca engine server
     if (tempBbPartial.isNotEmpty) {
-      payload['bbPartialNew'] = tempBbPartial
+      payload['bbPartial'] = tempBbPartial
           .map((e) => {
         'noBahanBaku': e.noBahanBaku,
         'noPallet': e.noPallet,
@@ -979,7 +1019,7 @@ class WashingProductionInputViewModel extends ChangeNotifier {
     }
 
     if (tempGilinganPartial.isNotEmpty) {
-      payload['gilinganPartialNew'] = tempGilinganPartial
+      payload['gilinganPartial'] = tempGilinganPartial
           .map((e) => {
         'noGilingan': e.noGilingan,
         'berat': e.berat,

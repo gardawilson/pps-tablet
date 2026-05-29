@@ -69,14 +69,20 @@ class BrokerProductionRepository {
       },
     );
 
+    print('➡️ [GET] (riwayat broker) $url');
+    final started = DateTime.now();
     late http.Response res;
     try {
       res = await http.get(url, headers: _headers(token)).timeout(_timeout);
     } on TimeoutException {
       throw Exception('Timeout mengambil data produksi shift');
     } catch (e) {
+      print('❌ Request error (riwayat broker): $e');
       rethrow;
     }
+    print(
+      '⬅️ [${res.statusCode}] (riwayat broker) in ${DateTime.now().difference(started).inMilliseconds}ms',
+    );
 
     if (res.statusCode != 200) {
       throw Exception('Gagal mengambil data produksi shift (${res.statusCode})');

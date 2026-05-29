@@ -829,6 +829,9 @@ class GroupTooltipAnchorTile extends StatefulWidget {
   /// ✅ NEW: Summary builder
   final TooltipSummary Function()? summaryBuilder;
 
+  /// Long-press callback (e.g. untuk menu opsi temp)
+  final VoidCallback? onLongPress;
+
   const GroupTooltipAnchorTile({
     super.key,
     required this.title,
@@ -843,6 +846,7 @@ class GroupTooltipAnchorTile extends StatefulWidget {
     this.onUpdate,
     this.onBulkDelete,
     this.summaryBuilder, // ✅ NEW
+    this.onLongPress,
   });
 
   @override
@@ -1001,6 +1005,7 @@ class _GroupTooltipAnchorTileState extends State<GroupTooltipAnchorTile> {
             child: InkWell(
               borderRadius: BorderRadius.circular(8),
               onTap: _show,
+              onLongPress: widget.onLongPress,
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 8,

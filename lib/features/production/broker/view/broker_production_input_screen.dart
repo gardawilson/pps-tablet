@@ -1,4 +1,4 @@
-﻿// lib/features/production/broker/view/washing_production_input_screen.dart
+// lib/features/production/broker/view/washing_production_input_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -35,50 +35,13 @@ import '../../../label/broker/repository/broker_repository.dart';
 import '../../../label/bonggolan/repository/bonggolan_repository.dart';
 import '../../../broker_type/model/broker_type_model.dart';
 import '../../../broker_type/widgets/broker_type_dropdown.dart';
+import '../widgets/broker_workspace_toolbar.dart';
 
 const _kBrokerPrimary = Color(0xFF1E6FD9);
 const _kBrokerSurface = Color(0xFFF8F9FB);
 const _kBrokerBorder = Color(0xFFE2E6EA);
 const _kBrokerRadius = 12.0;
 const _kBrokerOutput = Color(0xFF0A7349);
-
-BoxDecoration _brokerPanelDecoration({Color? borderColor}) => BoxDecoration(
-  color: Colors.white,
-  borderRadius: BorderRadius.circular(12),
-  border: Border.all(color: borderColor ?? _kBrokerBorder),
-  boxShadow: [
-    BoxShadow(
-      color: Colors.black.withValues(alpha: 0.025),
-      blurRadius: 10,
-      offset: const Offset(0, 3),
-    ),
-  ],
-);
-
-Widget _brokerSectionHeader(IconData icon, String title, {Color? iconColor}) {
-  final color = iconColor ?? _kBrokerPrimary;
-  return Row(
-    children: [
-      Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(icon, size: 16, color: color),
-      ),
-      const SizedBox(width: 10),
-      Text(
-        title,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-          color: Color(0xFF1A1D23),
-        ),
-      ),
-    ],
-  );
-}
 
 class BrokerProductionInputScreen extends StatefulWidget {
   final String noProduksi;
@@ -122,26 +85,29 @@ class _BrokerProductionInputScreenState
 
   List<BreadcrumbSegment> _prevBreadcrumb = [];
   bool _isReplacing = false;
+  String get _breadcrumbLabel {
+    final machineName = (widget.namaMesin ?? '').trim();
+    return machineName.isNotEmpty ? machineName : widget.noProduksi;
+  }
 
   @override
   void initState() {
     super.initState();
     _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
-    // Set breadcrumb synchronously so app bar doesn't jump on first frame
-    AppShell.breadcrumb.value = [
-      ..._prevBreadcrumb.map(
-        (s) => BreadcrumbSegment(
-          s.label,
-          onTap: () {
-            AppShell.breadcrumb.value = _prevBreadcrumb;
-            AppShell.shellNavigatorKey.currentState?.pop();
-          },
-        ),
-      ),
-      BreadcrumbSegment(widget.namaMesin ?? widget.noProduksi),
-    ];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      AppShell.breadcrumb.value = [
+        ..._prevBreadcrumb.map(
+          (s) => BreadcrumbSegment(
+            s.label,
+            onTap: () {
+              AppShell.breadcrumb.value = _prevBreadcrumb;
+              AppShell.shellNavigatorKey.currentState?.pop();
+            },
+          ),
+        ),
+        BreadcrumbSegment(_breadcrumbLabel),
+      ];
       context.read<BrokerProductionInputViewModel>().loadInputs(
         widget.noProduksi,
         force: true,
@@ -154,11 +120,20 @@ class _BrokerProductionInputScreenState
 
   @override
   void dispose() {
-    if (!_isReplacing) AppShell.breadcrumb.value = _prevBreadcrumb;
+    // Guard: hanya restore jika breadcrumb terakhir masih milik screen ini.
+    // Jika sidebar sudah ganti breadcrumb (via pushNamedAndRemoveUntil),
+    // jangan overwrite � itu yang menyebabkan breadcrumb kacau saat pindah menu.
+    if (!_isReplacing) {
+      final current = AppShell.breadcrumb.value;
+      final ourLabel = _breadcrumbLabel;
+      if (current.isNotEmpty && current.last.label == ourLabel) {
+        AppShell.breadcrumb.value = _prevBreadcrumb;
+      }
+    }
     super.dispose();
   }
 
-  // ✅ TAMBAHKAN: Method untuk handle back button
+  // ? TAMBAHKAN: Method untuk handle back button
   Future<bool> _onWillPop() async {
     final vm = context.read<BrokerProductionInputViewModel>();
 
@@ -195,73 +170,117 @@ class _BrokerProductionInputScreenState
 
   Future<void> _openTimelineDialog() async {
     if (!mounted) return;
-    final idMesin = widget.idMesin;
-    final tgl = widget.tglProduksi;
-    final namaMesin = widget.namaMesin;
-    if (idMesin == null || tgl == null) return;
-    await showDialog<void>(
+    await ProductionFlowHelpers.openTimeline(
       context: context,
-      barrierDismissible: true,
-      builder: (_) => _ShiftTimelineDialog(
-        idMesin: idMesin,
-        namaMesin: namaMesin,
+      idMesin: widget.idMesin,
+      tanggal: widget.tglProduksi,
+      onMissingContext: () => _showSnack(
+        'Data mesin/tanggal tidak tersedia',
+        backgroundColor: Colors.orange,
+      ),
+      dialogBuilder: (idMesin, tgl) => buildProductionShiftTimelineDialog(
+        namaMesin: widget.namaMesin,
         tanggal: tgl,
         shift: widget.shift ?? 1,
         currentNoProduksi: widget.noProduksi,
+        primaryColor: _kBrokerPrimary,
+        borderColor: _kBrokerBorder,
+        loadTimeline: () async {
+          final list = await BrokerProductionRepository()
+              .fetchByMesinTanggalShift(
+                idMesin: idMesin,
+                tanggal: tgl,
+                shift: widget.shift ?? 1,
+              );
+          return list
+              .map(
+                (e) => ProductionShiftTimelineEntry(
+                  noProduksi: e.noProduksi,
+                  hourStart: e.hourStart,
+                  hourEnd: e.hourEnd,
+                  isLocked: e.isLocked,
+                  subtitle: e.outputJenisNama,
+                ),
+              )
+              .toList();
+        },
       ),
     );
   }
 
   Future<void> _openSplitDialog() async {
     if (!mounted) return;
-    final idMesin = widget.idMesin;
-    final tgl = widget.tglProduksi;
-    if (idMesin == null || tgl == null) {
-      _showSnack(
+    await ProductionFlowHelpers.openSplitAndReplace<
+      ({BrokerProduction prod, String namaJenis})
+    >(
+      context: context,
+      idMesin: widget.idMesin,
+      tanggal: widget.tglProduksi,
+      onMissingContext: () => _showSnack(
         'Data mesin/tanggal tidak tersedia',
         backgroundColor: Colors.orange,
-      );
-      return;
-    }
-
-    final splitResult =
-        await showDialog<({BrokerProduction prod, String namaJenis})>(
+      ),
+      showSplitDialog: (idMesin, tgl) {
+        return showDialog<({BrokerProduction prod, String namaJenis})>(
           context: context,
           barrierDismissible: true,
-          builder: (_) => _GantiProduksiDialog(
-            idMesin: idMesin,
-            tanggal: tgl,
-            shift: widget.shift ?? 1,
-            currentNoProduksi: widget.noProduksi,
+          builder: (_) =>
+              ProductionGantiProduksiDialog<
+                ({BrokerProduction prod, String namaJenis}),
+                BrokerType
+              >(
+                tanggal: tgl,
+                shift: widget.shift ?? 1,
+                primaryColor: _kBrokerPrimary,
+                borderColor: _kBrokerBorder,
+                jenisRequiredMessage: 'Pilih jenis broker terlebih dahulu',
+                submitLabel: 'Ganti Produksi',
+                dropdownBuilder: (selected, onChanged) => BrokerTypeDropdown(
+                  preselectId: selected?.idBroker,
+                  onChanged: onChanged,
+                ),
+                jenisNameOf: (j) => j.nama,
+                onSubmit: (hourStart, jenis) async {
+                  final prod = await BrokerProductionRepository().addProduksi(
+                    idMesin: idMesin,
+                    tanggal: tgl,
+                    hourStart: hourStart,
+                    outputJenisId: jenis.idBroker,
+                  );
+                  return (prod: prod, namaJenis: jenis.nama);
+                },
+              ),
+        );
+      },
+      beforeReplace: () {
+        _isReplacing = true;
+        AppShell.breadcrumb.value = _prevBreadcrumb;
+      },
+      replaceToResult: (splitResult) async {
+        if (!mounted) return;
+        final newProd = splitResult.prod;
+        final namaJenis = splitResult.namaJenis.isNotEmpty
+            ? splitResult.namaJenis
+            : newProd.outputJenisNama;
+
+        await Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => BrokerProductionInputScreen(
+              noProduksi: newProd.noProduksi,
+              idMesin: newProd.idMesin,
+              namaMesin: widget.namaMesin,
+              shift: newProd.shift,
+              tglProduksi: newProd.tglProduksi,
+              isLocked: false,
+              lastClosedDate: null,
+              hourStart: newProd.hourStart,
+              hourEnd: newProd.hourEnd,
+              namaJenis: namaJenis,
+              outputJenisId: newProd.outputJenisId,
+            ),
           ),
         );
-
-    if (splitResult == null || !mounted) return;
-
-    final newProd = splitResult.prod;
-    final namaJenis = splitResult.namaJenis.isNotEmpty
-        ? splitResult.namaJenis
-        : newProd.outputJenisNama;
-
-    _isReplacing = true;
-    AppShell.breadcrumb.value = _prevBreadcrumb;
-
-    await Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => BrokerProductionInputScreen(
-          noProduksi: newProd.noProduksi,
-          idMesin: newProd.idMesin,
-          namaMesin: widget.namaMesin,
-          shift: newProd.shift,
-          tglProduksi: newProd.tglProduksi,
-          isLocked: false,
-          lastClosedDate: null,
-          hourStart: newProd.hourStart,
-          hourEnd: newProd.hourEnd,
-          namaJenis: namaJenis,
-          outputJenisId: newProd.outputJenisId,
-        ),
-      ),
+      },
     );
   }
 
@@ -320,283 +339,7 @@ class _BrokerProductionInputScreenState
         : const SizedBox.shrink();
   }
 
-  Widget _buildWorkspaceToolbar({required bool locked, String? namaJenis}) {
-    final tglText = widget.tglProduksi == null
-        ? null
-        : DateFormat(
-            'dd MMM yyyy',
-            'id_ID',
-          ).format(widget.tglProduksi!.toLocal());
-
-    final now = DateTime.now();
-
-    final isToday =
-        widget.idMesin != null &&
-        widget.tglProduksi != null &&
-        () {
-          final t = widget.tglProduksi!;
-          return t.year == now.year && t.month == now.month && t.day == now.day;
-        }();
-
-    final hStart = (widget.hourStart ?? '').trim();
-    final hEnd = (widget.hourEnd ?? '').trim();
-
-    bool isWithinTimeRange() {
-      if (!isToday) return false;
-      if (hStart.isEmpty && hEnd.isEmpty) return false;
-      int toMin(String hhmm) {
-        final p = hhmm.split(':');
-        if (p.length < 2) return -1;
-        final h = int.tryParse(p[0]) ?? -1;
-        final m = int.tryParse(p[1]) ?? -1;
-        if (h < 0 || m < 0) return -1;
-        return h * 60 + m;
-      }
-
-      final nowMin = now.hour * 60 + now.minute;
-      final startMin = hStart.isNotEmpty ? toMin(hStart) : 0;
-      final endMin = hEnd.isNotEmpty ? toMin(hEnd) : 23 * 60 + 59;
-      if (startMin < 0 || endMin < 0) return false;
-      // Overnight shift: end time wraps past midnight (e.g. 16:08 – 00:01)
-      if (endMin < startMin) {
-        return nowMin >= startMin || nowMin <= endMin;
-      }
-      return nowMin >= startMin && nowMin <= endMin;
-    }
-
-    final isActive = !locked && isWithinTimeRange();
-
-    const kActiveAccent = Color(0xFF00897B);
-    const kPastAccent = Color(0xFFF59E0B);
-    const kLockedAccent = Color(0xFFF97316);
-
-    final accentColor = locked
-        ? kLockedAccent
-        : (isActive ? kActiveAccent : kPastAccent);
-
-    final hasJenis = (namaJenis ?? '').trim().isNotEmpty;
-    final canChangeJenis = isToday && !locked;
-
-    final statusLabel = locked
-        ? 'Locked'
-        : (isActive ? 'Real-Time' : 'Backdate');
-    final statusIcon = locked
-        ? Icons.lock_outline
-        : (isActive ? Icons.play_circle_outline : Icons.history_rounded);
-
-    final jamText = (hStart.isNotEmpty || hEnd.isNotEmpty)
-        ? '${hStart.isNotEmpty ? hStart : "--:--"} – ${hEnd.isNotEmpty ? hEnd : "--:--"}'
-        : '-- : --';
-
-    // Segmen info: ikon kecil + teks inline
-    Widget infoTag(IconData icon, String text) => Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 11, color: Colors.grey.shade400),
-        const SizedBox(width: 3),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 11,
-            color: Colors.grey.shade600,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
-
-    Widget dot() => Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: Text(
-        '·',
-        style: TextStyle(
-          fontSize: 12,
-          color: Colors.grey.shade300,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-
-    Widget vline() => Container(
-      width: 1,
-      height: 18,
-      color: Colors.grey.shade200,
-      margin: const EdgeInsets.symmetric(horizontal: 10),
-    );
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border(left: BorderSide(color: accentColor, width: 4)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            children: [
-              // Status badge
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                decoration: BoxDecoration(
-                  color: accentColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: accentColor.withValues(alpha: 0.3)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(statusIcon, size: 10, color: accentColor),
-                    const SizedBox(width: 4),
-                    Text(
-                      statusLabel,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: accentColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              vline(),
-              // Jenis produksi — teks saja
-              Flexible(
-                child: Text(
-                  hasJenis ? namaJenis!.trim() : 'Belum ada jenis',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: hasJenis ? accentColor : Colors.grey.shade400,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              // Tombol Timeline + Ganti
-              if (widget.idMesin != null &&
-                  widget.shift != null &&
-                  widget.tglProduksi != null) ...[
-                const SizedBox(width: 4),
-                Material(
-                  color: accentColor,
-                  borderRadius: BorderRadius.circular(6),
-                  child: InkWell(
-                    onTap: _openSplitDialog,
-                    borderRadius: BorderRadius.circular(6),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.swap_horiz_rounded,
-                            size: 13,
-                            color: Colors.white,
-                          ),
-                          SizedBox(width: 4),
-                          Text(
-                            'Ganti',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-              const SizedBox(width: 6),
-              Material(
-                color: _kBrokerPrimary,
-                borderRadius: BorderRadius.circular(6),
-                child: InkWell(
-                  onTap: _openTimelineDialog,
-                  borderRadius: BorderRadius.circular(6),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.timeline_rounded,
-                          size: 13,
-                          color: Colors.white,
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          'Riwayat',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              vline(),
-              // Shift · Jam · Tanggal
-              if (tglText != null) ...[
-                infoTag(Icons.calendar_today_outlined, tglText),
-                dot(),
-              ],
-              if (widget.shift != null) ...[
-                infoTag(Icons.group_outlined, 'Shift ${widget.shift}'),
-                dot(),
-              ],
-              infoTag(Icons.schedule_outlined, jamText),
-              const Spacer(),
-              // noProduksi + refresh
-              Text(
-                widget.noProduksi,
-                style: TextStyle(
-                  fontSize: 10,
-                  color: Colors.grey.shade400,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 0.4,
-                ),
-              ),
-              const SizedBox(width: 2),
-              SizedBox(
-                width: 26,
-                height: 26,
-                child: IconButton(
-                  tooltip: 'Refresh',
-                  padding: EdgeInsets.zero,
-                  onPressed: () {
-                    final vm = context.read<BrokerProductionInputViewModel>();
-                    vm.loadInputs(widget.noProduksi, force: true);
-                    vm.loadOutputs(widget.noProduksi);
-                    _showSnack('Data di-refresh');
-                  },
-                  icon: Icon(
-                    Icons.refresh,
-                    size: 15,
-                    color: Colors.grey.shade400,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// ✅ Handler untuk bulk delete
+  /// ? Handler untuk bulk delete
   Future<bool> _handleBulkDelete(List<dynamic> items) async {
     final vm = context.read<BrokerProductionInputViewModel>();
 
@@ -643,10 +386,13 @@ class _BrokerProductionInputScreenState
 
     final result = await showDialog<String>(
       context: context,
-      builder: (ctx) => _TempCardOptionsDialog(
+      builder: (ctx) => ProductionTempCardOptionsDialog(
         labelTitle: labelTitle,
         showSebagian: isSakBased,
         showPartial: supportsPartial,
+        primaryColor: _kBrokerPrimary,
+        surfaceColor: _kBrokerSurface,
+        borderColor: _kBrokerBorder,
       ),
     );
     if (result == null || !mounted) return;
@@ -691,7 +437,7 @@ class _BrokerProductionInputScreenState
       return;
     }
 
-    // 🔹 Dialog konfirmasi formal
+    // ?? Dialog konfirmasi formal
     final confirm = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -703,13 +449,13 @@ class _BrokerProductionInputScreenState
 
     if (confirm != true || !mounted) return;
 
-    // Eksekusi submit → skeleton muncul dari state isSubmitting
+    // Eksekusi submit ? skeleton muncul dari state isSubmitting
     final success = await vm.submitTempItems(widget.noProduksi);
 
     if (!mounted) return;
 
     if (success) {
-      _showSnack('✅ Data berhasil disimpan', backgroundColor: Colors.green);
+      _showSnack('? Data berhasil disimpan', backgroundColor: Colors.green);
     } else {
       final errMsg = vm.submitError ?? 'Kesalahan tidak diketahui';
 
@@ -725,7 +471,7 @@ class _BrokerProductionInputScreenState
   Future<String?> _onCodeReady(BuildContext context, String code) async {
     final vm = context.read<BrokerProductionInputViewModel>();
 
-    // ✅ VALIDASI: Cek jika mode partial tidak support untuk washing/crusher
+    // ? VALIDASI: Cek jika mode partial tidak support untuk washing/crusher
     if (_selectedMode == 'partial') {
       final normalized = code.trim().toUpperCase();
       final prefix = normalized.length >= 2 ? normalized.substring(0, 2) : '';
@@ -733,7 +479,7 @@ class _BrokerProductionInputScreenState
       if (prefix == 'B.' || prefix == 'F.') {
         final labelType = prefix == 'B.' ? 'Washing' : 'Crusher';
 
-        // ✅ Tampilkan dialog informatif
+        // ? Tampilkan dialog informatif
         await PartialModeNotSupportedDialog.show(
           context: context,
           labelType: labelType,
@@ -747,7 +493,7 @@ class _BrokerProductionInputScreenState
       }
     }
 
-    // ✅ Lanjutkan proses lookup jika validasi OK
+    // ? Lanjutkan proses lookup jika validasi OK
     final res = await vm.lookupLabel(code, force: true);
     if (!mounted) return 'Halaman sudah tidak aktif';
 
@@ -790,7 +536,7 @@ class _BrokerProductionInputScreenState
       final hasTemp =
           labelCode != null && vm.hasTemporaryDataForLabel(labelCode);
       final suffix = hasTemp
-          ? ' • ${vm.getTemporaryDataSummary(labelCode!)}'
+          ? ' � ${vm.getTemporaryDataSummary(labelCode!)}'
           : '';
       _showSnack(
         'Semua item untuk ${labelCode ?? "label ini"} sudah ada.$suffix',
@@ -806,7 +552,7 @@ class _BrokerProductionInputScreenState
     final result = vm.commitPickedToTemp(noProduksi: widget.noProduksi);
 
     final msg = result.added > 0
-        ? '✅ Auto-added ${result.added} item${result.skipped > 0 ? ' • Duplikat terlewati ${result.skipped}' : ''}'
+        ? '? Auto-added ${result.added} item${result.skipped > 0 ? ' � Duplikat terlewati ${result.skipped}' : ''}'
         : 'Tidak ada item baru ditambahkan';
 
     _showSnack(
@@ -857,7 +603,7 @@ class _BrokerProductionInputScreenState
 
       _showSnack(
         r.added > 0
-            ? '✅ Ditambahkan ${r.added} item partial'
+            ? '? Ditambahkan ${r.added} item partial'
             : 'Item sudah ada atau gagal ditambahkan',
         backgroundColor: r.added > 0 ? Colors.green : Colors.orange,
       );
@@ -888,7 +634,7 @@ class _BrokerProductionInputScreenState
       final hasTemp =
           labelCode != null && vm.hasTemporaryDataForLabel(labelCode);
       final suffix = hasTemp
-          ? ' • ${vm.getTemporaryDataSummary(labelCode!)}'
+          ? ' � ${vm.getTemporaryDataSummary(labelCode!)}'
           : '';
       _showSnack(
         'Semua item untuk ${labelCode ?? "label ini"} sudah ada.$suffix',
@@ -925,7 +671,7 @@ class _BrokerProductionInputScreenState
     final item = res.typedItems.first;
 
     if (item is BrokerItem) {
-      // ⬇️ TAMBAHKAN: Cek partial code terlebih dahulu
+      // ?? TAMBAHKAN: Cek partial code terlebih dahulu
       return (item.noBrokerPartial ?? '').trim().isNotEmpty
           ? item.noBrokerPartial
           : item.noBroker;
@@ -963,7 +709,7 @@ class _BrokerProductionInputScreenState
     required Widget child,
   }) {
     return Container(
-      decoration: _brokerPanelDecoration(),
+      decoration: productionPanelDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -971,60 +717,12 @@ class _BrokerProductionInputScreenState
             padding: const EdgeInsets.fromLTRB(12, 1, 1, 1),
             child: Row(
               children: [
-                _brokerSectionHeader(Icons.input_rounded, 'Label Input'),
-                const Spacer(),
-                Material(
-                  color: locked || isLookupLoading
-                      ? Colors.grey.shade100
-                      : _kBrokerPrimary,
-                  borderRadius: BorderRadius.circular(10),
-                  child: InkWell(
-                    onTap: locked || isLookupLoading
-                        ? null
-                        : () => _openScanDialog(),
-                    borderRadius: BorderRadius.circular(10),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 7,
-                      ),
-                      child: Row(
-                        children: [
-                          isLookupLoading
-                              ? SizedBox(
-                                  width: 15,
-                                  height: 15,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: locked
-                                        ? Colors.grey.shade400
-                                        : Colors.white,
-                                  ),
-                                )
-                              : Icon(
-                                  Icons.qr_code_scanner,
-                                  size: 15,
-                                  color: locked
-                                      ? Colors.grey.shade400
-                                      : Colors.white,
-                                ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Scan',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: locked
-                                  ? Colors.grey.shade400
-                                  : Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                productionSectionHeader(
+                  Icons.input_rounded,
+                  'Label Input',
+                  primaryColor: _kBrokerPrimary,
                 ),
-                const SizedBox(width: 8),
+                const Spacer(),
                 SaveButtonWithBadge(
                   count: vm.totalTempCount,
                   isLoading: vm.isSubmitting,
@@ -1107,15 +805,105 @@ class _BrokerProductionInputScreenState
     final totalLabel = brokerOutputs.length + bonggolanOutputs.length;
     final isBrokerOutputTab = _selectedOutputTab == 'broker';
     final activeOutputLabel = isBrokerOutputTab ? 'Broker' : 'Bonggolan';
-    final selectedTabChild = _selectedOutputTab == 'broker'
-        ? _OutputCategoryContent(
-            footer: _BrokerOutputSummaryTile(
-              totalLabel: brokerOutputs.length,
-              totalSak: totalSakBroker,
-              totalBerat: totalBeratBroker,
+    final selectedOutputSummary = isBrokerOutputTab
+        ? _BrokerOutputSummaryTile(
+            totalLabel: brokerOutputs.length,
+            totalSak: totalSakBroker,
+            totalBerat: totalBeratBroker,
+          )
+        : _BonggolanOutputSummaryTile(
+            totalLabel: bonggolanOutputs.length,
+            totalBerat: totalBeratBonggolan,
+          );
+    Future<void> onAddOutput() async {
+      if (grandInputBerat == 0) {
+        if (!context.mounted) return;
+        showDialog<void>(
+          context: context,
+          builder: (_) => ErrorStatusDialog(
+            title: 'Belum Ada Input',
+            message:
+                'Masukkan label input terlebih dahulu sebelum membuat output.',
+          ),
+        );
+        return;
+      }
+
+      final totalOutputBerat = totalBeratBroker + totalBeratBonggolan;
+
+      if (totalOutputBerat >= grandInputBerat) {
+        if (!context.mounted) return;
+        showDialog<void>(
+          context: context,
+          builder: (_) => ErrorStatusDialog(
+            title: 'Berat Output Melebihi Input',
+            message:
+                'Total berat output (${num2(totalOutputBerat)} kg) sudah mencapai atau melebihi total berat input (${num2(grandInputBerat)} kg).\n\nTidak dapat menambah output baru.',
+          ),
+        );
+        return;
+      }
+
+      if (isBrokerOutputTab) {
+        if (widget.outputJenisId != null) {
+          await showDialog<void>(
+            context: context,
+            builder: (_) => BrokerProductionOutputFormDialog(
+              noProduksi: widget.noProduksi,
+              tglProduksi: widget.tglProduksi,
+              outputJenisId: widget.outputJenisId!,
+              outputJenisNama: widget.namaJenis ?? '',
+              namaMesin: widget.namaMesin,
             ),
+          );
+        } else {
+          await showDialog<void>(
+            context: context,
+            builder: (_) => BrokerFormDialog(
+              preselectNoProduksi: widget.noProduksi,
+              preselectNamaMesin: widget.namaMesin,
+              preselectDate: widget.tglProduksi,
+            ),
+          );
+        }
+      } else {
+        await showDialog<void>(
+          context: context,
+          builder: (_) => BonggolanProductionOutputFormDialog(
+            noProduksi: widget.noProduksi,
+            tglProduksi: widget.tglProduksi,
+            namaMesin: widget.namaMesin,
+          ),
+        );
+      }
+
+      if (!mounted) return;
+      final vm = context.read<BrokerProductionInputViewModel>();
+      await vm.loadOutputs(widget.noProduksi);
+
+      if (!mounted) return;
+      final newBrokerBerat = vm
+          .outputsOf(widget.noProduksi)
+          .fold<double>(0.0, (s, o) => s + o.totalBerat);
+      final newBonggolanBerat = vm
+          .bonggolanOutputsOf(widget.noProduksi)
+          .fold<double>(0.0, (s, o) => s + (o.berat ?? 0.0));
+      final newTotal = newBrokerBerat + newBonggolanBerat;
+      if (grandInputBerat > 0 && newTotal > grandInputBerat) {
+        _showSnack(
+          '?? Total berat output (${num2(newTotal)} kg) melebihi total berat input (${num2(grandInputBerat)} kg)',
+          backgroundColor: Colors.orange,
+        );
+      }
+    }
+
+    final selectedTabChild = _selectedOutputTab == 'broker'
+        ? ProductionOutputCategoryContent(
+            footer: const SizedBox.shrink(),
             child: brokerOutputs.isEmpty
-                ? const _EmptyOutputCategory(message: 'Belum ada output broker')
+                ? const ProductionEmptyCategory(
+                    message: 'Belum ada output broker',
+                  )
                 : LayoutBuilder(
                     builder: (_, c) => GridView(
                       padding: const EdgeInsets.all(6),
@@ -1131,13 +919,10 @@ class _BrokerProductionInputScreenState
                     ),
                   ),
           )
-        : _OutputCategoryContent(
-            footer: _BonggolanOutputSummaryTile(
-              totalLabel: bonggolanOutputs.length,
-              totalBerat: totalBeratBonggolan,
-            ),
+        : ProductionOutputCategoryContent(
+            footer: const SizedBox.shrink(),
             child: bonggolanOutputs.isEmpty
-                ? const _EmptyOutputCategory(
+                ? const ProductionEmptyCategory(
                     message: 'Belum ada output bonggolan',
                   )
                 : LayoutBuilder(
@@ -1157,7 +942,7 @@ class _BrokerProductionInputScreenState
           );
 
     return Container(
-      decoration: _brokerPanelDecoration(
+      decoration: productionPanelDecoration(
         borderColor: _kBrokerOutput.withValues(alpha: 0.3),
       ),
       child: Column(
@@ -1167,10 +952,11 @@ class _BrokerProductionInputScreenState
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
             child: Row(
               children: [
-                _brokerSectionHeader(
+                productionSectionHeader(
                   Icons.output_rounded,
                   'Label Output',
                   iconColor: _kBrokerOutput,
+                  primaryColor: _kBrokerPrimary,
                 ),
                 const Spacer(),
               ],
@@ -1186,22 +972,22 @@ class _BrokerProductionInputScreenState
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         if (error != null) ...[
-                          _OutputErrorBanner(message: error),
+                          ProductionOutputErrorBanner(message: error),
                           const SizedBox(height: 10),
                         ],
                         Row(
                           children: [
                             Expanded(
-                              child: _FolderTabBar(
+                              child: ProductionFolderTabBar(
                                 selectedValue: _selectedOutputTab,
                                 accentColor: _kBrokerOutput,
                                 tabs: [
-                                  _PanelTabItem(
+                                  ProductionTabItem(
                                     value: 'broker',
                                     label: 'Broker',
                                     count: brokerOutputs.length,
                                   ),
-                                  _PanelTabItem(
+                                  ProductionTabItem(
                                     value: 'bonggolan',
                                     label: 'Bonggolan',
                                     count: bonggolanOutputs.length,
@@ -1216,131 +1002,11 @@ class _BrokerProductionInputScreenState
                           ],
                         ),
                         Expanded(
-                          child: _InputCategoryBlock(
+                          child: ProductionInputCategoryBlock(
                             color: _kBrokerOutput,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    _OutputActionButton(
-                                      icon: Icons.add,
-                                      label: 'Tambah $activeOutputLabel',
-                                      color: _kBrokerOutput,
-                                      onTap: () async {
-                                        if (grandInputBerat == 0) {
-                                          if (!context.mounted) return;
-                                          showDialog<void>(
-                                            context: context,
-                                            builder: (_) => ErrorStatusDialog(
-                                              title: 'Belum Ada Input',
-                                              message:
-                                                  'Masukkan label input terlebih dahulu sebelum membuat output.',
-                                            ),
-                                          );
-                                          return;
-                                        }
-
-                                        final totalOutputBerat =
-                                            totalBeratBroker +
-                                            totalBeratBonggolan;
-
-                                        if (totalOutputBerat >=
-                                            grandInputBerat) {
-                                          if (!context.mounted) return;
-                                          showDialog<void>(
-                                            context: context,
-                                            builder: (_) => ErrorStatusDialog(
-                                              title:
-                                                  'Berat Output Melebihi Input',
-                                              message:
-                                                  'Total berat output (${num2(totalOutputBerat)} kg) sudah mencapai atau melebihi total berat input (${num2(grandInputBerat)} kg).\n\nTidak dapat menambah output baru.',
-                                            ),
-                                          );
-                                          return;
-                                        }
-
-                                        if (isBrokerOutputTab) {
-                                          if (widget.outputJenisId != null) {
-                                            await showDialog<void>(
-                                              context: context,
-                                              builder: (_) =>
-                                                  BrokerProductionOutputFormDialog(
-                                                    noProduksi:
-                                                        widget.noProduksi,
-                                                    tglProduksi:
-                                                        widget.tglProduksi,
-                                                    outputJenisId:
-                                                        widget.outputJenisId!,
-                                                    outputJenisNama:
-                                                        widget.namaJenis ?? '',
-                                                    namaMesin: widget.namaMesin,
-                                                  ),
-                                            );
-                                          } else {
-                                            await showDialog<void>(
-                                              context: context,
-                                              builder: (_) => BrokerFormDialog(
-                                                preselectNoProduksi:
-                                                    widget.noProduksi,
-                                                preselectNamaMesin:
-                                                    widget.namaMesin,
-                                                preselectDate:
-                                                    widget.tglProduksi,
-                                              ),
-                                            );
-                                          }
-                                        } else {
-                                          await showDialog<void>(
-                                            context: context,
-                                            builder: (_) =>
-                                                BonggolanProductionOutputFormDialog(
-                                                  noProduksi: widget.noProduksi,
-                                                  tglProduksi:
-                                                      widget.tglProduksi,
-                                                  namaMesin: widget.namaMesin,
-                                                ),
-                                          );
-                                        }
-
-                                        if (!mounted) return;
-                                        final vm = context
-                                            .read<
-                                              BrokerProductionInputViewModel
-                                            >();
-                                        await vm.loadOutputs(widget.noProduksi);
-
-                                        // Post-add warning if now exceeded
-                                        if (!mounted) return;
-                                        final newBrokerBerat = vm
-                                            .outputsOf(widget.noProduksi)
-                                            .fold<double>(
-                                              0.0,
-                                              (s, o) => s + o.totalBerat,
-                                            );
-                                        final newBonggolanBerat = vm
-                                            .bonggolanOutputsOf(
-                                              widget.noProduksi,
-                                            )
-                                            .fold<double>(
-                                              0.0,
-                                              (s, o) => s + (o.berat ?? 0.0),
-                                            );
-                                        final newTotal =
-                                            newBrokerBerat + newBonggolanBerat;
-                                        if (grandInputBerat > 0 &&
-                                            newTotal > grandInputBerat) {
-                                          _showSnack(
-                                            '⚠️ Total berat output (${num2(newTotal)} kg) melebihi total berat input (${num2(grandInputBerat)} kg)',
-                                            backgroundColor: Colors.orange,
-                                          );
-                                        }
-                                      },
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
                                 Expanded(
                                   child: LayoutBuilder(
                                     builder: (context, constraints) {
@@ -1352,11 +1018,36 @@ class _BrokerProductionInputScreenState
                                   ),
                                 ),
                                 const SizedBox(height: 10),
-                                _OutputGrandTotalBar(
-                                  totalLabel: totalLabel,
-                                  totalSak: totalSakBroker,
-                                  totalBerat:
-                                      totalBeratBroker + totalBeratBonggolan,
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          selectedOutputSummary,
+                                          const SizedBox(height: 10),
+                                          _OutputGrandTotalBar(
+                                            totalLabel: totalLabel,
+                                            totalSak: totalSakBroker,
+                                            totalBerat:
+                                                totalBeratBroker +
+                                                totalBeratBonggolan,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    FloatingActionButton(
+                                      heroTag: 'fab_add_broker_output',
+                                      mini: true,
+                                      backgroundColor: _kBrokerOutput,
+                                      foregroundColor: Colors.white,
+                                      tooltip: 'Tambah $activeOutputLabel',
+                                      onPressed: onAddOutput,
+                                      child: const Icon(Icons.add),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -1400,13 +1091,14 @@ class _BrokerProductionInputScreenState
     required Map<String, List<RejectItem>> rejectGroups,
     required BrokerProductionInputViewModel vm,
     required bool canDelete,
+    bool showFooter = true,
   }) {
-    _InputCategorySummaryTile summaryFor({
+    ProductionCategorySummaryTile summaryFor({
       required int totalData,
       required int totalSak,
       required double totalBerat,
     }) {
-      return _InputCategorySummaryTile(
+      return ProductionCategorySummaryTile(
         summary: SectionSummary(
           totalData: totalData,
           totalSak: totalSak,
@@ -1448,7 +1140,7 @@ class _BrokerProductionInputScreenState
                 ),
                 children: brokerGroups.entries.map((entry) {
                   final hasPartial = entry.value.any((x) => x.isPartialRow);
-                  return _InputGroupExpansionTile(
+                  return ProductionInputGroupTile(
                     title: entry.key,
                     headerSubtitle:
                         (entry.value.isNotEmpty
@@ -1463,6 +1155,7 @@ class _BrokerProductionInputScreenState
                       ),
                     ],
                     color: Colors.blue,
+                    isTemp: vm.hasTemporaryDataForLabel(entry.key),
                     onLongPress: vm.hasTemporaryDataForLabel(entry.key)
                         ? () => _showTempCardOptions(entry.key)
                         : null,
@@ -1498,7 +1191,7 @@ class _BrokerProductionInputScreenState
                         final isTemp =
                             vm.tempBroker.contains(item) ||
                             vm.tempBrokerPartial.contains(item);
-                        return _InputSakChip(
+                        return ProductionSakChip(
                           label: 'Sak ${item.noSak ?? '-'}',
                           berat: item.berat,
                           isTemp: isTemp,
@@ -1542,7 +1235,7 @@ class _BrokerProductionInputScreenState
                 ),
                 children: bbGroups.entries.map((entry) {
                   final hasPartial = entry.value.any((x) => x.isPartialRow);
-                  return _InputGroupExpansionTile(
+                  return ProductionInputGroupTile(
                     title: entry.key,
                     headerSubtitle:
                         (entry.value.isNotEmpty
@@ -1557,6 +1250,7 @@ class _BrokerProductionInputScreenState
                       ),
                     ],
                     color: Colors.blue,
+                    isTemp: vm.hasTemporaryDataForLabel(entry.key),
                     onLongPress: vm.hasTemporaryDataForLabel(entry.key)
                         ? () => _showTempCardOptions(entry.key)
                         : null,
@@ -1586,7 +1280,7 @@ class _BrokerProductionInputScreenState
                         final isTemp =
                             vm.tempBb.contains(item) ||
                             vm.tempBbPartial.contains(item);
-                        return _InputSakChip(
+                        return ProductionSakChip(
                           label: 'Sak ${item.noSak ?? '-'}',
                           berat: item.berat,
                           isTemp: isTemp,
@@ -1629,7 +1323,7 @@ class _BrokerProductionInputScreenState
                   mainAxisExtent: 72,
                 ),
                 children: washingGroups.entries.map((entry) {
-                  return _InputGroupExpansionTile(
+                  return ProductionInputGroupTile(
                     title: entry.key,
                     headerSubtitle:
                         (entry.value.isNotEmpty
@@ -1644,6 +1338,7 @@ class _BrokerProductionInputScreenState
                       ),
                     ],
                     color: Colors.blue,
+                    isTemp: vm.hasTemporaryDataForLabel(entry.key),
                     onLongPress: vm.hasTemporaryDataForLabel(entry.key)
                         ? () => _showTempCardOptions(entry.key)
                         : null,
@@ -1661,7 +1356,7 @@ class _BrokerProductionInputScreenState
                       ];
                       return items.map((item) {
                         final isTemp = vm.tempWashing.contains(item);
-                        return _InputSakChip(
+                        return ProductionSakChip(
                           label: 'Sak ${item.noSak ?? '-'}',
                           berat: item.berat,
                           isTemp: isTemp,
@@ -1701,7 +1396,7 @@ class _BrokerProductionInputScreenState
                   mainAxisExtent: 72,
                 ),
                 children: crusherGroups.entries.map((entry) {
-                  return _InputGroupExpansionTile(
+                  return ProductionInputGroupTile(
                     title: entry.key,
                     headerSubtitle:
                         (entry.value.isNotEmpty
@@ -1715,6 +1410,7 @@ class _BrokerProductionInputScreenState
                       ),
                     ],
                     color: Colors.blue,
+                    isTemp: vm.hasTemporaryDataForLabel(entry.key),
                     onLongPress: vm.hasTemporaryDataForLabel(entry.key)
                         ? () => _showTempCardOptions(entry.key)
                         : null,
@@ -1775,7 +1471,7 @@ class _BrokerProductionInputScreenState
                 ),
                 children: gilinganGroups.entries.map((entry) {
                   final hasPartial = entry.value.any((x) => x.isPartialRow);
-                  return _InputGroupExpansionTile(
+                  return ProductionInputGroupTile(
                     title: entry.key,
                     headerSubtitle:
                         (entry.value.isNotEmpty
@@ -1789,6 +1485,7 @@ class _BrokerProductionInputScreenState
                       ),
                     ],
                     color: Colors.blue,
+                    isTemp: vm.hasTemporaryDataForLabel(entry.key),
                     onLongPress: vm.hasTemporaryDataForLabel(entry.key)
                         ? () => _showTempCardOptions(entry.key)
                         : null,
@@ -1870,7 +1567,7 @@ class _BrokerProductionInputScreenState
                 ),
                 children: mixerGroups.entries.map((entry) {
                   final hasPartial = entry.value.any((x) => x.isPartialRow);
-                  return _InputGroupExpansionTile(
+                  return ProductionInputGroupTile(
                     title: entry.key,
                     headerSubtitle:
                         (entry.value.isNotEmpty
@@ -1885,6 +1582,7 @@ class _BrokerProductionInputScreenState
                       ),
                     ],
                     color: Colors.blue,
+                    isTemp: vm.hasTemporaryDataForLabel(entry.key),
                     onLongPress: vm.hasTemporaryDataForLabel(entry.key)
                         ? () => _showTempCardOptions(entry.key)
                         : null,
@@ -1915,7 +1613,7 @@ class _BrokerProductionInputScreenState
                         final isTemp =
                             vm.tempMixer.contains(item) ||
                             vm.tempMixerPartial.contains(item);
-                        return _InputSakChip(
+                        return ProductionSakChip(
                           label: 'Sak ${item.noSak ?? '-'}',
                           berat: item.berat,
                           isTemp: isTemp,
@@ -1958,7 +1656,7 @@ class _BrokerProductionInputScreenState
                 ),
                 children: rejectGroups.entries.map((entry) {
                   final hasPartial = entry.value.any((x) => x.isPartialRow);
-                  return _InputGroupExpansionTile(
+                  return ProductionInputGroupTile(
                     title: entry.key,
                     headerSubtitle:
                         (entry.value.isNotEmpty
@@ -1972,6 +1670,7 @@ class _BrokerProductionInputScreenState
                       ),
                     ],
                     color: Colors.blue,
+                    isTemp: vm.hasTemporaryDataForLabel(entry.key),
                     onLongPress: vm.hasTemporaryDataForLabel(entry.key)
                         ? () => _showTempCardOptions(entry.key)
                         : null,
@@ -2025,7 +1724,113 @@ class _BrokerProductionInputScreenState
             );
     }
 
-    return _OutputCategoryContent(footer: footer, child: grid);
+    return ProductionOutputCategoryContent(
+      footer: showFooter ? footer : const SizedBox.shrink(),
+      child: grid,
+    );
+  }
+
+  SectionSummary _selectedInputSummary({
+    required Map<String, List<BrokerItem>> brokerGroups,
+    required Map<String, List<BbItem>> bbGroups,
+    required Map<String, List<WashingItem>> washingGroups,
+    required Map<String, List<CrusherItem>> crusherGroups,
+    required Map<String, List<GilinganItem>> gilinganGroups,
+    required Map<String, List<MixerItem>> mixerGroups,
+    required Map<String, List<RejectItem>> rejectGroups,
+  }) {
+    if (_selectedInputTab == 'broker') {
+      int totalSak = 0;
+      double totalBerat = 0.0;
+      for (final entry in brokerGroups.entries) {
+        for (final item in entry.value) {
+          totalSak += 1;
+          totalBerat += item.berat ?? 0.0;
+        }
+      }
+      return SectionSummary(
+        totalData: brokerGroups.length,
+        totalSak: totalSak,
+        totalBerat: totalBerat,
+      );
+    } else if (_selectedInputTab == 'bb') {
+      int totalSak = 0;
+      double totalBerat = 0.0;
+      for (final entry in bbGroups.entries) {
+        for (final item in entry.value) {
+          totalSak += 1;
+          totalBerat += item.berat ?? 0.0;
+        }
+      }
+      return SectionSummary(
+        totalData: bbGroups.length,
+        totalSak: totalSak,
+        totalBerat: totalBerat,
+      );
+    } else if (_selectedInputTab == 'washing') {
+      int totalSak = 0;
+      double totalBerat = 0.0;
+      for (final entry in washingGroups.entries) {
+        for (final item in entry.value) {
+          totalSak += 1;
+          totalBerat += item.berat ?? 0.0;
+        }
+      }
+      return SectionSummary(
+        totalData: washingGroups.length,
+        totalSak: totalSak,
+        totalBerat: totalBerat,
+      );
+    } else if (_selectedInputTab == 'crusher') {
+      double totalBerat = 0.0;
+      for (final entry in crusherGroups.entries) {
+        for (final item in entry.value) {
+          totalBerat += item.berat ?? 0.0;
+        }
+      }
+      return SectionSummary(
+        totalData: crusherGroups.length,
+        totalSak: 0,
+        totalBerat: totalBerat,
+      );
+    } else if (_selectedInputTab == 'gilingan') {
+      double totalBerat = 0.0;
+      for (final entry in gilinganGroups.entries) {
+        for (final item in entry.value) {
+          totalBerat += item.berat ?? 0.0;
+        }
+      }
+      return SectionSummary(
+        totalData: gilinganGroups.length,
+        totalSak: 0,
+        totalBerat: totalBerat,
+      );
+    } else if (_selectedInputTab == 'mixer') {
+      int totalSak = 0;
+      double totalBerat = 0.0;
+      for (final entry in mixerGroups.entries) {
+        for (final item in entry.value) {
+          totalSak += 1;
+          totalBerat += item.berat ?? 0.0;
+        }
+      }
+      return SectionSummary(
+        totalData: mixerGroups.length,
+        totalSak: totalSak,
+        totalBerat: totalBerat,
+      );
+    }
+    double totalBerat = 0.0;
+    for (final entry in rejectGroups.entries) {
+      for (final item in entry.value) {
+        totalBerat += item.berat ?? 0.0;
+      }
+    }
+    return SectionSummary(
+      totalData: rejectGroups.length,
+      totalSak: 0,
+      totalBerat: totalBerat,
+    );
   }
 
   @override
@@ -2045,7 +1850,7 @@ class _BrokerProductionInputScreenState
         final canDeleteByPerm = perm.can('label_broker:delete');
         final canDelete = canDeleteByPerm && !locked;
 
-        // ✅ WRAP dengan WillPopScope untuk intercept back button
+        // ? WRAP dengan WillPopScope untuk intercept back button
         return WillPopScope(
           onWillPop: _onWillPop,
           child: Scaffold(
@@ -2120,16 +1925,31 @@ class _BrokerProductionInputScreenState
 
                 return Column(
                   children: [
-                    _buildWorkspaceToolbar(
-                      locked: locked,
+                    BrokerWorkspaceToolbar(
+                      noProduksi: widget.noProduksi,
+                      idMesin: widget.idMesin,
+                      shift: widget.shift,
+                      tglProduksi: widget.tglProduksi,
+                      isLocked: locked,
+                      hourStart: widget.hourStart,
+                      hourEnd: widget.hourEnd,
                       namaJenis: widget.namaJenis,
+                      onGanti: _openSplitDialog,
+                      onTimeline: _openTimelineDialog,
+                      onRefresh: () {
+                        final vm = context
+                            .read<BrokerProductionInputViewModel>();
+                        vm.loadInputs(widget.noProduksi, force: true);
+                        vm.loadOutputs(widget.noProduksi);
+                        _showSnack('Data di-refresh');
+                      },
                     ),
                     Expanded(
                       child: LayoutBuilder(
                         builder: (context, outerConstraints) {
                           final isWide = outerConstraints.maxWidth >= 800;
 
-                          // ── build input panel ──────────────────────────
+                          // -- build input panel --------------------------
                           final inputPanelWidget = Builder(
                             builder: (buttonContext) => _buildInputPanel(
                               buttonContext: buttonContext,
@@ -2147,41 +1967,41 @@ class _BrokerProductionInputScreenState
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  _FolderTabBar(
+                                  ProductionFolderTabBar(
                                     selectedValue: _selectedInputTab,
                                     accentColor: _kBrokerPrimary,
                                     tabs: [
-                                      _PanelTabItem(
+                                      ProductionTabItem(
                                         value: 'broker',
                                         label: 'Broker',
                                         count: brokerGroups.length,
                                       ),
-                                      _PanelTabItem(
+                                      ProductionTabItem(
                                         value: 'bb',
                                         label: 'Bahan Baku',
                                         count: bbGroups.length,
                                       ),
-                                      _PanelTabItem(
+                                      ProductionTabItem(
                                         value: 'washing',
                                         label: 'Washing',
                                         count: washingGroups.length,
                                       ),
-                                      _PanelTabItem(
+                                      ProductionTabItem(
                                         value: 'crusher',
                                         label: 'Crusher',
                                         count: crusherGroups.length,
                                       ),
-                                      _PanelTabItem(
+                                      ProductionTabItem(
                                         value: 'gilingan',
                                         label: 'Gilingan',
                                         count: gilinganGroups.length,
                                       ),
-                                      _PanelTabItem(
+                                      ProductionTabItem(
                                         value: 'mixer',
                                         label: 'Mixer',
                                         count: mixerGroups.length,
                                       ),
-                                      _PanelTabItem(
+                                      ProductionTabItem(
                                         value: 'reject',
                                         label: 'Reject',
                                         count: rejectGroups.length,
@@ -2193,7 +2013,7 @@ class _BrokerProductionInputScreenState
                                     },
                                   ),
                                   Expanded(
-                                    child: _InputCategoryBlock(
+                                    child: ProductionInputCategoryBlock(
                                       color: _kBrokerPrimary,
                                       isLoading: loading,
                                       child: Column(
@@ -2222,6 +2042,7 @@ class _BrokerProductionInputScreenState
                                                             rejectGroups,
                                                         vm: vm,
                                                         canDelete: canDelete,
+                                                        showFooter: false,
                                                       ),
                                                 );
                                               },
@@ -2257,17 +2078,95 @@ class _BrokerProductionInputScreenState
                                               for (final i in rejectAll) {
                                                 grandBerat += i.berat ?? 0.0;
                                               }
-                                              return _InputGrandTotalBar(
-                                                totalLabel:
-                                                    brokerGroups.length +
-                                                    bbGroups.length +
-                                                    washingGroups.length +
-                                                    crusherGroups.length +
-                                                    gilinganGroups.length +
-                                                    mixerGroups.length +
-                                                    rejectGroups.length,
-                                                totalSak: grandSak,
-                                                totalBerat: grandBerat,
+                                              final selectedSummary =
+                                                  _selectedInputSummary(
+                                                    brokerGroups: brokerGroups,
+                                                    bbGroups: bbGroups,
+                                                    washingGroups:
+                                                        washingGroups,
+                                                    crusherGroups:
+                                                        crusherGroups,
+                                                    gilinganGroups:
+                                                        gilinganGroups,
+                                                    mixerGroups: mixerGroups,
+                                                    rejectGroups: rejectGroups,
+                                                  );
+                                              return Row(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.center,
+                                                children: [
+                                                  Expanded(
+                                                    child: Column(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        ProductionCategorySummaryTile(
+                                                          summary:
+                                                              selectedSummary,
+                                                          accentColor:
+                                                              _kBrokerPrimary,
+                                                        ),
+                                                        const SizedBox(
+                                                          height: 10,
+                                                        ),
+                                                        ProductionInputGrandTotalBar(
+                                                          totalLabel:
+                                                              brokerGroups
+                                                                  .length +
+                                                              bbGroups.length +
+                                                              washingGroups
+                                                                  .length +
+                                                              crusherGroups
+                                                                  .length +
+                                                              gilinganGroups
+                                                                  .length +
+                                                              mixerGroups
+                                                                  .length +
+                                                              rejectGroups
+                                                                  .length,
+                                                          totalSak: grandSak,
+                                                          totalBerat:
+                                                              grandBerat,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 10),
+                                                  FloatingActionButton(
+                                                    heroTag:
+                                                        'fab_scan_broker_input',
+                                                    mini: true,
+                                                    backgroundColor:
+                                                        locked ||
+                                                            vm.isLookupLoading
+                                                        ? Colors.grey.shade300
+                                                        : _kBrokerPrimary,
+                                                    foregroundColor:
+                                                        Colors.white,
+                                                    onPressed:
+                                                        locked ||
+                                                            vm.isLookupLoading
+                                                        ? null
+                                                        : () =>
+                                                              _openScanDialog(),
+                                                    child: vm.isLookupLoading
+                                                        ? const SizedBox(
+                                                            width: 16,
+                                                            height: 16,
+                                                            child:
+                                                                CircularProgressIndicator(
+                                                                  strokeWidth:
+                                                                      2,
+                                                                  color: Colors
+                                                                      .white,
+                                                                ),
+                                                          )
+                                                        : const Icon(
+                                                            Icons
+                                                                .qr_code_scanner,
+                                                          ),
+                                                  ),
+                                                ],
                                               );
                                             },
                                           ),
@@ -2280,7 +2179,7 @@ class _BrokerProductionInputScreenState
                             ),
                           );
 
-                          // ── build output panel ─────────────────────────
+                          // -- build output panel -------------------------
                           double grandInputBerat = 0.0;
                           for (final i in brokerAll) {
                             grandInputBerat += i.berat ?? 0.0;
@@ -2312,7 +2211,7 @@ class _BrokerProductionInputScreenState
                             grandInputBerat: grandInputBerat,
                           );
 
-                          // ── responsive layout ──────────────────────────
+                          // -- responsive layout --------------------------
                           if (isWide) {
                             return Padding(
                               padding: const EdgeInsets.all(16),
@@ -2511,11 +2410,11 @@ class _BrokerOutputTile extends StatelessWidget {
                 spacing: 6,
                 runSpacing: 2,
                 children: [
-                  _MiniMetric(
+                  ProductionMiniMetric(
                     icon: Icons.inventory_2_outlined,
                     text: '${output.totalSak} sak',
                   ),
-                  _MiniMetric(
+                  ProductionMiniMetric(
                     icon: Icons.scale_outlined,
                     text: '${num2(output.totalBerat)} kg',
                   ),
@@ -2674,7 +2573,7 @@ class _BonggolanOutputTile extends StatelessWidget {
                 style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
               ),
               const SizedBox(height: 4),
-              _MiniMetric(
+              ProductionMiniMetric(
                 icon: Icons.scale_outlined,
                 text: '${num2(output.berat)} kg',
               ),
@@ -2708,66 +2607,24 @@ class _BrokerOutputSummaryTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _InlineStat(
+          ProductionInlineStat(
             label: 'Label',
             value: '$totalLabel',
             color: _kBrokerOutput,
           ),
           const SizedBox(width: 10),
-          _InlineStat(label: 'Sak', value: '$totalSak', color: _kBrokerOutput),
+          ProductionInlineStat(
+            label: 'Sak',
+            value: '$totalSak',
+            color: _kBrokerOutput,
+          ),
           const SizedBox(width: 10),
-          _InlineStat(
+          ProductionInlineStat(
             label: 'Berat',
             value: '${num2(totalBerat)} kg',
             color: _kBrokerOutput,
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _OutputActionButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _OutputActionButton({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: color,
-      borderRadius: BorderRadius.circular(10),
-      elevation: 2,
-      shadowColor: color.withValues(alpha: 0.4),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 15, color: Colors.white),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -2809,19 +2666,19 @@ class _OutputGrandTotalBar extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              _InlineStat(
+              ProductionInlineStat(
                 label: 'Label',
                 value: '$totalLabel',
                 color: _kBrokerOutput,
               ),
               const SizedBox(width: 10),
-              _InlineStat(
+              ProductionInlineStat(
                 label: 'Sak',
                 value: '$totalSak',
                 color: _kBrokerOutput,
               ),
               const SizedBox(width: 10),
-              _InlineStat(
+              ProductionInlineStat(
                 label: 'Berat',
                 value: '${num2(totalBerat)} kg',
                 color: _kBrokerOutput,
@@ -2854,895 +2711,18 @@ class _BonggolanOutputSummaryTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _InlineStat(
+          ProductionInlineStat(
             label: 'Label',
             value: '$totalLabel',
             color: _kBrokerOutput,
           ),
           const SizedBox(width: 10),
-          _InlineStat(
+          ProductionInlineStat(
             label: 'Berat',
             value: '${num2(totalBerat)} kg',
             color: _kBrokerOutput,
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _OutputCategoryContent extends StatelessWidget {
-  final Widget child;
-  final Widget? footer;
-
-  const _OutputCategoryContent({required this.child, this.footer});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(child: child),
-        if (footer != null) ...[const SizedBox(height: 10), footer!],
-      ],
-    );
-  }
-}
-
-class _InputCategoryBlock extends StatelessWidget {
-  final Color color;
-  final bool isLoading;
-  final String? label;
-  final SectionSummary Function()? summaryBuilder;
-  final Widget child;
-
-  const _InputCategoryBlock({
-    required this.color,
-    required this.child,
-    this.isLoading = false,
-    this.label,
-    this.summaryBuilder,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final summary = summaryBuilder?.call();
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(12),
-          bottomRight: Radius.circular(12),
-        ),
-        border: Border.all(color: color.withValues(alpha: 0.32), width: 1.1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.015),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (isLoading) ...[
-            const Align(
-              alignment: Alignment.centerRight,
-              child: SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
-            const SizedBox(height: 10),
-          ],
-          Expanded(child: child),
-          if (summary != null) ...[
-            const SizedBox(height: 10),
-            _InputCategorySummaryTile(summary: summary, accentColor: color),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _InputGrandTotalBar extends StatelessWidget {
-  final int totalLabel;
-  final int totalSak;
-  final double totalBerat;
-
-  const _InputGrandTotalBar({
-    required this.totalLabel,
-    required this.totalSak,
-    required this.totalBerat,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    const color = _kBrokerPrimary;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Divider(height: 1, thickness: 1),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-          child: Row(
-            children: [
-              const Icon(Icons.summarize_outlined, size: 13, color: color),
-              const SizedBox(width: 5),
-              const Text(
-                'Total',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: color,
-                ),
-              ),
-              const SizedBox(width: 10),
-              _InlineStat(label: 'Label', value: '$totalLabel', color: color),
-              const SizedBox(width: 10),
-              _InlineStat(label: 'Sak', value: '$totalSak', color: color),
-              const SizedBox(width: 10),
-              _InlineStat(
-                label: 'Berat',
-                value: '${num2(totalBerat)} kg',
-                color: color,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _InlineStat extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-
-  const _InlineStat({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          '$label: ',
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
-            color: color.withValues(alpha: 0.6),
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            color: color,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _InputCategorySummaryTile extends StatelessWidget {
-  final SectionSummary summary;
-  final Color accentColor;
-
-  const _InputCategorySummaryTile({
-    required this.summary,
-    required this.accentColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: accentColor.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: accentColor.withValues(alpha: 0.18)),
-      ),
-      child: Row(
-        children: [
-          _InlineStat(
-            label: 'Label',
-            value: '${summary.totalData}',
-            color: accentColor,
-          ),
-          if (summary.totalSak > 0) ...[
-            const SizedBox(width: 10),
-            _InlineStat(
-              label: 'Sak',
-              value: '${summary.totalSak}',
-              color: accentColor,
-            ),
-          ],
-          const SizedBox(width: 10),
-          _InlineStat(
-            label: 'Berat',
-            value: '${num2(summary.totalBerat)} kg',
-            color: accentColor,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InputSakChip {
-  final String label;
-  final double? berat;
-  final bool isTemp;
-  final bool isPartial;
-  final VoidCallback? onDelete;
-
-  const _InputSakChip({
-    required this.label,
-    this.berat,
-    this.isTemp = false,
-    this.isPartial = false,
-    this.onDelete,
-  });
-}
-
-class _InputGroupExpansionTile extends StatelessWidget {
-  final String title;
-  final String? headerSubtitle;
-  final List<(IconData, String)> tileMetrics;
-  final Color color;
-  final List<Widget> Function() detailsBuilder;
-  final List<_InputSakChip> Function()? chipItemsBuilder;
-  final bool expandable;
-  final bool isPartialGroup;
-  final String? partialReference;
-  final VoidCallback? onLongPress;
-
-  const _InputGroupExpansionTile({
-    required this.title,
-    required this.color,
-    required this.detailsBuilder,
-    this.chipItemsBuilder,
-    this.headerSubtitle,
-    this.tileMetrics = const [],
-    this.expandable = true,
-    this.isPartialGroup = false,
-    this.partialReference,
-    this.onLongPress,
-  });
-
-  Widget _buildHeader(bool hasTempForThis) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: hasTempForThis
-                              ? Colors.brown.shade800
-                              : const Color(0xFF1A1D23),
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (isPartialGroup) ...[
-                      const SizedBox(width: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.deepOrange.withValues(alpha: 0.14),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Text(
-                          'P',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.deepOrange,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                if ((headerSubtitle ?? '').trim().isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    headerSubtitle!.trim(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
-                  ),
-                ],
-                if (tileMetrics.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 6,
-                    children: tileMetrics
-                        .map((m) => _MiniMetric(icon: m.$1, text: m.$2))
-                        .toList(),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final vm = context.watch<BrokerProductionInputViewModel>();
-    final hasTempForThis = vm.hasTemporaryDataForLabel(title);
-
-    final bgColor = hasTempForThis ? Colors.yellow.shade50 : Colors.white;
-    final borderColor = hasTempForThis ? Colors.amber.shade200 : _kBrokerBorder;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: borderColor),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: () {
-          if (chipItemsBuilder != null) {
-            showDialog<void>(
-              context: context,
-              builder: (_) => _SakChipDetailDialog(
-                title: title,
-                subtitle: headerSubtitle ?? '-',
-                metrics: tileMetrics,
-                chips: chipItemsBuilder!(),
-              ),
-            );
-          } else {
-            showDialog<void>(
-              context: context,
-              builder: (_) => _InputGroupDetailDialog(
-                title: title,
-                subtitle: headerSubtitle ?? '-',
-                metrics: tileMetrics,
-                details: detailsBuilder(),
-              ),
-            );
-          }
-        },
-        onLongPress: onLongPress,
-        child: _buildHeader(hasTempForThis),
-      ),
-    );
-  }
-}
-
-class _SakChipDetailDialog extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final List<(IconData, String)> metrics;
-  final List<_InputSakChip> chips;
-
-  const _SakChipDetailDialog({
-    required this.title,
-    required this.subtitle,
-    required this.metrics,
-    required this.chips,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.white,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520, maxHeight: 520),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              decoration: const BoxDecoration(
-                color: Color(0xFF1565C0),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.list_alt_rounded,
-                    color: Colors.white,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          subtitle.isNotEmpty ? subtitle : title,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        if (subtitle.isNotEmpty)
-                          Text(
-                            title,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 11,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(
-                      Icons.close,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Chip grid
-            Flexible(
-              child: chips.isEmpty
-                  ? const Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Text(
-                        'Tidak ada detail',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF9CA3AF),
-                        ),
-                      ),
-                    )
-                  : Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: GridView.builder(
-                        shrinkWrap: true,
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 6,
-                              crossAxisSpacing: 5,
-                              mainAxisSpacing: 5,
-                              childAspectRatio: 1.5,
-                            ),
-                        itemCount: chips.length,
-                        itemBuilder: (_, i) {
-                          final chip = chips[i];
-                          final bgColor = chip.isTemp
-                              ? Colors.amber.shade50
-                              : chip.isPartial
-                              ? Colors.deepOrange.shade50
-                              : const Color(0xFFF0F7FF);
-                          final borderColor = chip.isTemp
-                              ? Colors.amber.shade300
-                              : chip.isPartial
-                              ? Colors.deepOrange.shade200
-                              : const Color(0xFFBFDBFE);
-                          final textColor = chip.isPartial
-                              ? Colors.deepOrange.shade800
-                              : const Color(0xFF1D4ED8);
-                          return Stack(
-                            children: [
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: bgColor,
-                                  borderRadius: BorderRadius.circular(7),
-                                  border: Border.all(color: borderColor),
-                                ),
-                                child: Center(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(4),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          chip.label,
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w800,
-                                            color: textColor,
-                                          ),
-                                          textAlign: TextAlign.center,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          '${num2(chip.berat)} kg',
-                                          style: const TextStyle(
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.w600,
-                                            color: Color(0xFF374151),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              if (chip.isPartial)
-                                Positioned(
-                                  top: 2,
-                                  left: 2,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 3,
-                                      vertical: 1,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.deepOrange,
-                                      borderRadius: BorderRadius.circular(3),
-                                    ),
-                                    child: const Text(
-                                      'P',
-                                      style: TextStyle(
-                                        fontSize: 7,
-                                        fontWeight: FontWeight.w900,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              if (chip.isTemp && chip.onDelete != null)
-                                Positioned(
-                                  top: 1,
-                                  right: 1,
-                                  child: GestureDetector(
-                                    onTap: chip.onDelete,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(1),
-                                      decoration: BoxDecoration(
-                                        color: Colors.amber.shade300,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.close,
-                                        size: 9,
-                                        color: Colors.brown,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-            ),
-            const Divider(height: 1, color: _kBrokerBorder),
-            // Footer
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: _kBrokerBorder),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: const Text('Tutup'),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TempCardOptionsDialog extends StatelessWidget {
-  final String labelTitle;
-  final bool showSebagian;
-  final bool showPartial;
-  const _TempCardOptionsDialog({
-    required this.labelTitle,
-    this.showSebagian = true,
-    this.showPartial = true,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.white,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 340),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-              decoration: const BoxDecoration(
-                color: _kBrokerPrimary,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.touch_app_rounded,
-                    color: Colors.white,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      labelTitle,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(
-                      Icons.close,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  if (showSebagian) ...[
-                    _TempOptionTile(
-                      icon: Icons.checklist_rounded,
-                      title: 'Sebagian Pallet',
-                      value: 'select',
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  if (showPartial) ...[
-                    _TempOptionTile(
-                      icon: Icons.call_split_rounded,
-                      title: 'Partial',
-                      value: 'partial',
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  _TempOptionTile(
-                    icon: Icons.delete_outline_rounded,
-                    title: 'Hapus Temp',
-                    value: 'delete',
-                    isDestructive: true,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TempOptionTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String value;
-  final bool isDestructive;
-
-  const _TempOptionTile({
-    required this.icon,
-    required this.title,
-    required this.value,
-    this.isDestructive = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = isDestructive ? Colors.red.shade600 : _kBrokerPrimary;
-    return Material(
-      color: isDestructive ? Colors.red.shade50 : _kBrokerSurface,
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        onTap: () => Navigator.of(context).pop(value),
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: isDestructive ? Colors.red.shade200 : _kBrokerBorder,
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: color, size: 16),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: color,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _InputGroupDetailDialog extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final List<(IconData, String)> metrics;
-  final List<Widget> details;
-
-  const _InputGroupDetailDialog({
-    required this.title,
-    required this.subtitle,
-    required this.metrics,
-    required this.details,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.white,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420, maxHeight: 560),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              decoration: const BoxDecoration(
-                color: Color(0xFF1565C0),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.list_alt_rounded,
-                    color: Colors.white,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          subtitle.isNotEmpty ? subtitle : title,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        if (subtitle.isNotEmpty)
-                          Text(
-                            title,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 11,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(
-                      Icons.close,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Detail rows
-            Flexible(
-              child: details.isEmpty
-                  ? const Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Text(
-                        'Tidak ada detail',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF9CA3AF),
-                        ),
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      itemBuilder: (_, i) => details[i],
-                      separatorBuilder: (_, __) => Divider(
-                        height: 1,
-                        thickness: 0.5,
-                        color: Colors.grey.shade200,
-                      ),
-                      itemCount: details.length,
-                    ),
-            ),
-            const Divider(height: 1, color: _kBrokerBorder),
-            // Footer
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: _kBrokerBorder),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: const Text('Tutup'),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -3981,12 +2961,12 @@ class _BonggolanOutputDetailDialog extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _MiniMetric(
+                  ProductionMiniMetric(
                     icon: Icons.scale_outlined,
                     text: '${num2(output.berat)} kg',
                   ),
                   const SizedBox(height: 8),
-                  _MiniMetric(
+                  ProductionMiniMetric(
                     icon: Icons.print_outlined,
                     text: 'Print ${output.printedCount}x',
                   ),
@@ -4017,1070 +2997,6 @@ class _BonggolanOutputDetailDialog extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                    child: const Text('Tutup'),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PanelTabItem {
-  final String value;
-  final String label;
-  final int count;
-
-  const _PanelTabItem({
-    required this.value,
-    required this.label,
-    required this.count,
-  });
-}
-
-class _PanelTabBar extends StatelessWidget {
-  final String selectedValue;
-  final List<_PanelTabItem> tabs;
-  final ValueChanged<String> onChanged;
-  final Color accentColor;
-
-  const _PanelTabBar({
-    required this.selectedValue,
-    required this.tabs,
-    required this.onChanged,
-    this.accentColor = _kBrokerOutput,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _kBrokerBorder),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: tabs.map((tab) {
-            final isSelected = tab.value == selectedValue;
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              child: Material(
-                color: isSelected ? accentColor : Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
-                child: InkWell(
-                  onTap: () => onChanged(tab.value),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          tab.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            color: isSelected
-                                ? Colors.white
-                                : Colors.grey.shade600,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? Colors.white.withValues(alpha: 0.25)
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: isSelected
-                                  ? Colors.white.withValues(alpha: 0.4)
-                                  : _kBrokerBorder,
-                            ),
-                          ),
-                          child: Text(
-                            '${tab.count}',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: isSelected
-                                  ? Colors.white
-                                  : Colors.grey.shade600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-}
-
-/// Folder-style (card tab) tab bar — active tab connects visually to content below.
-class _FolderTabBar extends StatelessWidget {
-  final String selectedValue;
-  final List<_PanelTabItem> tabs;
-  final ValueChanged<String> onChanged;
-  final Color accentColor;
-
-  const _FolderTabBar({
-    required this.selectedValue,
-    required this.tabs,
-    required this.onChanged,
-    this.accentColor = _kBrokerPrimary,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFECEFF3),
-        border: Border.all(
-          color: accentColor.withValues(alpha: 0.32),
-          width: 1.1,
-        ),
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(10),
-          topRight: Radius.circular(10),
-        ),
-      ),
-      // no bottom padding: selected tab overlaps the seam to content block
-      padding: const EdgeInsets.fromLTRB(6, 5, 6, 0),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: tabs.map((tab) {
-            final isSelected = tab.value == selectedValue;
-            return Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: GestureDetector(
-                onTap: () => onChanged(tab.value),
-                child: Stack(
-                  children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      curve: Curves.easeOut,
-                      margin: EdgeInsets.only(top: isSelected ? 0 : 4),
-                      padding: EdgeInsets.fromLTRB(
-                        10,
-                        isSelected ? 7 : 5,
-                        10,
-                        isSelected ? 9 : 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? Colors.white
-                            : const Color(0xFFDDE1E7),
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(7),
-                          topRight: Radius.circular(7),
-                        ),
-                        border: isSelected
-                            ? Border.all(
-                                color: accentColor.withValues(alpha: 0.32),
-                                width: 1.1,
-                              )
-                            : Border.all(
-                                color: const Color(0xFFC5CAD3),
-                                width: 1,
-                              ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            tab.label,
-                            maxLines: 1,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: isSelected
-                                  ? accentColor
-                                  : const Color(0xFF64748B),
-                            ),
-                          ),
-                          const SizedBox(width: 5),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 5,
-                              vertical: 1,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? accentColor.withValues(alpha: 0.1)
-                                  : const Color(0xFFC5CAD3),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              '${tab.count}',
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                                color: isSelected
-                                    ? accentColor
-                                    : const Color(0xFF64748B),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Strip putih menutupi border bawah tab yang selected
-                    if (isSelected)
-                      Positioned(
-                        bottom: 0,
-                        left: 1.1,
-                        right: 1.1,
-                        child: Container(height: 2, color: Colors.white),
-                      ),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyOutputCategory extends StatelessWidget {
-  final String message;
-
-  const _EmptyOutputCategory({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Text(
-        message,
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-      ),
-    );
-  }
-}
-
-class _OutputErrorBanner extends StatelessWidget {
-  final String message;
-
-  const _OutputErrorBanner({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.red.shade50,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.red.shade100),
-      ),
-      child: Text(
-        'Sebagian output gagal dimuat:\n$message',
-        style: TextStyle(fontSize: 12, color: Colors.red.shade700),
-      ),
-    );
-  }
-}
-
-class _MiniMetric extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const _MiniMetric({required this.icon, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 13, color: Colors.grey.shade600),
-        const SizedBox(width: 4),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: Colors.grey.shade700,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Dialog: Ganti Produksi — timeline shift + form buat produksi baru
-// ---------------------------------------------------------------------------
-class _GantiProduksiDialog extends StatefulWidget {
-  const _GantiProduksiDialog({
-    required this.idMesin,
-    required this.tanggal,
-    required this.shift,
-    required this.currentNoProduksi,
-  });
-
-  final int idMesin;
-  final DateTime tanggal;
-  final int shift;
-  final String currentNoProduksi;
-
-  @override
-  State<_GantiProduksiDialog> createState() => _GantiProduksiDialogState();
-}
-
-class _GantiProduksiDialogState extends State<_GantiProduksiDialog> {
-  final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _hourCtrl = TextEditingController(
-    text: () {
-      final now = DateTime.now();
-      return '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-    }(),
-  );
-  BrokerType? _selectedJenis;
-  bool _isLoading = false;
-  String? _errorMsg;
-
-  @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
-  void dispose() {
-    _hourCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _pickTime() async {
-    final now = TimeOfDay.now();
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: now,
-      builder: (ctx, child) => MediaQuery(
-        data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true),
-        child: child!,
-      ),
-    );
-    if (picked == null) return;
-    final h = picked.hour.toString().padLeft(2, '0');
-    final m = picked.minute.toString().padLeft(2, '0');
-    _hourCtrl.text = '$h:$m';
-  }
-
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_selectedJenis == null) {
-      setState(() => _errorMsg = 'Pilih jenis broker terlebih dahulu');
-      return;
-    }
-    setState(() {
-      _isLoading = true;
-      _errorMsg = null;
-    });
-    try {
-      final repo = BrokerProductionRepository();
-      final result = await repo.addProduksi(
-        idMesin: widget.idMesin,
-        tanggal: widget.tanggal,
-        hourStart: _hourCtrl.text.trim(),
-        outputJenisId: _selectedJenis!.idBroker,
-      );
-      if (mounted)
-        Navigator.of(
-          context,
-        ).pop((prod: result, namaJenis: _selectedJenis!.nama));
-    } catch (e) {
-      if (mounted)
-        setState(() {
-          _isLoading = false;
-          _errorMsg = e.toString().replaceFirst('Exception: ', '');
-        });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final tglLabel = DateFormat(
-      'dd MMM yyyy',
-      'id_ID',
-    ).format(widget.tanggal.toLocal());
-
-    return Dialog(
-      backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 60, vertical: 40),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 540),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.fromLTRB(18, 14, 12, 14),
-                decoration: const BoxDecoration(
-                  color: _kBrokerPrimary,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.swap_horiz_rounded,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Ganti Produksi',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          Text(
-                            '$tglLabel  ·  Shift ${widget.shift}',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.75),
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      onPressed: _isLoading
-                          ? null
-                          : () => Navigator.of(context).pop(),
-                      icon: const Icon(
-                        Icons.close,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Form — jam + jenis
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 10),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(
-                          width: 120,
-                          child: TextFormField(
-                            controller: _hourCtrl,
-                            readOnly: true,
-                            onTap: _pickTime,
-                            decoration: InputDecoration(
-                              labelText: 'Jam Mulai',
-                              hintText: '08:00',
-                              suffixIcon: const Icon(
-                                Icons.access_time,
-                                size: 16,
-                                color: Color(0xFF6B7280),
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(9),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(9),
-                                borderSide: const BorderSide(
-                                  color: _kBrokerBorder,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(9),
-                                borderSide: const BorderSide(
-                                  color: _kBrokerPrimary,
-                                  width: 1.5,
-                                ),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 10,
-                              ),
-                              isDense: true,
-                            ),
-                            validator: (v) {
-                              if (v == null || v.trim().isEmpty)
-                                return 'Wajib diisi';
-                              final p = v.trim().split(':');
-                              if (p.length < 2) return 'HH:mm';
-                              final h = int.tryParse(p[0]);
-                              final m = int.tryParse(p[1]);
-                              if (h == null || m == null || h > 23 || m > 59)
-                                return 'Tidak valid';
-                              return null;
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: BrokerTypeDropdown(
-                            onChanged: (bt) => setState(() {
-                              _selectedJenis = bt;
-                              _errorMsg = null;
-                            }),
-                            validator: (v) =>
-                                v == null ? 'Wajib pilih jenis' : null,
-                            autovalidateMode:
-                                AutovalidateMode.onUserInteraction,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              // Error banner
-              if (_errorMsg != null)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFEE2E2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.error_outline,
-                          size: 14,
-                          color: Color(0xFFDC2626),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _errorMsg!,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFFDC2626),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-              // Footer
-              const SizedBox(height: 12),
-              const Divider(height: 1, color: _kBrokerBorder),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    OutlinedButton(
-                      onPressed: _isLoading
-                          ? null
-                          : () => Navigator.of(context).pop(),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF6B7280),
-                        side: const BorderSide(color: _kBrokerBorder),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 10,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text(
-                        'Batal',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    ElevatedButton.icon(
-                      onPressed: _isLoading ? null : _submit,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _kBrokerPrimary,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 10,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      icon: _isLoading
-                          ? const SizedBox(
-                              width: 13,
-                              height: 13,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(Icons.check, size: 15),
-                      label: Text(
-                        _isLoading ? 'Menyimpan...' : 'Ganti Produksi',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Dialog: Timeline produksi shift
-// ---------------------------------------------------------------------------
-class _ShiftTimelineDialog extends StatefulWidget {
-  const _ShiftTimelineDialog({
-    required this.idMesin,
-    required this.namaMesin,
-    required this.tanggal,
-    required this.shift,
-    required this.currentNoProduksi,
-  });
-
-  final int idMesin;
-  final String? namaMesin;
-  final DateTime tanggal;
-  final int shift;
-  final String currentNoProduksi;
-
-  @override
-  State<_ShiftTimelineDialog> createState() => _ShiftTimelineDialogState();
-}
-
-class _ShiftTimelineDialogState extends State<_ShiftTimelineDialog> {
-  late Future<List<BrokerProduction>> _future;
-
-  @override
-  void initState() {
-    super.initState();
-    _future = BrokerProductionRepository().fetchByMesinTanggalShift(
-      idMesin: widget.idMesin,
-      tanggal: widget.tanggal,
-      shift: widget.shift,
-    );
-  }
-
-  Widget _buildTimeline(List<BrokerProduction> list) {
-    final sorted = [...list]
-      ..sort((a, b) {
-        int toMin(String? hhmm) {
-          if (hhmm == null || hhmm.isEmpty) return 0;
-          final p = hhmm.split(':');
-          return (int.tryParse(p[0]) ?? 0) * 60 + (int.tryParse(p[1]) ?? 0);
-        }
-
-        return toMin(a.hourStart).compareTo(toMin(b.hourStart));
-      });
-    final lastEnd = (sorted.isEmpty ? '' : sorted.last.hourEnd ?? '').trim();
-
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: sorted.length + 1,
-      itemBuilder: (_, i) {
-        if (i == sorted.length) {
-          return Row(
-            children: [
-              SizedBox(
-                width: 52,
-                child: Text(
-                  lastEnd,
-                  textAlign: TextAlign.right,
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.grey.shade300,
-                  border: Border.all(color: Colors.grey.shade400, width: 1.5),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Selesai',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey.shade400,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ],
-          );
-        }
-        final prod = sorted[i];
-        final isCurrent = prod.noProduksi == widget.currentNoProduksi;
-        final isLast = i == sorted.length - 1;
-        final jamStart = (prod.hourStart ?? '').trim();
-        final nodeColor = isCurrent
-            ? _kBrokerPrimary
-            : prod.isLocked
-            ? const Color(0xFFF97316)
-            : Colors.grey.shade400;
-
-        return IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                width: 52,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Text(
-                    jamStart.isNotEmpty ? jamStart : '--:--',
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: isCurrent ? _kBrokerPrimary : Colors.grey.shade600,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                children: [
-                  Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isCurrent ? _kBrokerPrimary : Colors.white,
-                      border: Border.all(color: nodeColor, width: 2),
-                    ),
-                    child: isCurrent
-                        ? Center(
-                            child: Container(
-                              width: 4,
-                              height: 4,
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.white,
-                              ),
-                            ),
-                          )
-                        : null,
-                  ),
-                  if (!isLast)
-                    Expanded(
-                      child: Container(
-                        width: 2,
-                        margin: const EdgeInsets.symmetric(vertical: 3),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade200,
-                          borderRadius: BorderRadius.circular(1),
-                        ),
-                      ),
-                    ),
-                  if (isLast) const SizedBox(height: 4),
-                ],
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 9,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isCurrent
-                          ? _kBrokerPrimary.withValues(alpha: 0.06)
-                          : Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: isCurrent
-                            ? _kBrokerPrimary.withValues(alpha: 0.4)
-                            : _kBrokerBorder,
-                        width: isCurrent ? 1.5 : 1,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                prod.outputJenisNama ?? 'Belum ada jenis',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: prod.outputJenisNama != null
-                                      ? const Color(0xFF1A1D23)
-                                      : Colors.grey.shade400,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                prod.noProduksi,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.grey.shade500,
-                                  fontWeight: FontWeight.w500,
-                                  letterSpacing: 0.3,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (isCurrent)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _kBrokerPrimary.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Text(
-                              'Sedang berlangsung',
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                                color: _kBrokerPrimary,
-                              ),
-                            ),
-                          )
-                        else if (prod.isLocked)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(
-                                0xFFF97316,
-                              ).withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Text(
-                              'Locked',
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFFF97316),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final tglLabel = DateFormat(
-      'dd MMM yyyy',
-      'id_ID',
-    ).format(widget.tanggal.toLocal());
-
-    return Dialog(
-      backgroundColor: Colors.white,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 520),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              padding: const EdgeInsets.fromLTRB(18, 14, 12, 14),
-              decoration: const BoxDecoration(
-                color: _kBrokerPrimary,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.view_list_rounded,
-                    color: Colors.white,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Riwayat Produksi ${widget.namaMesin} (Shift ${widget.shift})',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        Text(
-                          tglLabel,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.75),
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close, color: Colors.white),
-                  ),
-                ],
-              ),
-            ),
-            Flexible(
-              child: FutureBuilder<List<BrokerProduction>>(
-                future: _future,
-                builder: (context, snap) {
-                  if (snap.connectionState == ConnectionState.waiting) {
-                    return const Padding(
-                      padding: EdgeInsets.all(40),
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  }
-                  if (snap.hasError) {
-                    return Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.error_outline,
-                            color: Colors.red.shade400,
-                            size: 32,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            snap.error.toString().replaceFirst(
-                              'Exception: ',
-                              '',
-                            ),
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.red.shade600,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          TextButton.icon(
-                            onPressed: () => setState(() {
-                              _future = BrokerProductionRepository()
-                                  .fetchByMesinTanggalShift(
-                                    idMesin: widget.idMesin,
-                                    tanggal: widget.tanggal,
-                                    shift: widget.shift,
-                                  );
-                            }),
-                            icon: const Icon(Icons.refresh, size: 16),
-                            label: const Text('Coba lagi'),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-                  final list = snap.data ?? [];
-                  if (list.isEmpty) {
-                    return const Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Center(
-                        child: Text(
-                          'Belum ada produksi pada shift ini.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF9CA3AF),
-                          ),
-                        ),
-                      ),
-                    );
-                  }
-                  return SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    child: _buildTimeline(list),
-                  );
-                },
-              ),
-            ),
-            const Divider(height: 1, color: _kBrokerBorder),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
                     child: const Text('Tutup'),
                   ),
                 ],

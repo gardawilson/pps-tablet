@@ -3,8 +3,13 @@ import 'package:intl/intl.dart';
 
 class WashingProduction {
   final String noProduksi;
-  final int idOperator;
-  final String namaOperator;
+
+  /// Multi-operator support (new API)
+  final List<int> idOperators;
+
+  /// Comma-separated operator names e.g. "ABDUL, BUDI"
+  final String namaOperators;
+
   final int idMesin;
   final String namaMesin;
   final DateTime? tglProduksi;
@@ -21,17 +26,21 @@ class WashingProduction {
   final String? hourStart; // "HH:mm"
   final String? hourEnd;   // "HH:mm"
 
-  // ✅ Tutup transaksi flags
-  final bool isLocked;            // dari SQL: IsLocked (bit)
-  final DateTime? lastClosedDate; // dari SQL: LastClosedDate (date)
+  // Output jenis
+  final int? outputJenisId;
+  final String? outputJenisNama;
 
-  // ✅ Regu (sama seperti broker)
+  // ✅ Tutup transaksi flags
+  final bool isLocked;
+  final DateTime? lastClosedDate;
+
+  // ✅ Regu
   final int? idRegu;
 
   const WashingProduction({
     required this.noProduksi,
-    required this.idOperator,
-    required this.namaOperator,
+    required this.idOperators,
+    required this.namaOperators,
     required this.idMesin,
     required this.namaMesin,
     required this.tglProduksi,
@@ -47,10 +56,16 @@ class WashingProduction {
     this.hourMeter,
     this.hourStart,
     this.hourEnd,
+    this.outputJenisId,
+    this.outputJenisNama,
     required this.isLocked,
     this.lastClosedDate,
     this.idRegu,
   });
+
+  // ── Backward-compat getters ──────────────────────────────────────────────
+  int get idOperator => idOperators.isNotEmpty ? idOperators.first : 0;
+  String get namaOperator => namaOperators;
 
   // ---------- Tolerant parsers ----------
   static String _asString(dynamic v) => v?.toString() ?? '';
@@ -135,12 +150,22 @@ class WashingProduction {
   }
 
   factory WashingProduction.fromJson(Map<String, dynamic> j) {
-    final hm = _asDouble(j['HourMeter']); // kadang decimal
+    final hm = _asDouble(j['HourMeter']);
+
+    // Support both array (new) and single int (legacy)
+    List<int> parseIdOperators(dynamic v) {
+      if (v is List) return v.map((e) => _asIntRequired(e)).where((e) => e != 0).toList();
+      final single = _asInt(v);
+      return single != null ? [single] : [];
+    }
+
+    final idOperators = parseIdOperators(j['IdOperators'] ?? j['IdOperator']);
+    final namaOperators = _asString(j['NamaOperators'] ?? j['NamaOperator']);
 
     return WashingProduction(
       noProduksi: _asString(j['NoProduksi']),
-      idOperator: _asIntRequired(j['IdOperator']),
-      namaOperator: _asString(j['NamaOperator']),
+      idOperators: idOperators,
+      namaOperators: namaOperators,
       idMesin: _asIntRequired(j['IdMesin']),
       namaMesin: _asString(j['NamaMesin']),
       tglProduksi: _asDateTime(j['TglProduksi']),
@@ -149,22 +174,20 @@ class WashingProduction {
       isBlower: _asBool(j['IsBlower'] ?? j['isBlower'], fallback: false),
       createBy: _asString(j['CreateBy']),
       checkBy1: (j['CheckBy1'] == null || _asString(j['CheckBy1']).trim().isEmpty)
-          ? null
-          : _asString(j['CheckBy1']),
+          ? null : _asString(j['CheckBy1']),
       checkBy2: (j['CheckBy2'] == null || _asString(j['CheckBy2']).trim().isEmpty)
-          ? null
-          : _asString(j['CheckBy2']),
+          ? null : _asString(j['CheckBy2']),
       approveBy: (j['ApproveBy'] == null || _asString(j['ApproveBy']).trim().isEmpty)
-          ? null
-          : _asString(j['ApproveBy']),
+          ? null : _asString(j['ApproveBy']),
       jmlhAnggota: _asInt(j['JmlhAnggota']),
       hadir: _asInt(j['Hadir']),
-      hourMeter: hm?.round(), // kalau kamu mau tetap int
-      // kalau mau simpan double, ganti field hourMeter jadi double? di model
+      hourMeter: hm?.round(),
       hourStart: _asTimeHHmm(j['HourStart']),
       hourEnd: _asTimeHHmm(j['HourEnd']),
-
-      // ✅ new fields
+      outputJenisId: _asInt(j['OutputJenisId']),
+      outputJenisNama: j['OutputJenisNama'] == null
+          ? null : _asString(j['OutputJenisNama']).trim().isEmpty
+          ? null : _asString(j['OutputJenisNama']),
       isLocked: _asBool(j['IsLocked'], fallback: false),
       lastClosedDate: _asDateTime(j['LastClosedDate']),
       idRegu: _asInt(j['IdRegu']),
@@ -173,8 +196,8 @@ class WashingProduction {
 
   Map<String, dynamic> toJson({bool asDateOnly = true}) => {
     'NoProduksi': noProduksi,
-    'IdOperator': idOperator,
-    'NamaOperator': namaOperator,
+    'IdOperators': idOperators,
+    'NamaOperators': namaOperators,
     'IdMesin': idMesin,
     'NamaMesin': namaMesin,
     'TglProduksi': tglProduksi == null

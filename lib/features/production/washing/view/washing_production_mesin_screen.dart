@@ -1,8 +1,13 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
+import '../../../../core/network/endpoints.dart';
+import '../../../../core/services/token_storage.dart';
 import '../../../mesin/model/mesin_model.dart';
 import '../../shared/widgets/mesin_section_header.dart';
 import '../model/washing_production_model.dart';
@@ -28,10 +33,10 @@ class _WashingProductionMesinScreenState
   final _repo = WashingProductionRepository();
 
   // Left panel — mesin grid
-  Future<WashingMesinResult> _mesinFuture = Future.value(
-    (mesinList: <WashingMesinInfo>[], activeShift: null),
-  );
-  WashingActiveShift? _activeShift;
+  Future<WashingMesinResult> _mesinFuture = Future.value((
+    mesinList: <WashingMesinInfo>[],
+    activeShift: null,
+  ));
 
   // Right panel — riwayat produksi (paginated)
   final List<WashingProduction> _produksiItems = [];
@@ -63,10 +68,9 @@ class _WashingProductionMesinScreenState
     final future = _repo.fetchWashingMesin();
     if (!mounted) return;
     setState(() => _mesinFuture = future);
-    // Simpan activeShift setelah resolved
+    // activeShift tidak lagi disimpan di state — diambil real-time saat _openCreateDialog
     try {
-      final result = await future;
-      if (mounted) setState(() => _activeShift = result.activeShift);
+      await future;
     } catch (_) {}
   }
 
@@ -91,6 +95,7 @@ class _WashingProductionMesinScreenState
       final res = await _repo.fetchAll(
         page: 1,
         pageSize: _pageSize,
+        idMesin: _filterIdMesin,
       );
       if (!mounted) return;
       final newItems = res['items'] as List<WashingProduction>;
@@ -113,6 +118,7 @@ class _WashingProductionMesinScreenState
       final res = await _repo.fetchAll(
         page: nextPage,
         pageSize: _pageSize,
+        idMesin: _filterIdMesin,
       );
       if (!mounted) return;
       final newItems = res['items'] as List<WashingProduction>;
@@ -133,6 +139,42 @@ class _WashingProductionMesinScreenState
     _loadProduksiPage();
   }
 
+  Future<({int shift, String hourStart, String hourEnd})?>
+  _fetchCurrentShift() async {
+    try {
+      final base = ApiConstants.baseUrl.replaceFirst(RegExp(r'/*$'), '');
+      final url = Uri.parse('$base/api/mst/shift/current');
+      debugPrint('➡️ [GET] $url');
+      final token = await TokenStorage.getToken();
+      final res = await http
+          .get(
+            url,
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Accept': 'application/json',
+            },
+          )
+          .timeout(const Duration(seconds: 8));
+      debugPrint('⬅️ [${res.statusCode}] shift/current → ${res.body}');
+      if (res.statusCode != 200) return null;
+      final body =
+          jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      final data = body['data'] as Map<String, dynamic>?;
+      if (data == null) return null;
+      final shift = data['shift'] as int?;
+      if (shift == null) return null;
+      String trim(String? v) =>
+          (v != null && v.length >= 5) ? v.substring(0, 5) : (v ?? '');
+      final hourStart = trim(data['hourStart'] as String?);
+      final hourEnd = trim(data['hourEnd'] as String?);
+      debugPrint('✅ activeShift: shift=$shift, start=$hourStart, end=$hourEnd');
+      return (shift: shift, hourStart: hourStart, hourEnd: hourEnd);
+    } catch (e) {
+      debugPrint('❌ _fetchCurrentShift error: $e');
+      return null;
+    }
+  }
+
   // ── Navigation helpers ────────────────────────────────────────────────────
 
   Future<void> _openCreateDialog({required WashingMesinInfo mesin}) async {
@@ -145,15 +187,20 @@ class _WashingProductionMesinScreenState
       enable: true,
     );
 
+    // Ambil shift aktif real-time dari server
+    final defaultShift = await _fetchCurrentShift();
+    if (!mounted) return;
+
     final created = await showDialog<WashingProduction>(
       context: context,
       barrierDismissible: false,
       builder: (_) => WashingProductionFormDialog(
         initialMesin: mstMesin,
         initialDate: DateTime.now(),
-        initialShift: _activeShift?.shift,
-        initialHourStart: _activeShift?.hourStart,
-        initialHourEnd: _activeShift?.hourEnd,
+        initialShift: defaultShift?.shift,
+        initialHourStart: defaultShift?.hourStart,
+        initialHourEnd: defaultShift?.hourEnd,
+        lockShiftFields: defaultShift != null,
         onSave: (p) => Navigator.of(context).pop(p),
       ),
     );
@@ -164,8 +211,16 @@ class _WashingProductionMesinScreenState
         MaterialPageRoute(
           builder: (_) => WashingProductionInputScreen(
             noProduksi: created.noProduksi,
+            idMesin: created.idMesin,
             isLocked: created.isLocked,
             lastClosedDate: created.lastClosedDate,
+            namaMesin: created.namaMesin,
+            namaJenis: created.outputJenisNama,
+            outputJenisId: created.outputJenisId,
+            tglProduksi: created.tglProduksi,
+            shift: created.shift,
+            hourStart: created.hourStart,
+            hourEnd: created.hourEnd,
           ),
         ),
       );
@@ -186,8 +241,16 @@ class _WashingProductionMesinScreenState
       MaterialPageRoute(
         builder: (_) => WashingProductionInputScreen(
           noProduksi: mesin.noProduksi!,
+          idMesin: mesin.idMesin,
           isLocked: false,
           lastClosedDate: null,
+          namaMesin: mesin.namaMesin,
+          namaJenis: mesin.outputJenisNama,
+          outputJenisId: mesin.outputJenisId,
+          tglProduksi: mesin.tglProduksi,
+          shift: mesin.shift,
+          hourStart: mesin.hourStart,
+          hourEnd: mesin.hourEnd,
         ),
       ),
     );
@@ -212,16 +275,17 @@ class _WashingProductionMesinScreenState
                   future: _mesinFuture,
                   builder: (context, snapshot) {
                     final allMesin = snapshot.data?.mesinList ?? [];
-                    final activeCount =
-                        allMesin.where((m) => m.isActive).length;
+                    final activeCount = allMesin
+                        .where((m) => m.isActive)
+                        .length;
                     final inactiveCount = allMesin.length - activeCount;
                     return MesinSectionHeader(
                       title: 'Status Mesin Washing',
                       onRefresh: _refreshAll,
                       activeCount: activeCount,
                       inactiveCount: inactiveCount,
-                      isLoading: snapshot.connectionState ==
-                          ConnectionState.waiting,
+                      isLoading:
+                          snapshot.connectionState == ConnectionState.waiting,
                     );
                   },
                 ),
@@ -230,9 +294,7 @@ class _WashingProductionMesinScreenState
                     future: _mesinFuture,
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(
-                          child: CircularProgressIndicator(),
-                        );
+                        return const Center(child: CircularProgressIndicator());
                       }
                       if (snapshot.hasError) {
                         return Center(
@@ -311,8 +373,16 @@ class _WashingProductionMesinScreenState
                           MaterialPageRoute(
                             builder: (_) => WashingProductionInputScreen(
                               noProduksi: row.noProduksi,
+                              idMesin: row.idMesin,
                               isLocked: row.isLocked,
                               lastClosedDate: row.lastClosedDate,
+                              namaMesin: row.namaMesin,
+                              namaJenis: row.outputJenisNama,
+                              outputJenisId: row.outputJenisId,
+                              tglProduksi: row.tglProduksi,
+                              shift: row.shift,
+                              hourStart: row.hourStart,
+                              hourEnd: row.hourEnd,
                             ),
                           ),
                         );
@@ -368,8 +438,7 @@ class _WashingProductionMesinScreenState
                                   context: screenCtx,
                                   builder: (_) => ErrorStatusDialog(
                                     title: 'Gagal Menghapus!',
-                                    message:
-                                        errMsg ?? 'Gagal menghapus data',
+                                    message: errMsg ?? 'Gagal menghapus data',
                                   ),
                                 );
                               }
@@ -383,8 +452,16 @@ class _WashingProductionMesinScreenState
                           MaterialPageRoute(
                             builder: (_) => WashingProductionInputScreen(
                               noProduksi: row.noProduksi,
+                              idMesin: row.idMesin,
                               isLocked: row.isLocked,
                               lastClosedDate: row.lastClosedDate,
+                              namaMesin: row.namaMesin,
+                              namaJenis: row.outputJenisNama,
+                              outputJenisId: row.outputJenisId,
+                              tglProduksi: row.tglProduksi,
+                              shift: row.shift,
+                              hourStart: row.hourStart,
+                              hourEnd: row.hourEnd,
                             ),
                           ),
                         );

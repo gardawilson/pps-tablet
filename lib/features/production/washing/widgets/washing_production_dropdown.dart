@@ -74,8 +74,8 @@ class _WashingProductionDropdownState extends State<WashingProductionDropdown> {
       // === EDIT MODE: siapkan item lokal, JANGAN utak-atik VM ===
       final wp = WashingProduction(
         noProduksi: pre,
-        idOperator: 0,
-        namaOperator: '',
+        idOperators: const [],
+        namaOperators: '',
         idMesin: 0,
         namaMesin: widget.preselectNamaMesin ?? '',
         tglProduksi: DateTime.now().toUtc(),

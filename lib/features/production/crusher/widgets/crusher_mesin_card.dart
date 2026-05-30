@@ -2,52 +2,21 @@ import 'package:flutter/material.dart';
 
 import '../../shared/widgets/production_small_info_row.dart';
 import '../../shared/widgets/production_status_dot.dart';
-import '../model/broker_production_model.dart';
+import '../model/crusher_production_model.dart';
 
-/// Kartu mesin untuk panel kiri pada BrokerProductionMesinScreen.
-/// Menampilkan nama mesin, status aktif/nonaktif, shift & jam aktif,
-/// operator, dan jenis output.
-class BrokerMesinCard extends StatelessWidget {
-  const BrokerMesinCard({
+class CrusherMesinCard extends StatelessWidget {
+  const CrusherMesinCard({
     super.key,
     required this.mesin,
     required this.onTap,
   });
 
-  final BrokerMesinInfo mesin;
+  final CrusherMesinInfo mesin;
   final VoidCallback onTap;
-
-  BrokerProduksiItem? _currentItem() {
-    final now = TimeOfDay.now();
-    final nowMin = now.hour * 60 + now.minute;
-
-    TimeOfDay? parse(String? s) {
-      if (s == null || s.isEmpty) return null;
-      final parts = s.split(':');
-      if (parts.length < 2) return null;
-      final h = int.tryParse(parts[0]);
-      final m = int.tryParse(parts[1]);
-      if (h == null || m == null) return null;
-      return TimeOfDay(hour: h, minute: m);
-    }
-
-    for (final p in mesin.produksiList) {
-      final start = parse(p.hourStart);
-      final end = parse(p.hourEnd);
-      if (start == null || end == null) continue;
-      final s = start.hour * 60 + start.minute;
-      final e = end.hour * 60 + end.minute;
-      final inRange =
-          s <= e ? nowMin >= s && nowMin < e : nowMin >= s || nowMin < e;
-      if (inRange) return p;
-    }
-    return mesin.produksiList.isNotEmpty ? mesin.produksiList.first : null;
-  }
 
   @override
   Widget build(BuildContext context) {
     final active = mesin.isActive;
-    final current = active ? _currentItem() : null;
     final borderColor =
         active ? const Color(0xFF86EFAC) : const Color(0xFFFCA5A5);
 
@@ -91,31 +60,31 @@ class BrokerMesinCard extends StatelessWidget {
               const SizedBox(height: 6),
               const Divider(height: 1, color: Color(0xFFE2E8F0)),
               const SizedBox(height: 6),
-              if (current != null) ...[
-                if (current.shift != null ||
-                    current.hourStart != null ||
-                    current.hourEnd != null)
+              if (active) ...[
+                if (mesin.shift != null ||
+                    mesin.hourStart != null ||
+                    mesin.hourEnd != null)
                   ProductionSmallInfoRow(
                     icon: Icons.access_time_outlined,
                     text: [
-                      if (current.shift != null) 'Shift ${current.shift}',
-                      '${current.hourStart ?? '--:--'} – ${current.hourEnd ?? '--:--'}',
+                      if (mesin.shift != null) 'Shift ${mesin.shift}',
+                      '${mesin.hourStart ?? '--:--'} – ${mesin.hourEnd ?? '--:--'}',
                     ].join('  |  '),
                     bold: true,
                   ),
-                if ((current.namaRegu ?? '').isNotEmpty) ...[
+                if ((mesin.namaRegu ?? '').isNotEmpty) ...[
                   const SizedBox(height: 2),
                   ProductionSmallInfoRow(
                     icon: Icons.groups_outlined,
-                    text: current.namaRegu!,
+                    text: mesin.namaRegu!,
                   ),
                 ],
-                if (current.outputJenisNama != null &&
-                    current.outputJenisNama!.trim().isNotEmpty) ...[
+                if (mesin.outputJenisNama != null &&
+                    mesin.outputJenisNama!.trim().isNotEmpty) ...[
                   const SizedBox(height: 2),
                   ProductionSmallInfoRow(
                     icon: Icons.inventory_2_outlined,
-                    text: current.outputJenisNama!.trim(),
+                    text: mesin.outputJenisNama!.trim(),
                     color: const Color(0xFF374151),
                   ),
                 ],

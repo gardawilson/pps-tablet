@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../model/broker_production_model.dart';
 
-/// Panel list riwayat produksi broker (panel kanan).
-/// Menangani loading state, infinite scroll, dan aksi per-baris.
 class BrokerProduksiList extends StatelessWidget {
   const BrokerProduksiList({
     super.key,
@@ -55,7 +54,7 @@ class BrokerProduksiList extends StatelessWidget {
         final row = items[index];
         return _BrokerProduksiRow(
           row: row,
-          showRegu: filterIdMesin != null,
+          filterAll: filterIdMesin == null,
           onTap: () => onTap(row),
           onEdit: () => onEdit(row),
           onDelete: () => onDelete(row),
@@ -69,6 +68,9 @@ class BrokerProduksiList extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // Row item
 // ─────────────────────────────────────────────────────────────────────────────
+const _kAccent = Color(0xFF1D4ED8);
+const _kBorder = Color(0xFFE5E7EB);
+
 class _BrokerProduksiRow extends StatelessWidget {
   const _BrokerProduksiRow({
     required this.row,
@@ -76,7 +78,7 @@ class _BrokerProduksiRow extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onInput,
-    this.showRegu = false,
+    this.filterAll = true,
   });
 
   final BrokerProduction row;
@@ -84,158 +86,191 @@ class _BrokerProduksiRow extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onInput;
-  final bool showRegu;
+  final bool filterAll;
 
   String _fmtDate(DateTime? d) {
     if (d == null) return '-';
-    return '${d.day.toString().padLeft(2, '0')}/'
-        '${d.month.toString().padLeft(2, '0')}/'
-        '${d.year}';
+    return DateFormat('dd MMM yyyy', 'id_ID').format(d.toLocal());
   }
+
+  String _fmtTime(String? t) => (t ?? '--:--').length >= 5 ? t!.substring(0, 5) : (t ?? '--:--');
 
   @override
   Widget build(BuildContext context) {
     final jenis = (row.outputJenisNama ?? '').trim();
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       elevation: 0,
+      clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
-        side: const BorderSide(color: Color(0xFFE5E7EB)),
+        side: const BorderSide(color: _kBorder),
       ),
       color: Colors.white,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Row(
-            children: [
-              // Tanggal + shift + jam
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // ── Top: tanggal · shift · jam  |  noProduksi ────────
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              color: _kAccent.withValues(alpha: 0.06),
+              child: Row(
                 children: [
+                  Icon(Icons.calendar_today_outlined, size: 11, color: _kAccent),
+                  const SizedBox(width: 4),
                   Text(
                     _fmtDate(row.tglProduksi),
                     style: const TextStyle(
                       fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1D4ED8),
+                      fontWeight: FontWeight.w700,
+                      color: _kAccent,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(width: 10),
+                  _ShiftBadge(shift: row.shift),
+                  const SizedBox(width: 10),
+                  Icon(Icons.access_time, size: 11, color: Colors.grey.shade500),
+                  const SizedBox(width: 3),
                   Text(
-                    'Shift ${row.shift}',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF374151),
-                    ),
+                    '${_fmtTime(row.hourStart)} – ${_fmtTime(row.hourEnd)}',
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                   ),
+                  const Spacer(),
                   Text(
-                    '${row.hourStart ?? '--:--'} – ${row.hourEnd ?? '--:--'}',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: Color(0xFF6B7280),
+                    row.noProduksi,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic,
+                      color: Colors.grey.shade500,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(width: 10),
-              // Mesin / Regu name
-              Expanded(
-                flex: 2,
-                child: Text(
-                  showRegu
-                      ? (row.namaRegu?.trim().isNotEmpty == true
-                          ? row.namaRegu!.trim()
-                          : '-')
-                      : row.namaMesin,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF374151),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              // Jenis output
-              Expanded(
-                flex: 3,
-                child: Text(
-                  jenis.isEmpty ? '-' : jenis,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: jenis.isEmpty
-                        ? const Color(0xFF9CA3AF)
-                        : const Color(0xFF374151),
-                    fontStyle:
-                        jenis.isEmpty ? FontStyle.italic : FontStyle.normal,
-                  ),
-                ),
-              ),
-              PopupMenuButton<String>(
-                icon: const Icon(
-                  Icons.more_vert,
-                  size: 18,
-                  color: Color(0xFF6B7280),
-                ),
-                tooltip: 'Aksi',
-                onSelected: (value) {
-                  if (value == 'input') onInput();
-                  if (value == 'edit') onEdit();
-                  if (value == 'hapus') onDelete();
-                },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(
-                    value: 'input',
-                    child: Row(
+            ),
+            const Divider(height: 1, color: _kBorder),
+            // ── Bottom: detail + actions ──────────────────────────
+            Padding(
+              padding: EdgeInsets.fromLTRB(12, filterAll ? 8 : 5, 4, filterAll ? 8 : 5),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(
-                          Icons.input_outlined,
-                          size: 16,
-                          color: Color(0xFF00897B),
-                        ),
-                        SizedBox(width: 8),
-                        Text('Input', style: TextStyle(fontSize: 13)),
+                        if (filterAll) ...[
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              const Icon(Icons.precision_manufacturing_outlined, size: 11, color: Color(0xFF9CA3AF)),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  row.namaMesin,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ] else if ((row.namaRegu ?? '').isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              const Icon(Icons.groups_outlined, size: 11, color: Color(0xFF9CA3AF)),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  row.namaRegu!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        if (jenis.isNotEmpty) ...[
+                          const SizedBox(height: 1),
+                          Row(
+                            children: [
+                              const Icon(Icons.label_outline, size: 11, color: Color(0xFF9CA3AF)),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  jenis,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 11, color: Color(0xFF374151)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
-                  PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.edit_outlined,
-                          size: 16,
-                          color: Color(0xFF0D47A1),
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert, size: 18, color: Color(0xFF6B7280)),
+                    tooltip: 'Aksi',
+                    onSelected: (value) {
+                      if (value == 'edit') onEdit();
+                      if (value == 'hapus') onDelete();
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_outlined, size: 16, color: Color(0xFF0D47A1)),
+                            SizedBox(width: 8),
+                            Text('Edit', style: TextStyle(fontSize: 13)),
+                          ],
                         ),
-                        SizedBox(width: 8),
-                        Text('Edit', style: TextStyle(fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 'hapus',
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.delete_outline,
-                          size: 16,
-                          color: Color(0xFFDC2626),
+                      ),
+                      PopupMenuItem(
+                        value: 'hapus',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_outline, size: 16, color: Color(0xFFDC2626)),
+                            SizedBox(width: 8),
+                            Text('Hapus', style: TextStyle(fontSize: 13)),
+                          ],
                         ),
-                        SizedBox(width: 8),
-                        Text('Hapus', style: TextStyle(fontSize: 13)),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ShiftBadge extends StatelessWidget {
+  const _ShiftBadge({required this.shift});
+  final int shift;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: BoxDecoration(
+        color: _kAccent.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        'Shift $shift',
+        style: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: _kAccent,
         ),
       ),
     );

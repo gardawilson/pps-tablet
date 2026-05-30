@@ -36,6 +36,7 @@ class WashingProduction {
 
   // ✅ Regu
   final int? idRegu;
+  final String? namaRegu;
 
   const WashingProduction({
     required this.noProduksi,
@@ -61,6 +62,7 @@ class WashingProduction {
     required this.isLocked,
     this.lastClosedDate,
     this.idRegu,
+    this.namaRegu,
   });
 
   // ── Backward-compat getters ──────────────────────────────────────────────
@@ -191,6 +193,7 @@ class WashingProduction {
       isLocked: _asBool(j['IsLocked'], fallback: false),
       lastClosedDate: _asDateTime(j['LastClosedDate']),
       idRegu: _asInt(j['IdRegu']),
+      namaRegu: j['NamaRegu'] as String?,
     );
   }
 
@@ -285,6 +288,7 @@ class WashingMesinInfo {
   final String? outputJenisItemCode;
   final int? idOperator;
   final String? namaOperator;
+  final String? namaRegu;
   final int? shift;
   final String? hourStart; // “HH:mm”
   final String? hourEnd;   // “HH:mm”
@@ -304,6 +308,7 @@ class WashingMesinInfo {
     this.outputJenisItemCode,
     this.idOperator,
     this.namaOperator,
+    this.namaRegu,
     this.shift,
     this.hourStart,
     this.hourEnd,
@@ -370,6 +375,7 @@ class WashingMesinInfo {
       outputJenisItemCode: _s(j['OutputJenisItemCode']),
       idOperator: _i(j['IdOperator']),
       namaOperator: _s(j['NamaOperator']),
+      namaRegu: _s(j['NamaRegu']),
       shift: _i(j['Shift']),
       hourStart: _time(j['HourStart']),
       hourEnd: _time(j['HourEnd']),

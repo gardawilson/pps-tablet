@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import '../repository/crusher_production_input_repository.dart';
 import '../model/crusher_inputs_model.dart';
 // ⬆️ dari file ini kita dapat: CrusherInputs, BbItem, BonggolanItem
+import '../model/crusher_output_model.dart';
 
 import 'package:pps_tablet/features/production/shared/models/production_label_lookup_result.dart';
 
@@ -225,6 +226,40 @@ class CrusherProductionInputViewModel extends ChangeNotifier {
       _inputsError.remove(noProduksi);
     }
     notifyListeners();
+  }
+
+  // -------------------------------------------------------------------------
+  // Outputs per NoProduksi (cache)
+  // -------------------------------------------------------------------------
+  final Map<String, List<CrusherOutput>> _outputsCache = {};
+  final Map<String, bool> _outputsLoading = {};
+  final Map<String, String?> _outputsError = {};
+
+  bool isOutputsLoading(String noProduksi) =>
+      _outputsLoading[noProduksi] == true;
+
+  String? outputsError(String noProduksi) => _outputsError[noProduksi];
+
+  List<CrusherOutput>? outputsOf(String noProduksi) =>
+      _outputsCache[noProduksi];
+
+  Future<void> loadOutputs(String noProduksi, {bool force = false}) async {
+    if (!force && _outputsCache.containsKey(noProduksi)) return;
+
+    _outputsLoading[noProduksi] = true;
+    _outputsError[noProduksi] = null;
+    notifyListeners();
+
+    try {
+      final result = await repository.fetchOutputs(noProduksi);
+      _outputsCache[noProduksi] = result;
+    } catch (e) {
+      _outputsError[noProduksi] = e.toString();
+      _outputsCache.remove(noProduksi);
+    } finally {
+      _outputsLoading[noProduksi] = false;
+      notifyListeners();
+    }
   }
 
   // -------------------------------------------------------------------------

@@ -1,13 +1,9 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
-import '../../../../core/network/endpoints.dart';
-import '../../../../core/services/token_storage.dart';
+import '../../../shift/repository/shift_repository.dart';
 import '../../../../features/mesin/model/mesin_model.dart';
 import '../../shared/widgets/mesin_section_header.dart';
 import '../model/broker_production_model.dart';
@@ -44,6 +40,7 @@ class _BrokerProductionMesinScreenState
   static const _pageSize = 30;
   final _produksiScrollCtl = ScrollController();
   int? _filterIdMesin;
+  BrokerMesinInfo? _selectedMesinInfo;
 
   @override
   void initState() {
@@ -124,45 +121,59 @@ class _BrokerProductionMesinScreenState
     }
   }
 
-  Future<({int shift, String hourStart, String hourEnd})?>
-  _fetchCurrentShift() async {
-    try {
-      final base = ApiConstants.baseUrl.replaceFirst(RegExp(r'/*$'), '');
-      final url = Uri.parse('$base/api/mst/shift/current');
-      debugPrint('➡️ [GET] $url');
-      final token = await TokenStorage.getToken();
-      final res = await http
-          .get(
-            url,
-            headers: {
-              'Authorization': 'Bearer $token',
-              'Accept': 'application/json',
-            },
-          )
-          .timeout(const Duration(seconds: 8));
-      debugPrint('⬅️ [${res.statusCode}] shift/current → ${res.body}');
-      if (res.statusCode != 200) return null;
-      final body =
-          jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
-      final data = body['data'] as Map<String, dynamic>?;
-      if (data == null) return null;
-      final shift = data['shift'] as int?;
-      String trim(String? v) =>
-          (v != null && v.length >= 5) ? v.substring(0, 5) : (v ?? '');
-      final hourStart = trim(data['hourStart'] as String?);
-      final hourEnd = trim(data['hourEnd'] as String?);
-      if (shift == null) return null;
-      debugPrint('✅ activeShift: shift=$shift, start=$hourStart, end=$hourEnd');
-      return (shift: shift, hourStart: hourStart, hourEnd: hourEnd);
-    } catch (e) {
-      debugPrint('❌ _fetchCurrentShift error: $e');
-      return null;
-    }
-  }
-
   void _refreshAll() {
     _loadMesin();
     _loadProduksiPage();
+  }
+
+  Future<void> _openBackdateDialog(BrokerMesinInfo mesin) async {
+    if (!mounted) return;
+    final yesterday = DateTime.now().subtract(const Duration(days: 1));
+    final mstMesin = MstMesin(
+      idMesin: mesin.idMesin,
+      namaMesin: mesin.namaMesin,
+      bagian: mesin.bagian,
+      enable: true,
+    );
+    final editVm = BrokerProductionViewModel();
+    try {
+      final created = await showDialog<BrokerProduction>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => ChangeNotifierProvider.value(
+          value: editVm,
+          child: BrokerProductionFormDialog(
+            initialMesin: mstMesin,
+            initialDate: yesterday,
+            isBackdateInput: true,
+          ),
+        ),
+      );
+      if (!mounted) return;
+      if (created != null) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => BrokerProductionInputScreen(
+              noProduksi: created.noProduksi,
+              idMesin: created.idMesin,
+              namaMesin: created.namaMesin,
+              shift: created.shift,
+              tglProduksi: created.tglProduksi,
+              isLocked: created.isLocked,
+              lastClosedDate: created.lastClosedDate,
+              hourStart: created.hourStart,
+              hourEnd: created.hourEnd,
+              namaJenis: created.outputJenisNama,
+              outputJenisId: created.outputJenisId,
+            ),
+          ),
+        );
+        if (!mounted) return;
+        _refreshAll();
+      }
+    } finally {
+      editVm.dispose();
+    }
   }
 
   Future<void> _openCreateDialog({
@@ -176,7 +187,7 @@ class _BrokerProductionMesinScreenState
       bagian: mesin.bagian,
       enable: true,
     );
-    final defaultShift = await _fetchCurrentShift();
+    final defaultShift = await ShiftRepository.fetchCurrentShift();
     if (!mounted) return;
     final created = await showDialog<BrokerProduction>(
       context: context,
@@ -339,118 +350,147 @@ class _BrokerProductionMesinScreenState
                       mesinList: snapshot.data ?? [],
                       selectedIdMesin: _filterIdMesin,
                       onFilterChanged: (id) {
-                        setState(() => _filterIdMesin = id);
+                        final mesinData = snapshot.data ?? [];
+                        setState(() {
+                          _filterIdMesin = id;
+                          _selectedMesinInfo = id == null
+                              ? null
+                              : mesinData
+                                    .where((m) => m.idMesin == id)
+                                    .firstOrNull;
+                        });
                         _loadProduksiPage();
                       },
                     );
                   },
                 ),
                 Expanded(
-                  child: RefreshIndicator(
-                    onRefresh: _loadProduksiPage,
-                    child: BrokerProduksiList(
-                      items: _produksiItems,
-                      isLoading: _produksiLoading,
-                      isFetchingMore: _produksiFetchingMore,
-                      scrollController: _produksiScrollCtl,
-                      filterIdMesin: _filterIdMesin,
-                      onTap: (row) async {
-                        await Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => BrokerProductionInputScreen(
-                              noProduksi: row.noProduksi,
-                              idMesin: row.idMesin,
-                              namaMesin: row.namaMesin,
-                              shift: row.shift,
-                              tglProduksi: row.tglProduksi,
-                              isLocked: row.isLocked,
-                              lastClosedDate: row.lastClosedDate,
-                              hourStart: row.hourStart,
-                              hourEnd: row.hourEnd,
-                              namaJenis: row.outputJenisNama,
-                              outputJenisId: row.outputJenisId,
-                            ),
-                          ),
-                        );
-                        if (mounted) _refreshAll();
-                      },
-                      onEdit: (row) async {
-                        final editVm = BrokerProductionViewModel();
-                        try {
-                          await showDialog<void>(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (_) => ChangeNotifierProvider.value(
-                              value: editVm,
-                              child: BrokerProductionFormDialog(header: row),
-                            ),
-                          );
-                        } finally {
-                          editVm.dispose();
-                        }
-                        if (mounted) _refreshAll();
-                      },
-                      onDelete: (row) async {
-                        await showDialog<void>(
-                          context: context,
-                          barrierDismissible: false,
-                          builder: (ctx) => BrokerProductionDeleteDialog(
-                            header: row,
-                            onConfirm: () async {
-                              final deleteVm = BrokerProductionViewModel();
-                              final success = await deleteVm.deleteProduksi(
-                                row.noProduksi,
+                  child: Stack(
+                    children: [
+                      RefreshIndicator(
+                        onRefresh: _loadProduksiPage,
+                        child: BrokerProduksiList(
+                          items: _produksiItems,
+                          isLoading: _produksiLoading,
+                          isFetchingMore: _produksiFetchingMore,
+                          scrollController: _produksiScrollCtl,
+                          filterIdMesin: _filterIdMesin,
+                          onTap: (row) async {
+                            await Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => BrokerProductionInputScreen(
+                                  noProduksi: row.noProduksi,
+                                  idMesin: row.idMesin,
+                                  namaMesin: row.namaMesin,
+                                  shift: row.shift,
+                                  tglProduksi: row.tglProduksi,
+                                  isLocked: row.isLocked,
+                                  lastClosedDate: row.lastClosedDate,
+                                  hourStart: row.hourStart,
+                                  hourEnd: row.hourEnd,
+                                  namaJenis: row.outputJenisNama,
+                                  outputJenisId: row.outputJenisId,
+                                ),
+                              ),
+                            );
+                            if (mounted) _refreshAll();
+                          },
+                          onEdit: (row) async {
+                            final editVm = BrokerProductionViewModel();
+                            try {
+                              await showDialog<void>(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (_) => ChangeNotifierProvider.value(
+                                  value: editVm,
+                                  child: BrokerProductionFormDialog(
+                                    header: row,
+                                  ),
+                                ),
                               );
-                              final errMsg = deleteVm.saveError;
-                              deleteVm.dispose();
-                              if (ctx.mounted) Navigator.of(ctx).pop();
-                              if (!mounted) return;
-                              if (success) {
-                                // ignore: use_build_context_synchronously
-                                showDialog(
-                                  context: context,
-                                  builder: (_) => SuccessStatusDialog(
-                                    title: 'Berhasil Menghapus',
-                                    message:
-                                        'No. Produksi ${row.noProduksi} berhasil dihapus.',
-                                  ),
-                                );
-                              } else {
-                                // ignore: use_build_context_synchronously
-                                showDialog(
-                                  context: context,
-                                  builder: (_) => ErrorStatusDialog(
-                                    title: 'Gagal Menghapus!',
-                                    message: errMsg ?? 'Gagal menghapus data',
-                                  ),
-                                );
-                              }
-                              _refreshAll();
-                            },
+                            } finally {
+                              editVm.dispose();
+                            }
+                            if (mounted) _refreshAll();
+                          },
+                          onDelete: (row) async {
+                            await showDialog<void>(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (ctx) => BrokerProductionDeleteDialog(
+                                header: row,
+                                onConfirm: () async {
+                                  final deleteVm = BrokerProductionViewModel();
+                                  final success = await deleteVm.deleteProduksi(
+                                    row.noProduksi,
+                                  );
+                                  final errMsg = deleteVm.saveError;
+                                  deleteVm.dispose();
+                                  if (ctx.mounted) Navigator.of(ctx).pop();
+                                  if (!mounted) return;
+                                  if (success) {
+                                    // ignore: use_build_context_synchronously
+                                    showDialog(
+                                      context: context,
+                                      builder: (_) => SuccessStatusDialog(
+                                        title: 'Berhasil Menghapus',
+                                        message:
+                                            'No. Produksi ${row.noProduksi} berhasil dihapus.',
+                                      ),
+                                    );
+                                  } else {
+                                    // ignore: use_build_context_synchronously
+                                    showDialog(
+                                      context: context,
+                                      builder: (_) => ErrorStatusDialog(
+                                        title: 'Gagal Menghapus!',
+                                        message:
+                                            errMsg ?? 'Gagal menghapus data',
+                                      ),
+                                    );
+                                  }
+                                  _refreshAll();
+                                },
+                              ),
+                            );
+                          },
+                          onInput: (row) async {
+                            await Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => BrokerProductionInputScreen(
+                                  noProduksi: row.noProduksi,
+                                  idMesin: row.idMesin,
+                                  namaMesin: row.namaMesin,
+                                  shift: row.shift,
+                                  tglProduksi: row.tglProduksi,
+                                  isLocked: row.isLocked,
+                                  lastClosedDate: row.lastClosedDate,
+                                  hourStart: row.hourStart,
+                                  hourEnd: row.hourEnd,
+                                  namaJenis: row.outputJenisNama,
+                                  outputJenisId: row.outputJenisId,
+                                ),
+                              ),
+                            );
+                            if (mounted) _refreshAll();
+                          },
+                        ),
+                      ),
+                      if (_selectedMesinInfo != null)
+                        Positioned(
+                          right: 16,
+                          bottom: 16,
+                          child: FloatingActionButton.small(
+                            heroTag: 'fab_backdate_broker',
+                            onPressed: () =>
+                                _openBackdateDialog(_selectedMesinInfo!),
+                            backgroundColor: const Color(0xFF1D4ED8),
+                            foregroundColor: Colors.white,
+                            tooltip: 'Tambah Backdate',
+                            child: const Icon(Icons.add),
                           ),
-                        );
-                      },
-                      onInput: (row) async {
-                        await Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => BrokerProductionInputScreen(
-                              noProduksi: row.noProduksi,
-                              idMesin: row.idMesin,
-                              namaMesin: row.namaMesin,
-                              shift: row.shift,
-                              tglProduksi: row.tglProduksi,
-                              isLocked: row.isLocked,
-                              lastClosedDate: row.lastClosedDate,
-                              hourStart: row.hourStart,
-                              hourEnd: row.hourEnd,
-                              namaJenis: row.outputJenisNama,
-                              outputJenisId: row.outputJenisId,
-                            ),
-                          ),
-                        );
-                        if (mounted) _refreshAll();
-                      },
-                    ),
+                        ),
+                    ],
                   ),
                 ),
               ],

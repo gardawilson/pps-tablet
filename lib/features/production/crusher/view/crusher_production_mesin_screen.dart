@@ -4,38 +4,34 @@ import 'package:provider/provider.dart';
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
 import '../../../shift/repository/shift_repository.dart';
-import '../../../mesin/model/mesin_model.dart';
+import '../../../../features/mesin/model/mesin_model.dart';
 import '../../shared/widgets/mesin_section_header.dart';
-import '../model/washing_production_model.dart';
-import '../repository/washing_production_repository.dart';
-import '../view_model/washing_production_view_model.dart';
-import '../widgets/washing_delete_dialog.dart';
-import '../widgets/washing_mesin_card.dart';
-import '../widgets/washing_produksi_list.dart';
-import '../widgets/washing_production_form_dialog.dart';
-import '../widgets/washing_riwayat_section_header.dart';
-import 'washing_production_input_screen.dart';
+import '../model/crusher_production_model.dart';
+import '../repository/crusher_production_repository.dart';
+import '../view_model/crusher_production_view_model.dart';
+import '../widgets/broker_delete_dialog.dart';
+import '../widgets/crusher_mesin_card.dart';
+import '../widgets/crusher_produksi_list.dart';
+import '../widgets/crusher_production_form_dialog.dart';
+import '../widgets/crusher_riwayat_section_header.dart';
+import 'crusher_production_input_screen.dart';
 
-class WashingProductionMesinScreen extends StatefulWidget {
-  const WashingProductionMesinScreen({super.key});
+class CrusherProductionMesinScreen extends StatefulWidget {
+  const CrusherProductionMesinScreen({super.key});
 
   @override
-  State<WashingProductionMesinScreen> createState() =>
-      _WashingProductionMesinScreenState();
+  State<CrusherProductionMesinScreen> createState() =>
+      _CrusherProductionMesinScreenState();
 }
 
-class _WashingProductionMesinScreenState
-    extends State<WashingProductionMesinScreen> {
-  final _repo = WashingProductionRepository();
+class _CrusherProductionMesinScreenState
+    extends State<CrusherProductionMesinScreen> {
+  final _repo = CrusherProductionRepository();
+  late final CrusherProductionViewModel _editVmPool;
 
-  // Left panel — mesin grid
-  Future<WashingMesinResult> _mesinFuture = Future.value((
-    mesinList: <WashingMesinInfo>[],
-    activeShift: null,
-  ));
+  Future<List<CrusherMesinInfo>> _mesinFuture = Future.value([]);
 
-  // Right panel — riwayat produksi (paginated)
-  final List<WashingProduction> _produksiItems = [];
+  final List<CrusherProduction> _produksiItems = [];
   bool _produksiLoading = false;
   bool _produksiFetchingMore = false;
   bool _produksiHasMore = true;
@@ -43,11 +39,12 @@ class _WashingProductionMesinScreenState
   static const _pageSize = 30;
   final _produksiScrollCtl = ScrollController();
   int? _filterIdMesin;
-  WashingMesinInfo? _selectedMesinInfo;
+  CrusherMesinInfo? _selectedMesinInfo;
 
   @override
   void initState() {
     super.initState();
+    _editVmPool = CrusherProductionViewModel(repository: _repo);
     _loadMesin();
     _loadProduksiPage();
     _produksiScrollCtl.addListener(_onProduksiScroll);
@@ -56,21 +53,16 @@ class _WashingProductionMesinScreenState
   @override
   void dispose() {
     _produksiScrollCtl.dispose();
+    _editVmPool.dispose();
     super.dispose();
   }
 
-  // ── Data loading ──────────────────────────────────────────────────────────
-
   Future<void> _loadMesin() async {
-    final future = _repo.fetchWashingMesin();
-    if (!mounted) return;
-    setState(() {
-      _mesinFuture = future;
-    });
-    // activeShift tidak lagi disimpan di state — diambil real-time saat _openCreateDialog
-    try {
-      await future;
-    } catch (_) {}
+    final future = _repo.fetchCrusherMesin();
+    if (mounted)
+      setState(() {
+        _mesinFuture = future;
+      });
   }
 
   void _onProduksiScroll() {
@@ -97,7 +89,7 @@ class _WashingProductionMesinScreenState
         idMesin: _filterIdMesin,
       );
       if (!mounted) return;
-      final newItems = res['items'] as List<WashingProduction>;
+      final newItems = res['items'] as List<CrusherProduction>;
       final totalPages = (res['totalPages'] as int?) ?? 1;
       setState(() {
         _produksiItems.addAll(newItems);
@@ -120,7 +112,7 @@ class _WashingProductionMesinScreenState
         idMesin: _filterIdMesin,
       );
       if (!mounted) return;
-      final newItems = res['items'] as List<WashingProduction>;
+      final newItems = res['items'] as List<CrusherProduction>;
       final totalPages = (res['totalPages'] as int?) ?? 1;
       setState(() {
         _produksiItems.addAll(newItems);
@@ -138,33 +130,32 @@ class _WashingProductionMesinScreenState
     _loadProduksiPage();
   }
 
-  // ── Navigation helpers ────────────────────────────────────────────────────
-
-  Future<void> _openCreateDialog({required WashingMesinInfo mesin}) async {
+  Future<void> _openCreateDialog({required CrusherMesinInfo mesin}) async {
     if (!mounted) return;
 
     final mstMesin = MstMesin(
       idMesin: mesin.idMesin,
       namaMesin: mesin.namaMesin,
-      bagian: mesin.bagian ?? '',
+      bagian: mesin.bagian,
       enable: true,
     );
 
-    // Ambil shift aktif real-time dari server
     final defaultShift = await ShiftRepository.fetchCurrentShift();
     if (!mounted) return;
 
-    final created = await showDialog<WashingProduction>(
+    final created = await showDialog<CrusherProduction>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => WashingProductionFormDialog(
-        initialMesin: mstMesin,
-        initialDate: DateTime.now(),
-        initialShift: defaultShift?.shift,
-        initialHourStart: defaultShift?.hourStart,
-        initialHourEnd: defaultShift?.hourEnd,
-        lockShiftFields: defaultShift != null,
-        onSave: (p) => Navigator.of(context).pop(p),
+      builder: (_) => ChangeNotifierProvider.value(
+        value: _editVmPool,
+        child: CrusherProductionFormDialog(
+          initialMesin: mstMesin,
+          initialShift: defaultShift?.shift,
+          initialHourStart: defaultShift?.hourStart,
+          initialHourEnd: defaultShift?.hourEnd,
+          lockShiftFields: defaultShift != null,
+          onSave: (p) => Navigator.of(context).pop(p),
+        ),
       ),
     );
 
@@ -172,16 +163,15 @@ class _WashingProductionMesinScreenState
     if (created != null) {
       await Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => WashingProductionInputScreen(
-            noProduksi: created.noProduksi,
-            idMesin: created.idMesin,
+          builder: (_) => CrusherProductionInputScreen(
+            noCrusherProduksi: created.noCrusherProduksi,
             isLocked: created.isLocked,
             lastClosedDate: created.lastClosedDate,
-            namaMesin: created.namaMesin,
+            idMesin: created.idMesin,
             namaJenis: created.outputJenisNama,
             outputJenisId: created.outputJenisId,
-            tglProduksi: created.tglProduksi,
             shift: created.shift,
+            tglProduksi: created.tanggal,
             hourStart: created.hourStart,
             hourEnd: created.hourEnd,
           ),
@@ -192,51 +182,58 @@ class _WashingProductionMesinScreenState
     _refreshAll();
   }
 
-  Future<void> _openBackdateDialog(WashingMesinInfo mesin) async {
+  Future<void> _openBackdateDialog(CrusherMesinInfo mesin) async {
     if (!mounted) return;
     final yesterday = DateTime.now().subtract(const Duration(days: 1));
     final mstMesin = MstMesin(
       idMesin: mesin.idMesin,
       namaMesin: mesin.namaMesin,
-      bagian: mesin.bagian ?? '',
+      bagian: mesin.bagian,
       enable: true,
     );
-    final created = await showDialog<WashingProduction>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => WashingProductionFormDialog(
-        initialMesin: mstMesin,
-        initialDate: yesterday,
-        lockShiftFields: false,
-        isDateEditable: true,
-        onSave: (p) => Navigator.of(context).pop(p),
-      ),
-    );
-    if (!mounted) return;
-    if (created != null) {
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => WashingProductionInputScreen(
-            noProduksi: created.noProduksi,
-            idMesin: created.idMesin,
-            isLocked: created.isLocked,
-            lastClosedDate: created.lastClosedDate,
-            namaMesin: created.namaMesin,
-            namaJenis: created.outputJenisNama,
-            outputJenisId: created.outputJenisId,
-            tglProduksi: created.tglProduksi,
-            shift: created.shift,
-            hourStart: created.hourStart,
-            hourEnd: created.hourEnd,
+    final editVm = CrusherProductionViewModel(repository: _repo);
+    try {
+      final created = await showDialog<CrusherProduction>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => ChangeNotifierProvider.value(
+          value: editVm,
+          child: CrusherProductionFormDialog(
+            initialMesin: mstMesin,
+            initialDate: yesterday,
+            lockShiftFields: false,
+            isBackdateInput: true,
+            onSave: (p) => Navigator.of(context).pop(p),
           ),
         ),
       );
       if (!mounted) return;
+      if (created != null) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => CrusherProductionInputScreen(
+              noCrusherProduksi: created.noCrusherProduksi,
+              isLocked: created.isLocked,
+              lastClosedDate: created.lastClosedDate,
+              idMesin: created.idMesin,
+              namaJenis: created.outputJenisNama,
+              outputJenisId: created.outputJenisId,
+              shift: created.shift,
+              tglProduksi: created.tanggal,
+              hourStart: created.hourStart,
+              hourEnd: created.hourEnd,
+            ),
+          ),
+        );
+        if (!mounted) return;
+      }
+    } finally {
+      editVm.dispose();
     }
     _refreshAll();
   }
 
-  Future<void> _onMesinTap(WashingMesinInfo mesin) async {
+  Future<void> _onMesinTap(CrusherMesinInfo mesin) async {
     if (!mounted) return;
 
     if (!mesin.isActive) {
@@ -246,16 +243,15 @@ class _WashingProductionMesinScreenState
 
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => WashingProductionInputScreen(
-          noProduksi: mesin.noProduksi!,
-          idMesin: mesin.idMesin,
+        builder: (_) => CrusherProductionInputScreen(
+          noCrusherProduksi: mesin.noProduksi!,
           isLocked: false,
           lastClosedDate: null,
-          namaMesin: mesin.namaMesin,
+          idMesin: mesin.idMesin,
           namaJenis: mesin.outputJenisNama,
           outputJenisId: mesin.outputJenisId,
-          tglProduksi: mesin.tglProduksi,
           shift: mesin.shift,
+          tglProduksi: mesin.tglProduksi,
           hourStart: mesin.hourStart,
           hourEnd: mesin.hourEnd,
         ),
@@ -265,29 +261,27 @@ class _WashingProductionMesinScreenState
     _refreshAll();
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Row(
         children: [
-          // ── LEFT: mesin grid (3/5) ────────────────────────────
+          // ── LEFT: mesin grid (3/5) ──────────────────────────────
           Expanded(
             flex: 3,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                FutureBuilder<WashingMesinResult>(
+                FutureBuilder<List<CrusherMesinInfo>>(
                   future: _mesinFuture,
                   builder: (context, snapshot) {
-                    final allMesin = snapshot.data?.mesinList ?? [];
+                    final allMesin = snapshot.data ?? [];
                     final activeCount = allMesin
                         .where((m) => m.isActive)
                         .length;
                     final inactiveCount = allMesin.length - activeCount;
                     return MesinSectionHeader(
-                      title: 'Status Mesin Washing',
+                      title: 'Status Mesin Crusher',
                       onRefresh: _refreshAll,
                       activeCount: activeCount,
                       inactiveCount: inactiveCount,
@@ -297,7 +291,7 @@ class _WashingProductionMesinScreenState
                   },
                 ),
                 Expanded(
-                  child: FutureBuilder<WashingMesinResult>(
+                  child: FutureBuilder<List<CrusherMesinInfo>>(
                     future: _mesinFuture,
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
@@ -318,7 +312,7 @@ class _WashingProductionMesinScreenState
                           ),
                         );
                       }
-                      final allMesin = snapshot.data?.mesinList ?? [];
+                      final allMesin = snapshot.data ?? [];
                       return GridView.builder(
                         padding: const EdgeInsets.all(12),
                         gridDelegate:
@@ -331,7 +325,7 @@ class _WashingProductionMesinScreenState
                         itemCount: allMesin.length,
                         itemBuilder: (context, index) {
                           final mesin = allMesin[index];
-                          return WashingMesinCard(
+                          return CrusherMesinCard(
                             mesin: mesin,
                             onTap: () => _onMesinTap(mesin),
                           );
@@ -344,7 +338,7 @@ class _WashingProductionMesinScreenState
             ),
           ),
 
-          // ── DIVIDER ─────────────────────────────────────────────
+          // ── DIVIDER ──────────────────────────────────────────────
           const VerticalDivider(width: 1, color: Color(0xFFE5E7EB)),
 
           // ── RIGHT: riwayat produksi (2/5) ────────────────────────
@@ -353,14 +347,14 @@ class _WashingProductionMesinScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                FutureBuilder<WashingMesinResult>(
+                FutureBuilder<List<CrusherMesinInfo>>(
                   future: _mesinFuture,
                   builder: (context, snapshot) {
-                    return WashingRiwayatSectionHeader(
-                      mesinList: snapshot.data?.mesinList ?? [],
+                    return CrusherRiwayatSectionHeader(
+                      mesinList: snapshot.data ?? [],
                       selectedIdMesin: _filterIdMesin,
                       onFilterChanged: (id) {
-                        final mesinList = snapshot.data?.mesinList ?? [];
+                        final mesinList = snapshot.data ?? [];
                         setState(() {
                           _filterIdMesin = id;
                           _selectedMesinInfo = id == null
@@ -379,7 +373,7 @@ class _WashingProductionMesinScreenState
                     children: [
                       RefreshIndicator(
                         onRefresh: _loadProduksiPage,
-                        child: WashingProduksiList(
+                        child: CrusherProduksiList(
                           items: _produksiItems,
                           isLoading: _produksiLoading,
                           isFetchingMore: _produksiFetchingMore,
@@ -388,16 +382,15 @@ class _WashingProductionMesinScreenState
                           onTap: (row) async {
                             await Navigator.of(context).push(
                               MaterialPageRoute(
-                                builder: (_) => WashingProductionInputScreen(
-                                  noProduksi: row.noProduksi,
-                                  idMesin: row.idMesin,
+                                builder: (_) => CrusherProductionInputScreen(
+                                  noCrusherProduksi: row.noCrusherProduksi,
                                   isLocked: row.isLocked,
                                   lastClosedDate: row.lastClosedDate,
-                                  namaMesin: row.namaMesin,
+                                  idMesin: row.idMesin,
                                   namaJenis: row.outputJenisNama,
                                   outputJenisId: row.outputJenisId,
-                                  tglProduksi: row.tglProduksi,
                                   shift: row.shift,
+                                  tglProduksi: row.tanggal,
                                   hourStart: row.hourStart,
                                   hourEnd: row.hourEnd,
                                 ),
@@ -406,23 +399,14 @@ class _WashingProductionMesinScreenState
                             if (mounted) _refreshAll();
                           },
                           onEdit: (row) async {
-                            final editVm = WashingProductionViewModel(
-                              repository: _repo,
+                            await showDialog<void>(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (_) => ChangeNotifierProvider.value(
+                                value: _editVmPool,
+                                child: CrusherProductionFormDialog(header: row),
+                              ),
                             );
-                            try {
-                              await showDialog<void>(
-                                context: context,
-                                barrierDismissible: false,
-                                builder: (_) => ChangeNotifierProvider.value(
-                                  value: editVm,
-                                  child: WashingProductionFormDialog(
-                                    header: row,
-                                  ),
-                                ),
-                              );
-                            } finally {
-                              editVm.dispose();
-                            }
                             if (mounted) _refreshAll();
                           },
                           onDelete: (row) async {
@@ -430,17 +414,12 @@ class _WashingProductionMesinScreenState
                             await showDialog<void>(
                               context: screenCtx,
                               barrierDismissible: false,
-                              builder: (ctx) => WashingProductionDeleteDialog(
+                              builder: (ctx) => CrusherProductionDeleteDialog(
                                 header: row,
                                 onConfirm: () async {
-                                  bool success = false;
-                                  String? errMsg;
-                                  try {
-                                    await _repo.deleteProduksi(row.noProduksi);
-                                    success = true;
-                                  } catch (e) {
-                                    errMsg = e.toString();
-                                  }
+                                  final success = await _editVmPool
+                                      .deleteProduksi(row.noCrusherProduksi);
+                                  final errMsg = _editVmPool.saveError;
                                   if (ctx.mounted) Navigator.of(ctx).pop();
                                   if (!screenCtx.mounted) return;
                                   if (success) {
@@ -449,7 +428,7 @@ class _WashingProductionMesinScreenState
                                       builder: (_) => SuccessStatusDialog(
                                         title: 'Berhasil Menghapus',
                                         message:
-                                            'No. Produksi ${row.noProduksi} berhasil dihapus.',
+                                            'No. Crusher Produksi ${row.noCrusherProduksi} berhasil dihapus.',
                                       ),
                                     );
                                   } else {
@@ -470,16 +449,15 @@ class _WashingProductionMesinScreenState
                           onInput: (row) async {
                             await Navigator.of(context).push(
                               MaterialPageRoute(
-                                builder: (_) => WashingProductionInputScreen(
-                                  noProduksi: row.noProduksi,
-                                  idMesin: row.idMesin,
+                                builder: (_) => CrusherProductionInputScreen(
+                                  noCrusherProduksi: row.noCrusherProduksi,
                                   isLocked: row.isLocked,
                                   lastClosedDate: row.lastClosedDate,
-                                  namaMesin: row.namaMesin,
+                                  idMesin: row.idMesin,
                                   namaJenis: row.outputJenisNama,
                                   outputJenisId: row.outputJenisId,
-                                  tglProduksi: row.tglProduksi,
                                   shift: row.shift,
+                                  tglProduksi: row.tanggal,
                                   hourStart: row.hourStart,
                                   hourEnd: row.hourEnd,
                                 ),
@@ -494,7 +472,7 @@ class _WashingProductionMesinScreenState
                           right: 16,
                           bottom: 16,
                           child: FloatingActionButton.small(
-                            heroTag: 'fab_backdate_washing',
+                            heroTag: 'fab_backdate_crusher',
                             onPressed: () =>
                                 _openBackdateDialog(_selectedMesinInfo!),
                             backgroundColor: const Color(0xFF0277BD),

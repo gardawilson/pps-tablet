@@ -17,9 +17,10 @@ class ReguRepository {
         'Accept': 'application/json',
       };
 
-  Future<List<MstRegu>> fetchAll() async {
+  Future<List<MstRegu>> fetchAll({int? idBagian}) async {
     final token = await TokenStorage.getToken();
-    final uri = Uri.parse('$_base/api/mst/regu');
+    final query = idBagian != null ? '?idBagian=$idBagian' : '';
+    final uri = Uri.parse('$_base/api/mst/regu$query');
 
     final started = DateTime.now();
     print('📡 [GET] $uri');

@@ -1,17 +1,21 @@
 // lib/features/production/washing/widgets/washing_production_form_dialog.dart
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import 'package:pps_tablet/features/operator/model/operator_model.dart';
-import 'package:pps_tablet/features/operator/repository/operator_repository.dart';
+import 'package:pps_tablet/features/production/shared/widgets/regu_operator_picker.dart';
 import 'package:pps_tablet/features/production/shared/widgets/time_form_field.dart';
 import 'package:pps_tablet/features/regu/model/regu_model.dart';
-import 'package:pps_tablet/features/regu/repository/regu_repository.dart';
 import 'package:pps_tablet/features/washing_type/model/washing_type_model.dart';
 import 'package:pps_tablet/features/washing_type/widgets/washing_type_dropdown.dart';
 
 import '../../../../common/widgets/app_number_field.dart';
+import '../../../../core/network/endpoints.dart';
+import '../../../../core/services/token_storage.dart';
 import '../../../../core/utils/time_formatter.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../mesin/model/mesin_model.dart';
@@ -36,6 +40,9 @@ class WashingProductionFormDialog extends StatefulWidget {
   /// Jika true, field shift + jam mulai + jam selesai di-disable (readonly)
   final bool lockShiftFields;
 
+  /// Jika true, tampilkan field tanggal yang bisa diedit (untuk backdate)
+  final bool isDateEditable;
+
   const WashingProductionFormDialog({
     super.key,
     this.header,
@@ -46,6 +53,7 @@ class WashingProductionFormDialog extends StatefulWidget {
     this.initialHourStart,
     this.initialHourEnd,
     this.lockShiftFields = false,
+    this.isDateEditable = false,
   });
 
   @override
@@ -58,6 +66,7 @@ class _WashingProductionFormDialogState
   final _formKey = GlobalKey<FormState>();
 
   // Controllers
+  late final TextEditingController dateCreatedCtrl;
   late final TextEditingController hourStartCtrl;
   late final TextEditingController hourEndCtrl;
   late final TextEditingController hadirCtrl;
@@ -88,6 +97,9 @@ class _WashingProductionFormDialogState
         ? (parseAnyToDateTime(widget.header!.tglProduksi) ?? DateTime.now())
         : (widget.initialDate ?? DateTime.now());
     _selectedDate = seededDate;
+    dateCreatedCtrl = TextEditingController(
+      text: DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(seededDate),
+    );
 
     _selectedMesin = widget.initialMesin;
     _selectedShift = widget.header?.shift ?? widget.initialShift;
@@ -124,10 +136,53 @@ class _WashingProductionFormDialogState
 
   @override
   void dispose() {
+    dateCreatedCtrl.dispose();
     hourStartCtrl.dispose();
     hourEndCtrl.dispose();
     hadirCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickTanggal() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+      locale: const Locale('id', 'ID'),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _selectedDate = picked;
+      dateCreatedCtrl.text = DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(picked);
+    });
+    if (_selectedShift != null) await _fetchShiftHour(_selectedShift!);
+    await _checkOverlapIfReadyVM();
+  }
+
+  Future<void> _fetchShiftHour(int shift) async {
+    final tanggal = DateFormat('yyyy-MM-dd').format(_selectedDate);
+    final base = ApiConstants.baseUrl.replaceFirst(RegExp(r'/*$'), '');
+    final url = Uri.parse('$base/api/mst/shift/hour?tanggal=$tanggal&shift=$shift');
+    try {
+      final token = await TokenStorage.getToken();
+      final res = await http
+          .get(url, headers: {'Authorization': 'Bearer $token', 'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 10));
+      if (res.statusCode != 200) return;
+      final body = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      final data = body['data'] as Map<String, dynamic>?;
+      if (data == null) return;
+      String trimTime(String? v) => (v != null && v.length >= 5) ? v.substring(0, 5) : (v ?? '');
+      final start = trimTime(data['hourStart'] as String?);
+      final end = trimTime(data['hourEnd'] as String?);
+      if (!mounted) return;
+      setState(() {
+        if (start.isNotEmpty) hourStartCtrl.text = start;
+        if (end.isNotEmpty) hourEndCtrl.text = end;
+      });
+      await _checkOverlapIfReadyVM();
+    } catch (_) {}
   }
 
   String? _buildJamRange() {
@@ -159,25 +214,13 @@ class _WashingProductionFormDialogState
   Future<void> _openReguOperatorPicker() async {
     if (!mounted) return;
     setState(() => _loadingReguOperator = true);
-    List<MstRegu> allRegu = [];
-    try {
-      allRegu = await ReguRepository().fetchAll();
-    } catch (_) {
-      allRegu = [];
-    } finally {
-      if (mounted) setState(() => _loadingReguOperator = false);
-    }
-    if (!mounted) return;
-
-    final result =
-        await showDialog<({MstRegu regu, List<MstOperator> operators})>(
-          context: context,
-          builder: (_) => _ReguOperatorPickerDialog(
-            reguList: allRegu,
-            initialRegu: _selectedRegu,
-            initialSelected: _selectedOperators,
-          ),
-        );
+    final result = await showReguOperatorPicker(
+      context,
+      initialRegu: _selectedRegu,
+      initialSelected: _selectedOperators,
+      idBagian: 7,
+    );
+    if (mounted) setState(() => _loadingReguOperator = false);
     if (result != null && mounted) {
       setState(() {
         _selectedRegu = result.regu;
@@ -366,6 +409,7 @@ class _WashingProductionFormDialogState
         children: [
           // ── Judul ────────────────────────────────────────────────────────
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
@@ -381,6 +425,7 @@ class _WashingProductionFormDialogState
               ),
               const SizedBox(width: 10),
               Expanded(
+                flex: 3,
                 child: Text(
                   mesinName,
                   style: const TextStyle(
@@ -391,11 +436,31 @@ class _WashingProductionFormDialogState
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              // Tanggal (tampilkan, readonly untuk create dari mesin card)
-              Text(
-                DateFormat('dd MMM yyyy', 'id_ID').format(_selectedDate),
-                style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-              ),
+              if (!widget.isDateEditable)
+                Text(
+                  DateFormat('dd MMM yyyy', 'id_ID').format(_selectedDate),
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+                ),
+              if (widget.isDateEditable) ...[
+                const SizedBox(width: 16),
+                Expanded(
+                  flex: 2,
+                  child: TextFormField(
+                    controller: dateCreatedCtrl,
+                    readOnly: true,
+                    onTap: _pickTanggal,
+                    decoration: InputDecoration(
+                      labelText: 'Tanggal',
+                      hintText: 'Pilih tanggal',
+                      prefixIcon: const Icon(Icons.calendar_today_outlined, size: 20),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                    validator: (v) => (v == null || v.isEmpty) ? 'Wajib pilih tanggal' : null,
+                  ),
+                ),
+              ],
             ],
           ),
 
@@ -413,7 +478,10 @@ class _WashingProductionFormDialogState
                     width: 190,
                     child: ShiftDropdown(
                       preselectId: widget.header?.shift ?? widget.initialShift,
-                      onChangedId: (id) => setState(() => _selectedShift = id),
+                      onChangedId: (id) {
+                        setState(() => _selectedShift = id);
+                        if (id != null && widget.isDateEditable) _fetchShiftHour(id);
+                      },
                       validator: (v) => v == null ? 'Wajib pilih shift' : null,
                       autovalidateMode: AutovalidateMode.onUserInteraction,
                     ),
@@ -515,7 +583,7 @@ class _WashingProductionFormDialogState
             children: [
               Expanded(
                 flex: 4,
-                child: _ReguOperatorPickerField(
+                child: ReguOperatorPickerField(
                   selectedRegu: _selectedRegu,
                   selectedOperators: _selectedOperators,
                   isLoading: _loadingReguOperator,
@@ -639,621 +707,3 @@ class _WashingProductionFormDialogState
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Field: gabungan regu + operator
-// ─────────────────────────────────────────────────────────────────────────────
-class _ReguOperatorPickerField extends StatelessWidget {
-  const _ReguOperatorPickerField({
-    required this.selectedRegu,
-    required this.selectedOperators,
-    required this.isLoading,
-    required this.onTap,
-  });
-
-  final MstRegu? selectedRegu;
-  final List<MstOperator> selectedOperators;
-  final bool isLoading;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final hasValue = selectedRegu != null || selectedOperators.isNotEmpty;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: 'Regu & Operator',
-          labelStyle: const TextStyle(fontSize: 14, color: Color(0xFF374151)),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFF9CA3AF)),
-          ),
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 10,
-          ),
-          suffixIcon: isLoading
-              ? const Padding(
-                  padding: EdgeInsets.all(10),
-                  child: SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                )
-              : const Icon(
-                  Icons.groups_outlined,
-                  size: 18,
-                  color: Color(0xFF6B7280),
-                ),
-        ),
-        child: !hasValue
-            ? const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.groups_2_outlined,
-                    size: 15,
-                    color: Color(0xFFBEC8D5),
-                  ),
-                  SizedBox(width: 8),
-                  Text(
-                    'Pilih regu & operator',
-                    style: TextStyle(fontSize: 13, color: Color(0xFFADB8C4)),
-                  ),
-                ],
-              )
-            : Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (selectedRegu != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.groups_outlined,
-                            size: 13,
-                            color: Color(0xFF64748B),
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            selectedRegu!.namaRegu,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF334155),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  if (selectedOperators.isNotEmpty) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.person_outline,
-                            size: 13,
-                            color: Color(0xFF64748B),
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            '${selectedOperators.length} Operator',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF475569),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Dialog: pilih regu lalu operator
-// ─────────────────────────────────────────────────────────────────────────────
-class _ReguOperatorPickerDialog extends StatefulWidget {
-  const _ReguOperatorPickerDialog({
-    required this.reguList,
-    required this.initialRegu,
-    required this.initialSelected,
-  });
-
-  final List<MstRegu> reguList;
-  final MstRegu? initialRegu;
-  final List<MstOperator> initialSelected;
-
-  @override
-  State<_ReguOperatorPickerDialog> createState() =>
-      _ReguOperatorPickerDialogState();
-}
-
-class _ReguOperatorPickerDialogState extends State<_ReguOperatorPickerDialog> {
-  MstRegu? _activeRegu;
-  List<MstOperator> _operators = [];
-  bool _loadingOp = false;
-  Set<int> _selected = {};
-
-  final Map<int, Set<int>> _selectionPerRegu = {};
-  final Map<int, List<MstOperator>> _operatorsCache = {};
-
-  @override
-  void initState() {
-    super.initState();
-    _activeRegu = widget.initialRegu;
-    final initSet = widget.initialSelected.map((o) => o.idOperator).toSet();
-    if (widget.initialRegu != null && initSet.isNotEmpty) {
-      _selectionPerRegu[widget.initialRegu!.idRegu] = Set.from(initSet);
-    }
-    _selected = Set.from(initSet);
-    if (_activeRegu != null) _fetchOperators(_activeRegu!.idRegu);
-  }
-
-  Future<void> _fetchOperators(int idRegu) async {
-    if (_operatorsCache.containsKey(idRegu)) {
-      setState(() => _operators = _operatorsCache[idRegu]!);
-      return;
-    }
-    setState(() {
-      _loadingOp = true;
-      _operators = [];
-    });
-    try {
-      final result = await OperatorRepository().fetchByRegu(idRegu);
-      _operatorsCache[idRegu] = result;
-      if (mounted) setState(() => _operators = result);
-    } catch (_) {
-      if (mounted) setState(() => _operators = []);
-    } finally {
-      if (mounted) setState(() => _loadingOp = false);
-    }
-  }
-
-  bool get _allSelected =>
-      _operators.isNotEmpty && _selected.length == _operators.length;
-
-  void _toggleAll() {
-    setState(() {
-      if (_allSelected) {
-        _selected.clear();
-      } else {
-        _selected.addAll(_operators.map((o) => o.idOperator));
-      }
-    });
-  }
-
-  void _confirm() {
-    if (_activeRegu == null) {
-      Navigator.of(context).pop(null);
-      return;
-    }
-    // Gabungkan semua operator dari semua regu yang pernah dipilih
-    // (untuk simplicity: hanya regu aktif)
-    final allSelected = _operators
-        .where((o) => _selected.contains(o.idOperator))
-        .toList();
-
-    Navigator.of(context).pop((regu: _activeRegu!, operators: allSelected));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-      child: Container(
-        width: 600,
-        height: 500,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 24,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Column(
-            children: [
-              // Header
-              Container(
-                height: 56,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF0D766E), Color(0xFF00897B)],
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.groups_rounded,
-                        size: 18,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'Pilih Regu & Operator',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                    const Spacer(),
-                    InkWell(
-                      onTap: () => Navigator.of(context).pop(null),
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.close,
-                          size: 16,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Body
-              Expanded(
-                child: Row(
-                  children: [
-                    // Kiri: regu list
-                    SizedBox(
-                      width: 190,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            height: 36,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            color: const Color(0xFFF8FAFC),
-                            child: const Align(
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                'REGU',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF94A3B8),
-                                  letterSpacing: 1.2,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const Divider(height: 1, color: Color(0xFFE5E7EB)),
-                          Expanded(
-                            child: widget.reguList.isEmpty
-                                ? const Center(
-                                    child: Text(
-                                      'Tidak ada regu',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Color(0xFF9CA3AF),
-                                      ),
-                                    ),
-                                  )
-                                : ListView.builder(
-                                    itemCount: widget.reguList.length,
-                                    itemBuilder: (_, i) {
-                                      final regu = widget.reguList[i];
-                                      final isActive =
-                                          _activeRegu?.idRegu == regu.idRegu;
-                                      return _ReguTile(
-                                        regu: regu,
-                                        isActive: isActive,
-                                        onTap: () {
-                                          if (!isActive) {
-                                            setState(() {
-                                              if (_activeRegu != null) {
-                                                _selectionPerRegu[_activeRegu!
-                                                    .idRegu] = Set.from(
-                                                  _selected,
-                                                );
-                                              }
-                                              _activeRegu = regu;
-                                              _selected = Set.from(
-                                                _selectionPerRegu[regu
-                                                        .idRegu] ??
-                                                    {},
-                                              );
-                                            });
-                                            _fetchOperators(regu.idRegu);
-                                          }
-                                        },
-                                      );
-                                    },
-                                  ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const VerticalDivider(width: 1, color: Color(0xFFE5E7EB)),
-
-                    // Kanan: operator list
-                    Expanded(
-                      child: Column(
-                        children: [
-                          Container(
-                            height: 36,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            color: const Color(0xFFF8FAFC),
-                            child: Row(
-                              children: [
-                                const Text(
-                                  'OPERATOR',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF94A3B8),
-                                    letterSpacing: 1.2,
-                                  ),
-                                ),
-                                const Spacer(),
-                                if (_operators.isNotEmpty)
-                                  InkWell(
-                                    onTap: _toggleAll,
-                                    child: Text(
-                                      _allSelected
-                                          ? 'Batal Semua'
-                                          : 'Pilih Semua',
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFF00897B),
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                          const Divider(height: 1, color: Color(0xFFE5E7EB)),
-                          Expanded(
-                            child: _activeRegu == null
-                                ? const _EmptyHint(
-                                    text: 'Pilih regu terlebih dahulu',
-                                  )
-                                : _loadingOp
-                                ? const Center(
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : _operators.isEmpty
-                                ? const _EmptyHint(text: 'Tidak ada operator')
-                                : ListView.builder(
-                                    itemCount: _operators.length,
-                                    itemBuilder: (_, i) {
-                                      final op = _operators[i];
-                                      final checked = _selected.contains(
-                                        op.idOperator,
-                                      );
-                                      return _OperatorTile(
-                                        operator: op,
-                                        checked: checked,
-                                        onToggle: () {
-                                          setState(() {
-                                            if (checked) {
-                                              _selected.remove(op.idOperator);
-                                            } else {
-                                              _selected.add(op.idOperator);
-                                            }
-                                          });
-                                        },
-                                      );
-                                    },
-                                  ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Footer
-              Container(
-                height: 56,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF8FAFC),
-                  border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
-                ),
-                child: Row(
-                  children: [
-                    Text(
-                      '${_selected.length} operator dipilih',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF6B7280),
-                      ),
-                    ),
-                    const Spacer(),
-                    OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(null),
-                      child: const Text('Batal'),
-                    ),
-                    const SizedBox(width: 10),
-                    ElevatedButton(
-                      onPressed: _selected.isEmpty ? null : _confirm,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00897B),
-                        foregroundColor: Colors.white,
-                      ),
-                      child: const Text('Pilih'),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ReguTile extends StatelessWidget {
-  const _ReguTile({
-    required this.regu,
-    required this.isActive,
-    required this.onTap,
-  });
-
-  final MstRegu regu;
-  final bool isActive;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: isActive ? const Color(0xFFE0F2F1) : Colors.transparent,
-          border: const Border(bottom: BorderSide(color: Color(0xFFF3F4F6))),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                regu.namaRegu,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                  color: isActive
-                      ? const Color(0xFF00766E)
-                      : const Color(0xFF374151),
-                ),
-              ),
-            ),
-            if (isActive)
-              const Icon(
-                Icons.chevron_right,
-                size: 16,
-                color: Color(0xFF00897B),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _OperatorTile extends StatelessWidget {
-  const _OperatorTile({
-    required this.operator,
-    required this.checked,
-    required this.onToggle,
-  });
-
-  final MstOperator operator;
-  final bool checked;
-  final VoidCallback onToggle;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onToggle,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: Color(0xFFF3F4F6))),
-        ),
-        child: Row(
-          children: [
-            Checkbox(
-              value: checked,
-              onChanged: (_) => onToggle(),
-              activeColor: const Color(0xFF00897B),
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              visualDensity: VisualDensity.compact,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                operator.namaOperator,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: checked ? FontWeight.w500 : FontWeight.w400,
-                  color: checked
-                      ? const Color(0xFF1F2937)
-                      : const Color(0xFF374151),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyHint extends StatelessWidget {
-  const _EmptyHint({required this.text});
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        text,
-        style: const TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
-      ),
-    );
-  }
-}

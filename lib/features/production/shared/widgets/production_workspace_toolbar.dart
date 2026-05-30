@@ -194,7 +194,11 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.swap_horiz_rounded, size: 13, color: Colors.white),
+                          Icon(
+                            Icons.swap_horiz_rounded,
+                            size: 13,
+                            color: Colors.white,
+                          ),
                           SizedBox(width: 4),
                           Text(
                             'Ganti',
@@ -222,7 +226,11 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.timeline_rounded, size: 13, color: Colors.white),
+                        Icon(
+                          Icons.timeline_rounded,
+                          size: 13,
+                          color: Colors.white,
+                        ),
                         SizedBox(width: 4),
                         Text(
                           'Riwayat',

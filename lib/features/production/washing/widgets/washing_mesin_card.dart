@@ -75,11 +75,11 @@ class WashingMesinCard extends StatelessWidget {
                     ].join('  |  '),
                     bold: true,
                   ),
-                if (mesin.namaOperator != null) ...[
+                if ((mesin.namaRegu ?? '').isNotEmpty) ...[
                   const SizedBox(height: 2),
                   ProductionSmallInfoRow(
-                    icon: Icons.person_outline,
-                    text: mesin.namaOperator!,
+                    icon: Icons.groups_outlined,
+                    text: mesin.namaRegu!,
                   ),
                 ],
                 if (mesin.outputJenisNama != null &&

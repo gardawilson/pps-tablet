@@ -230,6 +230,8 @@ class BrokerProduksiItem {
   final List<int> idOperators;
   /// Comma-separated operator names e.g. "ABDUL HAKIM, RAMOT"
   final String? operators;
+  final int? idRegu;
+  final String? namaRegu;
   final int? shift;
   final String? hourStart;
   final String? hourEnd;
@@ -242,6 +244,8 @@ class BrokerProduksiItem {
     this.outputJenisItemCode,
     this.idOperators = const [],
     this.operators,
+    this.idRegu,
+    this.namaRegu,
     this.shift,
     this.hourStart,
     this.hourEnd,
@@ -281,6 +285,8 @@ class BrokerProduksiItem {
       outputJenisItemCode: s(j['OutputJenisItemCode']),
       idOperators: parseIdOperators(j['IdOperators'] ?? j['IdOperator']),
       operators: s(j['Operators']) ?? s(j['Operator']),
+      idRegu: i(j['IdRegu']),
+      namaRegu: s(j['NamaRegu']),
       shift: i(j['Shift']),
       hourStart: timeHHmm(j['HourStart']),
       hourEnd: timeHHmm(j['HourEnd']),
@@ -299,6 +305,7 @@ class BrokerMesinInfo {
   // backward-compat getters (first item)
   String? get noProduksi => produksiList.isNotEmpty ? produksiList.first.noProduksi : null;
   String? get operator_ => produksiList.isNotEmpty ? produksiList.first.operator_ : null;
+  String? get namaRegu => produksiList.isNotEmpty ? produksiList.first.namaRegu : null;
   int? get shift => produksiList.isNotEmpty ? produksiList.first.shift : null;
   String? get hourStart => produksiList.isNotEmpty ? produksiList.first.hourStart : null;
   String? get hourEnd => produksiList.isNotEmpty ? produksiList.first.hourEnd : null;

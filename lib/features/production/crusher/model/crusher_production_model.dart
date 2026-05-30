@@ -23,6 +23,12 @@ class CrusherProduction {
   /// Comma-separated outputs from subquery: "CR.0001, CR.0002"
   final String? outputNoCrusher;
 
+  final int? outputJenisId;
+  final String? outputJenisNama;
+
+  final int? idRegu;
+  final String? namaRegu;
+
   /// ✅ NEW: tutup transaksi flags
   final DateTime? lastClosedDate; // date only
   final bool isLocked;
@@ -54,7 +60,11 @@ class CrusherProduction {
     this.hourStart,
     this.hourEnd,
     this.outputNoCrusher,
+    this.outputJenisId,
+    this.outputJenisNama,
 
+    this.idRegu,
+    this.namaRegu,
     // ✅ NEW
     this.lastClosedDate,
     this.isLocked = false,
@@ -154,7 +164,13 @@ class CrusherProduction {
       outputNoCrusher: (j['OutputNoCrusher'] == null || j['OutputNoCrusher'] == '')
           ? null
           : _asString(j['OutputNoCrusher']),
+      outputJenisId: _asInt(j['OutputJenisId']),
+      outputJenisNama: (j['OutputJenisNama'] == null || j['OutputJenisNama'] == '')
+          ? null
+          : _asString(j['OutputJenisNama']),
 
+      idRegu: _asInt(j['IdRegu']),
+      namaRegu: j['NamaRegu'] as String?,
       // ✅ NEW: mapping dari backend
       lastClosedDate: _asDateTime(j['LastClosedDate']),
       isLocked: _asBool(j['IsLocked']),
@@ -261,6 +277,88 @@ class CrusherProduction {
       // ✅ NEW
       lastClosedDate: lastClosedDate ?? this.lastClosedDate,
       isLocked: isLocked ?? this.isLocked,
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CrusherMesinInfo — untuk panel kiri mesin screen
+// ─────────────────────────────────────────────────────────────────────────────
+class CrusherMesinInfo {
+  final int idMesin;
+  final String namaMesin;
+  final String bagian;
+  final String? noProduksi;
+  final DateTime? tglProduksi;
+  final int? outputJenisId;
+  final String? outputJenisNama;
+  final List<int> idOperators;
+  final String? operators;
+  final String? namaRegu;
+  final int? shift;
+  final String? hourStart;
+  final String? hourEnd;
+
+  bool get isActive => noProduksi != null;
+
+  const CrusherMesinInfo({
+    required this.idMesin,
+    required this.namaMesin,
+    required this.bagian,
+    this.noProduksi,
+    this.tglProduksi,
+    this.outputJenisId,
+    this.outputJenisNama,
+    this.idOperators = const [],
+    this.operators,
+    this.namaRegu,
+    this.shift,
+    this.hourStart,
+    this.hourEnd,
+  });
+
+  factory CrusherMesinInfo.fromJson(Map<String, dynamic> j) {
+    String? s(dynamic v) =>
+        v == null ? null : v.toString().trim().isEmpty ? null : v.toString().trim();
+    int? i(dynamic v) {
+      if (v == null) return null;
+      if (v is num) return v.toInt();
+      return int.tryParse(v.toString());
+    }
+    String? timeHHmm(dynamic v) {
+      final raw = s(v);
+      if (raw == null) return null;
+      final parts = raw.split(':');
+      if (parts.length < 2) return raw;
+      return '${parts[0].padLeft(2, '0')}:${parts[1].padLeft(2, '0')}';
+    }
+
+    final List<int> ids = [];
+    final raw = j['IdOperators'];
+    if (raw is List) {
+      for (final x in raw) {
+        final n = i(x);
+        if (n != null) ids.add(n);
+      }
+    } else {
+      final n = i(raw);
+      if (n != null) ids.add(n);
+    }
+
+    return CrusherMesinInfo(
+      idMesin: i(j['IdMesin']) ?? 0,
+      namaMesin: s(j['NamaMesin']) ?? '',
+      bagian: s(j['Bagian']) ?? '',
+      noProduksi: s(j['NoProduksi']),
+      tglProduksi: j['TglProduksi'] == null ? null : DateTime.tryParse(j['TglProduksi'].toString()),
+      outputJenisId: i(j['OutputJenisId']),
+      outputJenisNama: s(j['OutputJenisNama']),
+      idOperators: ids,
+      operators: s(j['Operators']),
+      namaRegu: s(j['NamaRegu']),
+      shift: i(j['Shift']),
+      hourStart: timeHHmm(j['HourStart']),
+      hourEnd: timeHHmm(j['HourEnd']),
     );
   }
 }

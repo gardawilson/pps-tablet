@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../model/washing_production_model.dart';
+import '../model/crusher_production_model.dart';
 
-class WashingProduksiList extends StatelessWidget {
-  const WashingProduksiList({
+class CrusherProduksiList extends StatelessWidget {
+  const CrusherProduksiList({
     super.key,
     required this.items,
     required this.isLoading,
@@ -17,14 +17,14 @@ class WashingProduksiList extends StatelessWidget {
     this.filterIdMesin,
   });
 
-  final List<WashingProduction> items;
+  final List<CrusherProduction> items;
   final bool isLoading;
   final bool isFetchingMore;
   final ScrollController scrollController;
-  final Future<void> Function(WashingProduction) onTap;
-  final Future<void> Function(WashingProduction) onEdit;
-  final Future<void> Function(WashingProduction) onDelete;
-  final Future<void> Function(WashingProduction) onInput;
+  final Future<void> Function(CrusherProduction) onTap;
+  final Future<void> Function(CrusherProduction) onEdit;
+  final Future<void> Function(CrusherProduction) onDelete;
+  final Future<void> Function(CrusherProduction) onInput;
   final int? filterIdMesin;
 
   @override
@@ -52,7 +52,7 @@ class WashingProduksiList extends StatelessWidget {
           );
         }
         final row = items[index];
-        return _WashingProduksiRow(
+        return _CrusherProduksiRow(
           row: row,
           filterAll: filterIdMesin == null,
           onTap: () => onTap(row),
@@ -71,8 +71,8 @@ class WashingProduksiList extends StatelessWidget {
 const _kAccent = Color(0xFF0277BD);
 const _kBorder = Color(0xFFE5E7EB);
 
-class _WashingProduksiRow extends StatelessWidget {
-  const _WashingProduksiRow({
+class _CrusherProduksiRow extends StatelessWidget {
+  const _CrusherProduksiRow({
     required this.row,
     required this.onTap,
     required this.onEdit,
@@ -81,7 +81,7 @@ class _WashingProduksiRow extends StatelessWidget {
     this.filterAll = true,
   });
 
-  final WashingProduction row;
+  final CrusherProduction row;
   final VoidCallback onTap;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -114,7 +114,7 @@ class _WashingProduksiRow extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ── Top: tanggal · shift · jam  |  noProduksi ────────
+            // ── Top: tanggal · shift · jam  |  noCrusherProduksi ─
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               color: _kAccent.withValues(alpha: 0.06),
@@ -123,7 +123,7 @@ class _WashingProduksiRow extends StatelessWidget {
                   Icon(Icons.calendar_today_outlined, size: 11, color: _kAccent),
                   const SizedBox(width: 4),
                   Text(
-                    _fmtDate(row.tglProduksi),
+                    _fmtDate(row.tanggal),
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -141,7 +141,7 @@ class _WashingProduksiRow extends StatelessWidget {
                   ),
                   const Spacer(),
                   Text(
-                    row.noProduksi,
+                    row.noCrusherProduksi,
                     style: TextStyle(
                       fontSize: 11,
                       fontStyle: FontStyle.italic,

@@ -104,10 +104,8 @@ class _GilinganProductionInputScreenState
       final errMsg = vm.deleteError ?? 'Gagal menghapus item';
       await showDialog(
         context: context,
-        builder: (_) => ErrorStatusDialog(
-          title: 'Gagal Menghapus',
-          message: errMsg,
-        ),
+        builder: (_) =>
+            ErrorStatusDialog(title: 'Gagal Menghapus', message: errMsg),
       );
     }
     return success;
@@ -117,8 +115,10 @@ class _GilinganProductionInputScreenState
     final vm = context.read<GilinganProductionInputViewModel>();
 
     if (vm.totalTempCount == 0) {
-      _showSnack('Tidak ada data untuk disimpan',
-          backgroundColor: Colors.orange);
+      _showSnack(
+        'Tidak ada data untuk disimpan',
+        backgroundColor: Colors.orange,
+      );
       return;
     }
 
@@ -143,10 +143,8 @@ class _GilinganProductionInputScreenState
       final errMsg = vm.submitError ?? 'Kesalahan tidak diketahui';
       await showDialog(
         context: context,
-        builder: (_) => ErrorStatusDialog(
-          title: 'Gagal Menyimpan',
-          message: errMsg,
-        ),
+        builder: (_) =>
+            ErrorStatusDialog(title: 'Gagal Menyimpan', message: errMsg),
       );
     }
   }
@@ -177,8 +175,10 @@ class _GilinganProductionInputScreenState
     if (!mounted) return;
 
     if (vm.lookupError != null) {
-      _showSnack('Gagal ambil data: ${vm.lookupError}',
-          backgroundColor: Colors.red);
+      _showSnack(
+        'Gagal ambil data: ${vm.lookupError}',
+        backgroundColor: Colors.red,
+      );
       return;
     }
 
@@ -209,20 +209,22 @@ class _GilinganProductionInputScreenState
   }
 
   Future<void> _handleFullMode(
-      BuildContext context,
-      GilinganProductionInputViewModel vm,
-      ProductionLabelLookupResult res,
-      ) async {
+    BuildContext context,
+    GilinganProductionInputViewModel vm,
+    ProductionLabelLookupResult res,
+  ) async {
     final freshCount = vm.countNewRowsInLastLookup(widget.noProduksi);
 
     if (freshCount == 0) {
       final labelCode = _labelCodeOfFirst(res);
       final hasTemp =
           labelCode != null && vm.hasTemporaryDataForLabel(labelCode);
-      final suffix =
-      hasTemp ? ' • ${vm.getTemporaryDataSummary(labelCode!)}' : '';
+      final suffix = hasTemp
+          ? ' • ${vm.getTemporaryDataSummary(labelCode!)}'
+          : '';
       _showSnack(
-          'Semua item untuk ${labelCode ?? "label ini"} sudah ada.$suffix');
+        'Semua item untuk ${labelCode ?? "label ini"} sudah ada.$suffix',
+      );
       return;
     }
 
@@ -235,15 +237,17 @@ class _GilinganProductionInputScreenState
         ? '✅ Auto-added ${r.added} item${r.skipped > 0 ? ' • Duplikat terlewati ${r.skipped}' : ''}'
         : 'Tidak ada item baru ditambahkan';
 
-    _showSnack(msg,
-        backgroundColor: r.added > 0 ? Colors.green : Colors.orange);
+    _showSnack(
+      msg,
+      backgroundColor: r.added > 0 ? Colors.green : Colors.orange,
+    );
   }
 
   Future<void> _handlePartialMode(
-      BuildContext context,
-      GilinganProductionInputViewModel vm,
-      ProductionLabelLookupResult res,
-      ) async {
+    BuildContext context,
+    GilinganProductionInputViewModel vm,
+    ProductionLabelLookupResult res,
+  ) async {
     await showDialog(
       context: context,
       barrierDismissible: true,
@@ -255,20 +259,22 @@ class _GilinganProductionInputScreenState
   }
 
   Future<void> _handleSelectMode(
-      BuildContext context,
-      GilinganProductionInputViewModel vm,
-      ProductionLabelLookupResult res,
-      ) async {
+    BuildContext context,
+    GilinganProductionInputViewModel vm,
+    ProductionLabelLookupResult res,
+  ) async {
     final freshCount = vm.countNewRowsInLastLookup(widget.noProduksi);
 
     if (freshCount == 0) {
       final labelCode = _labelCodeOfFirst(res);
       final hasTemp =
           labelCode != null && vm.hasTemporaryDataForLabel(labelCode);
-      final suffix =
-      hasTemp ? ' • ${vm.getTemporaryDataSummary(labelCode!)}' : '';
+      final suffix = hasTemp
+          ? ' • ${vm.getTemporaryDataSummary(labelCode!)}'
+          : '';
       _showSnack(
-          'Semua item untuk ${labelCode ?? "label ini"} sudah ada.$suffix');
+        'Semua item untuk ${labelCode ?? "label ini"} sudah ada.$suffix',
+      );
       return;
     }
 
@@ -347,7 +353,8 @@ class _GilinganProductionInputScreenState
                           builder: (_) => AlertDialog(
                             title: const Text('Hapus Semua Temp?'),
                             content: Text(
-                                'Apakah Anda yakin ingin menghapus ${vm.totalTempCount} item temp?'),
+                              'Apakah Anda yakin ingin menghapus ${vm.totalTempCount} item temp?',
+                            ),
                             actions: [
                               TextButton(
                                 onPressed: () => Navigator.pop(context),
@@ -387,11 +394,16 @@ class _GilinganProductionInputScreenState
                         value: 'clear_temp',
                         child: Row(
                           children: [
-                            Icon(Icons.delete_sweep,
-                                size: 20, color: Colors.red),
+                            Icon(
+                              Icons.delete_sweep,
+                              size: 20,
+                              color: Colors.red,
+                            ),
                             SizedBox(width: 8),
-                            Text('Hapus Semua Temp',
-                                style: TextStyle(color: Colors.red)),
+                            Text(
+                              'Hapus Semua Temp',
+                              style: TextStyle(color: Colors.red),
+                            ),
                           ],
                         ),
                       ),
@@ -409,42 +421,36 @@ class _GilinganProductionInputScreenState
                 final brokerAll = loading
                     ? <BrokerItem>[]
                     : [
-                  ...vm.tempBroker.reversed,
-                  ...vm.tempBrokerPartial.reversed,
-                  ...?inputs?.broker,
-                ];
+                        ...vm.tempBroker.reversed,
+                        ...vm.tempBrokerPartial.reversed,
+                        ...?inputs?.broker,
+                      ];
 
                 final bonggolanAll = loading
                     ? <BonggolanItem>[]
-                    : [
-                  ...vm.tempBonggolan.reversed,
-                  ...?inputs?.bonggolan,
-                ];
+                    : [...vm.tempBonggolan.reversed, ...?inputs?.bonggolan];
 
                 final crusherAll = loading
                     ? <CrusherItem>[]
-                    : [
-                  ...vm.tempCrusher.reversed,
-                  ...?inputs?.crusher,
-                ];
+                    : [...vm.tempCrusher.reversed, ...?inputs?.crusher];
 
                 final rejectAll = loading
                     ? <RejectItem>[]
                     : [
-                  ...vm.tempReject.reversed,
-                  ...vm.tempRejectPartial.reversed,
-                  ...?inputs?.reject,
-                ];
+                        ...vm.tempReject.reversed,
+                        ...vm.tempRejectPartial.reversed,
+                        ...?inputs?.reject,
+                      ];
 
                 // ===== GROUPS =====
                 final brokerGroups = groupBy(brokerAll, brokerTitleKey);
                 final bonggolanGroups = groupBy(
                   bonggolanAll,
-                      (BonggolanItem e) => e.noBonggolan ?? '-',
+                  (BonggolanItem e) => e.noBonggolan ?? '-',
                 );
                 final crusherGroups = groupBy(
                   crusherAll,
-                      (CrusherItem e) => e.noCrusher ?? '-',
+                  (CrusherItem e) => e.noCrusher ?? '-',
                 );
                 final rejectGroups = groupBy(rejectAll, rejectTitleKey);
 
@@ -459,15 +465,25 @@ class _GilinganProductionInputScreenState
                           title: 'Input via Scan / Manual',
                           modeLabel: 'Pilih Mode',
                           modeItems: const [
-                            DropdownMenuItem(value: 'full', child: Text('FULL PALLET')),
-                            DropdownMenuItem(value: 'select', child: Text('SEBAGIAN PALLET')),
-                            DropdownMenuItem(value: 'partial', child: Text('PARTIAL')),
+                            DropdownMenuItem(
+                              value: 'full',
+                              child: Text('FULL PALLET'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'select',
+                              child: Text('SEBAGIAN PALLET'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'partial',
+                              child: Text('PARTIAL'),
+                            ),
                           ],
                           selectedMode: _selectedMode,
                           manualHint: 'X.XXXXXXXXXX',
                           isProcessing: vm.isLookupLoading,
                           isLocked: locked,
-                          onModeChanged: (mode) => setState(() => _selectedMode = mode),
+                          onModeChanged: (mode) =>
+                              setState(() => _selectedMode = mode),
                           onCodeScanned: (code) => _onCodeReady(context, code),
                         ),
                       ),
@@ -581,84 +597,92 @@ class _GilinganProductionInputScreenState
       },
       child: groups.isEmpty
           ? const Center(
-          child: Text('Tidak ada data', style: TextStyle(fontSize: 11)))
+              child: Text('Tidak ada data', style: TextStyle(fontSize: 11)),
+            )
           : ListView(
-        padding: const EdgeInsets.all(8),
-        children: groups.entries.map((entry) {
-          final hasPartial = entry.value.any((x) => x.isPartialRow);
-          final headers = hasPartial
-              ? const ['Label', 'Sak', 'Berat', 'Action']
-              : const ['Sak', 'Berat', 'Action'];
-          final columnFlexes =
-          hasPartial ? const [3, 1, 2] : const [1, 2];
+              padding: const EdgeInsets.all(8),
+              children: groups.entries.map((entry) {
+                final hasPartial = entry.value.any((x) => x.isPartialRow);
+                final headers = hasPartial
+                    ? const ['Label', 'Sak', 'Berat', 'Action']
+                    : const ['Sak', 'Berat', 'Action'];
+                final columnFlexes = hasPartial
+                    ? const [3, 1, 2]
+                    : const [1, 2];
 
-          return GroupTooltipAnchorTile(
-            title: entry.key,
-            headerSubtitle:
-            (entry.value.isNotEmpty ? entry.value.first.namaJenis : '-') ??
-                '-',
-            color: Colors.blue,
-            tableHeaders: headers,
-            columnFlexes: columnFlexes,
-            canDelete: canDelete,
-            onBulkDelete: (items) => _handleBulkDelete(items),
-            summaryBuilder: () {
-              double totalBerat = 0.0;
-              for (final item in entry.value) {
-                totalBerat += (item.berat ?? 0.0);
-              }
-              return TooltipSummary(totalBerat: totalBerat);
-            },
-            detailsBuilder: () {
-              final dbItems = inputs == null
-                  ? <BrokerItem>[]
-                  : inputs.broker.where((x) => brokerTitleKey(x) == entry.key).toList();
-
-              final tempFull = vm.tempBroker
-                  .where((x) => brokerTitleKey(x) == entry.key)
-                  .toList();
-
-              final tempPart = vm.tempBrokerPartial
-                  .where((x) => brokerTitleKey(x) == entry.key)
-                  .toList();
-
-              final items = <BrokerItem>[
-                ...tempPart,
-                ...dbItems,
-                ...tempFull,
-              ];
-
-              return items.map((item) {
-                final isTemp =
-                    vm.tempBroker.contains(item) ||
-                        vm.tempBrokerPartial.contains(item);
-
-                final columns = hasPartial
-                    ? <String>[
-                  item.isPartialRow ? (item.noBroker ?? '-') : '-',
-                  '${item.noSak ?? '-'}',
-                  '${num2(item.berat)} kg',
-                ]
-                    : <String>[
-                  '${item.noSak ?? '-'}',
-                  '${num2(item.berat)} kg',
-                ];
-
-                return TooltipTableRow(
-                  columns: columns,
+                return GroupTooltipAnchorTile(
+                  title: entry.key,
+                  headerSubtitle:
+                      (entry.value.isNotEmpty
+                          ? entry.value.first.namaJenis
+                          : '-') ??
+                      '-',
+                  color: Colors.blue,
+                  tableHeaders: headers,
                   columnFlexes: columnFlexes,
-                  showDelete: isTemp,
-                  onDelete: isTemp ? () => vm.deleteTempBrokerItem(item) : null,
-                  isTempRow: isTemp,
-                  isHighlighted: isTemp,
-                  isDisabled: !isTemp && !canDelete,
-                  itemData: item,
+                  canDelete: canDelete,
+                  onBulkDelete: (items) => _handleBulkDelete(items),
+                  summaryBuilder: () {
+                    double totalBerat = 0.0;
+                    for (final item in entry.value) {
+                      totalBerat += (item.berat ?? 0.0);
+                    }
+                    return TooltipSummary(totalBerat: totalBerat);
+                  },
+                  detailsBuilder: () {
+                    final dbItems = inputs == null
+                        ? <BrokerItem>[]
+                        : inputs.broker
+                              .where((x) => brokerTitleKey(x) == entry.key)
+                              .toList();
+
+                    final tempFull = vm.tempBroker
+                        .where((x) => brokerTitleKey(x) == entry.key)
+                        .toList();
+
+                    final tempPart = vm.tempBrokerPartial
+                        .where((x) => brokerTitleKey(x) == entry.key)
+                        .toList();
+
+                    final items = <BrokerItem>[
+                      ...tempPart,
+                      ...dbItems,
+                      ...tempFull,
+                    ];
+
+                    return items.map((item) {
+                      final isTemp =
+                          vm.tempBroker.contains(item) ||
+                          vm.tempBrokerPartial.contains(item);
+
+                      final columns = hasPartial
+                          ? <String>[
+                              item.isPartialRow ? (item.noBroker ?? '-') : '-',
+                              '${item.noSak ?? '-'}',
+                              '${num2(item.berat)} kg',
+                            ]
+                          : <String>[
+                              '${item.noSak ?? '-'}',
+                              '${num2(item.berat)} kg',
+                            ];
+
+                      return TooltipTableRow(
+                        columns: columns,
+                        columnFlexes: columnFlexes,
+                        showDelete: isTemp,
+                        onDelete: isTemp
+                            ? () => vm.deleteTempBrokerItem(item)
+                            : null,
+                        isTempRow: isTemp,
+                        isHighlighted: isTemp,
+                        isDisabled: !isTemp && !canDelete,
+                        itemData: item,
+                      );
+                    }).toList();
+                  },
                 );
-              }).toList();
-            },
-          );
-        }).toList(),
-      ),
+              }).toList(),
+            ),
     );
   }
 
@@ -691,52 +715,53 @@ class _GilinganProductionInputScreenState
       },
       child: groups.isEmpty
           ? const Center(
-          child: Text('Tidak ada data', style: TextStyle(fontSize: 11)))
+              child: Text('Tidak ada data', style: TextStyle(fontSize: 11)),
+            )
           : ListView(
-        padding: const EdgeInsets.all(8),
-        children: groups.entries.map((entry) {
-          return GroupTooltipAnchorTile(
-            title: entry.key,
-            headerSubtitle:
-            (entry.value.isNotEmpty ? entry.value.first.namaJenis : '-') ??
-                '-',
-            color: Colors.blue,
-            tableHeaders: const ['Berat', 'Action'],
-            canDelete: canDelete,
-            onBulkDelete: (items) => _handleBulkDelete(items),
-            detailsBuilder: () {
-              final dbItems = inputs == null
-                  ? <BonggolanItem>[]
-                  : inputs.bonggolan
-                  .where((x) => (x.noBonggolan ?? '-') == entry.key)
-                  .toList();
+              padding: const EdgeInsets.all(8),
+              children: groups.entries.map((entry) {
+                return GroupTooltipAnchorTile(
+                  title: entry.key,
+                  headerSubtitle:
+                      (entry.value.isNotEmpty
+                          ? entry.value.first.namaJenis
+                          : '-') ??
+                      '-',
+                  color: Colors.blue,
+                  tableHeaders: const ['Berat', 'Action'],
+                  canDelete: canDelete,
+                  onBulkDelete: (items) => _handleBulkDelete(items),
+                  detailsBuilder: () {
+                    final dbItems = inputs == null
+                        ? <BonggolanItem>[]
+                        : inputs.bonggolan
+                              .where((x) => (x.noBonggolan ?? '-') == entry.key)
+                              .toList();
 
-              final tempItems = vm.tempBonggolan
-                  .where((x) => (x.noBonggolan ?? '-') == entry.key)
-                  .toList();
+                    final tempItems = vm.tempBonggolan
+                        .where((x) => (x.noBonggolan ?? '-') == entry.key)
+                        .toList();
 
-              final items = <BonggolanItem>[
-                ...dbItems,
-                ...tempItems,
-              ];
+                    final items = <BonggolanItem>[...dbItems, ...tempItems];
 
-              return items.map((item) {
-                final isTemp = vm.tempBonggolan.contains(item);
-                return TooltipTableRow(
-                  columns: ['${num2(item.berat)} kg'],
-                  showDelete: isTemp,
-                  onDelete:
-                  isTemp ? () => vm.deleteTempBonggolanItem(item) : null,
-                  isTempRow: isTemp,
-                  isHighlighted: isTemp,
-                  isDisabled: !isTemp && !canDelete,
-                  itemData: item,
+                    return items.map((item) {
+                      final isTemp = vm.tempBonggolan.contains(item);
+                      return TooltipTableRow(
+                        columns: ['${num2(item.berat)} kg'],
+                        showDelete: isTemp,
+                        onDelete: isTemp
+                            ? () => vm.deleteTempBonggolanItem(item)
+                            : null,
+                        isTempRow: isTemp,
+                        isHighlighted: isTemp,
+                        isDisabled: !isTemp && !canDelete,
+                        itemData: item,
+                      );
+                    }).toList();
+                  },
                 );
-              }).toList();
-            },
-          );
-        }).toList(),
-      ),
+              }).toList(),
+            ),
     );
   }
 
@@ -769,52 +794,53 @@ class _GilinganProductionInputScreenState
       },
       child: groups.isEmpty
           ? const Center(
-          child: Text('Tidak ada data', style: TextStyle(fontSize: 11)))
+              child: Text('Tidak ada data', style: TextStyle(fontSize: 11)),
+            )
           : ListView(
-        padding: const EdgeInsets.all(8),
-        children: groups.entries.map((entry) {
-          return GroupTooltipAnchorTile(
-            title: entry.key,
-            headerSubtitle:
-            (entry.value.isNotEmpty ? entry.value.first.namaJenis : '-') ??
-                '-',
-            color: Colors.blue,
-            tableHeaders: const ['Berat', 'Action'],
-            canDelete: canDelete,
-            onBulkDelete: (items) => _handleBulkDelete(items),
-            detailsBuilder: () {
-              final dbItems = inputs == null
-                  ? <CrusherItem>[]
-                  : inputs.crusher
-                  .where((x) => (x.noCrusher ?? '-') == entry.key)
-                  .toList();
+              padding: const EdgeInsets.all(8),
+              children: groups.entries.map((entry) {
+                return GroupTooltipAnchorTile(
+                  title: entry.key,
+                  headerSubtitle:
+                      (entry.value.isNotEmpty
+                          ? entry.value.first.namaJenis
+                          : '-') ??
+                      '-',
+                  color: Colors.blue,
+                  tableHeaders: const ['Berat', 'Action'],
+                  canDelete: canDelete,
+                  onBulkDelete: (items) => _handleBulkDelete(items),
+                  detailsBuilder: () {
+                    final dbItems = inputs == null
+                        ? <CrusherItem>[]
+                        : inputs.crusher
+                              .where((x) => (x.noCrusher ?? '-') == entry.key)
+                              .toList();
 
-              final tempItems = vm.tempCrusher
-                  .where((x) => (x.noCrusher ?? '-') == entry.key)
-                  .toList();
+                    final tempItems = vm.tempCrusher
+                        .where((x) => (x.noCrusher ?? '-') == entry.key)
+                        .toList();
 
-              final items = <CrusherItem>[
-                ...dbItems,
-                ...tempItems,
-              ];
+                    final items = <CrusherItem>[...dbItems, ...tempItems];
 
-              return items.map((item) {
-                final isTemp = vm.tempCrusher.contains(item);
-                return TooltipTableRow(
-                  columns: ['${num2(item.berat)} kg'],
-                  showDelete: isTemp,
-                  onDelete:
-                  isTemp ? () => vm.deleteTempCrusherItem(item) : null,
-                  isTempRow: isTemp,
-                  isHighlighted: isTemp,
-                  isDisabled: !isTemp && !canDelete,
-                  itemData: item,
+                    return items.map((item) {
+                      final isTemp = vm.tempCrusher.contains(item);
+                      return TooltipTableRow(
+                        columns: ['${num2(item.berat)} kg'],
+                        showDelete: isTemp,
+                        onDelete: isTemp
+                            ? () => vm.deleteTempCrusherItem(item)
+                            : null,
+                        isTempRow: isTemp,
+                        isHighlighted: isTemp,
+                        isDisabled: !isTemp && !canDelete,
+                        itemData: item,
+                      );
+                    }).toList();
+                  },
                 );
-              }).toList();
-            },
-          );
-        }).toList(),
-      ),
+              }).toList(),
+            ),
     );
   }
 
@@ -848,71 +874,75 @@ class _GilinganProductionInputScreenState
       },
       child: groups.isEmpty
           ? const Center(
-          child: Text('Tidak ada data', style: TextStyle(fontSize: 11)))
+              child: Text('Tidak ada data', style: TextStyle(fontSize: 11)),
+            )
           : ListView(
-        padding: const EdgeInsets.all(8),
-        children: groups.entries.map((entry) {
-          final hasPartial = entry.value.any((x) => x.isPartialRow);
+              padding: const EdgeInsets.all(8),
+              children: groups.entries.map((entry) {
+                final hasPartial = entry.value.any((x) => x.isPartialRow);
 
-          return GroupTooltipAnchorTile(
-            title: entry.key,
-            headerSubtitle:
-            (entry.value.isNotEmpty ? entry.value.first.namaJenis : '-') ??
-                '-',
-            color: Colors.blue,
-            tableHeaders:
-            hasPartial ? const ['Label', 'Berat', 'Action'] : const ['Berat', 'Action'],
-            canDelete: canDelete,
-            onBulkDelete: onBulkDelete,
-            detailsBuilder: () {
-              final dbItems = inputs == null
-                  ? <RejectItem>[]
-                  : inputs.reject
-                  .where((x) => rejectTitleKey(x) == entry.key)
-                  .toList();
+                return GroupTooltipAnchorTile(
+                  title: entry.key,
+                  headerSubtitle:
+                      (entry.value.isNotEmpty
+                          ? entry.value.first.namaJenis
+                          : '-') ??
+                      '-',
+                  color: Colors.blue,
+                  tableHeaders: hasPartial
+                      ? const ['Label', 'Berat', 'Action']
+                      : const ['Berat', 'Action'],
+                  canDelete: canDelete,
+                  onBulkDelete: onBulkDelete,
+                  detailsBuilder: () {
+                    final dbItems = inputs == null
+                        ? <RejectItem>[]
+                        : inputs.reject
+                              .where((x) => rejectTitleKey(x) == entry.key)
+                              .toList();
 
-              final tempFull = vm.tempReject
-                  .where((x) => rejectTitleKey(x) == entry.key)
-                  .toList();
+                    final tempFull = vm.tempReject
+                        .where((x) => rejectTitleKey(x) == entry.key)
+                        .toList();
 
-              final tempPart = vm.tempRejectPartial
-                  .where((x) => rejectTitleKey(x) == entry.key)
-                  .toList();
+                    final tempPart = vm.tempRejectPartial
+                        .where((x) => rejectTitleKey(x) == entry.key)
+                        .toList();
 
-              final items = <RejectItem>[
-                ...tempPart,
-                ...dbItems,
-                ...tempFull,
-              ];
+                    final items = <RejectItem>[
+                      ...tempPart,
+                      ...dbItems,
+                      ...tempFull,
+                    ];
 
-              return items.map((item) {
-                final isTemp =
-                    vm.tempReject.contains(item) ||
-                        vm.tempRejectPartial.contains(item);
+                    return items.map((item) {
+                      final isTemp =
+                          vm.tempReject.contains(item) ||
+                          vm.tempRejectPartial.contains(item);
 
-                final columns = item.isPartialRow
-                    ? <String>[
-                  (item.noReject ?? '-'),
-                  '${num2(item.berat)} kg',
-                ]
-                    : <String>[
-                  '${num2(item.berat)} kg',
-                ];
+                      final columns = item.isPartialRow
+                          ? <String>[
+                              (item.noReject ?? '-'),
+                              '${num2(item.berat)} kg',
+                            ]
+                          : <String>['${num2(item.berat)} kg'];
 
-                return TooltipTableRow(
-                  columns: columns,
-                  showDelete: isTemp,
-                  onDelete: isTemp ? () => vm.deleteTempRejectItem(item) : null,
-                  isTempRow: isTemp,
-                  isHighlighted: isTemp,
-                  isDisabled: !isTemp && !canDelete,
-                  itemData: item,
+                      return TooltipTableRow(
+                        columns: columns,
+                        showDelete: isTemp,
+                        onDelete: isTemp
+                            ? () => vm.deleteTempRejectItem(item)
+                            : null,
+                        isTempRow: isTemp,
+                        isHighlighted: isTemp,
+                        isDisabled: !isTemp && !canDelete,
+                        itemData: item,
+                      );
+                    }).toList();
+                  },
                 );
-              }).toList();
-            },
-          );
-        }).toList(),
-      ),
+              }).toList(),
+            ),
     );
   }
 }

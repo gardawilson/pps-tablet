@@ -259,8 +259,9 @@ class _GilinganProductionMesinScreenState
                   future: _mesinFuture,
                   builder: (context, snapshot) {
                     final allMesin = snapshot.data ?? [];
-                    final activeCount =
-                        allMesin.where((m) => m.isActive).length;
+                    final activeCount = allMesin
+                        .where((m) => m.isActive)
+                        .length;
                     final inactiveCount = allMesin.length - activeCount;
                     return MesinSectionHeader(
                       title: 'Status Mesin Gilingan',

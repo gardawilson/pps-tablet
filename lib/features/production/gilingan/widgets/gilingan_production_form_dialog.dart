@@ -25,11 +25,25 @@ import '../view_model/gilingan_production_view_model.dart';
 class GilinganProductionFormDialog extends StatefulWidget {
   final GilinganProduction? header;
   final Function(GilinganProduction)? onSave;
+  final MstMesin? initialMesin;
+  final DateTime? initialDate;
+  final int? initialShift;
+  final String? initialHourStart;
+  final String? initialHourEnd;
+  final bool lockShiftFields;
+  final bool isBackdateInput;
 
   const GilinganProductionFormDialog({
     super.key,
     this.header,
     this.onSave,
+    this.initialMesin,
+    this.initialDate,
+    this.initialShift,
+    this.initialHourStart,
+    this.initialHourEnd,
+    this.lockShiftFields = false,
+    this.isBackdateInput = false,
   });
 
   @override
@@ -79,14 +93,20 @@ class _GilinganProductionFormDialogState
 
     final DateTime seededDate = widget.header != null
         ? (parseAnyToDateTime(widget.header!.tglProduksi) ?? DateTime.now())
-        : DateTime.now();
+        : (widget.initialDate ?? DateTime.now());
 
     _selectedDate = seededDate;
     dateCreatedCtrl = TextEditingController(
       text: DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(seededDate),
     );
 
-    mesinCtrl = TextEditingController(text: widget.header?.namaMesin ?? '');
+    mesinCtrl = TextEditingController(
+      text: widget.header?.namaMesin ?? widget.initialMesin?.namaMesin ?? '',
+    );
+    if (widget.initialMesin != null && widget.header == null) {
+      _selectedMesin = widget.initialMesin;
+    }
+
     operatorCtrl =
         TextEditingController(text: widget.header?.namaOperator ?? '');
     jlhAnggotaCtrl = TextEditingController(
@@ -99,8 +119,16 @@ class _GilinganProductionFormDialogState
       text: widget.header?.hourMeter?.toString() ?? '',
     );
 
-    hourStartCtrl = TextEditingController(text: widget.header?.hourStart ?? '');
-    hourEndCtrl = TextEditingController(text: widget.header?.hourEnd ?? '');
+    hourStartCtrl = TextEditingController(
+      text: widget.header?.hourStart ?? widget.initialHourStart ?? '',
+    );
+    hourEndCtrl = TextEditingController(
+      text: widget.header?.hourEnd ?? widget.initialHourEnd ?? '',
+    );
+
+    if (widget.initialShift != null && widget.header == null) {
+      _selectedShift = widget.initialShift;
+    }
   }
 
   @override
@@ -384,21 +412,29 @@ class _GilinganProductionFormDialogState
               const SizedBox(height: 16),
 
               // Jenis Mesin
-              MesinDropdown(
-                idBagianMesin: 3, // TODO: sesuaikan ID bagian untuk GILINGAN
-                preselectId: widget.header?.idMesin,
-                label: 'Mesin Gilingan',
-                hint: 'Pilih mesin',
-                autovalidateMode: AutovalidateMode.onUserInteraction,
-                validator: (v) => v == null ? 'Wajib pilih mesin gilingan' : null,
-                onChanged: (m) async {
-                  _selectedMesin = m;
-                  _operatorPreselectId = m?.defaultOperatorId;
+              if (widget.initialMesin != null && !isEdit)
+                AppTextField(
+                  controller: mesinCtrl,
+                  label: 'Mesin Gilingan',
+                  icon: Icons.precision_manufacturing_outlined,
+                  readOnly: true,
+                )
+              else
+                MesinDropdown(
+                  idBagianMesin: 3,
+                  preselectId: widget.header?.idMesin,
+                  label: 'Mesin Gilingan',
+                  hint: 'Pilih mesin',
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                  validator: (v) => v == null ? 'Wajib pilih mesin gilingan' : null,
+                  onChanged: (m) async {
+                    _selectedMesin = m;
+                    _operatorPreselectId = m?.defaultOperatorId;
 
-                  setState(() {});
-                  await _checkOverlapIfReadyVM();
-                },
-              ),
+                    setState(() {});
+                    await _checkOverlapIfReadyVM();
+                  },
+                ),
 
               const SizedBox(height: 16),
 
@@ -507,16 +543,25 @@ class _GilinganProductionFormDialogState
               Row(
                 children: [
                   Expanded(
-                    child: ShiftDropdown(
-                      preselectId: widget.header?.shift,
-                      onChangedId: (id) {
-                        setState(() {
-                          _selectedShift = id;
-                        });
-                      },
-                      validator: (v) => v == null ? 'Wajib pilih shift' : null,
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                    ),
+                    child: widget.lockShiftFields && _selectedShift != null
+                        ? AppTextField(
+                            controller: TextEditingController(
+                              text: 'Shift $_selectedShift',
+                            ),
+                            label: 'Shift',
+                            icon: Icons.work_outline,
+                            readOnly: true,
+                          )
+                        : ShiftDropdown(
+                            preselectId: widget.header?.shift ?? widget.initialShift,
+                            onChangedId: (id) {
+                              setState(() {
+                                _selectedShift = id;
+                              });
+                            },
+                            validator: (v) => v == null ? 'Wajib pilih shift' : null,
+                            autovalidateMode: AutovalidateMode.onUserInteraction,
+                          ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(

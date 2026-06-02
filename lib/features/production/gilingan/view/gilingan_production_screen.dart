@@ -172,10 +172,7 @@ class _GilinganProductionScreenState extends State<GilinganProductionScreen> {
     }
   }
 
-  Future<void> _openEditDialog(
-    BuildContext ctx,
-    GilinganProduction row,
-  ) async {
+  Future<void> _openEditDialog(BuildContext ctx, GilinganProduction row) async {
     final updated = await showDialog<GilinganProduction>(
       context: ctx,
       barrierDismissible: false,
@@ -191,8 +188,7 @@ class _GilinganProductionScreenState extends State<GilinganProductionScreen> {
         context: ctx,
         builder: (_) => SuccessStatusDialog(
           title: 'Berhasil Mengupdate',
-          message:
-              'No. Produksi ${updated.noProduksi} berhasil diperbarui.',
+          message: 'No. Produksi ${updated.noProduksi} berhasil diperbarui.',
         ),
       );
     }

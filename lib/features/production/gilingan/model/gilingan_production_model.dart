@@ -195,3 +195,90 @@ class GilinganProduction {
     return 'Locked (<= $d)';
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GilinganMesinInfo — untuk panel kiri mesin screen
+// ─────────────────────────────────────────────────────────────────────────────
+class GilinganMesinInfo {
+  final int idMesin;
+  final String namaMesin;
+  final String bagian;
+  final String? noProduksi;
+  final DateTime? tglProduksi;
+  final int? idRegu;
+  final String? namaRegu;
+  final int? outputJenisId;
+  final String? outputJenisNama;
+  final List<int> idOperators;
+  final String? operators;
+  final int? shift;
+  final String? hourStart;
+  final String? hourEnd;
+
+  bool get isActive => noProduksi != null;
+
+  const GilinganMesinInfo({
+    required this.idMesin,
+    required this.namaMesin,
+    required this.bagian,
+    this.noProduksi,
+    this.tglProduksi,
+    this.idRegu,
+    this.namaRegu,
+    this.outputJenisId,
+    this.outputJenisNama,
+    this.idOperators = const [],
+    this.operators,
+    this.shift,
+    this.hourStart,
+    this.hourEnd,
+  });
+
+  factory GilinganMesinInfo.fromJson(Map<String, dynamic> j) {
+    String? s(dynamic v) =>
+        v == null ? null : v.toString().trim().isEmpty ? null : v.toString().trim();
+    int? i(dynamic v) {
+      if (v == null) return null;
+      if (v is num) return v.toInt();
+      return int.tryParse(v.toString());
+    }
+    String? timeHHmm(dynamic v) {
+      final raw = s(v);
+      if (raw == null) return null;
+      final parts = raw.split(':');
+      if (parts.length < 2) return raw;
+      return '${parts[0].padLeft(2, '0')}:${parts[1].padLeft(2, '0')}';
+    }
+
+    final List<int> ids = [];
+    final raw = j['IdOperators'];
+    if (raw is List) {
+      for (final x in raw) {
+        final n = i(x);
+        if (n != null) ids.add(n);
+      }
+    } else {
+      final n = i(raw);
+      if (n != null) ids.add(n);
+    }
+
+    return GilinganMesinInfo(
+      idMesin: i(j['IdMesin']) ?? 0,
+      namaMesin: s(j['NamaMesin']) ?? '',
+      bagian: s(j['Bagian']) ?? '',
+      noProduksi: s(j['NoProduksi']),
+      tglProduksi: j['TglProduksi'] == null
+          ? null
+          : DateTime.tryParse(j['TglProduksi'].toString()),
+      idRegu: i(j['IdRegu']),
+      namaRegu: s(j['NamaRegu']),
+      outputJenisId: i(j['OutputJenisId']),
+      outputJenisNama: s(j['OutputJenisNama']),
+      idOperators: ids,
+      operators: s(j['Operators']),
+      shift: i(j['Shift']),
+      hourStart: timeHHmm(j['HourStart']),
+      hourEnd: timeHHmm(j['HourEnd']),
+    );
+  }
+}

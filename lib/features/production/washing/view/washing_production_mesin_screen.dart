@@ -1,0 +1,514 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../../../common/widgets/error_status_dialog.dart';
+import '../../../../common/widgets/success_status_dialog.dart';
+import '../../../shift/repository/shift_repository.dart';
+import '../../../mesin/model/mesin_model.dart';
+import '../../shared/widgets/mesin_section_header.dart';
+import '../model/washing_production_model.dart';
+import '../repository/washing_production_repository.dart';
+import '../view_model/washing_production_view_model.dart';
+import '../widgets/washing_delete_dialog.dart';
+import '../widgets/washing_mesin_card.dart';
+import '../widgets/washing_produksi_list.dart';
+import '../widgets/washing_production_form_dialog.dart';
+import '../widgets/washing_riwayat_section_header.dart';
+import 'washing_production_input_screen.dart';
+
+class WashingProductionMesinScreen extends StatefulWidget {
+  const WashingProductionMesinScreen({super.key});
+
+  @override
+  State<WashingProductionMesinScreen> createState() =>
+      _WashingProductionMesinScreenState();
+}
+
+class _WashingProductionMesinScreenState
+    extends State<WashingProductionMesinScreen> {
+  final _repo = WashingProductionRepository();
+
+  // Left panel — mesin grid
+  Future<WashingMesinResult> _mesinFuture = Future.value((
+    mesinList: <WashingMesinInfo>[],
+    activeShift: null,
+  ));
+
+  // Right panel — riwayat produksi (paginated)
+  final List<WashingProduction> _produksiItems = [];
+  bool _produksiLoading = false;
+  bool _produksiFetchingMore = false;
+  bool _produksiHasMore = true;
+  int _produksiPage = 1;
+  static const _pageSize = 30;
+  final _produksiScrollCtl = ScrollController();
+  int? _filterIdMesin;
+  WashingMesinInfo? _selectedMesinInfo;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMesin();
+    _loadProduksiPage();
+    _produksiScrollCtl.addListener(_onProduksiScroll);
+  }
+
+  @override
+  void dispose() {
+    _produksiScrollCtl.dispose();
+    super.dispose();
+  }
+
+  // ── Data loading ──────────────────────────────────────────────────────────
+
+  Future<void> _loadMesin() async {
+    final future = _repo.fetchWashingMesin();
+    if (!mounted) return;
+    setState(() {
+      _mesinFuture = future;
+    });
+    // activeShift tidak lagi disimpan di state — diambil real-time saat _openCreateDialog
+    try {
+      await future;
+    } catch (_) {}
+  }
+
+  void _onProduksiScroll() {
+    if (_produksiScrollCtl.position.pixels >=
+            _produksiScrollCtl.position.maxScrollExtent - 100 &&
+        !_produksiFetchingMore &&
+        _produksiHasMore) {
+      _loadMoreProduksi();
+    }
+  }
+
+  Future<void> _loadProduksiPage() async {
+    if (!mounted) return;
+    setState(() {
+      _produksiLoading = true;
+      _produksiItems.clear();
+      _produksiPage = 1;
+      _produksiHasMore = true;
+    });
+    try {
+      final res = await _repo.fetchAll(
+        page: 1,
+        pageSize: _pageSize,
+        idMesin: _filterIdMesin,
+      );
+      if (!mounted) return;
+      final newItems = res['items'] as List<WashingProduction>;
+      final totalPages = (res['totalPages'] as int?) ?? 1;
+      setState(() {
+        _produksiItems.addAll(newItems);
+        _produksiHasMore = 1 < totalPages;
+        _produksiLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _produksiLoading = false);
+    }
+  }
+
+  Future<void> _loadMoreProduksi() async {
+    if (!mounted || _produksiFetchingMore || !_produksiHasMore) return;
+    setState(() => _produksiFetchingMore = true);
+    try {
+      final nextPage = _produksiPage + 1;
+      final res = await _repo.fetchAll(
+        page: nextPage,
+        pageSize: _pageSize,
+        idMesin: _filterIdMesin,
+      );
+      if (!mounted) return;
+      final newItems = res['items'] as List<WashingProduction>;
+      final totalPages = (res['totalPages'] as int?) ?? 1;
+      setState(() {
+        _produksiItems.addAll(newItems);
+        _produksiPage = nextPage;
+        _produksiHasMore = nextPage < totalPages;
+        _produksiFetchingMore = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _produksiFetchingMore = false);
+    }
+  }
+
+  void _refreshAll() {
+    _loadMesin();
+    _loadProduksiPage();
+  }
+
+  // ── Navigation helpers ────────────────────────────────────────────────────
+
+  Future<void> _openCreateDialog({required WashingMesinInfo mesin}) async {
+    if (!mounted) return;
+
+    final mstMesin = MstMesin(
+      idMesin: mesin.idMesin,
+      namaMesin: mesin.namaMesin,
+      bagian: mesin.bagian ?? '',
+      enable: true,
+    );
+
+    // Ambil shift aktif real-time dari server
+    final defaultShift = await ShiftRepository.fetchCurrentShift();
+    if (!mounted) return;
+
+    final created = await showDialog<WashingProduction>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => WashingProductionFormDialog(
+        initialMesin: mstMesin,
+        initialDate: DateTime.now(),
+        initialShift: defaultShift?.shift,
+        initialHourStart: defaultShift?.hourStart,
+        initialHourEnd: defaultShift?.hourEnd,
+        lockShiftFields: defaultShift != null,
+        onSave: (p) => Navigator.of(context).pop(p),
+      ),
+    );
+
+    if (!mounted) return;
+    if (created != null) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => WashingProductionInputScreen(
+            noProduksi: created.noProduksi,
+            idMesin: created.idMesin,
+            isLocked: created.isLocked,
+            lastClosedDate: created.lastClosedDate,
+            namaMesin: created.namaMesin,
+            namaJenis: created.outputJenisNama,
+            outputJenisId: created.outputJenisId,
+            tglProduksi: created.tglProduksi,
+            shift: created.shift,
+            hourStart: created.hourStart,
+            hourEnd: created.hourEnd,
+          ),
+        ),
+      );
+      if (!mounted) return;
+    }
+    _refreshAll();
+  }
+
+  Future<void> _openBackdateDialog(WashingMesinInfo mesin) async {
+    if (!mounted) return;
+    final yesterday = DateTime.now().subtract(const Duration(days: 1));
+    final mstMesin = MstMesin(
+      idMesin: mesin.idMesin,
+      namaMesin: mesin.namaMesin,
+      bagian: mesin.bagian ?? '',
+      enable: true,
+    );
+    final created = await showDialog<WashingProduction>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => WashingProductionFormDialog(
+        initialMesin: mstMesin,
+        initialDate: yesterday,
+        lockShiftFields: false,
+        isDateEditable: true,
+        onSave: (p) => Navigator.of(context).pop(p),
+      ),
+    );
+    if (!mounted) return;
+    if (created != null) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => WashingProductionInputScreen(
+            noProduksi: created.noProduksi,
+            idMesin: created.idMesin,
+            isLocked: created.isLocked,
+            lastClosedDate: created.lastClosedDate,
+            namaMesin: created.namaMesin,
+            namaJenis: created.outputJenisNama,
+            outputJenisId: created.outputJenisId,
+            tglProduksi: created.tglProduksi,
+            shift: created.shift,
+            hourStart: created.hourStart,
+            hourEnd: created.hourEnd,
+          ),
+        ),
+      );
+      if (!mounted) return;
+    }
+    _refreshAll();
+  }
+
+  Future<void> _onMesinTap(WashingMesinInfo mesin) async {
+    if (!mounted) return;
+
+    if (!mesin.isActive) {
+      await _openCreateDialog(mesin: mesin);
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => WashingProductionInputScreen(
+          noProduksi: mesin.noProduksi!,
+          idMesin: mesin.idMesin,
+          isLocked: false,
+          lastClosedDate: null,
+          namaMesin: mesin.namaMesin,
+          namaJenis: mesin.outputJenisNama,
+          outputJenisId: mesin.outputJenisId,
+          tglProduksi: mesin.tglProduksi,
+          shift: mesin.shift,
+          hourStart: mesin.hourStart,
+          hourEnd: mesin.hourEnd,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    _refreshAll();
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Row(
+        children: [
+          // ── LEFT: mesin grid (3/5) ────────────────────────────
+          Expanded(
+            flex: 3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FutureBuilder<WashingMesinResult>(
+                  future: _mesinFuture,
+                  builder: (context, snapshot) {
+                    final allMesin = snapshot.data?.mesinList ?? [];
+                    final activeCount = allMesin
+                        .where((m) => m.isActive)
+                        .length;
+                    final inactiveCount = allMesin.length - activeCount;
+                    return MesinSectionHeader(
+                      title: 'Status Mesin Washing',
+                      onRefresh: _refreshAll,
+                      activeCount: activeCount,
+                      inactiveCount: inactiveCount,
+                      isLoading:
+                          snapshot.connectionState == ConnectionState.waiting,
+                    );
+                  },
+                ),
+                Expanded(
+                  child: FutureBuilder<WashingMesinResult>(
+                    future: _mesinFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      if (snapshot.hasError) {
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Text(
+                              'Gagal memuat mesin\n${snapshot.error}',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+                      final allMesin = snapshot.data?.mesinList ?? [];
+                      return GridView.builder(
+                        padding: const EdgeInsets.all(12),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3,
+                              mainAxisExtent: 110,
+                              crossAxisSpacing: 10,
+                              mainAxisSpacing: 10,
+                            ),
+                        itemCount: allMesin.length,
+                        itemBuilder: (context, index) {
+                          final mesin = allMesin[index];
+                          return WashingMesinCard(
+                            mesin: mesin,
+                            onTap: () => _onMesinTap(mesin),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ── DIVIDER ─────────────────────────────────────────────
+          const VerticalDivider(width: 1, color: Color(0xFFE5E7EB)),
+
+          // ── RIGHT: riwayat produksi (2/5) ────────────────────────
+          Expanded(
+            flex: 2,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FutureBuilder<WashingMesinResult>(
+                  future: _mesinFuture,
+                  builder: (context, snapshot) {
+                    return WashingRiwayatSectionHeader(
+                      mesinList: snapshot.data?.mesinList ?? [],
+                      selectedIdMesin: _filterIdMesin,
+                      onFilterChanged: (id) {
+                        final mesinList = snapshot.data?.mesinList ?? [];
+                        setState(() {
+                          _filterIdMesin = id;
+                          _selectedMesinInfo = id == null
+                              ? null
+                              : mesinList
+                                    .where((m) => m.idMesin == id)
+                                    .firstOrNull;
+                        });
+                        _loadProduksiPage();
+                      },
+                    );
+                  },
+                ),
+                Expanded(
+                  child: Stack(
+                    children: [
+                      RefreshIndicator(
+                        onRefresh: _loadProduksiPage,
+                        child: WashingProduksiList(
+                          items: _produksiItems,
+                          isLoading: _produksiLoading,
+                          isFetchingMore: _produksiFetchingMore,
+                          scrollController: _produksiScrollCtl,
+                          filterIdMesin: _filterIdMesin,
+                          onTap: (row) async {
+                            await Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => WashingProductionInputScreen(
+                                  noProduksi: row.noProduksi,
+                                  idMesin: row.idMesin,
+                                  isLocked: row.isLocked,
+                                  lastClosedDate: row.lastClosedDate,
+                                  namaMesin: row.namaMesin,
+                                  namaJenis: row.outputJenisNama,
+                                  outputJenisId: row.outputJenisId,
+                                  tglProduksi: row.tglProduksi,
+                                  shift: row.shift,
+                                  hourStart: row.hourStart,
+                                  hourEnd: row.hourEnd,
+                                ),
+                              ),
+                            );
+                            if (mounted) _refreshAll();
+                          },
+                          onEdit: (row) async {
+                            final editVm = WashingProductionViewModel(
+                              repository: _repo,
+                            );
+                            try {
+                              await showDialog<void>(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (_) => ChangeNotifierProvider.value(
+                                  value: editVm,
+                                  child: WashingProductionFormDialog(
+                                    header: row,
+                                  ),
+                                ),
+                              );
+                            } finally {
+                              editVm.dispose();
+                            }
+                            if (mounted) _refreshAll();
+                          },
+                          onDelete: (row) async {
+                            final screenCtx = context;
+                            await showDialog<void>(
+                              context: screenCtx,
+                              barrierDismissible: false,
+                              builder: (ctx) => WashingProductionDeleteDialog(
+                                header: row,
+                                onConfirm: () async {
+                                  bool success = false;
+                                  String? errMsg;
+                                  try {
+                                    await _repo.deleteProduksi(row.noProduksi);
+                                    success = true;
+                                  } catch (e) {
+                                    errMsg = e.toString();
+                                  }
+                                  if (ctx.mounted) Navigator.of(ctx).pop();
+                                  if (!screenCtx.mounted) return;
+                                  if (success) {
+                                    showDialog(
+                                      context: screenCtx,
+                                      builder: (_) => SuccessStatusDialog(
+                                        title: 'Berhasil Menghapus',
+                                        message:
+                                            'No. Produksi ${row.noProduksi} berhasil dihapus.',
+                                      ),
+                                    );
+                                  } else {
+                                    showDialog(
+                                      context: screenCtx,
+                                      builder: (_) => ErrorStatusDialog(
+                                        title: 'Gagal Menghapus!',
+                                        message:
+                                            errMsg ?? 'Gagal menghapus data',
+                                      ),
+                                    );
+                                  }
+                                  _refreshAll();
+                                },
+                              ),
+                            );
+                          },
+                          onInput: (row) async {
+                            await Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => WashingProductionInputScreen(
+                                  noProduksi: row.noProduksi,
+                                  idMesin: row.idMesin,
+                                  isLocked: row.isLocked,
+                                  lastClosedDate: row.lastClosedDate,
+                                  namaMesin: row.namaMesin,
+                                  namaJenis: row.outputJenisNama,
+                                  outputJenisId: row.outputJenisId,
+                                  tglProduksi: row.tglProduksi,
+                                  shift: row.shift,
+                                  hourStart: row.hourStart,
+                                  hourEnd: row.hourEnd,
+                                ),
+                              ),
+                            );
+                            if (mounted) _refreshAll();
+                          },
+                        ),
+                      ),
+                      if (_selectedMesinInfo != null)
+                        Positioned(
+                          right: 16,
+                          bottom: 16,
+                          child: FloatingActionButton.small(
+                            heroTag: 'fab_backdate_washing',
+                            onPressed: () =>
+                                _openBackdateDialog(_selectedMesinInfo!),
+                            backgroundColor: const Color(0xFF0277BD),
+                            child: const Icon(Icons.add),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

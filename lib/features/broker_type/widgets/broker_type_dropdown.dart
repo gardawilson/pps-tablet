@@ -70,11 +70,7 @@ class _BrokerTypeDropdownState extends State<BrokerTypeDropdown> {
             setState(() => _value = val);
             widget.onChanged?.call(val);
           },
-          itemAsString: (bt) {
-            final code = (bt.itemCode ?? '').trim();
-            if (code.isEmpty) return bt.nama;
-            return '${bt.nama} [$code]';
-          },
+          itemAsString: (bt) => bt.nama,
           label: widget.label,
           prefixIcon: widget.icon,
           hint: widget.hintText ?? 'Pilih jenis broker',

@@ -18,12 +18,12 @@ export '../../shared/models/gilingan_item.dart';
 export '../../shared/models/mixer_item.dart';
 export '../../shared/models/reject_item.dart';
 
-bool _readPrintedFlag(Map<String, dynamic> j, List<String> keys) {
-  final asBoolValue = pickB(j, keys);
-  if (asBoolValue != null) return asBoolValue;
+int _readPrintedCount(Map<String, dynamic> j, List<String> keys) {
   final asIntValue = pickI(j, keys);
-  if (asIntValue != null) return asIntValue > 0;
-  return false;
+  if (asIntValue != null) return asIntValue;
+  final asBoolValue = pickB(j, keys);
+  if (asBoolValue != null) return asBoolValue ? 1 : 0;
+  return 0;
 }
 
 /* ===================== ROOT AGGREGATOR ===================== */
@@ -114,7 +114,7 @@ class BrokerOutput {
   final String? noBroker;
   final int? idJenis;
   final String? namaJenis;
-  final bool hasBeenPrinted;
+  final int printedCount;
   final List<BrokerOutputSak> detailSak;
 
   const BrokerOutput({
@@ -122,7 +122,7 @@ class BrokerOutput {
     this.noBroker,
     this.idJenis,
     this.namaJenis,
-    this.hasBeenPrinted = false,
+    this.printedCount = 0,
     this.detailSak = const [],
   });
 
@@ -133,12 +133,14 @@ class BrokerOutput {
       noBroker: pickS(j, ['NoBroker', 'noBroker']),
       idJenis: pickI(j, ['IdJenis', 'idJenis']),
       namaJenis: pickS(j, ['NamaJenis', 'namaJenis']),
-      hasBeenPrinted: _readPrintedFlag(j, ['HasBeenPrinted', 'hasBeenPrinted']),
+      printedCount: _readPrintedCount(j, ['HasBeenPrinted', 'hasBeenPrinted']),
       detailSak: rawDetails
           .map((e) => BrokerOutputSak.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList(),
     );
   }
+
+  bool get hasBeenPrinted => printedCount > 0;
 
   int get totalSak => detailSak.length;
   double get totalBerat =>
@@ -151,7 +153,7 @@ class BonggolanOutput {
   final int? idBonggolan;
   final String? namaBonggolan;
   final double? berat;
-  final bool hasBeenPrinted;
+  final int printedCount;
 
   const BonggolanOutput({
     this.noProduksi,
@@ -159,7 +161,7 @@ class BonggolanOutput {
     this.idBonggolan,
     this.namaBonggolan,
     this.berat,
-    this.hasBeenPrinted = false,
+    this.printedCount = 0,
   });
 
   factory BonggolanOutput.fromJson(Map<String, dynamic> j) {
@@ -169,7 +171,9 @@ class BonggolanOutput {
       idBonggolan: pickI(j, ['IdBonggolan', 'idBonggolan']),
       namaBonggolan: pickS(j, ['NamaBonggolan', 'namaBonggolan']),
       berat: pickD(j, ['Berat', 'berat']),
-      hasBeenPrinted: _readPrintedFlag(j, ['HasBeenPrinted', 'hasBeenPrinted']),
+      printedCount: _readPrintedCount(j, ['HasBeenPrinted', 'hasBeenPrinted']),
     );
   }
+
+  bool get hasBeenPrinted => printedCount > 0;
 }

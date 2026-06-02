@@ -34,6 +34,8 @@ class InjectProduction {
   final num? offsetNext;
 
   final int? idFurnitureMaterial;
+  final String? idJenis;
+  final String? namaJenis;
 
   final num? beratProdukHasilTimbang;
 
@@ -68,6 +70,8 @@ class InjectProduction {
     this.offsetCurrent,
     this.offsetNext,
     this.idFurnitureMaterial,
+    this.idJenis,
+    this.namaJenis,
     this.beratProdukHasilTimbang,
     this.hourStart,
     this.hourEnd,
@@ -191,6 +195,16 @@ class InjectProduction {
       offsetNext: _asNum(j['OffsetNext']),
 
       idFurnitureMaterial: (j['IdFurnitureMaterial'] as num?)?.toInt(),
+      idJenis:
+          j['IdJenis']?.toString() ??
+          j['idJenis']?.toString() ??
+          j['IdFurnitureWIP']?.toString() ??
+          j['IdFurnitureWip']?.toString(),
+      namaJenis:
+          j['NamaJenis']?.toString() ??
+          j['namaJenis']?.toString() ??
+          j['NamaFurnitureWIP']?.toString() ??
+          j['NamaFurnitureWip']?.toString(),
       beratProdukHasilTimbang: _asNum(j['BeratProdukHasilTimbang']),
 
       // ✅ normalized to "HH:mm"
@@ -232,6 +246,8 @@ class InjectProduction {
       'OffsetNext': offsetNext,
 
       'IdFurnitureMaterial': idFurnitureMaterial,
+      'IdJenis': idJenis,
+      'NamaJenis': namaJenis,
       'BeratProdukHasilTimbang': beratProdukHasilTimbang,
 
       // ✅ store as HH:mm (UI-friendly); submit layer can convert to HH:mm:ss

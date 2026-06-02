@@ -84,8 +84,16 @@ class _WashingProductionScreenState extends State<WashingProductionScreen> {
                       MaterialPageRoute(
                         builder: (_) => WashingProductionInputScreen(
                           noProduksi: row.noProduksi,
+                          idMesin: row.idMesin,
                           isLocked: row.isLocked,
                           lastClosedDate: row.lastClosedDate,
+                          namaMesin: row.namaMesin,
+                          namaJenis: row.outputJenisNama,
+                          outputJenisId: row.outputJenisId,
+                          tglProduksi: row.tglProduksi,
+                          shift: row.shift,
+                          hourStart: row.hourStart,
+                          hourEnd: row.hourEnd,
                         ),
                       ),
                     );

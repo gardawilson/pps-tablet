@@ -1,5 +1,7 @@
 // lib/view/widgets/mixer_form_dialog.dart
 
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
@@ -155,6 +157,7 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
 
   bool get _isLocked =>
       widget.preselectBrokerNoProduksi != null || widget.preselectDate != null;
+  bool get _forceBrokerOnly => widget.preselectBrokerNoProduksi != null;
 
   Future<void> _fetchOutputs(String code) async {
     if (code.trim().isEmpty) {
@@ -193,10 +196,12 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
 
     // 2) In CREATE, mode is required; in EDIT it's optional (kept as-is)
     if (!isEdit && _selectedMode == null) {
+      final processMessage = _forceBrokerOnly
+          ? 'Pilih Proses Broker terlebih dahulu'
+          : 'Pilih salah satu dari Proses Broker, Inject, atau Bongkar Susun';
       await DialogService.instance.showError(
         title: 'PILIH PROSES',
-        message:
-            'Pilih salah satu dari Proses Broker, Inject, atau Bongkar Susun',
+        message: processMessage,
       );
       return;
     }
@@ -321,9 +326,57 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
       }
     } catch (e) {
       DialogService.instance.hideLoading();
+
+      String backendMsg = e.toString();
+      final jsonMatch = RegExp(r'\{.*\}', dotAll: true).firstMatch(backendMsg);
+      if (jsonMatch != null) {
+        try {
+          backendMsg =
+              (jsonDecode(jsonMatch.group(0)!)['message'] as String?) ??
+              backendMsg;
+        } catch (_) {}
+      }
+
+      final inputMatch = RegExp(
+        r'Input=(\d+(?:\.\d+)?)\s*kg',
+        caseSensitive: false,
+      ).firstMatch(backendMsg);
+      final existingMatch = RegExp(
+        r'OutputExisting=(\d+(?:\.\d+)?)\s*kg',
+        caseSensitive: false,
+      ).firstMatch(backendMsg);
+      final newMatch = RegExp(
+        r'OutputBaru=(\d+(?:\.\d+)?)\s*kg',
+        caseSensitive: false,
+      ).firstMatch(backendMsg);
+
+      final String errorTitle;
+      final String errorMessage;
+
+      if (inputMatch != null && existingMatch != null && newMatch != null) {
+        final inputKg = inputMatch.group(1)!;
+        final existingKg = existingMatch.group(1)!;
+        final newKg = newMatch.group(1)!;
+        final remaining =
+            (double.tryParse(inputKg) ?? 0) -
+            (double.tryParse(existingKg) ?? 0);
+
+        errorTitle = 'Berat Label Melebihi Input';
+        errorMessage =
+            'Berat label yang ditambahkan ($newKg kg) melebihi sisa kapasitas input yang tersedia.\n\n'
+            '• Total berat input    : $inputKg kg\n'
+            '• Total output saat ini: $existingKg kg\n'
+            '• Sisa kapasitas       : ${remaining.toStringAsFixed(0)} kg\n'
+            '• Berat label baru     : $newKg kg\n\n'
+            'Kurangi berat label agar tidak melebihi sisa kapasitas.';
+      } else {
+        errorTitle = 'Gagal Membuat Label';
+        errorMessage = backendMsg;
+      }
+
       await DialogService.instance.showError(
-        title: 'Error',
-        message: e.toString(),
+        title: errorTitle,
+        message: errorMessage,
       );
     }
   }
@@ -389,6 +442,7 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
         !isEdit && !_isLocked && _selectedMode == InputMode.brokerProduction;
     final bool isInjectProductionEnabled =
         !isEdit && !_isLocked && _selectedMode == InputMode.injectProduction;
+    final bool showInjectOption = !_forceBrokerOnly;
 
     final errorStyle = TextStyle(
       color: Theme.of(context).colorScheme.error,
@@ -407,31 +461,6 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.description,
-                    color: Colors.blue.shade700,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Header',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              BonggolanTextField(
-                controller: noBonggolanCtrl,
-                label: 'No Bonggolan',
-                icon: Icons.label,
-                asText: true, // readonly text
-              ),
-
-              const SizedBox(height: 16),
-
               IgnorePointer(
                 ignoring: _isLocked,
                 child: Opacity(
@@ -455,63 +484,6 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
                             }
                           },
                   ),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // Jenis Bonggolan (Required)
-              JenisBonggolanDropdown(
-                preselectId: widget.header?.idBonggolan,
-                hintText: 'Pilih jenis bonggolan',
-                validator: (v) =>
-                    v == null ? 'Wajib pilih jenis bonggolan' : null,
-                autovalidateMode: AutovalidateMode.onUserInteraction,
-                onChanged: (jp) {
-                  _selectedJenis = jp;
-                  jenisCtrl.text = jp?.namaBonggolan ?? '';
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              // Berat (Required, numeric > 0)
-              SizedBox(
-                width: 300,
-                child: TextFormField(
-                  controller: beratCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(
-                      RegExp(r'^\d*([.,]\d{0,3})?$'),
-                    ),
-                  ],
-                  decoration: InputDecoration(
-                    labelText: 'Berat (kg)',
-                    hintText: '0',
-                    prefixIcon: const Icon(Icons.monitor_weight_outlined),
-                    suffixText: 'kg',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    isDense: true,
-                  ),
-                  validator: (val) {
-                    final raw = (val ?? '').trim();
-                    if (raw.isEmpty) return 'Berat wajib diisi.';
-                    final s = raw.replaceAll(',', '.');
-                    final d = double.tryParse(s);
-                    if (d == null) return 'Format berat tidak valid.';
-                    if (d <= 0) return 'Berat harus > 0.';
-                    return null;
-                  },
-                  onEditingComplete: () {
-                    final s = beratCtrl.text.trim().replaceAll(',', '.');
-                    beratCtrl.text = s;
-                    FocusScope.of(context).unfocus();
-                  },
                 ),
               ),
 
@@ -575,57 +547,117 @@ class _BonggolanFormDialogState extends State<BonggolanFormDialog> {
 
               const SizedBox(height: 16),
 
-              // ===== INJECT =====
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Radio<InputMode>(
-                    value: InputMode.injectProduction,
-                    groupValue: _selectedMode,
-                    onChanged: isEdit ? null : (val) => _selectMode(val!),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: IgnorePointer(
-                      ignoring: !isInjectProductionEnabled,
-                      child: Opacity(
-                        opacity: isInjectProductionEnabled ? 1 : 0.6,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            InjectProductionDropdown(
-                              preselectNoProduksi:
-                                  widget.header?.injectNoProduksi,
-                              preselectNamaMesin:
-                                  widget.header?.injectNamaMesin,
-                              date: _selectedDate,
-                              enabled: isInjectProductionEnabled,
-                              onChanged: isInjectProductionEnabled
-                                  ? (ip) {
-                                      if (_selectedMode !=
-                                          InputMode.injectProduction) {
-                                        _selectMode(InputMode.injectProduction);
+              if (showInjectOption) ...[
+                // ===== INJECT =====
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Radio<InputMode>(
+                      value: InputMode.injectProduction,
+                      groupValue: _selectedMode,
+                      onChanged: isEdit ? null : (val) => _selectMode(val!),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: IgnorePointer(
+                        ignoring: !isInjectProductionEnabled,
+                        child: Opacity(
+                          opacity: isInjectProductionEnabled ? 1 : 0.6,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              InjectProductionDropdown(
+                                preselectNoProduksi:
+                                    widget.header?.injectNoProduksi,
+                                preselectNamaMesin:
+                                    widget.header?.injectNamaMesin,
+                                date: _selectedDate,
+                                enabled: isInjectProductionEnabled,
+                                onChanged: isInjectProductionEnabled
+                                    ? (ip) {
+                                        if (_selectedMode !=
+                                            InputMode.injectProduction) {
+                                          _selectMode(
+                                            InputMode.injectProduction,
+                                          );
+                                        }
+                                        final code = ip?.noProduksi ?? '';
+                                        setState(() {
+                                          noInjectProduksiCtrl.text = code;
+                                          _injectError = null;
+                                          _bonggolanOutputs = [];
+                                        });
+                                        if (code.isNotEmpty) _fetchOutputs(code);
                                       }
-                                      final code = ip?.noProduksi ?? '';
-                                      setState(() {
-                                        noInjectProduksiCtrl.text = code;
-                                        _injectError = null;
-                                        _bonggolanOutputs = [];
-                                      });
-                                      if (code.isNotEmpty) _fetchOutputs(code);
-                                    }
-                                  : null,
-                            ),
-                            if (_injectError != null) ...[
-                              const SizedBox(height: 6),
-                              Text(_injectError!, style: errorStyle),
+                                    : null,
+                              ),
+                              if (_injectError != null) ...[
+                                const SizedBox(height: 6),
+                                Text(_injectError!, style: errorStyle),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
                       ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Jenis Bonggolan (Required)
+              JenisBonggolanDropdown(
+                preselectId: widget.header?.idBonggolan,
+                hintText: 'Pilih jenis bonggolan',
+                validator: (v) =>
+                    v == null ? 'Wajib pilih jenis bonggolan' : null,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                onChanged: (jp) {
+                  _selectedJenis = jp;
+                  jenisCtrl.text = jp?.namaBonggolan ?? '';
+                },
+              ),
+
+              const SizedBox(height: 16),
+
+              // Berat (Required, numeric > 0)
+              SizedBox(
+                width: 300,
+                child: TextFormField(
+                  controller: beratCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
                   ),
-                ],
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'^\d*([.,]\d{0,3})?$'),
+                    ),
+                  ],
+                  decoration: InputDecoration(
+                    labelText: 'Berat (kg)',
+                    hintText: '0',
+                    prefixIcon: const Icon(Icons.monitor_weight_outlined),
+                    suffixText: 'kg',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    isDense: true,
+                  ),
+                  validator: (val) {
+                    final raw = (val ?? '').trim();
+                    if (raw.isEmpty) return 'Berat wajib diisi.';
+                    final s = raw.replaceAll(',', '.');
+                    final d = double.tryParse(s);
+                    if (d == null) return 'Format berat tidak valid.';
+                    if (d <= 0) return 'Berat harus > 0.';
+                    return null;
+                  },
+                  onEditingComplete: () {
+                    final s = beratCtrl.text.trim().replaceAll(',', '.');
+                    beratCtrl.text = s;
+                    FocusScope.of(context).unfocus();
+                  },
+                ),
               ),
 
               const SizedBox(height: 16),

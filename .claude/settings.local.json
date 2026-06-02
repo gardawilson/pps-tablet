@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dart analyze *)"
+      "Bash(dart analyze *)",
+      "Bash(flutter analyze *)",
+      "Bash(Get-ChildItem -Path \"d:\\\\frontend\\\\pps_tablet\\\\lib\\\\features\\\\production\\\\broker\\\\\" -Recurse -Force | Select-Object -ExpandProperty FullName | Sort-Object)",
+      "Bash(cp /tmp/broker_input_trimmed.dart \"d:/frontend/pps_tablet/lib/features/production/broker/view/broker_production_input_screen.dart\")"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
     ]
   }
 }

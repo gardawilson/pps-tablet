@@ -1,6 +1,7 @@
 // lib/features/production/broker/view/broker_production_screen.dart
 import 'package:flutter/material.dart';
 import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
+import 'package:pps_tablet/features/mesin/model/mesin_model.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
@@ -17,7 +18,9 @@ import 'broker_production_input_screen.dart';
 import '../widgets/broker_production_row_popover.dart';
 
 class BrokerProductionScreen extends StatefulWidget {
-  const BrokerProductionScreen({super.key});
+  const BrokerProductionScreen({super.key, this.mesin});
+
+  final MstMesin? mesin;
 
   @override
   State<BrokerProductionScreen> createState() => _BrokerProductionScreenState();
@@ -81,6 +84,10 @@ class _BrokerProductionScreenState extends State<BrokerProductionScreen> {
                           tglProduksi: row.tglProduksi,
                           isLocked: row.isLocked,
                           lastClosedDate: row.lastClosedDate,
+                          hourStart: row.hourStart,
+                          hourEnd: row.hourEnd,
+                          namaJenis: row.outputJenisNama,
+                          outputJenisId: row.outputJenisId,
                         ),
                       ),
                     );

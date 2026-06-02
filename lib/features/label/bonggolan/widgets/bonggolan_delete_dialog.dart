@@ -5,6 +5,7 @@ import '../model/bonggolan_header_model.dart';
 
 class BonggolanDeleteDialog extends StatefulWidget {
   final BonggolanHeader header;
+
   /// Parent yang menutup dialog; komponen ini tidak memanggil Navigator.pop.
   final Future<void> Function() onConfirm;
 
@@ -49,12 +50,18 @@ class _BonggolanDeleteDialogState extends State<BonggolanDeleteDialog> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _InfoRow(label: 'No. Bonggolan', value: widget.header.noBonggolan),
+                _InfoRow(
+                  label: 'No. Bonggolan',
+                  value: widget.header.noBonggolan,
+                ),
                 const SizedBox(height: 6),
                 // _InfoRow(label: 'Jenis', value: widget.header.namaJenisPlastik),
                 if ((widget.header.dateCreate ?? '').isNotEmpty) ...[
                   const SizedBox(height: 6),
-                  _InfoRow(label: 'Dibuat', value: formatDateToFullId(widget.header.dateCreate!)),
+                  _InfoRow(
+                    label: 'Dibuat',
+                    value: formatDateToFullId(widget.header.dateCreate!),
+                  ),
                 ],
               ],
             ),
@@ -79,7 +86,9 @@ class _BonggolanDeleteDialogState extends State<BonggolanDeleteDialog> {
             contentPadding: EdgeInsets.zero,
             dense: true,
             value: _agree,
-            onChanged: _submitting ? null : (v) => setState(() => _agree = v ?? false),
+            onChanged: _submitting
+                ? null
+                : (v) => setState(() => _agree = v ?? false),
             controlAffinity: ListTileControlAffinity.leading,
             title: Text(
               'Saya mengerti dan ingin menghapus label ini.',
@@ -94,7 +103,9 @@ class _BonggolanDeleteDialogState extends State<BonggolanDeleteDialog> {
           onPressed: _submitting ? null : () => Navigator.pop(context),
           style: OutlinedButton.styleFrom(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
           child: const Text('BATAL'),
         ),
@@ -104,18 +115,22 @@ class _BonggolanDeleteDialogState extends State<BonggolanDeleteDialog> {
           onPressed: (!_agree || _submitting)
               ? null
               : () async {
-            setState(() => _submitting = true);
-            try {
-              await widget.onConfirm(); // parent menutup dialog
-            } finally {
-              if (mounted) setState(() => _submitting = false);
-            }
-          },
+                  setState(() => _submitting = true);
+                  try {
+                    await widget.onConfirm(); // parent menutup dialog
+                  } finally {
+                    if (mounted) setState(() => _submitting = false);
+                  }
+                },
           icon: _submitting
               ? SizedBox(
-            width: 16, height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2, color: cs.onError),
-          )
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: cs.onError,
+                  ),
+                )
               : const Icon(Icons.delete_outline),
           label: const Text('HAPUS'),
           style: FilledButton.styleFrom(
@@ -124,7 +139,9 @@ class _BonggolanDeleteDialogState extends State<BonggolanDeleteDialog> {
             disabledBackgroundColor: cs.error.withOpacity(.4),
             disabledForegroundColor: cs.onError.withOpacity(.8),
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
             elevation: 1,
           ),
         ),
@@ -149,7 +166,11 @@ class _WarningBanner extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
       child: Row(
         children: [
-          const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 28),
+          const Icon(
+            Icons.warning_amber_rounded,
+            color: Colors.white,
+            size: 28,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -194,10 +215,7 @@ class _InfoRow extends StatelessWidget {
         Expanded(
           child: Text(
             value,
-            style: TextStyle(
-              color: cs.onSurface,
-              fontWeight: FontWeight.w600,
-            ),
+            style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w600),
             overflow: TextOverflow.ellipsis,
           ),
         ),

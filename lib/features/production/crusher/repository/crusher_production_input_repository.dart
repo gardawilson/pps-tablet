@@ -9,6 +9,7 @@ import '../../../../core/services/token_storage.dart';
 import '../../../stock_opname/model/label_validation_result.dart';
 import '../../shared/models/production_label_lookup_result.dart';
 import '../model/crusher_inputs_model.dart';
+import '../model/crusher_output_model.dart';
 import '../model/crusher_production_model.dart';
 import 'package:pps_tablet/core/utils/date_formatter.dart';
 
@@ -79,6 +80,31 @@ class CrusherProductionInputRepository {
 
   void invalidateInputs(String noCrusherProduksi) => _inputsCache.remove(noCrusherProduksi);
   void clearCache() => _inputsCache.clear();
+
+  // -----------------------------
+  // FETCH OUTPUTS
+  // -----------------------------
+  Future<List<CrusherOutput>> fetchOutputs(String noCrusherProduksi) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/production/crusher/$noCrusherProduksi/outputs');
+
+    http.Response res;
+    try {
+      res = await http.get(url, headers: _headers(token)).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout mengambil output ($noCrusherProduksi)');
+    }
+
+    if (res.statusCode != 200) {
+      throw Exception('Gagal mengambil output ($noCrusherProduksi), code ${res.statusCode}');
+    }
+
+    final body = json.decode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    final list = (body['data'] as List? ?? []);
+    return list
+        .map((e) => CrusherOutput.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
 
 // -----------------------------
 // VALIDATE LABEL
@@ -191,6 +217,126 @@ class CrusherProductionInputRepository {
     }
   }
 
+
+// -----------------------------
+// CREATE OUTPUT
+// -----------------------------
+  /// POST /api/labels/crusher
+  /// Body: { header: { IdCrusher, DateCreate, Berat }, ProcessedCode }
+  Future<void> createOutputs({
+    required String noProduksi,
+    required int idJenis,
+    required double berat,
+    required DateTime tglProduksi,
+  }) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/labels/crusher');
+
+    final dateStr =
+        '${tglProduksi.year.toString().padLeft(4, '0')}-'
+        '${tglProduksi.month.toString().padLeft(2, '0')}-'
+        '${tglProduksi.day.toString().padLeft(2, '0')}';
+
+    final payload = {
+      'header': {
+        'IdCrusher': idJenis,
+        'DateCreate': dateStr,
+        'Berat': berat,
+      },
+      'ProcessedCode': noProduksi,
+    };
+
+    print('➡️ [POST] $url');
+    print('📦 Payload: ${json.encode(payload)}');
+
+    http.Response res;
+    try {
+      res = await http
+          .post(
+            url,
+            headers: {..._headers(token), 'Content-Type': 'application/json'},
+            body: json.encode(payload),
+          )
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout create output crusher ($noProduksi)');
+    } catch (e) {
+      print('❌ Request error: $e');
+      rethrow;
+    }
+
+    print('⬅️ [${res.statusCode}] create output crusher');
+
+    final decoded = utf8.decode(res.bodyBytes);
+    Map<String, dynamic> body;
+    try {
+      body = json.decode(decoded) as Map<String, dynamic>;
+    } catch (e) {
+      throw FormatException('Response create output crusher bukan JSON valid: $e');
+    }
+
+    if (res.statusCode == 200 || res.statusCode == 201) return;
+
+    final msg = (body['message'] as String?) ??
+        'Gagal create output crusher (HTTP ${res.statusCode})';
+    throw Exception(msg);
+  }
+
+// -----------------------------
+// SPLIT TIME (GANTI PRODUKSI)
+// -----------------------------
+  /// POST /api/production/crusher/split-time/{idMesin}/{tanggal}
+  /// Body: { "hourStart": "13:30", "outputJenisId": 12 }
+  Future<Map<String, dynamic>> splitTime({
+    required int idMesin,
+    required DateTime tanggal,
+    required String hourStart,
+    required int outputJenisId,
+  }) async {
+    final token = await TokenStorage.getToken();
+    final dateStr =
+        '${tanggal.year.toString().padLeft(4, '0')}-'
+        '${tanggal.month.toString().padLeft(2, '0')}-'
+        '${tanggal.day.toString().padLeft(2, '0')}';
+    final url = Uri.parse('$_base/api/production/crusher/split-time/$idMesin/$dateStr');
+
+    final payload = {'hourStart': hourStart, 'outputJenisId': outputJenisId};
+
+    print('➡️ [POST] $url');
+    print('📦 Payload: ${json.encode(payload)}');
+
+    http.Response res;
+    try {
+      res = await http
+          .post(
+            url,
+            headers: {..._headers(token), 'Content-Type': 'application/json'},
+            body: json.encode(payload),
+          )
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout split-time crusher ($idMesin)');
+    } catch (e) {
+      print('❌ Request error: $e');
+      rethrow;
+    }
+
+    print('⬅️ [${res.statusCode}] split-time crusher');
+
+    final decoded = utf8.decode(res.bodyBytes);
+    Map<String, dynamic> body;
+    try {
+      body = json.decode(decoded) as Map<String, dynamic>;
+    } catch (e) {
+      throw FormatException('Response split-time bukan JSON valid: $e');
+    }
+
+    if (res.statusCode == 200 || res.statusCode == 201) return body;
+
+    final msg = (body['message'] as String?) ??
+        'Gagal split-time crusher (HTTP ${res.statusCode})';
+    throw Exception(msg);
+  }
 
 // -----------------------------
 // DELETE INPUTS & PARTIALS

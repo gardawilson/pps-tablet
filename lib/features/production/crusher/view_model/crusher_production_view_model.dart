@@ -248,17 +248,14 @@ class CrusherProductionViewModel extends ChangeNotifier {
   Future<CrusherProduction?> createProduksi({
     required DateTime tanggal,
     required int idMesin,
-    required int idOperator,
-    required int jamKerja,
+    required List<int> idOperators,
     required int shift,
+    required double jam,
+    int? outputJenisId,
+    int? idRegu,
     String? hourStart,
     String? hourEnd,
-    String? checkBy1,
-    String? checkBy2,
-    String? approveBy,
-    int? jmlhAnggota,
     int? hadir,
-    double? hourMeter,
   }) async {
     isSaving = true;
     saveError = null;
@@ -268,17 +265,14 @@ class CrusherProductionViewModel extends ChangeNotifier {
       final created = await repository.createProduksi(
         tanggal: tanggal,
         idMesin: idMesin,
-        idOperator: idOperator,
-        jamKerja: jamKerja,
+        idOperators: idOperators,
         shift: shift,
+        jam: jam,
+        outputJenisId: outputJenisId,
+        idRegu: idRegu,
         hourStart: hourStart,
         hourEnd: hourEnd,
-        checkBy1: checkBy1,
-        checkBy2: checkBy2,
-        approveBy: approveBy,
-        jmlhAnggota: jmlhAnggota,
         hadir: hadir,
-        hourMeter: hourMeter,
       );
 
       // setelah create, refresh sesuai mode

@@ -40,6 +40,7 @@ enum _PrintMode { singleCreate, autoPrintManual, autoRepeat }
 
 class _FurnitureWipCreateDraft {
   final int? idFurnitureWip;
+  final List<int> injectFurnitureWipIds;
   final DateTime dateCreate;
   final double? pcs;
   final double? berat;
@@ -52,6 +53,7 @@ class _FurnitureWipCreateDraft {
 
   const _FurnitureWipCreateDraft({
     required this.idFurnitureWip,
+    this.injectFurnitureWipIds = const <int>[],
     required this.dateCreate,
     required this.pcs,
     required this.berat,
@@ -120,6 +122,7 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
   String? _returError;
   String? _spannerError;
   String? _injectError;
+  Set<int> _selectedInjectFurnitureWipIds = <int>{};
 
   // Output panel
   List<FurnitureWipOutputItem> _furnitureWipOutputs = [];
@@ -360,29 +363,21 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
         baseUrl: 'http://192.168.10.100:3000',
         onGenerateSame: () async {
           final vm = context.read<FurnitureWipViewModel>();
-
-          final res = await vm.createFromForm(
+          final batch = await _createFurnitureWipBatch(
+            vm: vm,
+            injectSelectedIds: draft.injectFurnitureWipIds,
             idFurnitureWip: draft.idFurnitureWip,
             dateCreate: draft.dateCreate,
             pcs: draft.pcs,
             berat: draft.berat,
-            isPartial: false,
-            idWarna: null,
-            blok: null,
-            idLokasi: null,
             mode: draft.mode,
             hotStampCode: draft.hotStampCode,
             pasangKunciCode: draft.pasangKunciCode,
             returCode: draft.returCode,
             spannerCode: draft.spannerCode,
             injectCode: draft.injectCode,
-            toDbDateString: toDbDateString,
           );
-
-          final data = res['data'] as Map<String, dynamic>? ?? {};
-          final List<dynamic> newHeaders =
-              (data['headers'] as List?)?.cast<dynamic>() ?? [];
-          return newHeaders;
+          return batch.$1;
         },
         labelQueryKey: 'NoFurnitureWIP',
         labelExtractor: (header) => header['NoFurnitureWIP']?.toString() ?? '-',
@@ -409,30 +404,100 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
         baseUrl: 'http://192.168.10.100:3000',
         onCreate: () async {
           final vm = context.read<FurnitureWipViewModel>();
-          final res = await vm.createFromForm(
+          final batch = await _createFurnitureWipBatch(
+            vm: vm,
+            injectSelectedIds: draft.injectFurnitureWipIds,
             idFurnitureWip: draft.idFurnitureWip,
             dateCreate: draft.dateCreate,
             pcs: draft.pcs,
             berat: draft.berat,
-            isPartial: false,
-            idWarna: null,
-            blok: null,
-            idLokasi: null,
             mode: draft.mode,
             hotStampCode: draft.hotStampCode,
             pasangKunciCode: draft.pasangKunciCode,
             returCode: draft.returCode,
             spannerCode: draft.spannerCode,
             injectCode: draft.injectCode,
-            toDbDateString: toDbDateString,
           );
-          final data = res['data'] as Map<String, dynamic>? ?? {};
-          final List headers = data['headers'] as List? ?? [];
+          final List headers = batch.$1;
           if (headers.isEmpty) return null;
           return headers.first['NoFurnitureWIP']?.toString();
         },
       ),
     );
+  }
+
+  Future<(List<dynamic>, int)> _createFurnitureWipBatch({
+    required FurnitureWipViewModel vm,
+    required List<int> injectSelectedIds,
+    required int? idFurnitureWip,
+    required DateTime dateCreate,
+    required double? pcs,
+    required double? berat,
+    required FurnitureWipInputMode mode,
+    String? hotStampCode,
+    String? pasangKunciCode,
+    String? returCode,
+    String? spannerCode,
+    String? injectCode,
+  }) async {
+    final selectedIds = injectSelectedIds.where((e) => e > 0).toList();
+    final shouldSplitInject =
+        mode == FurnitureWipInputMode.inject && selectedIds.isNotEmpty;
+
+    if (!shouldSplitInject) {
+      final res = await vm.createFromForm(
+        idFurnitureWip: idFurnitureWip,
+        dateCreate: dateCreate,
+        pcs: pcs,
+        berat: berat,
+        isPartial: false,
+        idWarna: null,
+        blok: null,
+        idLokasi: null,
+        mode: mode,
+        hotStampCode: hotStampCode,
+        pasangKunciCode: pasangKunciCode,
+        returCode: returCode,
+        spannerCode: spannerCode,
+        injectCode: injectCode,
+        toDbDateString: toDbDateString,
+      );
+      final data = res['data'] as Map<String, dynamic>? ?? {};
+      final headers =
+          (data['headers'] as List?)?.cast<dynamic>() ?? <dynamic>[];
+      final output = data['output'] as Map<String, dynamic>? ?? {};
+      final count = (output['count'] as int?) ?? headers.length;
+      return (headers, count);
+    }
+
+    final allHeaders = <dynamic>[];
+    var totalCount = 0;
+    for (final id in selectedIds) {
+      final res = await vm.createFromForm(
+        idFurnitureWip: id,
+        dateCreate: dateCreate,
+        pcs: pcs,
+        berat: berat,
+        isPartial: false,
+        idWarna: null,
+        blok: null,
+        idLokasi: null,
+        mode: mode,
+        hotStampCode: hotStampCode,
+        pasangKunciCode: pasangKunciCode,
+        returCode: returCode,
+        spannerCode: spannerCode,
+        injectCode: injectCode,
+        toDbDateString: toDbDateString,
+      );
+      final data = res['data'] as Map<String, dynamic>? ?? {};
+      final headers =
+          (data['headers'] as List?)?.cast<dynamic>() ?? <dynamic>[];
+      allHeaders.addAll(headers);
+      final output = data['output'] as Map<String, dynamic>? ?? {};
+      totalCount += (output['count'] as int?) ?? headers.length;
+    }
+    return (allHeaders, totalCount == 0 ? allHeaders.length : totalCount);
   }
 
   Future<void> _submit() async {
@@ -623,38 +688,36 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
         }
 
         DialogService.instance.showLoading(message: 'Membuat label...');
+        if (isInjectCreate && _selectedInjectFurnitureWipIds.isEmpty) {
+          DialogService.instance.hideLoading();
+          await DialogService.instance.showError(
+            title: 'JENIS FURNITURE WIP',
+            message: 'Pilih minimal 1 jenis Furniture WIP untuk proses Inject.',
+          );
+          return;
+        }
 
-        final res = await vm.createFromForm(
-          // Inject create → null (multi), mode lain → IdFurnitureWIP dari dropdown
+        final batch = await _createFurnitureWipBatch(
+          vm: vm,
+          injectSelectedIds: _selectedInjectFurnitureWipIds.toList(),
           idFurnitureWip: idFurnitureVal,
           dateCreate: _selectedDate,
           pcs: pcsVal,
           berat: beratVal,
-          isPartial: false,
-          idWarna: null,
-          blok: null,
-          idLokasi: null,
-          mode: _selectedMode,
+          mode: _selectedMode!,
           hotStampCode: hotStampCode,
           pasangKunciCode: pasangKunciCode,
           returCode: returCode,
           spannerCode: spannerCode,
           injectCode: injectCode,
-          toDbDateString: toDbDateString,
         );
-
         DialogService.instance.hideLoading();
-
-        // =======================
-        // Handle response baru: data.headers (array)
-        // =======================
-        final data = res['data'] as Map<String, dynamic>? ?? {};
-        final List headers = data['headers'] as List? ?? [];
-        final output = data['output'] as Map<String, dynamic>? ?? {};
-        final int count = (output['count'] as int?) ?? headers.length;
+        final List headers = batch.$1;
+        final int count = batch.$2;
 
         _lastDraft = _FurnitureWipCreateDraft(
           idFurnitureWip: idFurnitureVal,
+          injectFurnitureWipIds: _selectedInjectFurnitureWipIds.toList(),
           dateCreate: _selectedDate,
           pcs: pcsVal,
           berat: beratVal,
@@ -1204,6 +1267,10 @@ class _FurnitureWipFormDialogState extends State<FurnitureWipFormDialog> {
                       _selectedInject?.noProduksi ?? _preInjectNoProduksi,
                   title: 'Jenis Furniture WIP',
                   icon: Icons.category_outlined,
+                  selectedIds: _selectedInjectFurnitureWipIds,
+                  onSelectionChanged: (ids) {
+                    setState(() => _selectedInjectFurnitureWipIds = ids);
+                  },
                 ),
                 const SizedBox(height: 16),
               ] else ...[

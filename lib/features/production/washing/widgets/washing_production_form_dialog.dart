@@ -1,35 +1,60 @@
 // lib/features/production/washing/widgets/washing_production_form_dialog.dart
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import 'package:pps_tablet/features/mesin/widgets/mesin_dropdown.dart';
 import 'package:pps_tablet/features/operator/model/operator_model.dart';
+import 'package:pps_tablet/features/production/shared/widgets/regu_operator_picker.dart';
 import 'package:pps_tablet/features/production/shared/widgets/time_form_field.dart';
+import 'package:pps_tablet/features/regu/model/regu_model.dart';
+import 'package:pps_tablet/features/washing_type/model/washing_type_model.dart';
+import 'package:pps_tablet/features/washing_type/widgets/washing_type_dropdown.dart';
 
 import '../../../../common/widgets/app_number_field.dart';
-import '../../../../common/widgets/app_text_field.dart';
+import '../../../../core/network/endpoints.dart';
+import '../../../../core/services/token_storage.dart';
 import '../../../../core/utils/time_formatter.dart';
+import '../../../../core/utils/date_formatter.dart';
 import '../../../mesin/model/mesin_model.dart';
-import '../../../operator/widgets/operator_dropdown.dart';
 import '../../../shared/overlap/repository/overlap_repository.dart';
 import '../../../shared/overlap/view_model/overlap_view_model.dart';
 import '../../../shared/shift/widgets/shift_dropdown.dart';
-
 import '../../shared/widgets/total_hours_pill.dart';
 import '../model/washing_production_model.dart';
-import '../view_model/washing_production_view_model.dart'
-    show WashingProductionViewModel;
-import 'washing_text_field.dart';
-import '../../../../core/utils/date_formatter.dart';
-import '../../../../common/widgets/app_date_field.dart';
+import '../view_model/washing_production_view_model.dart';
 
 class WashingProductionFormDialog extends StatefulWidget {
   final WashingProduction? header;
   final Function(WashingProduction)? onSave;
 
-  const WashingProductionFormDialog({super.key, this.header, this.onSave});
+  // Pre-fill saat create baru dari mesin card
+  final MstMesin? initialMesin;
+  final DateTime? initialDate;
+  final int? initialShift;
+  final String? initialHourStart;
+  final String? initialHourEnd;
+
+  /// Jika true, field shift + jam mulai + jam selesai di-disable (readonly)
+  final bool lockShiftFields;
+
+  /// Jika true, tampilkan field tanggal yang bisa diedit (untuk backdate)
+  final bool isDateEditable;
+
+  const WashingProductionFormDialog({
+    super.key,
+    this.header,
+    this.onSave,
+    this.initialMesin,
+    this.initialDate,
+    this.initialShift,
+    this.initialHourStart,
+    this.initialHourEnd,
+    this.lockShiftFields = false,
+    this.isDateEditable = false,
+  });
 
   @override
   State<WashingProductionFormDialog> createState() =>
@@ -41,87 +66,125 @@ class _WashingProductionFormDialogState
   final _formKey = GlobalKey<FormState>();
 
   // Controllers
-  late final TextEditingController noProduction;
   late final TextEditingController dateCreatedCtrl;
-  late final TextEditingController mesinCtrl;
-  late final TextEditingController operatorCtrl;
-  late final TextEditingController jlhAnggotaCtrl;
+  late final TextEditingController hourStartCtrl;
+  late final TextEditingController hourEndCtrl;
   late final TextEditingController hadirCtrl;
-  late final TextEditingController hourMeterCtrl;
 
   // State
   MstMesin? _selectedMesin;
-  MstOperator? _selectedOperator;
-  int? _selectedShift; // ← sama seperti washing
+  MstRegu? _selectedRegu;
+  List<MstOperator> _selectedOperators = [];
+  bool _loadingReguOperator = false;
+  int? _selectedShift;
+  int? _selectedReguId;
+  WashingType? _selectedWashingType;
   bool _isBlower = false;
 
-  // hold the preselect id for operator (from mesin.defaultOperatorId)
-  int? _operatorPreselectId;
-
   DateTime _selectedDate = DateTime.now();
-
-  // --- time controllers ---
-  late final TextEditingController hourStartCtrl;
-  late final TextEditingController hourEndCtrl;
-
-  // --- time state ---
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
 
   bool get isEdit => widget.header != null;
 
-  // kind untuk endpoint overlap (modul washing)
   static const String _kind = 'washing';
 
   @override
   void initState() {
     super.initState();
-    noProduction = TextEditingController(text: widget.header?.noProduksi ?? '');
 
     final DateTime seededDate = widget.header != null
         ? (parseAnyToDateTime(widget.header!.tglProduksi) ?? DateTime.now())
-        : DateTime.now();
-
+        : (widget.initialDate ?? DateTime.now());
     _selectedDate = seededDate;
     dateCreatedCtrl = TextEditingController(
       text: DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(seededDate),
     );
 
-    mesinCtrl = TextEditingController(text: widget.header?.namaMesin ?? '');
-    operatorCtrl = TextEditingController(
-      text: widget.header?.namaOperator ?? '',
-    );
-    jlhAnggotaCtrl = TextEditingController(
-      text: widget.header?.jmlhAnggota?.toString() ?? '',
-    );
+    _selectedMesin = widget.initialMesin;
+    _selectedShift = widget.header?.shift ?? widget.initialShift;
+    _selectedReguId = widget.header?.idRegu;
+    _isBlower = widget.header?.isBlower ?? false;
+
+    final initStart = widget.header?.hourStart ?? widget.initialHourStart;
+    final initEnd = widget.header?.hourEnd ?? widget.initialHourEnd;
+    hourStartCtrl = TextEditingController(text: initStart ?? '');
+    hourEndCtrl = TextEditingController(text: initEnd ?? '');
+
     hadirCtrl = TextEditingController(
       text: widget.header?.hadir?.toString() ?? '',
     );
-    hourMeterCtrl = TextEditingController(
-      text: widget.header?.hourMeter?.toString() ?? '',
-    );
-    _isBlower = widget.header?.isBlower ?? false;
 
-    // washing sudah punya hourStart/hourEnd di model
-    hourStartCtrl = TextEditingController(text: widget.header?.hourStart);
-    hourEndCtrl = TextEditingController(text: widget.header?.hourEnd);
+    // Pre-fill regu & operator dari header (edit mode)
+    final h = widget.header;
+    if (h != null) {
+      if (h.idRegu != null) {
+        _selectedRegu = MstRegu(idRegu: h.idRegu!, idBagian: 0, namaRegu: '');
+      }
+      if (h.idOperators.isNotEmpty) {
+        final names = h.namaOperators.split(',').map((s) => s.trim()).toList();
+        _selectedOperators = List.generate(h.idOperators.length, (i) {
+          return MstOperator(
+            idOperator: h.idOperators[i],
+            namaOperator: i < names.length ? names[i] : '',
+            enable: true,
+          );
+        });
+      }
+    }
   }
 
   @override
   void dispose() {
-    noProduction.dispose();
     dateCreatedCtrl.dispose();
     hourStartCtrl.dispose();
     hourEndCtrl.dispose();
-    mesinCtrl.dispose();
-    operatorCtrl.dispose();
-    jlhAnggotaCtrl.dispose();
     hadirCtrl.dispose();
-    hourMeterCtrl.dispose();
     super.dispose();
   }
 
-  // --- helper untuk build jam 'HH:mm-HH:mm'
+  Future<void> _pickTanggal() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+      locale: const Locale('id', 'ID'),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _selectedDate = picked;
+      dateCreatedCtrl.text = DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(picked);
+    });
+    if (_selectedShift != null) await _fetchShiftHour(_selectedShift!);
+    await _checkOverlapIfReadyVM();
+  }
+
+  Future<void> _fetchShiftHour(int shift) async {
+    final tanggal = DateFormat('yyyy-MM-dd').format(_selectedDate);
+    final base = ApiConstants.baseUrl.replaceFirst(RegExp(r'/*$'), '');
+    final url = Uri.parse('$base/api/mst/shift/hour?tanggal=$tanggal&shift=$shift');
+    try {
+      final token = await TokenStorage.getToken();
+      final res = await http
+          .get(url, headers: {'Authorization': 'Bearer $token', 'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 10));
+      if (res.statusCode != 200) return;
+      final body = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      final data = body['data'] as Map<String, dynamic>?;
+      if (data == null) return;
+      String trimTime(String? v) => (v != null && v.length >= 5) ? v.substring(0, 5) : (v ?? '');
+      final start = trimTime(data['hourStart'] as String?);
+      final end = trimTime(data['hourEnd'] as String?);
+      if (!mounted) return;
+      setState(() {
+        if (start.isNotEmpty) hourStartCtrl.text = start;
+        if (end.isNotEmpty) hourEndCtrl.text = end;
+      });
+      await _checkOverlapIfReadyVM();
+    } catch (_) {}
+  }
+
   String? _buildJamRange() {
     final start = hourStartCtrl.text.trim();
     final end = hourEndCtrl.text.trim();
@@ -129,8 +192,47 @@ class _WashingProductionFormDialogState
     return '$start-$end';
   }
 
+  Future<void> _checkOverlapIfReadyVM() async {
+    final vm = context.read<OverlapViewModel>();
+    final start = hourStartCtrl.text.trim();
+    final end = hourEndCtrl.text.trim();
+    final idMesin = _selectedMesin?.idMesin ?? widget.header?.idMesin;
+    if (start.isEmpty || end.isEmpty || idMesin == null) {
+      vm.clear();
+      return;
+    }
+    await vm.check(
+      kind: _kind,
+      date: _selectedDate,
+      idMesin: idMesin,
+      hourStart: start,
+      hourEnd: end,
+      excludeNo: isEdit ? widget.header!.noProduksi : null,
+    );
+  }
+
+  Future<void> _openReguOperatorPicker() async {
+    if (!mounted) return;
+    setState(() => _loadingReguOperator = true);
+    final result = await showReguOperatorPicker(
+      context,
+      initialRegu: _selectedRegu,
+      initialSelected: _selectedOperators,
+      idBagian: 7,
+    );
+    if (mounted) setState(() => _loadingReguOperator = false);
+    if (result != null && mounted) {
+      setState(() {
+        _selectedRegu = result.regu;
+        _selectedReguId = result.regu.idRegu;
+        _selectedOperators
+          ..clear()
+          ..addAll(result.operators);
+      });
+    }
+  }
+
   Future<void> _submit() async {
-    // cek overlap dulu
     final ovm = context.read<OverlapViewModel>();
     if (ovm.hasOverlap) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -143,7 +245,6 @@ class _WashingProductionFormDialogState
 
     if (!_formKey.currentState!.validate()) return;
 
-    // pastikan ada mesin & operator & shift
     final mesinId = _selectedMesin?.idMesin ?? widget.header?.idMesin;
     if (mesinId == null) {
       ScaffoldMessenger.of(
@@ -152,14 +253,11 @@ class _WashingProductionFormDialogState
       return;
     }
 
-    final operatorId =
-        _selectedOperator?.idOperator ??
-        _operatorPreselectId ??
-        widget.header?.idOperator;
-    if (operatorId == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Operator wajib dipilih')));
+    final idOperatorList = _selectedOperators.map((o) => o.idOperator).toList();
+    if (idOperatorList.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Minimal 1 operator wajib dipilih')),
+      );
       return;
     }
 
@@ -178,24 +276,17 @@ class _WashingProductionFormDialogState
       return;
     }
 
-    // helper HH:mm -> HH:mm:00
-    String _toSqlTime(String raw) {
+    String toSqlTime(String raw) {
       final t = raw.trim();
-      if (t.isEmpty) return t;
-      return t.length == 5 ? '$t:00' : t;
+      return (t.isNotEmpty && t.length == 5) ? '$t:00' : t;
     }
 
-    final hourStartSql = _toSqlTime(hourStartCtrl.text);
-    final hourEndSql = _toSqlTime(hourEndCtrl.text);
-
-    // parse angka
-    final jlhAnggota = int.tryParse(jlhAnggotaCtrl.text.trim());
+    final hourStartSql = toSqlTime(hourStartCtrl.text);
+    final hourEndSql = toSqlTime(hourEndCtrl.text);
     final hadir = int.tryParse(hadirCtrl.text.trim());
-    final hourMeter = double.tryParse(hourMeterCtrl.text.trim());
 
     final prodVm = context.read<WashingProductionViewModel>();
 
-    // show loading
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -206,51 +297,43 @@ class _WashingProductionFormDialogState
 
     try {
       if (isEdit) {
-        // 🔁 UPDATE (SEKARANG SUDAH BISA)
         result = await prodVm.updateProduksi(
           noProduksi: widget.header!.noProduksi,
           tglProduksi: _selectedDate,
           idMesin: mesinId,
-          idOperator: operatorId,
-          jamKerja: jamRange, // ⚠️ PERBEDAAN: jamKerja (bukan jam)
-          shift: _selectedShift!,
-          isBlower: _isBlower,
-          hourStart: hourStartSql,
-          hourEnd: hourEndSql,
-          jmlhAnggota: jlhAnggota,
-          hadir: hadir,
-          hourMeter: hourMeter,
-        );
-      } else {
-        // 🆕 CREATE
-        result = await prodVm.createProduksi(
-          tglProduksi: _selectedDate,
-          idMesin: mesinId,
-          idOperator: operatorId,
+          idOperator: idOperatorList.first,
           jamKerja: jamRange,
           shift: _selectedShift!,
           isBlower: _isBlower,
           hourStart: hourStartSql,
           hourEnd: hourEndSql,
-          jmlhAnggota: jlhAnggota,
           hadir: hadir,
-          hourMeter: hourMeter,
+          idRegu: _selectedReguId,
+        );
+      } else {
+        result = await prodVm.createProduksi(
+          tglProduksi: _selectedDate,
+          idMesin: mesinId,
+          idOperators: idOperatorList,
+          outputJenisId: _selectedWashingType?.idWashing,
+          jamKerja: jamRange,
+          shift: _selectedShift!,
+          isBlower: _isBlower,
+          hourStart: hourStartSql,
+          hourEnd: hourEndSql,
+          hadir: hadir,
+          idRegu: _selectedReguId,
         );
       }
     } finally {
-      // pop loading
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
+      if (mounted) Navigator.of(context).pop();
     }
+
+    if (!mounted) return;
 
     if (result != null) {
       widget.onSave?.call(result);
-      if (mounted) {
-        Navigator.of(
-          context,
-        ).pop(result); // tutup dialog form & kembalikan result
-      }
+      Navigator.of(context).pop(result);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(prodVm.saveError ?? 'Gagal menyimpan data')),
@@ -258,293 +341,154 @@ class _WashingProductionFormDialogState
     }
   }
 
-  /// Panggil cek-overlap via ViewModel hanya jika input sudah lengkap:
-  /// - Jam Mulai & Jam Selesai terisi
-  /// - IdMesin tersedia
-  Future<void> _checkOverlapIfReadyVM() async {
-    final vm = context.read<OverlapViewModel>();
-
-    final start = hourStartCtrl.text.trim();
-    final end = hourEndCtrl.text.trim();
-    final idMesin = _selectedMesin?.idMesin ?? widget.header?.idMesin;
-
-    if (start.isEmpty || end.isEmpty || idMesin == null) {
-      vm.clear();
-      return;
-    }
-
-    await vm.check(
-      kind: _kind,
-      date: _selectedDate,
-      idMesin: idMesin,
-      hourStart: start,
-      hourEnd: end,
-      excludeNo: isEdit ? widget.header!.noProduksi : null,
-    );
-  }
-
-  void _showOverlapDialog(List<OverlapConflict> conflicts) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Overlap Terdeteksi'),
-        content: SizedBox(
-          width: 420,
-          child: ListView.separated(
-            shrinkWrap: true,
-            itemCount: conflicts.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (_, i) {
-              final c = conflicts[i];
-              return ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.warning_amber_rounded),
-                title: Text(c.noDoc),
-                subtitle: Text('${c.hourStart} – ${c.hourEnd}'),
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('TUTUP'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    final isLandscape = mq.orientation == Orientation.landscape;
+
     return ChangeNotifierProvider(
       create: (_) => OverlapViewModel(repository: OverlapRepository()),
       child: Dialog(
+        backgroundColor: Colors.white,
+        insetPadding: isLandscape
+            ? const EdgeInsets.symmetric(horizontal: 72, vertical: 12)
+            : const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildHeader(),
-              const SizedBox(height: 12),
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [Expanded(flex: 4, child: _buildLeftColumn())],
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: isLandscape ? 680 : 620,
+            maxHeight: (mq.size.height - 24).clamp(
+              260,
+              isLandscape ? 560 : 680,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  fit: FlexFit.loose,
+                  child: SingleChildScrollView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    child: _buildForm(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              _buildActions(),
-            ],
+                const SizedBox(height: 16),
+                _buildActions(),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: isEdit ? Colors.orange.shade100 : Colors.green.shade100,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            isEdit ? Icons.edit : Icons.add,
-            color: isEdit ? Colors.orange.shade700 : Colors.green.shade700,
-            size: 24,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Text(
-          isEdit ? 'Edit Produksi' : 'Tambah Produksi',
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLeftColumn() {
+  Widget _buildForm() {
     final vm = context.watch<OverlapViewModel>();
-    // durasi lokal
     final dur = durationBetweenHHmmWrap(hourStartCtrl.text, hourEndCtrl.text);
     final startFilled = hourStartCtrl.text.trim().isNotEmpty;
     final endFilled = hourEndCtrl.text.trim().isNotEmpty;
     final hasDurationError = startFilled && endFilled && dur == null;
-
-    // overlap dari server
     final hasOverlap = vm.hasOverlap;
     final overlapMsg =
         vm.overlapMessage ?? 'Jam ini bentrok dengan dokumen lain';
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final mesinName =
+        _selectedMesin?.namaMesin ??
+        widget.header?.namaMesin ??
+        widget.initialMesin?.namaMesin ??
+        (isEdit ? 'Edit Produksi' : 'Tambah Produksi');
+
+    return Form(
+      key: _formKey,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Judul ────────────────────────────────────────────────────────
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.description,
-                    color: Colors.blue.shade700,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Header',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              WashingTextField(
-                controller: noProduction,
-                label: 'No. Produksi',
-                icon: Icons.label,
-                asText: true, // readonly text (bold)
-                // ⬅️ Washing: prefix 'C' tanpa titik
-                placeholderText: 'C.XXXXXXXXXX',
-              ),
-
-              const SizedBox(height: 16),
-
-              AppDateField(
-                controller: dateCreatedCtrl,
-                label: 'Tanggal',
-                format: DateFormat('EEEE, dd MMM yyyy', 'id_ID'),
-                initialDate: _selectedDate,
-                onChanged: (d) async {
-                  if (d != null) {
-                    setState(() {
-                      _selectedDate = d;
-                      dateCreatedCtrl.text = DateFormat(
-                        'EEEE, dd MMM yyyy',
-                        'id_ID',
-                      ).format(d);
-                    });
-                    await _checkOverlapIfReadyVM(); // guard mencegah hit jika belum lengkap
-                  }
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              Text(
-                'Tipe Produksi',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade800,
-                ),
-              ),
-              const SizedBox(height: 8),
               Container(
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade300),
+                  color: isEdit ? Colors.orange.shade50 : Colors.teal.shade50,
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: RadioListTile<bool>(
-                        value: false,
-                        groupValue: _isBlower,
-                        dense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                        ),
-                        title: const Text('Cuci'),
-                        onChanged: (value) {
-                          if (value == null) return;
-                          setState(() => _isBlower = value);
-                        },
-                      ),
-                    ),
-                    Container(
-                      width: 1,
-                      height: 52,
-                      color: Colors.grey.shade200,
-                    ),
-                    Expanded(
-                      child: RadioListTile<bool>(
-                        value: true,
-                        groupValue: _isBlower,
-                        dense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                        ),
-                        title: const Text('Blower'),
-                        onChanged: (value) {
-                          if (value == null) return;
-                          setState(() => _isBlower = value);
-                        },
-                      ),
-                    ),
-                  ],
+                child: Icon(
+                  isEdit ? Icons.edit : Icons.add,
+                  color: isEdit ? Colors.orange.shade700 : Colors.teal.shade700,
+                  size: 20,
                 ),
               ),
-
-              const SizedBox(height: 16),
-
-              // Jenis Mesin (Required)
-              MesinDropdown(
-                idBagianMesin: 7, // sesuaikan ID bagian untuk modul washing
-                preselectId: widget.header?.idMesin,
-                label: 'Mesin',
-                hint: 'Pilih jenis mesin',
-                autovalidateMode: AutovalidateMode.onUserInteraction,
-                validator: (v) => v == null ? 'Wajib pilih jenis mesin' : null,
-                onChanged: (m) async {
-                  _selectedMesin = m;
-                  _operatorPreselectId = m?.defaultOperatorId;
-
-                  setState(() {});
-                  await _checkOverlapIfReadyVM();
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              // Operator Default (Required/Optional sesuai kebutuhan)
-              OperatorDropdown(
-                key: ValueKey(
-                  _operatorPreselectId ?? widget.header?.idOperator,
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 3,
+                child: Text(
+                  mesinName,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1F2937),
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                preselectId: isEdit
-                    ? widget
-                          .header
-                          ?.idOperator // ← when editing, take from header
-                    : _operatorPreselectId, // ← when creating, take from mesin.defaultOperatorId
-                label: 'Operator',
-                hint: 'Pilih operator',
-                autovalidateMode: AutovalidateMode.onUserInteraction,
-                validator: (v) => v == null ? 'Wajib pilih operator' : null,
-                onChanged: (op) {
-                  _selectedOperator = op;
-                  setState(() {});
-                },
               ),
+              if (!widget.isDateEditable)
+                Text(
+                  DateFormat('dd MMM yyyy', 'id_ID').format(_selectedDate),
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+                ),
+              if (widget.isDateEditable) ...[
+                const SizedBox(width: 16),
+                Expanded(
+                  flex: 2,
+                  child: TextFormField(
+                    controller: dateCreatedCtrl,
+                    readOnly: true,
+                    onTap: _pickTanggal,
+                    decoration: InputDecoration(
+                      labelText: 'Tanggal',
+                      hintText: 'Pilih tanggal',
+                      prefixIcon: const Icon(Icons.calendar_today_outlined, size: 20),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                    validator: (v) => (v == null || v.isEmpty) ? 'Wajib pilih tanggal' : null,
+                  ),
+                ),
+              ],
+            ],
+          ),
 
-              const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
-              // Jam Mulai & Jam Selesai
-              Row(
+          // ── Baris 1: Shift + Jam Mulai + Jam Selesai + Total Jam ─────────
+          AbsorbPointer(
+            absorbing: widget.lockShiftFields,
+            child: Opacity(
+              opacity: widget.lockShiftFields ? 0.55 : 1.0,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  SizedBox(
+                    width: 190,
+                    child: ShiftDropdown(
+                      preselectId: widget.header?.shift ?? widget.initialShift,
+                      onChangedId: (id) {
+                        setState(() => _selectedShift = id);
+                        if (id != null && widget.isDateEditable) _fetchShiftHour(id);
+                      },
+                      validator: (v) => v == null ? 'Wajib pilih shift' : null,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
+                    flex: 2,
                     child: TimeFormField(
                       controller: hourStartCtrl,
                       label: 'Jam Mulai',
@@ -559,19 +503,19 @@ class _WashingProductionFormDialogState
                             _startTime = picked;
                             hourStartCtrl.text = formatHHmm(picked);
                           });
-                          await _checkOverlapIfReadyVM(); // tidak hit kalau end kosong
+                          await _checkOverlapIfReadyVM();
                         }
                       },
                       validator: (_) {
                         final s = parseHHmm(hourStartCtrl.text);
-                        if (s == null) return 'Wajib isi jam mulai (HH:mm)';
+                        if (s == null) return 'Wajib isi (HH:mm)';
                         final diff = durationBetweenHHmmWrap(
                           hourStartCtrl.text,
                           hourEndCtrl.text,
                         );
                         if (diff == null &&
                             parseHHmm(hourEndCtrl.text) != null) {
-                          return 'Durasi tidak boleh 0 menit';
+                          return 'Durasi 0';
                         }
                         return null;
                       },
@@ -579,6 +523,7 @@ class _WashingProductionFormDialogState
                   ),
                   const SizedBox(width: 12),
                   Expanded(
+                    flex: 2,
                     child: TimeFormField(
                       controller: hourEndCtrl,
                       label: 'Jam Selesai',
@@ -593,104 +538,138 @@ class _WashingProductionFormDialogState
                             _endTime = picked;
                             hourEndCtrl.text = formatHHmm(picked);
                           });
-                          await _checkOverlapIfReadyVM(); // WAJIB cek setelah pilih end
+                          await _checkOverlapIfReadyVM();
                         }
                       },
                       validator: (_) {
                         final e = parseHHmm(hourEndCtrl.text);
-                        if (e == null) return 'Wajib isi jam selesai (HH:mm)';
+                        if (e == null) return 'Wajib isi (HH:mm)';
                         final s = parseHHmm(hourStartCtrl.text);
                         if (s != null) {
                           final diff = durationBetweenHHmmWrap(
                             hourStartCtrl.text,
                             hourEndCtrl.text,
                           );
-                          if (diff == null) return 'Durasi tidak boleh 0 menit';
+                          if (diff == null) return 'Durasi 0';
                         }
                         return null;
                       },
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  TotalHoursPill(
-                    duration: dur,
-                    // kalau overlap → error
-                    isError: hasOverlap || hasDurationError,
-                    errorText: hasOverlap
-                        ? overlapMsg
-                        : 'Durasi tidak boleh 0 menit',
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: ShiftDropdown(
-                      preselectId: widget.header?.shift,
-                      onChangedId: (id) {
-                        setState(() {
-                          _selectedShift = id; // ← simpan
-                        });
-                      },
-                      validator: (v) => v == null ? 'Wajib pilih shift' : null,
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: AppNumberField(
-                      controller: hourMeterCtrl,
-                      label: 'Hour Meter',
-                      icon: Icons.timer_sharp,
-                      allowDecimal: false,
-                      allowNegative: false,
-                      hintText: '0',
-                      validator: (v) =>
-                          (v == null || v.isEmpty) ? 'Wajib diisi' : null,
+                  const SizedBox(width: 16),
+                  Align(
+                    alignment: Alignment.center,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: TotalHoursPill(
+                        duration: dur,
+                        isError: hasOverlap || hasDurationError,
+                        errorText: hasOverlap
+                            ? overlapMsg
+                            : 'Durasi tidak boleh 0 menit',
+                      ),
                     ),
                   ),
                 ],
               ),
+            ),
+          ),
 
-              const SizedBox(height: 16),
+          const SizedBox(height: 16),
 
-              Row(
-                children: [
-                  Expanded(
-                    child: AppNumberField(
-                      controller: jlhAnggotaCtrl,
-                      label: 'Jumlah Anggota',
-                      icon: Icons.people,
-                      allowDecimal: false,
-                      allowNegative: false,
-                      hintText: '0',
-                      validator: (v) =>
-                          (v == null || v.isEmpty) ? 'Wajib diisi' : null,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: AppNumberField(
-                      controller: hadirCtrl,
-                      label: 'Hadir',
-                      icon: Icons.people,
-                      allowDecimal: false,
-                      allowNegative: false,
-                      hintText: '0',
-                      validator: (v) =>
-                          (v == null || v.isEmpty) ? 'Wajib diisi' : null,
-                    ),
-                  ),
-                ],
+          // ── Baris 3: Regu & Operator + Hadir ────────────────────────────
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 4,
+                child: ReguOperatorPickerField(
+                  selectedRegu: _selectedRegu,
+                  selectedOperators: _selectedOperators,
+                  isLoading: _loadingReguOperator,
+                  onTap: _openReguOperatorPicker,
+                ),
               ),
-
-              const SizedBox(height: 16),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 1,
+                child: AppNumberField(
+                  controller: hadirCtrl,
+                  label: 'Hadir',
+                  icon: Icons.people,
+                  allowDecimal: false,
+                  allowNegative: false,
+                  hintText: '0',
+                  isDense: true,
+                  iconSize: 20,
+                  fontSize: 14,
+                  labelFontSize: 14,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  validator: (v) =>
+                      (v == null || v.isEmpty) ? 'Wajib diisi' : null,
+                ),
+              ),
             ],
           ),
-        ),
+
+          const SizedBox(height: 16),
+
+          // ── Baris 4: Tipe Produksi (Washing / Blower) ───────────────────
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFD1D5DB)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: RadioListTile<bool>(
+                    value: false,
+                    groupValue: _isBlower,
+                    dense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    title: const Text(
+                      'Washing',
+                      style: TextStyle(fontSize: 13),
+                    ),
+                    onChanged: (v) {
+                      if (v != null) setState(() => _isBlower = v);
+                    },
+                  ),
+                ),
+                Container(width: 1, height: 48, color: const Color(0xFFE5E7EB)),
+                Expanded(
+                  child: RadioListTile<bool>(
+                    value: true,
+                    groupValue: _isBlower,
+                    dense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    title: const Text('Blower', style: TextStyle(fontSize: 13)),
+                    onChanged: (v) {
+                      if (v != null) setState(() => _isBlower = v);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // ── Baris 5: Jenis Washing ───────────────────────────────────────
+          WashingTypeDropdown(
+            preselectId: widget.header?.outputJenisId,
+            onChanged: (wt) => setState(() => _selectedWashingType = wt),
+            validator: (v) => v == null ? 'Wajib pilih jenis washing' : null,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+          ),
+
+          const SizedBox(height: 8),
+        ],
       ),
     );
   }
@@ -698,8 +677,6 @@ class _WashingProductionFormDialogState
   Widget _buildActions() {
     final vm = context.watch<OverlapViewModel>();
     final hasOverlap = vm.hasOverlap;
-
-    // cek saving dari WashingProductionViewModel
     final prodVm = context.watch<WashingProductionViewModel>();
     final isSaving = prodVm.isSaving;
 
@@ -708,7 +685,6 @@ class _WashingProductionFormDialogState
       children: [
         OutlinedButton(
           onPressed: isSaving ? null : () => Navigator.pop(context),
-          // ...
           child: const Text('BATAL', style: TextStyle(fontSize: 15)),
         ),
         const SizedBox(width: 12),
@@ -730,3 +706,4 @@ class _WashingProductionFormDialogState
     );
   }
 }
+

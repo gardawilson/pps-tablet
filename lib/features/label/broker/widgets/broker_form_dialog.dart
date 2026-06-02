@@ -1,5 +1,7 @@
 // lib/view/widgets/mixer_form_dialog.dart
 
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
@@ -31,6 +33,9 @@ class BrokerFormDialog extends StatefulWidget {
   final String? preselectNamaMesin;
   final DateTime? preselectDate;
 
+  /// Jika diisi, jenis broker di-preselect dan di-disable (tidak bisa diubah).
+  final int? preselectOutputJenisId;
+
   const BrokerFormDialog({
     super.key,
     this.header,
@@ -39,6 +44,7 @@ class BrokerFormDialog extends StatefulWidget {
     this.preselectNoProduksi,
     this.preselectNamaMesin,
     this.preselectDate,
+    this.preselectOutputJenisId,
   });
 
   @override
@@ -191,7 +197,7 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
         ),
         const SizedBox(width: 12),
         Text(
-          isEdit ? 'Edit Label' : 'Tambah Label Baru',
+          isEdit ? 'Edit Label' : 'Buat Label',
           style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
       ],
@@ -219,31 +225,6 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.description,
-                      color: Colors.blue.shade700,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      "Header",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                BrokerTextField(
-                  controller: noBrokerCtrl,
-                  label: 'No Broker',
-                  icon: Icons.label,
-                  asText: true,
-                ),
-                const SizedBox(height: 16),
                 IgnorePointer(
                   ignoring: _isLocked,
                   child: Opacity(
@@ -270,18 +251,6 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                             },
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                BrokerTypeDropdown(
-                  preselectId: widget.header?.idJenisPlastik,
-                  hintText: 'Pilih jenis broker',
-                  validator: (v) =>
-                      v == null ? 'Wajib pilih jenis broker' : null,
-                  autovalidateMode: AutovalidateMode.onUserInteraction,
-                  onChanged: (bt) {
-                    _selectedJenis = bt;
-                    jenisCtrl.text = bt?.nama ?? '';
-                  },
                 ),
                 const SizedBox(height: 16),
                 // No Produksi
@@ -326,6 +295,19 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 16),
+                BrokerTypeDropdown(
+                  preselectId: widget.preselectOutputJenisId ?? widget.header?.idJenisPlastik,
+                  enabled: widget.preselectOutputJenisId == null,
+                  hintText: 'Pilih jenis broker',
+                  validator: (v) =>
+                      v == null ? 'Wajib pilih jenis broker' : null,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                  onChanged: (bt) {
+                    _selectedJenis = bt;
+                    jenisCtrl.text = bt?.nama ?? '';
+                  },
                 ),
               ],
             ),
@@ -1288,8 +1270,75 @@ class _BrokerFormDialogState extends State<BrokerFormDialog> {
 
                 DialogService.instance.hideLoading();
 
+                if (res == null) {
+                  final rawMsg = vm.errorMessage ?? 'Gagal membuat label';
+
+                  // Extract JSON message from ApiException string
+                  String backendMsg = rawMsg;
+                  final jsonMatch = RegExp(
+                    r'\{.*\}',
+                    dotAll: true,
+                  ).firstMatch(rawMsg);
+                  if (jsonMatch != null) {
+                    try {
+                      backendMsg =
+                          (jsonDecode(jsonMatch.group(0)!)['message']
+                              as String?) ??
+                          rawMsg;
+                    } catch (_) {}
+                  }
+
+                  // Try to parse weight-exceeded message from backend
+                  // Format: "... Input=75 kg, OutputExisting=0 kg, OutputBaru=90 kg, ..."
+                  final inputMatch = RegExp(
+                    r'Input=(\d+(?:\.\d+)?)\s*kg',
+                    caseSensitive: false,
+                  ).firstMatch(backendMsg);
+                  final existingMatch = RegExp(
+                    r'OutputExisting=(\d+(?:\.\d+)?)\s*kg',
+                    caseSensitive: false,
+                  ).firstMatch(backendMsg);
+                  final newMatch = RegExp(
+                    r'OutputBaru=(\d+(?:\.\d+)?)\s*kg',
+                    caseSensitive: false,
+                  ).firstMatch(backendMsg);
+
+                  final String errorTitle;
+                  final String errorMessage;
+
+                  if (inputMatch != null &&
+                      existingMatch != null &&
+                      newMatch != null) {
+                    final inputKg = inputMatch.group(1)!;
+                    final existingKg = existingMatch.group(1)!;
+                    final newKg = newMatch.group(1)!;
+                    final remaining =
+                        (double.tryParse(inputKg) ?? 0) -
+                        (double.tryParse(existingKg) ?? 0);
+
+                    errorTitle = 'Berat Label Melebihi Input';
+                    errorMessage =
+                        'Berat label yang ditambahkan ($newKg kg) melebihi sisa kapasitas input yang tersedia.\n\n'
+                        '• Total berat input    : $inputKg kg\n'
+                        '• Total output saat ini: $existingKg kg\n'
+                        '• Sisa kapasitas       : ${remaining.toStringAsFixed(0)} kg\n'
+                        '• Berat label baru     : $newKg kg\n\n'
+                        'Kurangi berat atau jumlah sak label agar tidak melebihi sisa kapasitas.';
+                  } else {
+                    errorTitle = 'Gagal Membuat Label';
+                    errorMessage = backendMsg;
+                  }
+
+                  await DialogService.instance.showError(
+                    title: errorTitle,
+                    message: errorMessage,
+                  );
+                  return;
+                }
+
                 final noWashing =
-                    res?['data']?['header']?['NoWashing']?.toString() ??
+                    (res['data'] as Map?)?['header']?['NoWashing']
+                        ?.toString() ??
                     vm.lastCreatedNoBroker ??
                     '-';
 

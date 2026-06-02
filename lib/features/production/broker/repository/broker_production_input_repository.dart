@@ -59,7 +59,10 @@ class BrokerProductionInputRepository {
         .toList();
   }
 
-  Future<BrokerInputs> fetchInputs(String noProduksi, {bool force = false}) async {
+  Future<BrokerInputs> fetchInputs(
+    String noProduksi, {
+    bool force = false,
+  }) async {
     final token = await TokenStorage.getToken();
     final url = Uri.parse('$_base/api/production/broker/$noProduksi/inputs');
 
@@ -80,7 +83,9 @@ class BrokerProductionInputRepository {
     print('⬅️ [${res.statusCode}] in ${elapsedMs}ms');
 
     if (res.statusCode != 200) {
-      throw Exception('Gagal mengambil input ($noProduksi), code ${res.statusCode})');
+      throw Exception(
+        'Gagal mengambil input ($noProduksi), code ${res.statusCode})',
+      );
     }
 
     final decoded = utf8.decode(res.bodyBytes);
@@ -207,13 +212,14 @@ class BrokerProductionInputRepository {
     }
 
     if (res.statusCode == 200) return ProductionLabelLookupResult.success(body);
-    if (res.statusCode == 404) return ProductionLabelLookupResult.notFound(body);
+    if (res.statusCode == 404)
+      return ProductionLabelLookupResult.notFound(body);
 
-    final msg = (body['message'] as String?) ?? 'Gagal lookup label (HTTP ${res.statusCode})';
+    final msg =
+        (body['message'] as String?) ??
+        'Gagal lookup label (HTTP ${res.statusCode})';
     throw Exception(msg);
   }
-
-
 
   // -----------------------------
   // NEW: Submit Inputs & Partials
@@ -221,9 +227,9 @@ class BrokerProductionInputRepository {
   /// POST /api/production/broker/:noProduksi/inputs
   /// Body: { broker: [...], bb: [...], bbPartialNew: [...], ... }
   Future<Map<String, dynamic>> submitInputsAndPartials(
-      String noProduksi,
-      Map<String, dynamic> payload,
-      ) async {
+    String noProduksi,
+    Map<String, dynamic> payload,
+  ) async {
     final token = await TokenStorage.getToken();
     final url = Uri.parse('$_base/api/production/broker/$noProduksi/inputs');
 
@@ -235,13 +241,10 @@ class BrokerProductionInputRepository {
     try {
       res = await http
           .post(
-        url,
-        headers: {
-          ..._headers(token),
-          'Content-Type': 'application/json',
-        },
-        body: json.encode(payload),
-      )
+            url,
+            headers: {..._headers(token), 'Content-Type': 'application/json'},
+            body: json.encode(payload),
+          )
           .timeout(_timeout);
     } on TimeoutException {
       throw Exception('Timeout submit inputs ($noProduksi)');
@@ -278,13 +281,12 @@ class BrokerProductionInputRepository {
       throw Exception(message);
     } else {
       // Other errors
-      final message = body['message'] as String? ??
+      final message =
+          body['message'] as String? ??
           'Gagal submit inputs (HTTP ${res.statusCode})';
       throw Exception(message);
     }
   }
-
-
 
   // -----------------------------
   // NEW: Move Outputs
@@ -300,10 +302,7 @@ class BrokerProductionInputRepository {
       '$_base/api/production/broker/${Uri.encodeComponent(noProduksi)}/outputs/move',
     );
 
-    final payload = {
-      'targetNoProduksi': targetNoProduksi,
-      'items': items,
-    };
+    final payload = {'targetNoProduksi': targetNoProduksi, 'items': items};
 
     print('➡️ [PATCH] $url');
     print('📦 Move payload: ${json.encode(payload)}');
@@ -313,10 +312,7 @@ class BrokerProductionInputRepository {
       res = await http
           .patch(
             url,
-            headers: {
-              ..._headers(token),
-              'Content-Type': 'application/json',
-            },
+            headers: {..._headers(token), 'Content-Type': 'application/json'},
             body: json.encode(payload),
           )
           .timeout(_timeout);
@@ -372,10 +368,7 @@ class BrokerProductionInputRepository {
       res = await http
           .patch(
             url,
-            headers: {
-              ..._headers(token),
-              'Content-Type': 'application/json',
-            },
+            headers: {..._headers(token), 'Content-Type': 'application/json'},
             body: json.encode(payload),
           )
           .timeout(_timeout);
@@ -416,9 +409,9 @@ class BrokerProductionInputRepository {
   /// - 400 => request tidak valid (mis. tidak ada array yang berisi)
   /// - 500 => error server
   Future<Map<String, dynamic>> deleteInputsAndPartials(
-      String noProduksi,
-      Map<String, dynamic> payload,
-      ) async {
+    String noProduksi,
+    Map<String, dynamic> payload,
+  ) async {
     final token = await TokenStorage.getToken();
     final url = Uri.parse('$_base/api/production/broker/$noProduksi/inputs');
 
@@ -430,13 +423,10 @@ class BrokerProductionInputRepository {
     try {
       res = await http
           .delete(
-        url,
-        headers: {
-          ..._headers(token),
-          'Content-Type': 'application/json',
-        },
-        body: json.encode(payload),
-      )
+            url,
+            headers: {..._headers(token), 'Content-Type': 'application/json'},
+            body: json.encode(payload),
+          )
           .timeout(_timeout);
     } on TimeoutException {
       throw Exception('Timeout delete inputs ($noProduksi)');
@@ -469,7 +459,8 @@ class BrokerProductionInputRepository {
           body['message'] as String? ?? 'Request delete inputs tidak valid';
       throw Exception(message);
     } else {
-      final message = body['message'] as String? ??
+      final message =
+          body['message'] as String? ??
           'Gagal delete inputs (HTTP ${res.statusCode})';
       throw Exception(message);
     }

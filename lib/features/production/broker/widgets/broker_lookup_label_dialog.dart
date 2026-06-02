@@ -22,7 +22,8 @@ class BrokerLookupLabelDialog extends StatefulWidget {
   });
 
   @override
-  State<BrokerLookupLabelDialog> createState() => _BrokerLookupLabelDialogState();
+  State<BrokerLookupLabelDialog> createState() =>
+      _BrokerLookupLabelDialogState();
 }
 
 class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
@@ -99,7 +100,11 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
     _didAutoSelect = true;
   }
 
-  void _toggleRow(BrokerProductionInputViewModel vm, int index, Map<String, dynamic> row) {
+  void _toggleRow(
+    BrokerProductionInputViewModel vm,
+    int index,
+    Map<String, dynamic> row,
+  ) {
     if (_isDisabled(index)) return;
     setState(() {
       if (_localPickedIndices.contains(index)) {
@@ -110,7 +115,10 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
     });
   }
 
-  void _selectAllNew(BrokerProductionInputViewModel vm, ProductionLabelLookupResult result) {
+  void _selectAllNew(
+    BrokerProductionInputViewModel vm,
+    ProductionLabelLookupResult result,
+  ) {
     setState(() {
       _localPickedIndices.clear();
       for (int i = 0; i < result.data.length; i++) {
@@ -121,7 +129,10 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
     });
   }
 
-  void _commitSelection(BrokerProductionInputViewModel vm, ProductionLabelLookupResult result) {
+  void _commitSelection(
+    BrokerProductionInputViewModel vm,
+    ProductionLabelLookupResult result,
+  ) {
     if (_localPickedIndices.isEmpty) return;
 
     vm.clearPicks();
@@ -153,11 +164,11 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
   }
 
   _Presence _presenceForRow(
-      BrokerProductionInputViewModel vm,
-      Map<String, dynamic> row,
-      ProductionLabelLookupResult ctx,
-      String noProduksi,
-      ) {
+    BrokerProductionInputViewModel vm,
+    Map<String, dynamic> row,
+    ProductionLabelLookupResult ctx,
+    String noProduksi,
+  ) {
     final sk = ctx.simpleKey(row);
     if (vm.isInTempKeys(sk)) {
       return _Presence.temp;
@@ -172,7 +183,10 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
         final result = vm.lastLookup;
         if (result == null) {
           return const Dialog(
-            child: SizedBox(height: 120, child: Center(child: Text('Tidak ada hasil lookup'))),
+            child: SizedBox(
+              height: 120,
+              child: Center(child: Text('Tidak ada hasil lookup')),
+            ),
           );
         }
 
@@ -190,7 +204,9 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
 
         final dynamic sample = typedItems.isNotEmpty ? typedItems.first : null;
         final labelCode = sample == null ? '-' : _labelCodeOf(sample);
-        final namaJenis = sample == null ? prefixType.displayName : (_namaJenisOf(sample) ?? '-');
+        final namaJenis = sample == null
+            ? prefixType.displayName
+            : (_namaJenisOf(sample) ?? '-');
 
         int newCount = 0;
         for (int i = 0; i < result.data.length; i++) {
@@ -198,9 +214,14 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
         }
 
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           elevation: 8,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 24,
+          ),
           child: Container(
             constraints: const BoxConstraints(maxWidth: 720, maxHeight: 600),
             decoration: BoxDecoration(
@@ -215,10 +236,7 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [
-                        Colors.blue.shade600,
-                        Colors.blue.shade700,
-                      ],
+                      colors: [Colors.blue.shade600, Colors.blue.shade700],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -235,7 +253,11 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                           color: Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.qr_code_2_rounded, size: 28, color: Colors.white),
+                        child: const Icon(
+                          Icons.qr_code_2_rounded,
+                          size: 28,
+                          color: Colors.white,
+                        ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
@@ -243,19 +265,19 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              labelCode,
+                              namaJenis,
                               style: const TextStyle(
-                                fontSize: 20,
+                                fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              namaJenis,
+                              labelCode,
                               style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.white.withOpacity(0.9),
+                                fontSize: 13,
+                                color: Colors.white.withOpacity(0.85),
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -263,7 +285,10 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(20),
@@ -281,356 +306,209 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                   ),
                 ),
 
-                // ✅ COLUMN HEADERS - Lebih clean
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    border: Border(
-                      bottom: BorderSide(color: Colors.grey.shade200),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const SizedBox(width: 40),
-                      const Expanded(
-                        flex: 2,
-                        child: Text(
-                          'SAK',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                            color: Colors.black87,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                      const Expanded(
-                        flex: 2,
-                        child: Text(
-                          'BERAT (KG)',
-                          textAlign: TextAlign.right,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                            color: Colors.black87,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      SizedBox(
-                        width: 220,
-                        child: Text(
-                          'STATUS',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                            color: Colors.black87,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // ✅ LIST - Design lebih modern
+                // ✅ GRID - Kartu sak kotak-kotak (mengikuti desain _SakCard)
                 Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(12),
-                    itemCount: typedItems.length,
-                    itemBuilder: (_, idx) {
-                      final item = typedItems[idx];
-                      final rawRow = result.data[idx];
+                  child: LayoutBuilder(
+                    builder: (_, constraints) {
+                      final crossCount = constraints.maxWidth < 300
+                          ? 4
+                          : constraints.maxWidth < 450
+                          ? 6
+                          : constraints.maxWidth < 600
+                          ? 7
+                          : 8;
+                      return GridView.builder(
+                        padding: const EdgeInsets.all(12),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossCount,
+                          crossAxisSpacing: 6,
+                          mainAxisSpacing: 6,
+                          childAspectRatio: 1.3,
+                        ),
+                        itemCount: typedItems.length,
+                        itemBuilder: (_, idx) {
+                          final item = typedItems[idx];
+                          final rawRow = result.data[idx];
 
-                      final presence = _presenceForRow(vm, rawRow, result, widget.noProduksi);
-                      final isDuplicate = _isDisabled(idx);
-                      final picked = _localPickedIndices.contains(idx);
+                          final presence = _presenceForRow(
+                            vm,
+                            rawRow,
+                            result,
+                            widget.noProduksi,
+                          );
+                          final isDuplicate = _isDisabled(idx);
+                          final picked = _localPickedIndices.contains(idx);
 
-                      if (isDuplicate && picked) {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (!mounted) return;
-                          setState(() => _localPickedIndices.remove(idx));
-                        });
-                      }
+                          if (isDuplicate && picked) {
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (!mounted) return;
+                              setState(() => _localPickedIndices.remove(idx));
+                            });
+                          }
 
-                      final sak = _sakOf(item);
-                      final originalBerat = _beratOf(item);
-                      final displayBerat = _editedWeights[idx] ?? originalBerat;
-                      final beratTxt = displayBerat == null ? '-' : num2(displayBerat);
+                          final sak = _sakOf(item);
+                          final originalBerat = _beratOf(item);
+                          final displayBerat =
+                              _editedWeights[idx] ?? originalBerat;
+                          final beratTxt = displayBerat == null
+                              ? '-'
+                              : num2(displayBerat);
 
-                      final isPartial = _isPartialOf(item, rawRow);
-                      final isWeightEdited = _editedWeights.containsKey(idx);
+                          final isPartial = _isPartialOf(item, rawRow);
+                          final isWeightEdited = _editedWeights.containsKey(
+                            idx,
+                          );
+                          final isSudahInput = presence == _Presence.temp;
 
-                      String? statusText;
-                      Color? statusColor;
-                      switch (presence) {
-                        case _Presence.temp:
-                          statusText = 'Sudah Input';
-                          statusColor = Colors.orange;
-                          break;
-                        case _Presence.none:
-                          statusText = null;
-                          statusColor = null;
-                          break;
-                      }
+                          Color cardBg;
+                          Color borderColor;
+                          Color titleColor;
+                          if (isSudahInput) {
+                            cardBg = Colors.orange.shade50;
+                            borderColor = Colors.orange.shade300;
+                            titleColor = Colors.orange.shade700;
+                          } else if (picked) {
+                            cardBg = const Color(0xFFDCEEFF);
+                            borderColor = const Color(0xFF1D4ED8);
+                            titleColor = const Color(0xFF1D4ED8);
+                          } else {
+                            cardBg = const Color(0xFFF0F7FF);
+                            borderColor = const Color(0xFFBFDBFE);
+                            titleColor = const Color(0xFF1D4ED8);
+                          }
 
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: IgnorePointer(
-                          ignoring: isDuplicate,
-                          child: AnimatedOpacity(
+                          return AnimatedOpacity(
                             duration: const Duration(milliseconds: 200),
-                            opacity: isDuplicate ? 0.4 : 1.0,
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(12),
-                                onTap: isDuplicate ? null : () => _toggleRow(vm, idx, rawRow),
-                                child: Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: picked && !isDuplicate
-                                        ? Colors.blue.shade50
-                                        : Colors.white,
-                                    border: Border.all(
-                                      color: picked && !isDuplicate
-                                          ? Colors.blue.shade300
-                                          : Colors.grey.shade200,
-                                      width: picked && !isDuplicate ? 2 : 1,
+                            opacity: isDuplicate ? 0.45 : 1.0,
+                            child: GestureDetector(
+                              onTap: isDuplicate
+                                  ? null
+                                  : () => _toggleRow(vm, idx, rawRow),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: cardBg,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: borderColor,
+                                    width: picked && !isDuplicate ? 2 : 1,
+                                  ),
+                                ),
+                                child: Stack(
+                                  children: [
+                                    Center(
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            'Sak ${sak ?? idx + 1}',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w800,
+                                              color: titleColor,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            '$beratTxt kg',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: isWeightEdited
+                                                  ? Colors.amber.shade800
+                                                  : const Color(0xFF374151),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: picked && !isDuplicate
-                                        ? [
-                                      BoxShadow(
-                                        color: Colors.blue.withOpacity(0.1),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ]
-                                        : null,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      // Checkbox
-                                      Container(
-                                        width: 40,
-                                        height: 40,
-                                        alignment: Alignment.center,
-                                        child: Checkbox(
-                                          value: picked && !isDuplicate,
-                                          onChanged: isDuplicate
-                                              ? null
-                                              : (_) => _toggleRow(vm, idx, rawRow),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(6),
-                                          ),
-                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                        ),
-                                      ),
-
-                                      // SAK dengan icon partial
-                                      Expanded(
-                                        flex: 2,
-                                        child: Row(
-                                          children: [
-                                            if (isPartial) ...[
-                                              Container(
-                                                padding: const EdgeInsets.all(4),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.amber.withOpacity(0.2),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                ),
-                                                child: const Icon(
-                                                  Icons.content_cut,
-                                                  size: 14,
-                                                  color: Colors.amber,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                            ],
-                                            Expanded(
-                                              child: Text(
-                                                sak?.toString() ?? '-',
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: 15,
-                                                  color: isDuplicate
-                                                      ? Colors.grey.shade400
-                                                      : Colors.black87,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-
-                                      // BERAT - Pill style lebih modern
-                                      Expanded(
-                                        flex: 2,
-                                        child: Align(
-                                          alignment: Alignment.centerRight,
+                                    // Edit button for partial items (top-right)
+                                    if (isPartial && !isDuplicate)
+                                      Positioned(
+                                        top: 3,
+                                        right: 3,
+                                        child: GestureDetector(
+                                          onTap: () async {
+                                            if (originalBerat != null) {
+                                              final newWeight =
+                                                  await WeightInputDialog.show(
+                                                    context,
+                                                    maxWeight: originalBerat,
+                                                    currentWeight:
+                                                        _editedWeights[idx],
+                                                  );
+                                              if (newWeight != null &&
+                                                  mounted) {
+                                                setState(
+                                                  () => _editedWeights[idx] =
+                                                      newWeight,
+                                                );
+                                              }
+                                            }
+                                          },
                                           child: Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 12,
-                                              vertical: 6,
-                                            ),
+                                            width: 16,
+                                            height: 16,
                                             decoration: BoxDecoration(
-                                              gradient: LinearGradient(
-                                                colors: isWeightEdited
-                                                    ? [
-                                                  Colors.amber.shade300,
-                                                  Colors.amber.shade400,
-                                                ]
-                                                    : statusText != null
-                                                    ? [
-                                                  statusColor!.withOpacity(0.2),
-                                                  statusColor.withOpacity(0.3),
-                                                ]
-                                                    : [
-                                                  Colors.green.shade100,
-                                                  Colors.green.shade200,
-                                                ],
-                                              ),
-                                              borderRadius: BorderRadius.circular(20),
+                                              color: isWeightEdited
+                                                  ? Colors.amber.shade500
+                                                  : Colors.blue.shade400,
+                                              shape: BoxShape.circle,
                                             ),
-                                            child: Text(
-                                              '$beratTxt kg',
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.bold,
-                                                color: isWeightEdited
-                                                    ? Colors.amber.shade900
-                                                    : statusText != null
-                                                    ? statusColor
-                                                    : Colors.green.shade800,
-                                              ),
+                                            child: const Icon(
+                                              Icons.edit,
+                                              size: 9,
+                                              color: Colors.white,
                                             ),
                                           ),
                                         ),
                                       ),
-
-                                      const SizedBox(width: 12),
-
-                                      // BADGES & BUTTON - Lebih compact
-                                      SizedBox(
-                                        width: 220,
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.end,
-                                          children: [
-                                            // Edit button
-                                            if (isPartial && !isDuplicate)
-                                              Container(
-                                                height: 32,
-                                                child: OutlinedButton.icon(
-                                                  style: OutlinedButton.styleFrom(
-                                                    padding: const EdgeInsets.symmetric(
-                                                      horizontal: 10,
-                                                      vertical: 4,
-                                                    ),
-                                                    side: BorderSide(
-                                                      color: Colors.amber.shade600,
-                                                      width: 1.5,
-                                                    ),
-                                                    shape: RoundedRectangleBorder(
-                                                      borderRadius: BorderRadius.circular(8),
-                                                    ),
-                                                  ),
-                                                  icon: Icon(
-                                                    Icons.edit_outlined,
-                                                    size: 14,
-                                                    color: Colors.amber.shade700,
-                                                  ),
-                                                  label: Text(
-                                                    'Edit',
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      fontWeight: FontWeight.w600,
-                                                      color: Colors.amber.shade700,
-                                                    ),
-                                                  ),
-                                                  onPressed: () async {
-                                                    if (originalBerat != null) {
-                                                      final newWeight =
-                                                      await WeightInputDialog.show(
-                                                        context,
-                                                        maxWeight: originalBerat,
-                                                        currentWeight: _editedWeights[idx],
-                                                      );
-
-                                                      if (newWeight != null && mounted) {
-                                                        setState(() {
-                                                          _editedWeights[idx] = newWeight;
-                                                        });
-                                                      }
-                                                    }
-                                                  },
-                                                ),
-                                              ),
-
-                                            if (isPartial && !isDuplicate)
-                                              const SizedBox(width: 8),
-
-                                            // Badges
-                                            if (isPartial)
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(
-                                                  horizontal: 10,
-                                                  vertical: 4,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.amber.withOpacity(0.15),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                  border: Border.all(
-                                                    color: Colors.amber.shade400,
-                                                  ),
-                                                ),
-                                                child: Text(
-                                                  'PARTIAL',
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w800,
-                                                    color: Colors.amber.shade700,
-                                                    letterSpacing: 0.5,
-                                                  ),
-                                                ),
-                                              ),
-
-                                            if (statusText != null)
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(
-                                                  horizontal: 10,
-                                                  vertical: 4,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  color: statusColor!.withOpacity(0.15),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                  border: Border.all(
-                                                    color: statusColor.withOpacity(0.4),
-                                                  ),
-                                                ),
-                                                child: Text(
-                                                  statusText,
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: statusColor,
-                                                    letterSpacing: 0.3,
-                                                  ),
-                                                ),
-                                              ),
-                                          ],
+                                    // Checkmark for selected (top-left)
+                                    if (picked && !isDuplicate)
+                                      Positioned(
+                                        top: 3,
+                                        left: 3,
+                                        child: Icon(
+                                          Icons.check_circle,
+                                          size: 12,
+                                          color: Colors.blue.shade700,
                                         ),
                                       ),
-                                    ],
-                                  ),
+                                    // "Input" label for already-added
+                                    if (isSudahInput)
+                                      Positioned(
+                                        top: 3,
+                                        right: 3,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 4,
+                                            vertical: 1,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.orange.shade100,
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.orange.shade400,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            'Input',
+                                            style: TextStyle(
+                                              fontSize: 8,
+                                              fontWeight: FontWeight.w800,
+                                              color: Colors.orange.shade700,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
                             ),
-                          ),
-                        ),
+                          );
+                        },
                       );
                     },
                   ),
@@ -681,7 +559,10 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
                       // Counter
                       if (_localPickedIndices.isNotEmpty)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           margin: const EdgeInsets.only(right: 12),
                           decoration: BoxDecoration(
                             color: Colors.blue.shade100,
@@ -807,7 +688,7 @@ class _BrokerLookupLabelDialogState extends State<BrokerLookupLabelDialog> {
     try {
       if (item is BbItem && item.isPartialRow == true) return true;
       final dynamic dyn = item;
-      final hasIsPartial = (dyn as dynamic?)?.isPartial;
+      final hasIsPartial = (dyn as dynamic).isPartial;
       if (hasIsPartial is bool && hasIsPartial) return true;
     } catch (_) {}
     return false;

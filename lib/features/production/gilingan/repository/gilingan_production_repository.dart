@@ -19,6 +19,40 @@ class GilinganProductionRepository {
     'Accept': 'application/json',
   };
 
+  // =========================
+  //  GILINGAN MESIN LIST
+  //  GET /api/mst-mesin/gilingan
+  // =========================
+  Future<List<GilinganMesinInfo>> fetchGilinganMesin() async {
+    final token = await TokenStorage.getToken();
+    final apiBaseUri = Uri.parse(ApiConstants.baseUrl);
+    final url = Uri(
+      scheme: apiBaseUri.scheme.isEmpty ? 'http' : apiBaseUri.scheme,
+      host: apiBaseUri.host,
+      port: 7500,
+      path: '/api/mst-mesin/gilingan',
+    );
+
+    late http.Response res;
+    try {
+      res = await http.get(url, headers: _headers(token)).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout mengambil data mesin gilingan');
+    } catch (e) {
+      throw Exception('Gagal terhubung ke server: $e');
+    }
+
+    if (res.statusCode != 200) {
+      throw Exception('Gagal memuat mesin gilingan (${res.statusCode})');
+    }
+
+    final body = json.decode(utf8.decode(res.bodyBytes));
+    final data = body['data'] as List<dynamic>? ?? [];
+    return data
+        .map((e) => GilinganMesinInfo.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   /// Get GilinganProduksi_h by date
   /// Backend: GET /api/production/gilingan/:date (YYYY-MM-DD)
   Future<List<GilinganProduction>> fetchByDate(DateTime date) async {

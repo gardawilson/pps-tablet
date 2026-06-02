@@ -2,10 +2,14 @@ import 'package:intl/intl.dart';
 
 class BrokerProduction {
   final String noProduksi;
-  final int idOperator;
+  /// List of operator IDs (multi-operator support)
+  final List<int> idOperators;
   final int idMesin;
   final String namaMesin;
-  final String namaOperator;
+  /// Comma-separated operator names e.g. "ABDUL HAKIM, RAMOT"
+  final String namaOperators;
+  final String? outputJenisNama;
+  final int? outputJenisId;
   final DateTime? tglProduksi;
   final int jamKerja;
   final int shift;
@@ -23,16 +27,18 @@ class BrokerProduction {
   final String? hourStart; // "HH:mm"
   final String? hourEnd;   // "HH:mm"
 
-  // ✅ NEW: tutup transaksi flags
-  final DateTime? lastClosedDate; // date only
+  // tutup transaksi flags
+  final DateTime? lastClosedDate;
   final bool isLocked;
 
   const BrokerProduction({
     required this.noProduksi,
-    required this.idOperator,
+    required this.idOperators,
     required this.idMesin,
     required this.namaMesin,
-    required this.namaOperator,
+    required this.namaOperators,
+    this.outputJenisNama,
+    this.outputJenisId,
     required this.tglProduksi,
     required this.jamKerja,
     required this.shift,
@@ -47,11 +53,15 @@ class BrokerProduction {
     this.namaRegu,
     this.hourStart,
     this.hourEnd,
-
-    // ✅ NEW
     this.lastClosedDate,
     this.isLocked = false,
   });
+
+  // ── Backward-compat getters ──────────────────────────────────────────────
+  /// First operator ID (or 0 if empty). Use `idOperators` for full list.
+  int get idOperator => idOperators.isNotEmpty ? idOperators.first : 0;
+  /// Comma-separated operator names. Alias for `namaOperators`.
+  String get namaOperator => namaOperators;
 
   // ---------- tolerant parsers ----------
   static String _asString(dynamic v) => v?.toString() ?? '';
@@ -95,7 +105,7 @@ class BrokerProduction {
     if (v == null) return null;
 
     if (v is DateTime) {
-      return DateFormat('HH:mm').format(v.toLocal());
+      return DateFormat('HH:mm').format(v.isUtc ? v : v.toUtc());
     }
 
     if (v is String) {
@@ -104,7 +114,9 @@ class BrokerProduction {
 
       final asDt = DateTime.tryParse(s);
       if (asDt != null) {
-        return DateFormat('HH:mm').format(asDt.toLocal());
+        // Server stores TIME as epoch datetime in UTC (e.g. 1970-01-01T08:00:00.000Z).
+        // Always read the UTC hour to avoid timezone shift.
+        return DateFormat('HH:mm').format(asDt.toUtc());
       }
 
       final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(s);
@@ -121,10 +133,17 @@ class BrokerProduction {
   factory BrokerProduction.fromJson(Map<String, dynamic> j) {
     return BrokerProduction(
       noProduksi: _asString(j['NoProduksi']),
-      idOperator: _asIntRequired(j['IdOperator']),
+      idOperators: (j['IdOperators'] as List?)
+              ?.map((e) => _asIntRequired(e))
+              .toList() ??
+          [],
       idMesin: _asIntRequired(j['IdMesin']),
       namaMesin: _asString(j['NamaMesin']),
-      namaOperator: _asString(j['NamaOperator']),
+      namaOperators: _asString(j['NamaOperators']),
+      outputJenisNama: (j['OutputJenisNama'] == null || _asString(j['OutputJenisNama']).trim().isEmpty)
+          ? null
+          : _asString(j['OutputJenisNama']),
+      outputJenisId: _asInt(j['OutputJenisId']),
       tglProduksi: _asDateTime(j['TglProduksi']),
       jamKerja: _asIntRequired(j['JamKerja']),
       shift: _asIntRequired(j['Shift']),
@@ -140,7 +159,6 @@ class BrokerProduction {
       hourStart: _asTimeHHmm(j['HourStart']),
       hourEnd: _asTimeHHmm(j['HourEnd']),
 
-      // ✅ NEW: mapping dari backend
       lastClosedDate: _asDateTime(j['LastClosedDate']),
       isLocked: _asBool(j['IsLocked']),
     );
@@ -148,10 +166,11 @@ class BrokerProduction {
 
   Map<String, dynamic> toJson({bool asDateOnly = true}) => {
     'NoProduksi': noProduksi,
-    'IdOperator': idOperator,
+    'IdOperators': idOperators,
     'IdMesin': idMesin,
     'NamaMesin': namaMesin,
-    'NamaOperator': namaOperator,
+    'NamaOperators': namaOperators,
+    'OutputJenisNama': outputJenisNama,
     'TglProduksi': tglProduksi == null
         ? null
         : (asDateOnly
@@ -198,5 +217,126 @@ class BrokerProduction {
     if (lastClosedDate == null) return 'Locked';
     final d = DateFormat('dd MMM yyyy', 'id_ID').format(lastClosedDate!.toLocal());
     return 'Locked (<= $d)';
+  }
+}
+
+class BrokerProduksiItem {
+  final String noProduksi;
+  final DateTime? tglProduksi;
+  final int? outputJenisId;
+  final String? outputJenisNama;
+  final String? outputJenisItemCode;
+  /// List of operator IDs (multi-operator)
+  final List<int> idOperators;
+  /// Comma-separated operator names e.g. "ABDUL HAKIM, RAMOT"
+  final String? operators;
+  final int? idRegu;
+  final String? namaRegu;
+  final int? shift;
+  final String? hourStart;
+  final String? hourEnd;
+
+  const BrokerProduksiItem({
+    required this.noProduksi,
+    this.tglProduksi,
+    this.outputJenisId,
+    this.outputJenisNama,
+    this.outputJenisItemCode,
+    this.idOperators = const [],
+    this.operators,
+    this.idRegu,
+    this.namaRegu,
+    this.shift,
+    this.hourStart,
+    this.hourEnd,
+  });
+
+  // ── Backward-compat getters ──────────────────────────────────────────────
+  int? get idOperator => idOperators.isNotEmpty ? idOperators.first : null;
+  String? get operator_ => operators;
+
+  factory BrokerProduksiItem.fromJson(Map<String, dynamic> j) {
+    String? s(dynamic v) => v == null ? null : v.toString().trim().isEmpty ? null : v.toString().trim();
+    int? i(dynamic v) {
+      if (v == null) return null;
+      if (v is num) return v.toInt();
+      return int.tryParse(v.toString());
+    }
+    String? timeHHmm(dynamic v) {
+      final raw = s(v);
+      if (raw == null) return null;
+      final parts = raw.split(':');
+      if (parts.length < 2) return raw;
+      return '${parts[0].padLeft(2, '0')}:${parts[1].padLeft(2, '0')}';
+    }
+
+    // Parse IdOperators — support both array (new) and single int (legacy)
+    List<int> parseIdOperators(dynamic v) {
+      if (v is List) return v.map((e) => i(e) ?? 0).where((e) => e != 0).toList();
+      final single = i(v);
+      return single != null ? [single] : [];
+    }
+
+    return BrokerProduksiItem(
+      noProduksi: s(j['NoProduksi']) ?? '',
+      tglProduksi: j['TglProduksi'] != null ? DateTime.tryParse(j['TglProduksi'].toString()) : null,
+      outputJenisId: i(j['OutputJenisId']),
+      outputJenisNama: s(j['OutputJenisNama']),
+      outputJenisItemCode: s(j['OutputJenisItemCode']),
+      idOperators: parseIdOperators(j['IdOperators'] ?? j['IdOperator']),
+      operators: s(j['Operators']) ?? s(j['Operator']),
+      idRegu: i(j['IdRegu']),
+      namaRegu: s(j['NamaRegu']),
+      shift: i(j['Shift']),
+      hourStart: timeHHmm(j['HourStart']),
+      hourEnd: timeHHmm(j['HourEnd']),
+    );
+  }
+}
+
+class BrokerMesinInfo {
+  final int idMesin;
+  final String namaMesin;
+  final String bagian;
+  final List<BrokerProduksiItem> produksiList;
+
+  bool get isActive => produksiList.isNotEmpty;
+
+  // backward-compat getters (first item)
+  String? get noProduksi => produksiList.isNotEmpty ? produksiList.first.noProduksi : null;
+  String? get operator_ => produksiList.isNotEmpty ? produksiList.first.operator_ : null;
+  String? get namaRegu => produksiList.isNotEmpty ? produksiList.first.namaRegu : null;
+  int? get shift => produksiList.isNotEmpty ? produksiList.first.shift : null;
+  String? get hourStart => produksiList.isNotEmpty ? produksiList.first.hourStart : null;
+  String? get hourEnd => produksiList.isNotEmpty ? produksiList.first.hourEnd : null;
+
+  const BrokerMesinInfo({
+    required this.idMesin,
+    required this.namaMesin,
+    required this.bagian,
+    this.produksiList = const [],
+  });
+
+  factory BrokerMesinInfo.fromJson(Map<String, dynamic> j) {
+    String? s(dynamic v) => v == null ? null : v.toString().trim().isEmpty ? null : v.toString().trim();
+    int? i(dynamic v) {
+      if (v == null) return null;
+      if (v is num) return v.toInt();
+      return int.tryParse(v.toString());
+    }
+
+    // API now returns flat structure — one item per mesin row.
+    // Build a produksiList from the flat fields when NoProduksi is present.
+    final List<BrokerProduksiItem> items = [];
+    if (s(j['NoProduksi']) != null) {
+      items.add(BrokerProduksiItem.fromJson(j));
+    }
+
+    return BrokerMesinInfo(
+      idMesin: i(j['IdMesin']) ?? 0,
+      namaMesin: s(j['NamaMesin']) ?? '',
+      bagian: s(j['Bagian']) ?? '',
+      produksiList: items,
+    );
   }
 }

@@ -176,7 +176,8 @@ class WashingProductionViewModel extends ChangeNotifier {
   Future<WashingProduction?> createProduksi({
     required DateTime tglProduksi,
     required int idMesin,
-    required int idOperator,
+    required List<int> idOperators,
+    int? outputJenisId,
     /// Bisa int (jam) atau 'HH:mm-HH:mm'
     required dynamic jamKerja,
     required int shift,
@@ -187,10 +188,9 @@ class WashingProductionViewModel extends ChangeNotifier {
     int? hadir,
     double? hourMeter,
     bool isBlower = false,
-
-    // ⬇️ baru: ikuti repository
     String? hourStart,
     String? hourEnd,
+    int? idRegu,
   }) async {
     isSaving = true;
     saveError = null;
@@ -200,7 +200,8 @@ class WashingProductionViewModel extends ChangeNotifier {
       final created = await repository.createProduksi(
         tglProduksi: tglProduksi,
         idMesin: idMesin,
-        idOperator: idOperator,
+        idOperators: idOperators,
+        outputJenisId: outputJenisId,
         jamKerja: jamKerja,
         shift: shift,
         checkBy1: checkBy1,
@@ -210,9 +211,9 @@ class WashingProductionViewModel extends ChangeNotifier {
         hadir: hadir,
         hourMeter: hourMeter,
         isBlower: isBlower,
-        // ⬇️ lempar ke repo
         hourStart: hourStart,
         hourEnd: hourEnd,
+        idRegu: idRegu,
       );
 
       // setelah create, refresh sesuai mode
@@ -257,6 +258,7 @@ class WashingProductionViewModel extends ChangeNotifier {
     int? jmlhAnggota,
     int? hadir,
     double? hourMeter,
+    int? idRegu,
   }) async {
     isSaving = true;
     saveError = null;
@@ -279,6 +281,7 @@ class WashingProductionViewModel extends ChangeNotifier {
         jmlhAnggota: jmlhAnggota,
         hadir: hadir,
         hourMeter: hourMeter,
+        idRegu: idRegu,
       );
 
       // setelah update, refresh sesuai mode

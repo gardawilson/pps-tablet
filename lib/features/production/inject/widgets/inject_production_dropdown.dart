@@ -1,7 +1,6 @@
 // lib/features/shared/inject_production/widgets/packing_production_dropdown.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 
 import '../view_model/inject_production_view_model.dart';
 import '../model/inject_production_model.dart';
@@ -96,6 +95,8 @@ class _InjectProductionDropdownState extends State<InjectProductionDropdown> {
         offsetNext: null,
 
         idFurnitureMaterial: null,
+        idJenis: null,
+        namaJenis: null,
         beratProdukHasilTimbang: null,
 
         // ✅ field baru dari GET ALL
@@ -150,6 +151,12 @@ class _InjectProductionDropdownState extends State<InjectProductionDropdown> {
     }
   }
 
+  String _buildFurnitureWipLabel(InjectProduction e) {
+    final nama = (e.namaJenis ?? '').trim();
+    if (nama.isEmpty) return '';
+    return ' | $nama';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<InjectProductionViewModel>(
@@ -177,7 +184,7 @@ class _InjectProductionDropdownState extends State<InjectProductionDropdown> {
           value: safeValue,
           items: base,
           itemAsString: (e) =>
-              '${e.noProduksi} | ${e.namaMesin} (SHIFT ${e.shift})'.trim(),
+              '${e.noProduksi} | ${e.namaMesin} (SHIFT ${e.shift})${_buildFurnitureWipLabel(e)}',
           compareFn: (a, b) => a.noProduksi == b.noProduksi,
 
           onChanged: widget.enabled

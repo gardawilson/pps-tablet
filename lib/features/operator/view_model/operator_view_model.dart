@@ -36,6 +36,22 @@ class OperatorViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> loadByRegu(int idRegu) async {
+    isLoading = true;
+    error = '';
+    notifyListeners();
+
+    try {
+      items = await repository.fetchByRegu(idRegu);
+    } catch (e) {
+      error = e.toString();
+      items = [];
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
   void clear() {
     items = [];
     error = '';

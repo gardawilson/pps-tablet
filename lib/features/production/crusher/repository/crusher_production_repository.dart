@@ -22,6 +22,40 @@ class CrusherProductionRepository {
   };
 
   // =========================
+  //  CRUSHER MESIN LIST
+  //  GET /api/mst-mesin/crusher
+  // =========================
+  Future<List<CrusherMesinInfo>> fetchCrusherMesin() async {
+    final token = await TokenStorage.getToken();
+    final apiBaseUri = Uri.parse(ApiConstants.baseUrl);
+    final url = Uri(
+      scheme: apiBaseUri.scheme.isEmpty ? 'http' : apiBaseUri.scheme,
+      host: apiBaseUri.host,
+      port: 7500,
+      path: '/api/mst-mesin/crusher',
+    );
+
+    late http.Response res;
+    try {
+      res = await http.get(url, headers: _headers(token)).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout mengambil data mesin crusher');
+    } catch (e) {
+      throw Exception('Gagal terhubung ke server: $e');
+    }
+
+    if (res.statusCode != 200) {
+      throw Exception('Gagal memuat mesin crusher (${res.statusCode})');
+    }
+
+    final body = json.decode(utf8.decode(res.bodyBytes));
+    final data = body['data'] as List<dynamic>? ?? [];
+    return data
+        .map((e) => CrusherMesinInfo.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  // =========================
   //  BY DATE (untuk dropdown/filter)
   // =========================
   /// Optional: filter by idMesin and/or shift (server supports it)
@@ -205,70 +239,52 @@ class CrusherProductionRepository {
   Future<CrusherProduction> createProduksi({
     required DateTime tanggal,
     required int idMesin,
-    required int idOperator,
-    required int jamKerja,
+    required List<int> idOperators,
     required int shift,
+    required double jam,
+    int? outputJenisId,
+    int? idRegu,
     String? hourStart,
     String? hourEnd,
-    String? checkBy1,
-    String? checkBy2,
-    String? approveBy,
-    int? jmlhAnggota,
     int? hadir,
-    double? hourMeter,
   }) async {
     final token = await TokenStorage.getToken();
     final url = Uri.parse('$_base/api/production/crusher');
 
-    final tanggalStr = toDbDateString(tanggal);
-
-    // helper kecil biar "08:00" -> "08:00:00"
     String _normalizeTime(String v) {
       final t = v.trim();
       if (t.isEmpty) return t;
-      // kalau cuma HH:mm tambahin :00
-      if (t.length == 5) {
-        return '$t:00';
-      }
-      return t;
+      return t.length == 5 ? '$t:00' : t;
     }
 
-    // 🔴 PENTING: kirim sebagai MAP<String, String>
-    final body = <String, String>{
-      'tanggal': tanggalStr,
-      'idMesin': idMesin.toString(),
-      'idOperator': idOperator.toString(),
-      'jamKerja': jamKerja.toString(),
-      'shift': shift.toString(),
+    final bodyMap = <String, dynamic>{
+      'tanggal': toDbDateString(tanggal),
+      'idMesin': idMesin,
+      'idOperators': idOperators,
+      'shift': shift,
+      'jam': jam,
+      if (outputJenisId != null) 'outputJenisId': outputJenisId,
+      if (idRegu != null) 'idRegu': idRegu,
       if (hourStart != null && hourStart.isNotEmpty)
         'hourStart': _normalizeTime(hourStart),
       if (hourEnd != null && hourEnd.isNotEmpty)
         'hourEnd': _normalizeTime(hourEnd),
-      if (checkBy1 != null) 'checkBy1': checkBy1,
-      if (checkBy2 != null) 'checkBy2': checkBy2,
-      if (approveBy != null) 'approveBy': approveBy,
-      if (jmlhAnggota != null) 'jmlhAnggota': jmlhAnggota.toString(),
-      if (hadir != null) 'hadir': hadir.toString(),
-      if (hourMeter != null) 'hourMeter': hourMeter.toString(),
+      if (hadir != null) 'hadir': hadir,
     };
 
     final headers = {
       'Authorization': 'Bearer $token',
       'Accept': 'application/json',
-      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Type': 'application/json',
     };
 
     print('➡️ [POST] $url');
-    print('📦 form body: $body');
+    print('📦 body: $bodyMap');
 
     late http.Response res;
     try {
       res = await http
-          .post(
-        url,
-        headers: headers,
-        body: body,
-      )
+          .post(url, headers: headers, body: json.encode(bodyMap))
           .timeout(_timeout);
     } on TimeoutException {
       throw Exception('Timeout membuat crusher produksi');
@@ -423,6 +439,42 @@ class CrusherProductionRepository {
     return CrusherProduction.fromJson(data);
   }
 
+
+// =========================
+//  FETCH BY MESIN/TANGGAL/SHIFT (timeline)
+// =========================
+  /// GET /api/production/crusher?idMesin=&tanggal=&shift=
+  Future<List<CrusherProduction>> fetchByMesinTanggalShift({
+    required int idMesin,
+    required DateTime tanggal,
+    required int shift,
+  }) async {
+    final token = await TokenStorage.getToken();
+    final dateStr =
+        '${tanggal.year.toString().padLeft(4, '0')}-'
+        '${tanggal.month.toString().padLeft(2, '0')}-'
+        '${tanggal.day.toString().padLeft(2, '0')}';
+    final url = Uri.parse(
+      '$_base/api/production/crusher?idMesin=$idMesin&tanggal=$dateStr&shift=$shift',
+    );
+
+    http.Response res;
+    try {
+      res = await http.get(url, headers: _headers(token)).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout mengambil riwayat crusher');
+    }
+
+    if (res.statusCode != 200) {
+      throw Exception('Gagal mengambil riwayat crusher (HTTP ${res.statusCode})');
+    }
+
+    final body = json.decode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    final list = (body['data'] as List? ?? []);
+    return list
+        .map((e) => CrusherProduction.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
 
 // =========================
 //  DELETE

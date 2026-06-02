@@ -22,8 +22,8 @@ import 'package:pps_tablet/features/label/reject/view/reject_screen.dart';
 import 'package:pps_tablet/features/label/selection/view/label_selection_screen.dart';
 import 'package:pps_tablet/features/label/washing/view/washing_screen.dart';
 import 'package:pps_tablet/features/mapping/view/mapping_screen.dart';
-import 'package:pps_tablet/features/production/broker/view/broker_production_screen.dart';
-import 'package:pps_tablet/features/production/crusher/view/crusher_production_screen.dart';
+import 'package:pps_tablet/features/production/broker/view/broker_production_mesin_screen.dart';
+import 'package:pps_tablet/features/production/crusher/view/crusher_production_mesin_screen.dart';
 import 'package:pps_tablet/features/production/gilingan/view/gilingan_production_screen.dart';
 import 'package:pps_tablet/features/production/hot_stamp/view/hot_stamp_production_screen.dart';
 import 'package:pps_tablet/features/production/inject/view/inject_production_screen.dart';
@@ -34,16 +34,27 @@ import 'package:pps_tablet/features/production/return/view/return_production_scr
 import 'package:pps_tablet/features/production/selection/view/production_selection_screen.dart';
 import 'package:pps_tablet/features/production/sortir_reject/view/sortir_reject_production_screen.dart';
 import 'package:pps_tablet/features/production/spanner/view/spanner_production_screen.dart';
-import 'package:pps_tablet/features/production/washing/view/washing_production_screen.dart';
+import 'package:pps_tablet/features/production/washing/view/washing_production_mesin_screen.dart';
 import 'package:pps_tablet/features/report/view/report_list_screen.dart';
 import 'package:pps_tablet/features/sortir_reject_v2/view/sr_v2_list_screen.dart';
 import 'package:pps_tablet/features/stock_opname/view/stock_opname_list_screen.dart';
 import 'package:provider/provider.dart';
 
+class BreadcrumbSegment {
+  final String label;
+  final VoidCallback? onTap;
+  const BreadcrumbSegment(this.label, {this.onTap});
+}
+
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
 
   static final shellNavigatorKey = GlobalKey<NavigatorState>();
+
+  /// Global breadcrumb — screens can push/pop segments to show navigation flow.
+  static final breadcrumb = ValueNotifier<List<BreadcrumbSegment>>([
+    const BreadcrumbSegment('Dashboard'),
+  ]);
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -51,11 +62,20 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   bool _sidebarCollapsed = false;
-  final _activeTitle = ValueNotifier<String>('Dashboard');
+
+  @override
+  void initState() {
+    super.initState();
+    AppShell.breadcrumb.addListener(_onBreadcrumbChanged);
+  }
+
+  void _onBreadcrumbChanged() {
+    if (mounted) setState(() {});
+  }
 
   @override
   void dispose() {
-    _activeTitle.dispose();
+    AppShell.breadcrumb.removeListener(_onBreadcrumbChanged);
     super.dispose();
   }
 
@@ -65,7 +85,7 @@ class _AppShellState extends State<AppShell> {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
         if (AppShell.shellNavigatorKey.currentState?.canPop() ?? false) {
-          AppShell.shellNavigatorKey.currentState?.pop();
+          AppShell.shellNavigatorKey.currentState?.maybePop();
           return;
         }
         if (!context.mounted) return;
@@ -83,7 +103,16 @@ class _AppShellState extends State<AppShell> {
                 isCollapsed: _sidebarCollapsed,
                 onToggleCollapse: () =>
                     setState(() => _sidebarCollapsed = !_sidebarCollapsed),
-                onNavigate: (title) => _activeTitle.value = title,
+                onNavigate: (title, {String? parentTitle}) {
+                  if (parentTitle != null) {
+                    AppShell.breadcrumb.value = [
+                      BreadcrumbSegment(parentTitle),
+                      BreadcrumbSegment(title),
+                    ];
+                  } else {
+                    AppShell.breadcrumb.value = [BreadcrumbSegment(title)];
+                  }
+                },
               ),
               Expanded(
                 child: Column(
@@ -122,19 +151,7 @@ class _AppShellState extends State<AppShell> {
       ),
       child: Row(
         children: [
-          ValueListenableBuilder<String>(
-            valueListenable: _activeTitle,
-            builder: (_, title, __) => Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFF1F2937),
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
+          _BreadcrumbRow(segments: AppShell.breadcrumb.value),
           const Spacer(),
           _buildUserMenu(context),
           const SizedBox(width: 10),
@@ -206,7 +223,7 @@ class _AppShellState extends State<AppShell> {
                           'Masuk sebagai',
                           style: TextStyle(
                             color: Color(0xFF94A3B8),
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -216,7 +233,7 @@ class _AppShellState extends State<AppShell> {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Color(0xFF1E293B),
-                            fontSize: 14,
+                            fontSize: 15,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -250,7 +267,7 @@ class _AppShellState extends State<AppShell> {
                     'Akun',
                     style: TextStyle(
                       color: Color(0xFF334155),
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -280,7 +297,7 @@ class _AppShellState extends State<AppShell> {
                     'Logout',
                     style: TextStyle(
                       color: Color(0xFFDC2626),
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -306,7 +323,7 @@ class _AppShellState extends State<AppShell> {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Color(0xFF475569),
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -407,11 +424,11 @@ class _AppShellState extends State<AppShell> {
       case '/production':
         return ProductionSelectionScreen();
       case '/production/washing':
-        return WashingProductionScreen();
+        return const WashingProductionMesinScreen();
       case '/production/broker':
-        return BrokerProductionScreen();
+        return const BrokerProductionMesinScreen();
       case '/production/crusher':
-        return CrusherProductionScreen();
+        return const CrusherProductionMesinScreen();
       case '/production/gilingan':
         return GilinganProductionScreen();
       case '/production/mixer':
@@ -483,3 +500,60 @@ class _AppShellState extends State<AppShell> {
 }
 
 enum _UserMenuAction { account, logout }
+
+class _BreadcrumbRow extends StatelessWidget {
+  final List<BreadcrumbSegment> segments;
+  const _BreadcrumbRow({required this.segments});
+
+  @override
+  Widget build(BuildContext context) {
+    if (segments.isEmpty) return const SizedBox.shrink();
+
+    final items = <Widget>[];
+    for (var i = 0; i < segments.length; i++) {
+      final seg = segments[i];
+      final isLast = i == segments.length - 1;
+      final label = Text(
+        seg.label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: isLast ? const Color(0xFF1F2937) : const Color(0xFF6B7280),
+          fontSize: 15,
+          fontWeight: isLast ? FontWeight.w700 : FontWeight.w500,
+        ),
+      );
+
+      items.add(
+        !isLast && seg.onTap != null
+            ? InkWell(
+                onTap: seg.onTap,
+                borderRadius: BorderRadius.circular(4),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 2,
+                  ),
+                  child: label,
+                ),
+              )
+            : label,
+      );
+
+      if (!isLast) {
+        items.add(
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: Icon(
+              Icons.chevron_right_rounded,
+              size: 16,
+              color: Color(0xFFD1D5DB),
+            ),
+          ),
+        );
+      }
+    }
+
+    return Row(mainAxisSize: MainAxisSize.min, children: items);
+  }
+}

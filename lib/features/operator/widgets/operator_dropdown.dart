@@ -10,6 +10,9 @@ class OperatorDropdown extends StatefulWidget {
   final int? preselectId;
   final ValueChanged<MstOperator?>? onChanged;
 
+  // filter by regu (jika diset, gunakan endpoint /regu/{idRegu})
+  final int? idRegu;
+
   // filtering (server)
   final bool includeDisabled;
   final String? q;           // optional query (passed to BE)
@@ -29,6 +32,8 @@ class OperatorDropdown extends StatefulWidget {
   final IconData? prefixIcon;
   final double popupMaxHeight;
   final EdgeInsetsGeometry contentPadding;
+  final bool useDialogPopup;
+  final String? dialogTitle;
 
   // search UI (client)
   final bool showSearchBox;
@@ -38,6 +43,7 @@ class OperatorDropdown extends StatefulWidget {
     super.key,
     this.preselectId,
     this.onChanged,
+    this.idRegu,
     this.includeDisabled = false,
     this.q,
     this.orderBy = 'NamaOperator',
@@ -56,6 +62,8 @@ class OperatorDropdown extends StatefulWidget {
     this.prefixIcon = Icons.person_outline,
     this.popupMaxHeight = 500,
     this.contentPadding = const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+    this.useDialogPopup = true,
+    this.dialogTitle,
 
     // search UI
     this.showSearchBox = true,
@@ -78,8 +86,8 @@ class _OperatorDropdownState extends State<OperatorDropdown> {
   @override
   void didUpdateWidget(covariant OperatorDropdown oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // reload data if filter props changed
-    if (oldWidget.includeDisabled != widget.includeDisabled ||
+    if (oldWidget.idRegu != widget.idRegu ||
+        oldWidget.includeDisabled != widget.includeDisabled ||
         oldWidget.q != widget.q ||
         oldWidget.orderBy != widget.orderBy ||
         oldWidget.orderDir != widget.orderDir) {
@@ -91,12 +99,16 @@ class _OperatorDropdownState extends State<OperatorDropdown> {
   void _load() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final vm = context.read<OperatorViewModel>();
-      vm.loadAll(
-        includeDisabled: widget.includeDisabled,
-        q: widget.q,
-        orderBy: widget.orderBy,
-        orderDir: widget.orderDir,
-      );
+      if (widget.idRegu != null) {
+        vm.loadByRegu(widget.idRegu!);
+      } else {
+        vm.loadAll(
+          includeDisabled: widget.includeDisabled,
+          q: widget.q,
+          orderBy: widget.orderBy,
+          orderDir: widget.orderDir,
+        );
+      }
     });
   }
 
@@ -144,6 +156,8 @@ class _OperatorDropdownState extends State<OperatorDropdown> {
           errorText: widget.errorText,
           popupMaxHeight: widget.popupMaxHeight,
           contentPadding: widget.contentPadding,
+          useDialogPopup: widget.useDialogPopup,
+          dialogTitle: widget.dialogTitle,
 
           // search popup UI
           showSearchBox: widget.showSearchBox,

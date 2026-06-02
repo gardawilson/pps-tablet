@@ -10,6 +10,7 @@ import '../../../../core/network/endpoints.dart';
 import '../../../../core/services/token_storage.dart';
 import '../../shared/models/production_label_lookup_result.dart';
 import '../model/washing_inputs_model.dart';
+import '../model/washing_output_model.dart';
 
 class WashingProductionInputRepository {
   static const _timeout = Duration(seconds: 25);
@@ -95,6 +96,61 @@ class WashingProductionInputRepository {
       _inputsCache.remove(noProduksi.trim());
 
   void clearCache() => _inputsCache.clear();
+
+  // -----------------------------
+  // GET /api/production/washing/:noProduksi/outputs
+  // -----------------------------
+  static List<WashingOutput> _parseOutputs(Map<String, dynamic> body) {
+    final data = body['data'];
+    if (data == null) return [];
+    final list = data as List;
+    return list
+        .map(
+          (e) =>
+              WashingOutput.fromJson(Map<String, dynamic>.from(e as Map)),
+        )
+        .toList();
+  }
+
+  Future<List<WashingOutput>> fetchOutputs(String noProduksi) async {
+    final key = noProduksi.trim();
+    if (key.isEmpty) throw ArgumentError('noProduksi tidak boleh kosong');
+
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/production/washing/$key/outputs');
+
+    final started = DateTime.now();
+    print('➡️ [GET] $url');
+
+    http.Response res;
+    try {
+      res = await http.get(url, headers: _headers(token)).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout mengambil washing outputs ($key)');
+    } catch (e) {
+      print('❌ Request error (washing outputs): $e');
+      rethrow;
+    }
+
+    final elapsedMs = DateTime.now().difference(started).inMilliseconds;
+    print('⬅️ [${res.statusCode}] (washing outputs) in ${elapsedMs}ms');
+
+    if (res.statusCode != 200) {
+      throw Exception(
+        'Gagal mengambil washing outputs ($key), code ${res.statusCode}',
+      );
+    }
+
+    final decoded = utf8.decode(res.bodyBytes);
+    Map<String, dynamic> body;
+    try {
+      body = json.decode(decoded) as Map<String, dynamic>;
+    } catch (e) {
+      throw FormatException('Response washing outputs bukan JSON valid: $e');
+    }
+
+    return compute(_parseOutputs, body);
+  }
 
 
 
@@ -279,5 +335,92 @@ class WashingProductionInputRepository {
     }
   }
 
+  // -----------------------------
+  // POST: Create Label Washing
+  // -----------------------------
+  /// POST /api/labels/washing
+  /// Body: {
+  ///   "header": { "IdJenisPlastik": idJenis, "DateCreate": "YYYY-MM-DD", "IdWarehouse": 2 },
+  ///   "details": [{ "NoSak": n, "Berat": b }],
+  ///   "NoProduksi": noProduksi
+  /// }
+  /// Returns: noWashing (String) hasil create
+  Future<String> createOutput({
+    required String noProduksi,
+    required int idJenis,
+    required DateTime tglProduksi,
+    required List<Map<String, dynamic>> details,
+  }) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/labels/washing');
 
+    final dateStr =
+        '${tglProduksi.year.toString().padLeft(4, '0')}-'
+        '${tglProduksi.month.toString().padLeft(2, '0')}-'
+        '${tglProduksi.day.toString().padLeft(2, '0')}';
+
+    final payload = <String, dynamic>{
+      'header': {
+        'IdJenisPlastik': idJenis,
+        'DateCreate': dateStr,
+        'IdWarehouse': 2,
+      },
+      'details': details, // sudah pakai key NoSak, Berat (capitalized)
+      'NoProduksi': noProduksi,
+    };
+
+    debugPrint('➡️ [POST] $url');
+    debugPrint('📦 Payload: ${json.encode(payload)}');
+
+    final started = DateTime.now();
+    http.Response res;
+    try {
+      res = await http
+          .post(
+            url,
+            headers: {
+              ..._headers(token),
+              'Content-Type': 'application/json',
+            },
+            body: json.encode(payload),
+          )
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout create label washing ($noProduksi)');
+    } catch (e) {
+      debugPrint('❌ Request error: $e');
+      rethrow;
+    }
+
+    final elapsedMs = DateTime.now().difference(started).inMilliseconds;
+    debugPrint('⬅️ [${res.statusCode}] in ${elapsedMs}ms');
+
+    final decoded = utf8.decode(res.bodyBytes);
+    Map<String, dynamic> body;
+    try {
+      body = json.decode(decoded) as Map<String, dynamic>;
+    } catch (e) {
+      throw FormatException('Response create label washing bukan JSON valid: $e');
+    }
+    debugPrint('📥 Response: ${json.encode(body)}');
+
+    if (res.statusCode == 200 || res.statusCode == 201) {
+      // Ambil noWashing dari response
+      final data = body['data'];
+      String noWashing = '';
+      if (data is Map<String, dynamic>) {
+        noWashing = (data['NoWashing'] as String?) ?? '';
+      } else if (data is List && data.isNotEmpty) {
+        final first = data.first;
+        if (first is Map<String, dynamic>) {
+          noWashing = (first['NoWashing'] as String?) ?? '';
+        }
+      }
+      return noWashing;
+    }
+    final msg =
+        (body['message'] as String?) ??
+        'Gagal membuat label washing (HTTP ${res.statusCode})';
+    throw Exception(msg);
+  }
 }

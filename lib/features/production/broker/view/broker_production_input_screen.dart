@@ -3,16 +3,19 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import 'package:pps_tablet/core/view/app_shell.dart';
 import 'package:pps_tablet/features/production/broker/view_model/broker_production_input_view_model.dart';
 import '../../../../common/widgets/error_status_dialog.dart';
-import '../../../../common/widgets/loading_dialog.dart';
 import '../../../../common/widgets/scan_label_dialog.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../../shared/models/production_label_lookup_result.dart';
 import '../../shared/widgets/confirm_save_temp_dialog.dart';
 import '../../shared/widgets/unsaved_temp_warning_dialog.dart';
+import '../model/broker_production_model.dart';
+import '../repository/broker_production_repository.dart';
 import '../widgets/broker_input_group_popover.dart';
 import '../../shared/widgets/partial_mode_not_supported_dialog.dart';
+import '../../shared/widgets/weight_input_dialog.dart';
 import '../../shared/widgets/save_button_with_badge.dart';
 import '../model/broker_inputs_model.dart';
 
@@ -20,9 +23,8 @@ import 'package:pps_tablet/features/production/shared/shared.dart';
 import '../widgets/broker_lookup_label_dialog.dart';
 import '../widgets/broker_lookup_label_partial_dialog.dart';
 import '../../../label/broker/widgets/broker_form_dialog.dart';
-import '../../../label/bonggolan/widgets/bonggolan_form_dialog.dart';
-import '../widgets/broker_move_output_dialog.dart';
-import '../widgets/broker_move_bonggolan_output_dialog.dart';
+import '../../../label/broker/widgets/broker_production_output_form_dialog.dart';
+import '../../../label/bonggolan/widgets/bonggolan_production_output_form_dialog.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/endpoints.dart';
 import '../../../../core/network/label_print_lock_api.dart';
@@ -31,6 +33,9 @@ import '../../../../core/utils/pdf_print_service.dart';
 import '../../../../core/view_model/label_print_lock_socket_manager.dart';
 import '../../../label/broker/repository/broker_repository.dart';
 import '../../../label/bonggolan/repository/bonggolan_repository.dart';
+import '../../../broker_type/model/broker_type_model.dart';
+import '../../../broker_type/widgets/broker_type_dropdown.dart';
+import '../widgets/broker_workspace_toolbar.dart';
 
 const _kBrokerPrimary = Color(0xFF1E6FD9);
 const _kBrokerSurface = Color(0xFFF8F9FB);
@@ -38,61 +43,33 @@ const _kBrokerBorder = Color(0xFFE2E6EA);
 const _kBrokerRadius = 12.0;
 const _kBrokerOutput = Color(0xFF0A7349);
 
-BoxDecoration _brokerPanelDecoration({Color? borderColor}) => BoxDecoration(
-  color: Colors.white,
-  borderRadius: BorderRadius.circular(_kBrokerRadius),
-  border: Border.all(color: borderColor ?? _kBrokerBorder),
-  boxShadow: [
-    BoxShadow(
-      color: Colors.black.withValues(alpha: 0.04),
-      blurRadius: 8,
-      offset: const Offset(0, 2),
-    ),
-  ],
-);
-
-Widget _brokerSectionHeader(IconData icon, String title, {Color? iconColor}) {
-  final color = iconColor ?? _kBrokerPrimary;
-  return Row(
-    children: [
-      Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(icon, size: 16, color: color),
-      ),
-      const SizedBox(width: 10),
-      Text(
-        title,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-          color: Color(0xFF1A1D23),
-        ),
-      ),
-    ],
-  );
-}
-
 class BrokerProductionInputScreen extends StatefulWidget {
   final String noProduksi;
+  final int? idMesin;
   final String? namaMesin;
   final int? shift;
   final DateTime? tglProduksi;
 
   final bool? isLocked;
   final DateTime? lastClosedDate;
+  final String? hourStart;
+  final String? hourEnd;
+  final String? namaJenis;
+  final int? outputJenisId;
 
   const BrokerProductionInputScreen({
     super.key,
     required this.noProduksi,
+    this.idMesin,
     this.namaMesin,
     this.shift,
     this.tglProduksi,
     this.isLocked,
     this.lastClosedDate,
+    this.hourStart,
+    this.hourEnd,
+    this.namaJenis,
+    this.outputJenisId,
   });
 
   @override
@@ -106,11 +83,31 @@ class _BrokerProductionInputScreenState
   String _selectedInputTab = 'broker';
   String _selectedOutputTab = 'broker';
 
+  List<BreadcrumbSegment> _prevBreadcrumb = [];
+  bool _isReplacing = false;
+  String get _breadcrumbLabel {
+    final machineName = (widget.namaMesin ?? '').trim();
+    return machineName.isNotEmpty ? machineName : widget.noProduksi;
+  }
+
   @override
   void initState() {
     super.initState();
+    _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      AppShell.breadcrumb.value = [
+        ..._prevBreadcrumb.map(
+          (s) => BreadcrumbSegment(
+            s.label,
+            onTap: () {
+              AppShell.breadcrumb.value = _prevBreadcrumb;
+              AppShell.shellNavigatorKey.currentState?.pop();
+            },
+          ),
+        ),
+        BreadcrumbSegment(_breadcrumbLabel),
+      ];
       context.read<BrokerProductionInputViewModel>().loadInputs(
         widget.noProduksi,
         force: true,
@@ -121,12 +118,28 @@ class _BrokerProductionInputScreenState
     });
   }
 
-  // ✅ TAMBAHKAN: Method untuk handle back button
+  @override
+  void dispose() {
+    // Guard: hanya restore jika breadcrumb terakhir masih milik screen ini.
+    // Jika sidebar sudah ganti breadcrumb (via pushNamedAndRemoveUntil),
+    // jangan overwrite � itu yang menyebabkan breadcrumb kacau saat pindah menu.
+    if (!_isReplacing) {
+      final current = AppShell.breadcrumb.value;
+      final ourLabel = _breadcrumbLabel;
+      if (current.isNotEmpty && current.last.label == ourLabel) {
+        AppShell.breadcrumb.value = _prevBreadcrumb;
+      }
+    }
+    super.dispose();
+  }
+
+  // ? TAMBAHKAN: Method untuk handle back button
   Future<bool> _onWillPop() async {
     final vm = context.read<BrokerProductionInputViewModel>();
 
     // Tidak ada temp data, boleh keluar langsung
     if (vm.totalTempCount == 0) {
+      AppShell.breadcrumb.value = _prevBreadcrumb;
       return true;
     }
 
@@ -138,9 +151,7 @@ class _BrokerProductionInputScreenState
         totalTempCount: vm.totalTempCount,
         submitSummary: vm.getSubmitSummary(),
         onSavePressed: () {
-          // Tutup dialog dengan hasil false (tidak pop dulu)
           Navigator.of(dialogContext).pop(false);
-          // Trigger flow save yang sudah ada
           _handleSave(context);
         },
       ),
@@ -149,11 +160,128 @@ class _BrokerProductionInputScreenState
     // Jika user pilih "Keluar & Hapus"
     if (shouldPop == true) {
       vm.clearAllTempItems();
+      AppShell.breadcrumb.value = _prevBreadcrumb;
       return true;
     }
 
-    // selain itu (Batal / Simpan Dulu) -> jangan keluar
+    // Batal / Simpan Dulu -> jangan keluar
     return false;
+  }
+
+  Future<void> _openTimelineDialog() async {
+    if (!mounted) return;
+    await ProductionFlowHelpers.openTimeline(
+      context: context,
+      idMesin: widget.idMesin,
+      tanggal: widget.tglProduksi,
+      onMissingContext: () => _showSnack(
+        'Data mesin/tanggal tidak tersedia',
+        backgroundColor: Colors.orange,
+      ),
+      dialogBuilder: (idMesin, tgl) => buildProductionShiftTimelineDialog(
+        namaMesin: widget.namaMesin,
+        tanggal: tgl,
+        shift: widget.shift ?? 1,
+        currentNoProduksi: widget.noProduksi,
+        primaryColor: _kBrokerPrimary,
+        borderColor: _kBrokerBorder,
+        loadTimeline: () async {
+          final list = await BrokerProductionRepository()
+              .fetchByMesinTanggalShift(
+                idMesin: idMesin,
+                tanggal: tgl,
+                shift: widget.shift ?? 1,
+              );
+          return list
+              .map(
+                (e) => ProductionShiftTimelineEntry(
+                  noProduksi: e.noProduksi,
+                  hourStart: e.hourStart,
+                  hourEnd: e.hourEnd,
+                  isLocked: e.isLocked,
+                  subtitle: e.outputJenisNama,
+                ),
+              )
+              .toList();
+        },
+      ),
+    );
+  }
+
+  Future<void> _openSplitDialog() async {
+    if (!mounted) return;
+    await ProductionFlowHelpers.openSplitAndReplace<
+      ({BrokerProduction prod, String namaJenis})
+    >(
+      context: context,
+      idMesin: widget.idMesin,
+      tanggal: widget.tglProduksi,
+      onMissingContext: () => _showSnack(
+        'Data mesin/tanggal tidak tersedia',
+        backgroundColor: Colors.orange,
+      ),
+      showSplitDialog: (idMesin, tgl) {
+        return showDialog<({BrokerProduction prod, String namaJenis})>(
+          context: context,
+          barrierDismissible: true,
+          builder: (_) =>
+              ProductionGantiProduksiDialog<
+                ({BrokerProduction prod, String namaJenis}),
+                BrokerType
+              >(
+                tanggal: tgl,
+                shift: widget.shift ?? 1,
+                primaryColor: _kBrokerPrimary,
+                borderColor: _kBrokerBorder,
+                jenisRequiredMessage: 'Pilih jenis broker terlebih dahulu',
+                submitLabel: 'Ganti Produksi',
+                dropdownBuilder: (selected, onChanged) => BrokerTypeDropdown(
+                  preselectId: selected?.idBroker,
+                  onChanged: onChanged,
+                ),
+                jenisNameOf: (j) => j.nama,
+                onSubmit: (hourStart, jenis) async {
+                  final prod = await BrokerProductionRepository().addProduksi(
+                    idMesin: idMesin,
+                    tanggal: tgl,
+                    hourStart: hourStart,
+                    outputJenisId: jenis.idBroker,
+                  );
+                  return (prod: prod, namaJenis: jenis.nama);
+                },
+              ),
+        );
+      },
+      beforeReplace: () {
+        _isReplacing = true;
+        AppShell.breadcrumb.value = _prevBreadcrumb;
+      },
+      replaceToResult: (splitResult) async {
+        if (!mounted) return;
+        final newProd = splitResult.prod;
+        final namaJenis = splitResult.namaJenis.isNotEmpty
+            ? splitResult.namaJenis
+            : newProd.outputJenisNama;
+
+        await Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => BrokerProductionInputScreen(
+              noProduksi: newProd.noProduksi,
+              idMesin: newProd.idMesin,
+              namaMesin: widget.namaMesin,
+              shift: newProd.shift,
+              tglProduksi: newProd.tglProduksi,
+              isLocked: false,
+              lastClosedDate: null,
+              hourStart: newProd.hourStart,
+              hourEnd: newProd.hourEnd,
+              namaJenis: namaJenis,
+              outputJenisId: newProd.outputJenisId,
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _showSnack(String msg, {Color? backgroundColor}) {
@@ -167,18 +295,8 @@ class _BrokerProductionInputScreenState
     );
   }
 
-  Future<void> _openModePopup(BuildContext buttonContext) async {
-    final mode = await showDialog<String>(
-      context: context,
-      builder: (_) => const _BrokerInputModeDialog(),
-    );
-
-    if (mode == null || !mounted) return;
+  Future<void> _openScanDialog({String mode = 'full'}) async {
     setState(() => _selectedMode = mode);
-    await _openScanDialog();
-  }
-
-  Future<void> _openScanDialog() async {
     await showDialog<void>(
       context: context,
       builder: (_) => ScanLabelDialog(
@@ -217,142 +335,11 @@ class _BrokerProductionInputScreenState
     double? width,
   }) {
     return visible
-        ? Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: SizedBox(width: width ?? 360, child: child),
-          )
+        ? SizedBox(width: width ?? 360, child: child)
         : const SizedBox.shrink();
   }
 
-  Widget _buildWorkspaceToolbar({required bool locked}) {
-    final tglText = widget.tglProduksi == null
-        ? null
-        : DateFormat(
-            'dd MMM yyyy',
-            'id_ID',
-          ).format(widget.tglProduksi!.toLocal());
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: _brokerPanelDecoration(),
-        child: Row(
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: _kBrokerPrimary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.confirmation_number_outlined,
-                size: 18,
-                color: _kBrokerPrimary,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    widget.noProduksi,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF1A1D23),
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if ((widget.namaMesin ?? '').trim().isNotEmpty ||
-                      widget.shift != null ||
-                      tglText != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      _buildHeaderMetaLine(tglText: tglText),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade700,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            if (locked) ...[
-              const SizedBox(width: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  'Locked',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.orange.shade800,
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(width: 10),
-            OutlinedButton.icon(
-              onPressed: () {
-                final vm = context.read<BrokerProductionInputViewModel>();
-                vm.loadInputs(widget.noProduksi, force: true);
-                vm.loadOutputs(widget.noProduksi);
-                _showSnack('Data di-refresh');
-              },
-              style: OutlinedButton.styleFrom(
-                foregroundColor: _kBrokerPrimary,
-                side: const BorderSide(color: _kBrokerBorder),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              icon: const Icon(Icons.refresh, size: 16),
-              label: const Text(
-                'Refresh',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _buildHeaderMetaLine({String? tglText}) {
-    final parts = <String>[];
-
-    final namaMesin = (widget.namaMesin ?? '').trim();
-    if (namaMesin.isNotEmpty) {
-      parts.add(namaMesin);
-    }
-    if (widget.shift != null) {
-      parts.add('Shift ${widget.shift}');
-    }
-    if (tglText != null && tglText.isNotEmpty) {
-      parts.add(tglText);
-    }
-
-    return parts.join('  •  ');
-  }
-
-  /// ✅ Handler untuk bulk delete
+  /// ? Handler untuk bulk delete
   Future<bool> _handleBulkDelete(List<dynamic> items) async {
     final vm = context.read<BrokerProductionInputViewModel>();
 
@@ -370,6 +357,75 @@ class _BrokerProductionInputScreenState
     return success;
   }
 
+  Future<void> _showTempCardOptions(String labelTitle) async {
+    final vm = context.read<BrokerProductionInputViewModel>();
+
+    final tempData = vm.getTemporaryDataForLabel(labelTitle);
+    final isSakBased =
+        tempData != null &&
+        (tempData.brokerItems.isNotEmpty ||
+            tempData.brokerPartials.isNotEmpty ||
+            tempData.bbItems.isNotEmpty ||
+            tempData.bbPartials.isNotEmpty ||
+            tempData.washingItems.isNotEmpty ||
+            tempData.mixerItems.isNotEmpty ||
+            tempData.mixerPartials.isNotEmpty);
+    // Partial not supported for Washing (B.) and Crusher (F.)
+    final supportsPartial =
+        tempData != null &&
+        (tempData.brokerItems.isNotEmpty ||
+            tempData.brokerPartials.isNotEmpty ||
+            tempData.bbItems.isNotEmpty ||
+            tempData.bbPartials.isNotEmpty ||
+            tempData.gilinganItems.isNotEmpty ||
+            tempData.gilinganPartials.isNotEmpty ||
+            tempData.mixerItems.isNotEmpty ||
+            tempData.mixerPartials.isNotEmpty ||
+            tempData.rejectItems.isNotEmpty ||
+            tempData.rejectPartials.isNotEmpty);
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => ProductionTempCardOptionsDialog(
+        labelTitle: labelTitle,
+        showSebagian: isSakBased,
+        showPartial: supportsPartial,
+        primaryColor: _kBrokerPrimary,
+        surfaceColor: _kBrokerSurface,
+        borderColor: _kBrokerBorder,
+      ),
+    );
+    if (result == null || !mounted) return;
+
+    if (result == 'delete') {
+      vm.deleteTempItemsForLabel(labelTitle);
+    } else if (result == 'select' || result == 'partial') {
+      // Delete existing temp for this label so user can choose a subset/partial
+      vm.deleteTempItemsForLabel(labelTitle);
+      setState(() => _selectedMode = result);
+
+      if (!mounted) return;
+
+      // Reload lookup for this label (uses cache, no new scan needed)
+      final lookupResult = await vm.lookupLabel(labelTitle);
+      if (!mounted) return;
+
+      if (lookupResult == null) {
+        _showSnack(
+          'Gagal memuat data label: ${vm.lookupError ?? "error tidak diketahui"}',
+          backgroundColor: Colors.red,
+        );
+        return;
+      }
+
+      if (result == 'partial') {
+        await _handlePartialMode(context, vm, lookupResult);
+      } else {
+        await _handleSelectMode(context, vm, lookupResult);
+      }
+    }
+  }
+
   Future<void> _handleSave(BuildContext context) async {
     final vm = context.read<BrokerProductionInputViewModel>();
 
@@ -381,7 +437,7 @@ class _BrokerProductionInputScreenState
       return;
     }
 
-    // 🔹 Dialog konfirmasi formal
+    // ?? Dialog konfirmasi formal
     final confirm = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -393,13 +449,13 @@ class _BrokerProductionInputScreenState
 
     if (confirm != true || !mounted) return;
 
-    // Eksekusi submit → skeleton muncul dari state isSubmitting
+    // Eksekusi submit ? skeleton muncul dari state isSubmitting
     final success = await vm.submitTempItems(widget.noProduksi);
 
     if (!mounted) return;
 
     if (success) {
-      _showSnack('✅ Data berhasil disimpan', backgroundColor: Colors.green);
+      _showSnack('? Data berhasil disimpan', backgroundColor: Colors.green);
     } else {
       final errMsg = vm.submitError ?? 'Kesalahan tidak diketahui';
 
@@ -415,7 +471,7 @@ class _BrokerProductionInputScreenState
   Future<String?> _onCodeReady(BuildContext context, String code) async {
     final vm = context.read<BrokerProductionInputViewModel>();
 
-    // ✅ VALIDASI: Cek jika mode partial tidak support untuk washing/crusher
+    // ? VALIDASI: Cek jika mode partial tidak support untuk washing/crusher
     if (_selectedMode == 'partial') {
       final normalized = code.trim().toUpperCase();
       final prefix = normalized.length >= 2 ? normalized.substring(0, 2) : '';
@@ -423,7 +479,7 @@ class _BrokerProductionInputScreenState
       if (prefix == 'B.' || prefix == 'F.') {
         final labelType = prefix == 'B.' ? 'Washing' : 'Crusher';
 
-        // ✅ Tampilkan dialog informatif
+        // ? Tampilkan dialog informatif
         await PartialModeNotSupportedDialog.show(
           context: context,
           labelType: labelType,
@@ -437,7 +493,7 @@ class _BrokerProductionInputScreenState
       }
     }
 
-    // ✅ Lanjutkan proses lookup jika validasi OK
+    // ? Lanjutkan proses lookup jika validasi OK
     final res = await vm.lookupLabel(code, force: true);
     if (!mounted) return 'Halaman sudah tidak aktif';
 
@@ -447,6 +503,12 @@ class _BrokerProductionInputScreenState
 
     if (res == null || res.found == false || res.data.isEmpty) {
       return 'Label "$code" tidak memiliki data yang tersedia.';
+    }
+
+    // Auto-switch ke tab sesuai tipe label yang discan
+    final tab = _tabForLookupResult(res);
+    if (tab != null && tab != _selectedInputTab) {
+      setState(() => _selectedInputTab = tab);
     }
 
     // ===== ROUTING BERDASARKAN MODE =====
@@ -474,7 +536,7 @@ class _BrokerProductionInputScreenState
       final hasTemp =
           labelCode != null && vm.hasTemporaryDataForLabel(labelCode);
       final suffix = hasTemp
-          ? ' • ${vm.getTemporaryDataSummary(labelCode!)}'
+          ? ' � ${vm.getTemporaryDataSummary(labelCode!)}'
           : '';
       _showSnack(
         'Semua item untuk ${labelCode ?? "label ini"} sudah ada.$suffix',
@@ -490,7 +552,7 @@ class _BrokerProductionInputScreenState
     final result = vm.commitPickedToTemp(noProduksi: widget.noProduksi);
 
     final msg = result.added > 0
-        ? '✅ Auto-added ${result.added} item${result.skipped > 0 ? ' • Duplikat terlewati ${result.skipped}' : ''}'
+        ? '? Auto-added ${result.added} item${result.skipped > 0 ? ' � Duplikat terlewati ${result.skipped}' : ''}'
         : 'Tidak ada item baru ditambahkan';
 
     _showSnack(
@@ -505,8 +567,50 @@ class _BrokerProductionInputScreenState
     BrokerProductionInputViewModel vm,
     ProductionLabelLookupResult res,
   ) async {
-    // ⬇️ PERBAIKAN: Tidak perlu filter karena dialog sudah menampilkan semua
-    // Langsung tampilkan dialog
+    // Non-sak items (gilingan/reject): langsung tanya berat saja
+    final firstItem = res.typedItems.isNotEmpty ? res.typedItems.first : null;
+    final isNonSak = firstItem is GilinganItem || firstItem is RejectItem;
+
+    if (isNonSak && res.data.isNotEmpty) {
+      final row = res.data.first;
+      final beratRaw = row['berat'] ?? row['Berat'];
+      final originalBerat = beratRaw != null
+          ? (beratRaw as num).toDouble()
+          : null;
+      if (originalBerat == null || originalBerat <= 0) return;
+
+      final newWeight = await WeightInputDialog.show(
+        context,
+        maxWeight: originalBerat,
+        currentWeight: null,
+      );
+      if (!mounted || newWeight == null) return;
+
+      final originalIsPartial = row['isPartial'];
+      row['isPartial'] = true;
+      row['IsPartial'] = true;
+      row['berat'] = newWeight;
+      row['Berat'] = newWeight;
+
+      vm.clearPicks();
+      vm.togglePick(row);
+      final r = vm.commitPickedToTemp(noProduksi: widget.noProduksi);
+
+      row['berat'] = originalBerat;
+      row['Berat'] = originalBerat;
+      row['isPartial'] = originalIsPartial;
+      row['IsPartial'] = originalIsPartial;
+
+      _showSnack(
+        r.added > 0
+            ? '? Ditambahkan ${r.added} item partial'
+            : 'Item sudah ada atau gagal ditambahkan',
+        backgroundColor: r.added > 0 ? Colors.green : Colors.orange,
+      );
+      return;
+    }
+
+    // Sak-based: tampilkan dialog partial normal
     await showDialog(
       context: context,
       barrierDismissible: true,
@@ -530,7 +634,7 @@ class _BrokerProductionInputScreenState
       final hasTemp =
           labelCode != null && vm.hasTemporaryDataForLabel(labelCode);
       final suffix = hasTemp
-          ? ' • ${vm.getTemporaryDataSummary(labelCode!)}'
+          ? ' � ${vm.getTemporaryDataSummary(labelCode!)}'
           : '';
       _showSnack(
         'Semua item untuk ${labelCode ?? "label ini"} sudah ada.$suffix',
@@ -549,12 +653,25 @@ class _BrokerProductionInputScreenState
     );
   }
 
+  String? _tabForLookupResult(ProductionLabelLookupResult res) {
+    if (res.typedItems.isEmpty) return null;
+    final item = res.typedItems.first;
+    if (item is BrokerItem) return 'broker';
+    if (item is BbItem) return 'bb';
+    if (item is WashingItem) return 'washing';
+    if (item is CrusherItem) return 'crusher';
+    if (item is GilinganItem) return 'gilingan';
+    if (item is MixerItem) return 'mixer';
+    if (item is RejectItem) return 'reject';
+    return null;
+  }
+
   String? _labelCodeOfFirst(ProductionLabelLookupResult res) {
     if (res.typedItems.isEmpty) return null;
     final item = res.typedItems.first;
 
     if (item is BrokerItem) {
-      // ⬇️ TAMBAHKAN: Cek partial code terlebih dahulu
+      // ?? TAMBAHKAN: Cek partial code terlebih dahulu
       return (item.noBrokerPartial ?? '').trim().isNotEmpty
           ? item.noBrokerPartial
           : item.noBroker;
@@ -592,89 +709,20 @@ class _BrokerProductionInputScreenState
     required Widget child,
   }) {
     return Container(
-      decoration: _brokerPanelDecoration(),
+      decoration: productionPanelDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+            padding: const EdgeInsets.fromLTRB(12, 1, 1, 1),
             child: Row(
               children: [
-                _brokerSectionHeader(Icons.input_rounded, 'Label Input'),
-                const Spacer(),
-                if (labelCount > 0) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _kBrokerPrimary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '$labelCount label',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: _kBrokerPrimary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                Material(
-                  color: locked || isLookupLoading
-                      ? Colors.grey.shade100
-                      : _kBrokerPrimary,
-                  borderRadius: BorderRadius.circular(10),
-                  child: InkWell(
-                    onTap: locked || isLookupLoading
-                        ? null
-                        : () => _openModePopup(buttonContext),
-                    borderRadius: BorderRadius.circular(10),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 7,
-                      ),
-                      child: Row(
-                        children: [
-                          isLookupLoading
-                              ? SizedBox(
-                                  width: 15,
-                                  height: 15,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: locked
-                                        ? Colors.grey.shade400
-                                        : Colors.white,
-                                  ),
-                                )
-                              : Icon(
-                                  Icons.qr_code_scanner,
-                                  size: 15,
-                                  color: locked
-                                      ? Colors.grey.shade400
-                                      : Colors.white,
-                                ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Scan',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: locked
-                                  ? Colors.grey.shade400
-                                  : Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                productionSectionHeader(
+                  Icons.input_rounded,
+                  'Label Input',
+                  primaryColor: _kBrokerPrimary,
                 ),
-                const SizedBox(width: 8),
+                const Spacer(),
                 SaveButtonWithBadge(
                   count: vm.totalTempCount,
                   isLoading: vm.isSubmitting,
@@ -687,14 +735,15 @@ class _BrokerProductionInputScreenState
                       ? () {
                           showDialog(
                             context: context,
-                            builder: (_) => AlertDialog(
+                            builder: (dialogContext) => AlertDialog(
                               title: const Text('Hapus Semua Temp?'),
                               content: Text(
                                 'Apakah Anda yakin ingin menghapus ${vm.totalTempCount} item temp?',
                               ),
                               actions: [
                                 TextButton(
-                                  onPressed: () => Navigator.pop(context),
+                                  onPressed: () =>
+                                      Navigator.of(dialogContext).pop(),
                                   child: const Text('Batal'),
                                 ),
                                 ElevatedButton(
@@ -704,7 +753,7 @@ class _BrokerProductionInputScreenState
                                   ),
                                   onPressed: () {
                                     vm.clearAllTempItems();
-                                    Navigator.pop(context);
+                                    Navigator.of(dialogContext).pop();
                                     _showSnack('Semua temp items dihapus');
                                   },
                                   child: const Text('Hapus'),
@@ -739,6 +788,7 @@ class _BrokerProductionInputScreenState
     required List<BonggolanOutput> bonggolanOutputs,
     required bool isLoading,
     required String? error,
+    required double grandInputBerat,
   }) {
     int totalSakBroker = 0;
     double totalBeratBroker = 0.0;
@@ -753,51 +803,146 @@ class _BrokerProductionInputScreenState
     }
 
     final totalLabel = brokerOutputs.length + bonggolanOutputs.length;
-    final selectedTabChild = _selectedOutputTab == 'broker'
-        ? _OutputCategoryContent(
-            footer: _BrokerOutputSummaryTile(
-              totalLabel: brokerOutputs.length,
-              totalSak: totalSakBroker,
-              totalBerat: totalBeratBroker,
+    final isBrokerOutputTab = _selectedOutputTab == 'broker';
+    final activeOutputLabel = isBrokerOutputTab ? 'Broker' : 'Bonggolan';
+    final selectedOutputSummary = isBrokerOutputTab
+        ? _BrokerOutputSummaryTile(
+            totalLabel: brokerOutputs.length,
+            totalSak: totalSakBroker,
+            totalBerat: totalBeratBroker,
+          )
+        : _BonggolanOutputSummaryTile(
+            totalLabel: bonggolanOutputs.length,
+            totalBerat: totalBeratBonggolan,
+          );
+    Future<void> onAddOutput() async {
+      if (grandInputBerat == 0) {
+        if (!context.mounted) return;
+        showDialog<void>(
+          context: context,
+          builder: (_) => ErrorStatusDialog(
+            title: 'Belum Ada Input',
+            message:
+                'Masukkan label input terlebih dahulu sebelum membuat output.',
+          ),
+        );
+        return;
+      }
+
+      final totalOutputBerat = totalBeratBroker + totalBeratBonggolan;
+
+      if (totalOutputBerat >= grandInputBerat) {
+        if (!context.mounted) return;
+        showDialog<void>(
+          context: context,
+          builder: (_) => ErrorStatusDialog(
+            title: 'Berat Output Melebihi Input',
+            message:
+                'Total berat output (${num2(totalOutputBerat)} kg) sudah mencapai atau melebihi total berat input (${num2(grandInputBerat)} kg).\n\nTidak dapat menambah output baru.',
+          ),
+        );
+        return;
+      }
+
+      if (isBrokerOutputTab) {
+        if (widget.outputJenisId != null) {
+          await showDialog<void>(
+            context: context,
+            builder: (_) => BrokerProductionOutputFormDialog(
+              noProduksi: widget.noProduksi,
+              tglProduksi: widget.tglProduksi,
+              outputJenisId: widget.outputJenisId!,
+              outputJenisNama: widget.namaJenis ?? '',
+              namaMesin: widget.namaMesin,
             ),
+          );
+        } else {
+          await showDialog<void>(
+            context: context,
+            builder: (_) => BrokerFormDialog(
+              preselectNoProduksi: widget.noProduksi,
+              preselectNamaMesin: widget.namaMesin,
+              preselectDate: widget.tglProduksi,
+            ),
+          );
+        }
+      } else {
+        await showDialog<void>(
+          context: context,
+          builder: (_) => BonggolanProductionOutputFormDialog(
+            noProduksi: widget.noProduksi,
+            tglProduksi: widget.tglProduksi,
+            namaMesin: widget.namaMesin,
+          ),
+        );
+      }
+
+      if (!mounted) return;
+      final vm = context.read<BrokerProductionInputViewModel>();
+      await vm.loadOutputs(widget.noProduksi);
+
+      if (!mounted) return;
+      final newBrokerBerat = vm
+          .outputsOf(widget.noProduksi)
+          .fold<double>(0.0, (s, o) => s + o.totalBerat);
+      final newBonggolanBerat = vm
+          .bonggolanOutputsOf(widget.noProduksi)
+          .fold<double>(0.0, (s, o) => s + (o.berat ?? 0.0));
+      final newTotal = newBrokerBerat + newBonggolanBerat;
+      if (grandInputBerat > 0 && newTotal > grandInputBerat) {
+        _showSnack(
+          '?? Total berat output (${num2(newTotal)} kg) melebihi total berat input (${num2(grandInputBerat)} kg)',
+          backgroundColor: Colors.orange,
+        );
+      }
+    }
+
+    final selectedTabChild = _selectedOutputTab == 'broker'
+        ? ProductionOutputCategoryContent(
+            footer: const SizedBox.shrink(),
             child: brokerOutputs.isEmpty
-                ? const _EmptyOutputCategory(message: 'Belum ada output broker')
-                : ListView(
-                    padding: const EdgeInsets.all(8),
-                    children: brokerOutputs
-                        .map(
-                          (output) => Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: _BrokerOutputTile(output: output),
-                          ),
-                        )
-                        .toList(),
+                ? const ProductionEmptyCategory(
+                    message: 'Belum ada output broker',
+                  )
+                : LayoutBuilder(
+                    builder: (_, c) => GridView(
+                      padding: const EdgeInsets.all(6),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+                        crossAxisSpacing: 6,
+                        mainAxisSpacing: 6,
+                        mainAxisExtent: 78,
+                      ),
+                      children: brokerOutputs
+                          .map((output) => _BrokerOutputTile(output: output))
+                          .toList(),
+                    ),
                   ),
           )
-        : _OutputCategoryContent(
-            footer: _BonggolanOutputSummaryTile(
-              totalLabel: bonggolanOutputs.length,
-              totalBerat: totalBeratBonggolan,
-            ),
+        : ProductionOutputCategoryContent(
+            footer: const SizedBox.shrink(),
             child: bonggolanOutputs.isEmpty
-                ? const _EmptyOutputCategory(
+                ? const ProductionEmptyCategory(
                     message: 'Belum ada output bonggolan',
                   )
-                : ListView(
-                    padding: const EdgeInsets.all(8),
-                    children: bonggolanOutputs
-                        .map(
-                          (output) => Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: _BonggolanOutputTile(output: output),
-                          ),
-                        )
-                        .toList(),
+                : LayoutBuilder(
+                    builder: (_, c) => GridView(
+                      padding: const EdgeInsets.all(6),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+                        crossAxisSpacing: 6,
+                        mainAxisSpacing: 6,
+                        mainAxisExtent: 72,
+                      ),
+                      children: bonggolanOutputs
+                          .map((output) => _BonggolanOutputTile(output: output))
+                          .toList(),
+                    ),
                   ),
           );
 
     return Container(
-      decoration: _brokerPanelDecoration(
+      decoration: productionPanelDecoration(
         borderColor: _kBrokerOutput.withValues(alpha: 0.3),
       ),
       child: Column(
@@ -807,197 +952,13 @@ class _BrokerProductionInputScreenState
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
             child: Row(
               children: [
-                _brokerSectionHeader(
+                productionSectionHeader(
                   Icons.output_rounded,
                   'Label Output',
                   iconColor: _kBrokerOutput,
+                  primaryColor: _kBrokerPrimary,
                 ),
                 const Spacer(),
-                if (_selectedOutputTab == 'broker' &&
-                    brokerOutputs.isNotEmpty) ...[
-                  Material(
-                    color: _kBrokerPrimary,
-                    borderRadius: BorderRadius.circular(10),
-                    child: InkWell(
-                      onTap: () async {
-                        final moved = await showDialog<bool>(
-                          context: context,
-                          barrierDismissible: false,
-                          builder: (_) => BrokerMoveOutputDialog(
-                            noProduksi: widget.noProduksi,
-                            outputs: brokerOutputs,
-                          ),
-                        );
-                        if (moved == true && mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Output berhasil dipindahkan'),
-                              behavior: SnackBarBehavior.floating,
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                        }
-                      },
-                      borderRadius: BorderRadius.circular(10),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 7,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.swap_horiz_rounded,
-                              size: 15,
-                              color: Colors.white,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              'Pindah',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                if (_selectedOutputTab == 'bonggolan' &&
-                    bonggolanOutputs.isNotEmpty) ...[
-                  Material(
-                    color: _kBrokerPrimary,
-                    borderRadius: BorderRadius.circular(10),
-                    child: InkWell(
-                      onTap: () async {
-                        final moved = await showDialog<bool>(
-                          context: context,
-                          barrierDismissible: false,
-                          builder: (_) => BrokerMoveBonggolanOutputDialog(
-                            noProduksi: widget.noProduksi,
-                            outputs: bonggolanOutputs,
-                          ),
-                        );
-                        if (moved == true && mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Output bonggolan berhasil dipindahkan',
-                              ),
-                              behavior: SnackBarBehavior.floating,
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                        }
-                      },
-                      borderRadius: BorderRadius.circular(10),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 7,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.swap_horiz_rounded,
-                              size: 15,
-                              color: Colors.white,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              'Pindah',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                if (_selectedOutputTab == 'broker' ||
-                    _selectedOutputTab == 'bonggolan') ...[
-                  Material(
-                    color: _kBrokerOutput,
-                    borderRadius: BorderRadius.circular(10),
-                    child: InkWell(
-                      onTap: () async {
-                        if (_selectedOutputTab == 'broker') {
-                          await showDialog<void>(
-                            context: context,
-                            builder: (_) => BrokerFormDialog(
-                              preselectNoProduksi: widget.noProduksi,
-                              preselectNamaMesin: widget.namaMesin,
-                              preselectDate: widget.tglProduksi,
-                            ),
-                          );
-                        } else {
-                          await showDialog<void>(
-                            context: context,
-                            builder: (_) => BonggolanFormDialog(
-                              preselectBrokerNoProduksi: widget.noProduksi,
-                              preselectBrokerNamaMesin: widget.namaMesin,
-                              preselectDate: widget.tglProduksi,
-                            ),
-                          );
-                        }
-                        if (mounted) {
-                          context
-                              .read<BrokerProductionInputViewModel>()
-                              .loadOutputs(widget.noProduksi);
-                        }
-                      },
-                      borderRadius: BorderRadius.circular(10),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 7,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.add, size: 15, color: Colors.white),
-                            SizedBox(width: 4),
-                            Text(
-                              'Tambah',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _kBrokerOutput.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '$totalLabel label',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: _kBrokerOutput,
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
@@ -1011,38 +972,85 @@ class _BrokerProductionInputScreenState
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         if (error != null) ...[
-                          _OutputErrorBanner(message: error),
+                          ProductionOutputErrorBanner(message: error),
                           const SizedBox(height: 10),
                         ],
-                        _PanelTabBar(
-                          selectedValue: _selectedOutputTab,
-                          accentColor: _kBrokerOutput,
-                          tabs: [
-                            _PanelTabItem(
-                              value: 'broker',
-                              label: 'Broker',
-                              count: brokerOutputs.length,
-                            ),
-                            _PanelTabItem(
-                              value: 'bonggolan',
-                              label: 'Bonggolan',
-                              count: bonggolanOutputs.length,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ProductionFolderTabBar(
+                                selectedValue: _selectedOutputTab,
+                                accentColor: _kBrokerOutput,
+                                tabs: [
+                                  ProductionTabItem(
+                                    value: 'broker',
+                                    label: 'Broker',
+                                    count: brokerOutputs.length,
+                                  ),
+                                  ProductionTabItem(
+                                    value: 'bonggolan',
+                                    label: 'Bonggolan',
+                                    count: bonggolanOutputs.length,
+                                  ),
+                                ],
+                                onChanged: (value) {
+                                  if (_selectedOutputTab == value) return;
+                                  setState(() => _selectedOutputTab = value);
+                                },
+                              ),
                             ),
                           ],
-                          onChanged: (value) {
-                            if (_selectedOutputTab == value) return;
-                            setState(() => _selectedOutputTab = value);
-                          },
                         ),
-                        const SizedBox(height: 12),
                         Expanded(
-                          child: LayoutBuilder(
-                            builder: (context, constraints) {
-                              return SizedBox(
-                                width: constraints.maxWidth,
-                                child: selectedTabChild,
-                              );
-                            },
+                          child: ProductionInputCategoryBlock(
+                            color: _kBrokerOutput,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Expanded(
+                                  child: LayoutBuilder(
+                                    builder: (context, constraints) {
+                                      return SizedBox(
+                                        width: constraints.maxWidth,
+                                        child: selectedTabChild,
+                                      );
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          selectedOutputSummary,
+                                          const SizedBox(height: 10),
+                                          _OutputGrandTotalBar(
+                                            totalLabel: totalLabel,
+                                            totalSak: totalSakBroker,
+                                            totalBerat:
+                                                totalBeratBroker +
+                                                totalBeratBonggolan,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    FloatingActionButton(
+                                      heroTag: 'fab_add_broker_output',
+                                      mini: true,
+                                      backgroundColor: _kBrokerOutput,
+                                      foregroundColor: Colors.white,
+                                      tooltip: 'Tambah $activeOutputLabel',
+                                      onPressed: onAddOutput,
+                                      child: const Icon(Icons.add),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ],
@@ -1073,6 +1081,758 @@ class _BrokerProductionInputScreenState
     return false;
   }
 
+  Widget _buildSelectedInputTabChild({
+    required Map<String, List<BrokerItem>> brokerGroups,
+    required Map<String, List<BbItem>> bbGroups,
+    required Map<String, List<WashingItem>> washingGroups,
+    required Map<String, List<CrusherItem>> crusherGroups,
+    required Map<String, List<GilinganItem>> gilinganGroups,
+    required Map<String, List<MixerItem>> mixerGroups,
+    required Map<String, List<RejectItem>> rejectGroups,
+    required BrokerProductionInputViewModel vm,
+    required bool canDelete,
+    bool showFooter = true,
+  }) {
+    ProductionCategorySummaryTile summaryFor({
+      required int totalData,
+      required int totalSak,
+      required double totalBerat,
+    }) {
+      return ProductionCategorySummaryTile(
+        summary: SectionSummary(
+          totalData: totalData,
+          totalSak: totalSak,
+          totalBerat: totalBerat,
+        ),
+        accentColor: _kBrokerPrimary,
+      );
+    }
+
+    Widget grid;
+    Widget? footer;
+
+    if (_selectedInputTab == 'broker') {
+      int totalSak = 0;
+      double totalBerat = 0.0;
+      for (final entry in brokerGroups.entries) {
+        for (final item in entry.value) {
+          totalSak += 1;
+          totalBerat += item.berat ?? 0.0;
+        }
+      }
+      footer = summaryFor(
+        totalData: brokerGroups.length,
+        totalSak: totalSak,
+        totalBerat: totalBerat,
+      );
+      grid = brokerGroups.isEmpty
+          ? const Center(
+              child: Text('Tidak ada data', style: TextStyle(fontSize: 11)),
+            )
+          : LayoutBuilder(
+              builder: (_, c) => GridView(
+                padding: const EdgeInsets.all(6),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+                  crossAxisSpacing: 6,
+                  mainAxisSpacing: 6,
+                  mainAxisExtent: 72,
+                ),
+                children: brokerGroups.entries.map((entry) {
+                  final hasPartial = entry.value.any((x) => x.isPartialRow);
+                  return ProductionInputGroupTile(
+                    title: entry.key,
+                    headerSubtitle:
+                        (entry.value.isNotEmpty
+                            ? entry.value.first.namaJenis
+                            : '-') ??
+                        '-',
+                    tileMetrics: [
+                      (Icons.inventory_2_outlined, '${entry.value.length} sak'),
+                      (
+                        Icons.scale_outlined,
+                        '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
+                      ),
+                    ],
+                    color: Colors.blue,
+                    isTemp: vm.hasTemporaryDataForLabel(entry.key),
+                    onLongPress: vm.hasTemporaryDataForLabel(entry.key)
+                        ? () => _showTempCardOptions(entry.key)
+                        : null,
+                    expandable: !hasPartial,
+                    isPartialGroup: hasPartial,
+                    partialReference: hasPartial
+                        ? (entry.value
+                                  .firstWhere((x) => x.isPartialRow)
+                                  .noBroker
+                                  ?.toString() ??
+                              '-')
+                        : null,
+                    detailsBuilder: () => [],
+                    chipItemsBuilder: () {
+                      final currentInputs = vm.inputsOf(widget.noProduksi);
+                      final dbItems = currentInputs == null
+                          ? <BrokerItem>[]
+                          : currentInputs.broker.where(
+                              (x) => brokerTitleKey(x) == entry.key,
+                            );
+                      final tempFull = vm.tempBroker.where(
+                        (x) => brokerTitleKey(x) == entry.key,
+                      );
+                      final tempPart = vm.tempBrokerPartial.where(
+                        (x) => brokerTitleKey(x) == entry.key,
+                      );
+                      final items = <BrokerItem>[
+                        ...tempPart,
+                        ...dbItems,
+                        ...tempFull,
+                      ];
+                      return items.map((item) {
+                        final isTemp =
+                            vm.tempBroker.contains(item) ||
+                            vm.tempBrokerPartial.contains(item);
+                        return ProductionSakChip(
+                          label: 'Sak ${item.noSak ?? '-'}',
+                          berat: item.berat,
+                          isTemp: isTemp,
+                          isPartial: item.isPartialRow,
+                          onDelete: isTemp
+                              ? () => vm.deleteTempBrokerItem(item)
+                              : null,
+                        );
+                      }).toList();
+                    },
+                  );
+                }).toList(),
+              ),
+            );
+    } else if (_selectedInputTab == 'bb') {
+      int totalSak = 0;
+      double totalBerat = 0.0;
+      for (final entry in bbGroups.entries) {
+        for (final item in entry.value) {
+          totalSak += 1;
+          totalBerat += item.berat ?? 0.0;
+        }
+      }
+      footer = summaryFor(
+        totalData: bbGroups.length,
+        totalSak: totalSak,
+        totalBerat: totalBerat,
+      );
+      grid = bbGroups.isEmpty
+          ? const Center(
+              child: Text('Tidak ada data', style: TextStyle(fontSize: 11)),
+            )
+          : LayoutBuilder(
+              builder: (_, c) => GridView(
+                padding: const EdgeInsets.all(6),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+                  crossAxisSpacing: 6,
+                  mainAxisSpacing: 6,
+                  mainAxisExtent: 72,
+                ),
+                children: bbGroups.entries.map((entry) {
+                  final hasPartial = entry.value.any((x) => x.isPartialRow);
+                  return ProductionInputGroupTile(
+                    title: entry.key,
+                    headerSubtitle:
+                        (entry.value.isNotEmpty
+                            ? entry.value.first.namaJenis
+                            : '-') ??
+                        '-',
+                    tileMetrics: [
+                      (Icons.inventory_2_outlined, '${entry.value.length} sak'),
+                      (
+                        Icons.scale_outlined,
+                        '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
+                      ),
+                    ],
+                    color: Colors.blue,
+                    isTemp: vm.hasTemporaryDataForLabel(entry.key),
+                    onLongPress: vm.hasTemporaryDataForLabel(entry.key)
+                        ? () => _showTempCardOptions(entry.key)
+                        : null,
+                    expandable: !hasPartial,
+                    isPartialGroup: hasPartial,
+                    partialReference: hasPartial
+                        ? bbPairLabel(
+                            entry.value.firstWhere((x) => x.isPartialRow),
+                          )
+                        : null,
+                    detailsBuilder: () => [],
+                    chipItemsBuilder: () {
+                      final currentInputs = vm.inputsOf(widget.noProduksi);
+                      final dbItems = currentInputs == null
+                          ? <BbItem>[]
+                          : currentInputs.bb.where(
+                              (x) => bbTitleKey(x) == entry.key,
+                            );
+                      final tempFull = vm.tempBb.where(
+                        (x) => bbTitleKey(x) == entry.key,
+                      );
+                      final tempPart = vm.tempBbPartial.where(
+                        (x) => bbTitleKey(x) == entry.key,
+                      );
+                      final items = [...tempPart, ...dbItems, ...tempFull];
+                      return items.map((item) {
+                        final isTemp =
+                            vm.tempBb.contains(item) ||
+                            vm.tempBbPartial.contains(item);
+                        return ProductionSakChip(
+                          label: 'Sak ${item.noSak ?? '-'}',
+                          berat: item.berat,
+                          isTemp: isTemp,
+                          isPartial: item.isPartialRow,
+                          onDelete: isTemp
+                              ? () => vm.deleteTempBbItem(item)
+                              : null,
+                        );
+                      }).toList();
+                    },
+                  );
+                }).toList(),
+              ),
+            );
+    } else if (_selectedInputTab == 'washing') {
+      int totalSak = 0;
+      double totalBerat = 0.0;
+      for (final entry in washingGroups.entries) {
+        for (final item in entry.value) {
+          totalSak += 1;
+          totalBerat += item.berat ?? 0.0;
+        }
+      }
+      footer = summaryFor(
+        totalData: washingGroups.length,
+        totalSak: totalSak,
+        totalBerat: totalBerat,
+      );
+      grid = washingGroups.isEmpty
+          ? const Center(
+              child: Text('Tidak ada data', style: TextStyle(fontSize: 11)),
+            )
+          : LayoutBuilder(
+              builder: (_, c) => GridView(
+                padding: const EdgeInsets.all(6),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+                  crossAxisSpacing: 6,
+                  mainAxisSpacing: 6,
+                  mainAxisExtent: 72,
+                ),
+                children: washingGroups.entries.map((entry) {
+                  return ProductionInputGroupTile(
+                    title: entry.key,
+                    headerSubtitle:
+                        (entry.value.isNotEmpty
+                            ? entry.value.first.namaJenis
+                            : '-') ??
+                        '-',
+                    tileMetrics: [
+                      (Icons.inventory_2_outlined, '${entry.value.length} sak'),
+                      (
+                        Icons.scale_outlined,
+                        '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
+                      ),
+                    ],
+                    color: Colors.blue,
+                    isTemp: vm.hasTemporaryDataForLabel(entry.key),
+                    onLongPress: vm.hasTemporaryDataForLabel(entry.key)
+                        ? () => _showTempCardOptions(entry.key)
+                        : null,
+                    detailsBuilder: () => [],
+                    chipItemsBuilder: () {
+                      final currentInputs = vm.inputsOf(widget.noProduksi);
+                      final items = [
+                        if (currentInputs != null)
+                          ...currentInputs.washing.where(
+                            (x) => (x.noWashing ?? '-') == entry.key,
+                          ),
+                        ...vm.tempWashing.where(
+                          (x) => (x.noWashing ?? '-') == entry.key,
+                        ),
+                      ];
+                      return items.map((item) {
+                        final isTemp = vm.tempWashing.contains(item);
+                        return ProductionSakChip(
+                          label: 'Sak ${item.noSak ?? '-'}',
+                          berat: item.berat,
+                          isTemp: isTemp,
+                          onDelete: isTemp
+                              ? () => vm.deleteTempWashingItem(item)
+                              : null,
+                        );
+                      }).toList();
+                    },
+                  );
+                }).toList(),
+              ),
+            );
+    } else if (_selectedInputTab == 'crusher') {
+      double totalBerat = 0.0;
+      for (final entry in crusherGroups.entries) {
+        for (final item in entry.value) {
+          totalBerat += item.berat ?? 0.0;
+        }
+      }
+      footer = summaryFor(
+        totalData: crusherGroups.length,
+        totalSak: 0,
+        totalBerat: totalBerat,
+      );
+      grid = crusherGroups.isEmpty
+          ? const Center(
+              child: Text('Tidak ada data', style: TextStyle(fontSize: 11)),
+            )
+          : LayoutBuilder(
+              builder: (_, c) => GridView(
+                padding: const EdgeInsets.all(6),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+                  crossAxisSpacing: 6,
+                  mainAxisSpacing: 6,
+                  mainAxisExtent: 72,
+                ),
+                children: crusherGroups.entries.map((entry) {
+                  return ProductionInputGroupTile(
+                    title: entry.key,
+                    headerSubtitle:
+                        (entry.value.isNotEmpty
+                            ? entry.value.first.namaJenis
+                            : '-') ??
+                        '-',
+                    tileMetrics: [
+                      (
+                        Icons.scale_outlined,
+                        '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
+                      ),
+                    ],
+                    color: Colors.blue,
+                    isTemp: vm.hasTemporaryDataForLabel(entry.key),
+                    onLongPress: vm.hasTemporaryDataForLabel(entry.key)
+                        ? () => _showTempCardOptions(entry.key)
+                        : null,
+                    detailsBuilder: () {
+                      final currentInputs = vm.inputsOf(widget.noProduksi);
+                      final items = [
+                        if (currentInputs != null)
+                          ...currentInputs.crusher.where(
+                            (x) => (x.noCrusher ?? '-') == entry.key,
+                          ),
+                        ...vm.tempCrusher.where(
+                          (x) => (x.noCrusher ?? '-') == entry.key,
+                        ),
+                      ];
+                      return items.map((item) {
+                        final isTemp = vm.tempCrusher.contains(item);
+                        return TooltipTableRow(
+                          columns: ['${num2(item.berat)} kg'],
+                          showDelete: isTemp,
+                          onDelete: isTemp
+                              ? () => vm.deleteTempCrusherItem(item)
+                              : null,
+                          isTempRow: isTemp,
+                          isHighlighted: isTemp,
+                          isDisabled: !isTemp && !canDelete,
+                          itemData: item,
+                        );
+                      }).toList();
+                    },
+                  );
+                }).toList(),
+              ),
+            );
+    } else if (_selectedInputTab == 'gilingan') {
+      double totalBerat = 0.0;
+      for (final entry in gilinganGroups.entries) {
+        for (final item in entry.value) {
+          totalBerat += item.berat ?? 0.0;
+        }
+      }
+      footer = summaryFor(
+        totalData: gilinganGroups.length,
+        totalSak: 0,
+        totalBerat: totalBerat,
+      );
+      grid = gilinganGroups.isEmpty
+          ? const Center(
+              child: Text('Tidak ada data', style: TextStyle(fontSize: 11)),
+            )
+          : LayoutBuilder(
+              builder: (_, c) => GridView(
+                padding: const EdgeInsets.all(6),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+                  crossAxisSpacing: 6,
+                  mainAxisSpacing: 6,
+                  mainAxisExtent: 72,
+                ),
+                children: gilinganGroups.entries.map((entry) {
+                  final hasPartial = entry.value.any((x) => x.isPartialRow);
+                  return ProductionInputGroupTile(
+                    title: entry.key,
+                    headerSubtitle:
+                        (entry.value.isNotEmpty
+                            ? entry.value.first.namaJenis
+                            : '-') ??
+                        '-',
+                    tileMetrics: [
+                      (
+                        Icons.scale_outlined,
+                        '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
+                      ),
+                    ],
+                    color: Colors.blue,
+                    isTemp: vm.hasTemporaryDataForLabel(entry.key),
+                    onLongPress: vm.hasTemporaryDataForLabel(entry.key)
+                        ? () => _showTempCardOptions(entry.key)
+                        : null,
+                    expandable: !hasPartial,
+                    isPartialGroup: hasPartial,
+                    partialReference: hasPartial
+                        ? (entry.value
+                                  .firstWhere((x) => x.isPartialRow)
+                                  .noGilingan ??
+                              '-')
+                        : null,
+                    detailsBuilder: () {
+                      final currentInputs = vm.inputsOf(widget.noProduksi);
+                      final dbItems = currentInputs == null
+                          ? <GilinganItem>[]
+                          : currentInputs.gilingan.where(
+                              (x) => gilinganTitleKey(x) == entry.key,
+                            );
+                      final tempFull = vm.tempGilingan.where(
+                        (x) => gilinganTitleKey(x) == entry.key,
+                      );
+                      final tempPart = vm.tempGilinganPartial.where(
+                        (x) => gilinganTitleKey(x) == entry.key,
+                      );
+                      final items = [...tempPart, ...dbItems, ...tempFull];
+                      return items.map((item) {
+                        final isTemp =
+                            vm.tempGilingan.contains(item) ||
+                            vm.tempGilinganPartial.contains(item);
+                        final columns = item.isPartialRow
+                            ? <String>[
+                                (item.noGilingan ?? '-'),
+                                '${num2(item.berat)} kg',
+                              ]
+                            : <String>['${num2(item.berat)} kg'];
+                        return TooltipTableRow(
+                          columns: columns,
+                          showDelete: isTemp,
+                          onDelete: isTemp
+                              ? () => vm.deleteTempGilinganItem(item)
+                              : null,
+                          isTempRow: isTemp,
+                          isHighlighted: isTemp,
+                          isDisabled: !isTemp && !canDelete,
+                          itemData: item,
+                        );
+                      }).toList();
+                    },
+                  );
+                }).toList(),
+              ),
+            );
+    } else if (_selectedInputTab == 'mixer') {
+      int totalSak = 0;
+      double totalBerat = 0.0;
+      for (final entry in mixerGroups.entries) {
+        for (final item in entry.value) {
+          totalSak += 1;
+          totalBerat += item.berat ?? 0.0;
+        }
+      }
+      footer = summaryFor(
+        totalData: mixerGroups.length,
+        totalSak: totalSak,
+        totalBerat: totalBerat,
+      );
+      grid = mixerGroups.isEmpty
+          ? const Center(
+              child: Text('Tidak ada data', style: TextStyle(fontSize: 11)),
+            )
+          : LayoutBuilder(
+              builder: (_, c) => GridView(
+                padding: const EdgeInsets.all(6),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+                  crossAxisSpacing: 6,
+                  mainAxisSpacing: 6,
+                  mainAxisExtent: 72,
+                ),
+                children: mixerGroups.entries.map((entry) {
+                  final hasPartial = entry.value.any((x) => x.isPartialRow);
+                  return ProductionInputGroupTile(
+                    title: entry.key,
+                    headerSubtitle:
+                        (entry.value.isNotEmpty
+                            ? entry.value.first.namaJenis
+                            : '-') ??
+                        '-',
+                    tileMetrics: [
+                      (Icons.inventory_2_outlined, '${entry.value.length} sak'),
+                      (
+                        Icons.scale_outlined,
+                        '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
+                      ),
+                    ],
+                    color: Colors.blue,
+                    isTemp: vm.hasTemporaryDataForLabel(entry.key),
+                    onLongPress: vm.hasTemporaryDataForLabel(entry.key)
+                        ? () => _showTempCardOptions(entry.key)
+                        : null,
+                    expandable: !hasPartial,
+                    isPartialGroup: hasPartial,
+                    partialReference: hasPartial
+                        ? (entry.value
+                                  .firstWhere((x) => x.isPartialRow)
+                                  .noMixer ??
+                              '-')
+                        : null,
+                    detailsBuilder: () => [],
+                    chipItemsBuilder: () {
+                      final currentInputs = vm.inputsOf(widget.noProduksi);
+                      final dbItems = currentInputs == null
+                          ? <MixerItem>[]
+                          : currentInputs.mixer
+                                .where((x) => mixerTitleKey(x) == entry.key)
+                                .toList();
+                      final tempFull = vm.tempMixer
+                          .where((x) => mixerTitleKey(x) == entry.key)
+                          .toList();
+                      final tempPart = vm.tempMixerPartial
+                          .where((x) => mixerTitleKey(x) == entry.key)
+                          .toList();
+                      final items = [...tempPart, ...dbItems, ...tempFull];
+                      return items.map((item) {
+                        final isTemp =
+                            vm.tempMixer.contains(item) ||
+                            vm.tempMixerPartial.contains(item);
+                        return ProductionSakChip(
+                          label: 'Sak ${item.noSak ?? '-'}',
+                          berat: item.berat,
+                          isTemp: isTemp,
+                          isPartial: item.isPartialRow,
+                          onDelete: isTemp
+                              ? () => vm.deleteTempMixerItem(item)
+                              : null,
+                        );
+                      }).toList();
+                    },
+                  );
+                }).toList(),
+              ),
+            );
+    } else {
+      // reject
+      double totalBerat = 0.0;
+      for (final entry in rejectGroups.entries) {
+        for (final item in entry.value) {
+          totalBerat += item.berat ?? 0.0;
+        }
+      }
+      footer = summaryFor(
+        totalData: rejectGroups.length,
+        totalSak: 0,
+        totalBerat: totalBerat,
+      );
+      grid = rejectGroups.isEmpty
+          ? const Center(
+              child: Text('Tidak ada data', style: TextStyle(fontSize: 11)),
+            )
+          : LayoutBuilder(
+              builder: (_, c) => GridView(
+                padding: const EdgeInsets.all(6),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+                  crossAxisSpacing: 6,
+                  mainAxisSpacing: 6,
+                  mainAxisExtent: 72,
+                ),
+                children: rejectGroups.entries.map((entry) {
+                  final hasPartial = entry.value.any((x) => x.isPartialRow);
+                  return ProductionInputGroupTile(
+                    title: entry.key,
+                    headerSubtitle:
+                        (entry.value.isNotEmpty
+                            ? entry.value.first.namaJenis
+                            : '-') ??
+                        '-',
+                    tileMetrics: [
+                      (
+                        Icons.scale_outlined,
+                        '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
+                      ),
+                    ],
+                    color: Colors.blue,
+                    isTemp: vm.hasTemporaryDataForLabel(entry.key),
+                    onLongPress: vm.hasTemporaryDataForLabel(entry.key)
+                        ? () => _showTempCardOptions(entry.key)
+                        : null,
+                    isPartialGroup: hasPartial,
+                    partialReference: hasPartial
+                        ? (entry.value
+                                  .firstWhere((x) => x.isPartialRow)
+                                  .noReject ??
+                              '-')
+                        : null,
+                    detailsBuilder: () {
+                      final currentInputs = vm.inputsOf(widget.noProduksi);
+                      final dbItems = currentInputs == null
+                          ? <RejectItem>[]
+                          : currentInputs.reject.where(
+                              (x) => rejectTitleKey(x) == entry.key,
+                            );
+                      final tempFull = vm.tempReject.where(
+                        (x) => rejectTitleKey(x) == entry.key,
+                      );
+                      final tempPart = vm.tempRejectPartial.where(
+                        (x) => rejectTitleKey(x) == entry.key,
+                      );
+                      final items = [...tempPart, ...dbItems, ...tempFull];
+                      return items.map((item) {
+                        final isTemp =
+                            vm.tempReject.contains(item) ||
+                            vm.tempRejectPartial.contains(item);
+                        final columns = item.isPartialRow
+                            ? <String>[
+                                (item.noReject ?? '-'),
+                                '${num2(item.berat)} kg',
+                              ]
+                            : <String>['${num2(item.berat)} kg'];
+                        return TooltipTableRow(
+                          columns: columns,
+                          showDelete: isTemp,
+                          onDelete: isTemp
+                              ? () => vm.deleteTempRejectItem(item)
+                              : null,
+                          isTempRow: isTemp,
+                          isHighlighted: isTemp,
+                          isDisabled: !isTemp && !canDelete,
+                          itemData: item,
+                        );
+                      }).toList();
+                    },
+                  );
+                }).toList(),
+              ),
+            );
+    }
+
+    return ProductionOutputCategoryContent(
+      footer: showFooter ? footer : const SizedBox.shrink(),
+      child: grid,
+    );
+  }
+
+  SectionSummary _selectedInputSummary({
+    required Map<String, List<BrokerItem>> brokerGroups,
+    required Map<String, List<BbItem>> bbGroups,
+    required Map<String, List<WashingItem>> washingGroups,
+    required Map<String, List<CrusherItem>> crusherGroups,
+    required Map<String, List<GilinganItem>> gilinganGroups,
+    required Map<String, List<MixerItem>> mixerGroups,
+    required Map<String, List<RejectItem>> rejectGroups,
+  }) {
+    if (_selectedInputTab == 'broker') {
+      int totalSak = 0;
+      double totalBerat = 0.0;
+      for (final entry in brokerGroups.entries) {
+        for (final item in entry.value) {
+          totalSak += 1;
+          totalBerat += item.berat ?? 0.0;
+        }
+      }
+      return SectionSummary(
+        totalData: brokerGroups.length,
+        totalSak: totalSak,
+        totalBerat: totalBerat,
+      );
+    } else if (_selectedInputTab == 'bb') {
+      int totalSak = 0;
+      double totalBerat = 0.0;
+      for (final entry in bbGroups.entries) {
+        for (final item in entry.value) {
+          totalSak += 1;
+          totalBerat += item.berat ?? 0.0;
+        }
+      }
+      return SectionSummary(
+        totalData: bbGroups.length,
+        totalSak: totalSak,
+        totalBerat: totalBerat,
+      );
+    } else if (_selectedInputTab == 'washing') {
+      int totalSak = 0;
+      double totalBerat = 0.0;
+      for (final entry in washingGroups.entries) {
+        for (final item in entry.value) {
+          totalSak += 1;
+          totalBerat += item.berat ?? 0.0;
+        }
+      }
+      return SectionSummary(
+        totalData: washingGroups.length,
+        totalSak: totalSak,
+        totalBerat: totalBerat,
+      );
+    } else if (_selectedInputTab == 'crusher') {
+      double totalBerat = 0.0;
+      for (final entry in crusherGroups.entries) {
+        for (final item in entry.value) {
+          totalBerat += item.berat ?? 0.0;
+        }
+      }
+      return SectionSummary(
+        totalData: crusherGroups.length,
+        totalSak: 0,
+        totalBerat: totalBerat,
+      );
+    } else if (_selectedInputTab == 'gilingan') {
+      double totalBerat = 0.0;
+      for (final entry in gilinganGroups.entries) {
+        for (final item in entry.value) {
+          totalBerat += item.berat ?? 0.0;
+        }
+      }
+      return SectionSummary(
+        totalData: gilinganGroups.length,
+        totalSak: 0,
+        totalBerat: totalBerat,
+      );
+    } else if (_selectedInputTab == 'mixer') {
+      int totalSak = 0;
+      double totalBerat = 0.0;
+      for (final entry in mixerGroups.entries) {
+        for (final item in entry.value) {
+          totalSak += 1;
+          totalBerat += item.berat ?? 0.0;
+        }
+      }
+      return SectionSummary(
+        totalData: mixerGroups.length,
+        totalSak: totalSak,
+        totalBerat: totalBerat,
+      );
+    }
+    double totalBerat = 0.0;
+    for (final entry in rejectGroups.entries) {
+      for (final item in entry.value) {
+        totalBerat += item.berat ?? 0.0;
+      }
+    }
+    return SectionSummary(
+      totalData: rejectGroups.length,
+      totalSak: 0,
+      totalBerat: totalBerat,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<BrokerProductionInputViewModel>(
@@ -1090,7 +1850,7 @@ class _BrokerProductionInputScreenState
         final canDeleteByPerm = perm.can('label_broker:delete');
         final canDelete = canDeleteByPerm && !locked;
 
-        // ✅ WRAP dengan WillPopScope untuk intercept back button
+        // ? WRAP dengan WillPopScope untuk intercept back button
         return WillPopScope(
           onWillPop: _onWillPop,
           child: Scaffold(
@@ -1165,1579 +1925,327 @@ class _BrokerProductionInputScreenState
 
                 return Column(
                   children: [
-                    _buildWorkspaceToolbar(locked: locked),
+                    BrokerWorkspaceToolbar(
+                      noProduksi: widget.noProduksi,
+                      idMesin: widget.idMesin,
+                      shift: widget.shift,
+                      tglProduksi: widget.tglProduksi,
+                      isLocked: locked,
+                      hourStart: widget.hourStart,
+                      hourEnd: widget.hourEnd,
+                      namaJenis: widget.namaJenis,
+                      onGanti: _openSplitDialog,
+                      onTimeline: _openTimelineDialog,
+                      onRefresh: () {
+                        final vm = context
+                            .read<BrokerProductionInputViewModel>();
+                        vm.loadInputs(widget.noProduksi, force: true);
+                        vm.loadOutputs(widget.noProduksi);
+                        _showSnack('Data di-refresh');
+                      },
+                    ),
                     Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Expanded(
-                              child: Builder(
-                                builder: (buttonContext) {
-                                  return _buildInputPanel(
-                                    buttonContext: buttonContext,
-                                    vm: vm,
-                                    locked: locked,
-                                    isLookupLoading: vm.isLookupLoading,
-                                    labelCount:
-                                        brokerGroups.length +
-                                        bbGroups.length +
-                                        washingGroups.length +
-                                        crusherGroups.length +
-                                        gilinganGroups.length +
-                                        mixerGroups.length +
-                                        rejectGroups.length,
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                        _PanelTabBar(
-                                          selectedValue: _selectedInputTab,
-                                          accentColor: _kBrokerPrimary,
-                                          tabs: [
-                                            _PanelTabItem(
-                                              value: 'broker',
-                                              label: 'Broker',
-                                              count: brokerGroups.length,
-                                            ),
-                                            _PanelTabItem(
-                                              value: 'bb',
-                                              label: 'Bahan Baku',
-                                              count: bbGroups.length,
-                                            ),
-                                            _PanelTabItem(
-                                              value: 'washing',
-                                              label: 'Washing',
-                                              count: washingGroups.length,
-                                            ),
-                                            _PanelTabItem(
-                                              value: 'crusher',
-                                              label: 'Crusher',
-                                              count: crusherGroups.length,
-                                            ),
-                                            _PanelTabItem(
-                                              value: 'gilingan',
-                                              label: 'Gilingan',
-                                              count: gilinganGroups.length,
-                                            ),
-                                            _PanelTabItem(
-                                              value: 'mixer',
-                                              label: 'Mixer',
-                                              count: mixerGroups.length,
-                                            ),
-                                            _PanelTabItem(
-                                              value: 'reject',
-                                              label: 'Reject',
-                                              count: rejectGroups.length,
-                                            ),
-                                          ],
-                                          onChanged: (value) {
-                                            if (_selectedInputTab == value) {
-                                              return;
-                                            }
-                                            setState(
-                                              () => _selectedInputTab = value,
-                                            );
-                                          },
-                                        ),
-                                        const SizedBox(height: 12),
-                                        Expanded(
-                                          child: LayoutBuilder(
-                                            builder: (context, constraints) {
-                                              return SingleChildScrollView(
-                                                scrollDirection:
-                                                    Axis.horizontal,
-                                                child: Row(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment
-                                                          .stretch,
-                                                  children: [
-                                                    // BROKER
-                                                    _categorySlot(
-                                                      visible:
-                                                          _selectedInputTab ==
-                                                          'broker',
-                                                      width:
-                                                          constraints.maxWidth,
-                                                      child: _InputCategoryBlock(
-                                                        color: Colors.blue,
-                                                        isLoading:
-                                                            loading, // ✅ TAMBAHKAN
+                      child: LayoutBuilder(
+                        builder: (context, outerConstraints) {
+                          final isWide = outerConstraints.maxWidth >= 800;
 
-                                                        summaryBuilder: () {
-                                                          int totalSak = 0;
-                                                          double totalBerat =
-                                                              0.0;
-
-                                                          // Loop semua groups
-                                                          for (final entry
-                                                              in brokerGroups
-                                                                  .entries) {
-                                                            for (final item
-                                                                in entry
-                                                                    .value) {
-                                                              totalSak +=
-                                                                  1; // Count item (atau item.jumlahSak jika ada)
-                                                              totalBerat +=
-                                                                  (item.berat ??
-                                                                  0.0);
-                                                            }
-                                                          }
-
-                                                          return SectionSummary(
-                                                            totalData:
-                                                                brokerGroups
-                                                                    .length,
-                                                            totalSak: totalSak,
-                                                            totalBerat:
-                                                                totalBerat,
-                                                          );
-                                                        },
-
-                                                        child:
-                                                            brokerGroups.isEmpty
-                                                            ? const Center(
-                                                                child: Text(
-                                                                  'Tidak ada data',
-                                                                  style:
-                                                                      TextStyle(
-                                                                        fontSize:
-                                                                            11,
-                                                                      ),
-                                                                ),
-                                                              )
-                                                            : ListView(
-                                                                padding:
-                                                                    const EdgeInsets.all(
-                                                                      8,
-                                                                    ),
-                                                                children: brokerGroups.entries.map((
-                                                                  entry,
-                                                                ) {
-                                                                  final hasPartial =
-                                                                      entry
-                                                                          .value
-                                                                          .any(
-                                                                            (
-                                                                              x,
-                                                                            ) =>
-                                                                                x.isPartialRow,
-                                                                          );
-
-                                                                  late final List<
-                                                                    String
-                                                                  >
-                                                                  headers;
-                                                                  late final List<
-                                                                    int
-                                                                  >
-                                                                  columnFlexes;
-
-                                                                  if (hasPartial) {
-                                                                    headers = const [
-                                                                      'Label',
-                                                                      'Sak',
-                                                                      'Berat',
-                                                                      'Action',
-                                                                    ];
-                                                                    columnFlexes =
-                                                                        const [
-                                                                          3,
-                                                                          1,
-                                                                          2,
-                                                                        ];
-                                                                  } else {
-                                                                    headers = const [
-                                                                      'Sak',
-                                                                      'Berat',
-                                                                      'Action',
-                                                                    ];
-                                                                    columnFlexes =
-                                                                        const [
-                                                                          1,
-                                                                          2,
-                                                                        ];
-                                                                  }
-
-                                                                  return _InputGroupExpansionTile(
-                                                                    title: entry
-                                                                        .key,
-                                                                    headerSubtitle:
-                                                                        (entry.value.isNotEmpty
-                                                                            ? entry.value.first.namaJenis
-                                                                            : '-') ??
-                                                                        '-',
-                                                                    tileMetrics: [
-                                                                      (
-                                                                        Icons
-                                                                            .inventory_2_outlined,
-                                                                        '${entry.value.length} sak',
-                                                                      ),
-                                                                      (
-                                                                        Icons
-                                                                            .scale_outlined,
-                                                                        '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
-                                                                      ),
-                                                                    ],
-                                                                    color: Colors
-                                                                        .blue,
-                                                                    expandable:
-                                                                        !hasPartial,
-                                                                    isPartialGroup:
-                                                                        hasPartial,
-                                                                    partialReference:
-                                                                        hasPartial
-                                                                        ? (entry.value
-                                                                                  .firstWhere(
-                                                                                    (
-                                                                                      x,
-                                                                                    ) => x.isPartialRow,
-                                                                                  )
-                                                                                  .noBroker
-                                                                                  ?.toString() ??
-                                                                              '-')
-                                                                        : null,
-                                                                    detailsBuilder: () {
-                                                                      final currentInputs =
-                                                                          vm.inputsOf(
-                                                                            widget.noProduksi,
-                                                                          );
-
-                                                                      final dbItems =
-                                                                          currentInputs ==
-                                                                              null
-                                                                          ? <
-                                                                              BrokerItem
-                                                                            >[]
-                                                                          : currentInputs.broker.where(
-                                                                              (
-                                                                                x,
-                                                                              ) =>
-                                                                                  brokerTitleKey(
-                                                                                    x,
-                                                                                  ) ==
-                                                                                  entry.key,
-                                                                            );
-
-                                                                      final tempFull = vm.tempBroker.where(
-                                                                        (x) =>
-                                                                            brokerTitleKey(
-                                                                              x,
-                                                                            ) ==
-                                                                            entry.key,
-                                                                      );
-                                                                      final tempPart = vm.tempBrokerPartial.where(
-                                                                        (x) =>
-                                                                            brokerTitleKey(
-                                                                              x,
-                                                                            ) ==
-                                                                            entry.key,
-                                                                      );
-
-                                                                      final items =
-                                                                          <
-                                                                            BrokerItem
-                                                                          >[
-                                                                            ...tempPart,
-                                                                            ...dbItems,
-                                                                            ...tempFull,
-                                                                          ];
-
-                                                                      return items.map((
-                                                                        item,
-                                                                      ) {
-                                                                        final bool
-                                                                        isTemp =
-                                                                            vm.tempBroker.contains(
-                                                                              item,
-                                                                            ) ||
-                                                                            vm.tempBrokerPartial.contains(
-                                                                              item,
-                                                                            );
-
-                                                                        late final List<
-                                                                          String
-                                                                        >
-                                                                        columns;
-
-                                                                        if (hasPartial) {
-                                                                          columns = [
-                                                                            item.isPartialRow
-                                                                                ? item.noBroker.toString()
-                                                                                : '-',
-                                                                            '${item.noSak ?? '-'}',
-                                                                            '${num2(item.berat)} kg',
-                                                                          ];
-                                                                        } else {
-                                                                          columns = [
-                                                                            '${item.noSak ?? '-'}',
-                                                                            '${num2(item.berat)} kg',
-                                                                          ];
-                                                                        }
-
-                                                                        return TooltipTableRow(
-                                                                          columns:
-                                                                              columns,
-                                                                          columnFlexes:
-                                                                              columnFlexes,
-                                                                          showDelete:
-                                                                              isTemp,
-                                                                          onDelete:
-                                                                              isTemp
-                                                                              ? () => vm.deleteTempBrokerItem(
-                                                                                  item,
-                                                                                )
-                                                                              : null, // ✅ Existing tidak ada onDelete
-                                                                          isTempRow:
-                                                                              isTemp,
-                                                                          isHighlighted:
-                                                                              isTemp,
-                                                                          isDisabled:
-                                                                              !isTemp &&
-                                                                              !canDelete,
-                                                                          itemData:
-                                                                              item, // ✅ PASS item asli
-                                                                        );
-                                                                      }).toList();
-                                                                    },
-                                                                  );
-                                                                }).toList(),
-                                                              ),
+                          // -- build input panel --------------------------
+                          final inputPanelWidget = Builder(
+                            builder: (buttonContext) => _buildInputPanel(
+                              buttonContext: buttonContext,
+                              vm: vm,
+                              locked: locked,
+                              isLookupLoading: vm.isLookupLoading,
+                              labelCount:
+                                  brokerGroups.length +
+                                  bbGroups.length +
+                                  washingGroups.length +
+                                  crusherGroups.length +
+                                  gilinganGroups.length +
+                                  mixerGroups.length +
+                                  rejectGroups.length,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  ProductionFolderTabBar(
+                                    selectedValue: _selectedInputTab,
+                                    accentColor: _kBrokerPrimary,
+                                    tabs: [
+                                      ProductionTabItem(
+                                        value: 'broker',
+                                        label: 'Broker',
+                                        count: brokerGroups.length,
+                                      ),
+                                      ProductionTabItem(
+                                        value: 'bb',
+                                        label: 'Bahan Baku',
+                                        count: bbGroups.length,
+                                      ),
+                                      ProductionTabItem(
+                                        value: 'washing',
+                                        label: 'Washing',
+                                        count: washingGroups.length,
+                                      ),
+                                      ProductionTabItem(
+                                        value: 'crusher',
+                                        label: 'Crusher',
+                                        count: crusherGroups.length,
+                                      ),
+                                      ProductionTabItem(
+                                        value: 'gilingan',
+                                        label: 'Gilingan',
+                                        count: gilinganGroups.length,
+                                      ),
+                                      ProductionTabItem(
+                                        value: 'mixer',
+                                        label: 'Mixer',
+                                        count: mixerGroups.length,
+                                      ),
+                                      ProductionTabItem(
+                                        value: 'reject',
+                                        label: 'Reject',
+                                        count: rejectGroups.length,
+                                      ),
+                                    ],
+                                    onChanged: (value) {
+                                      if (_selectedInputTab == value) return;
+                                      setState(() => _selectedInputTab = value);
+                                    },
+                                  ),
+                                  Expanded(
+                                    child: ProductionInputCategoryBlock(
+                                      color: _kBrokerPrimary,
+                                      isLoading: loading,
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          Expanded(
+                                            child: LayoutBuilder(
+                                              builder: (context, constraints) {
+                                                return SizedBox(
+                                                  width: constraints.maxWidth,
+                                                  child:
+                                                      _buildSelectedInputTabChild(
+                                                        brokerGroups:
+                                                            brokerGroups,
+                                                        bbGroups: bbGroups,
+                                                        washingGroups:
+                                                            washingGroups,
+                                                        crusherGroups:
+                                                            crusherGroups,
+                                                        gilinganGroups:
+                                                            gilinganGroups,
+                                                        mixerGroups:
+                                                            mixerGroups,
+                                                        rejectGroups:
+                                                            rejectGroups,
+                                                        vm: vm,
+                                                        canDelete: canDelete,
+                                                        showFooter: false,
                                                       ),
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                          const SizedBox(height: 10),
+                                          Builder(
+                                            builder: (context) {
+                                              double grandBerat = 0.0;
+                                              int grandSak =
+                                                  brokerAll.length +
+                                                  bbAll.length +
+                                                  washingAll.length +
+                                                  mixerAll.length;
+                                              for (final i in brokerAll) {
+                                                grandBerat += i.berat ?? 0.0;
+                                              }
+                                              for (final i in bbAll) {
+                                                grandBerat += i.berat ?? 0.0;
+                                              }
+                                              for (final i in washingAll) {
+                                                grandBerat += i.berat ?? 0.0;
+                                              }
+                                              for (final i in crusherAll) {
+                                                grandBerat += i.berat ?? 0.0;
+                                              }
+                                              for (final i in gilinganAll) {
+                                                grandBerat += i.berat ?? 0.0;
+                                              }
+                                              for (final i in mixerAll) {
+                                                grandBerat += i.berat ?? 0.0;
+                                              }
+                                              for (final i in rejectAll) {
+                                                grandBerat += i.berat ?? 0.0;
+                                              }
+                                              final selectedSummary =
+                                                  _selectedInputSummary(
+                                                    brokerGroups: brokerGroups,
+                                                    bbGroups: bbGroups,
+                                                    washingGroups:
+                                                        washingGroups,
+                                                    crusherGroups:
+                                                        crusherGroups,
+                                                    gilinganGroups:
+                                                        gilinganGroups,
+                                                    mixerGroups: mixerGroups,
+                                                    rejectGroups: rejectGroups,
+                                                  );
+                                              return Row(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.center,
+                                                children: [
+                                                  Expanded(
+                                                    child: Column(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        ProductionCategorySummaryTile(
+                                                          summary:
+                                                              selectedSummary,
+                                                          accentColor:
+                                                              _kBrokerPrimary,
+                                                        ),
+                                                        const SizedBox(
+                                                          height: 10,
+                                                        ),
+                                                        ProductionInputGrandTotalBar(
+                                                          totalLabel:
+                                                              brokerGroups
+                                                                  .length +
+                                                              bbGroups.length +
+                                                              washingGroups
+                                                                  .length +
+                                                              crusherGroups
+                                                                  .length +
+                                                              gilinganGroups
+                                                                  .length +
+                                                              mixerGroups
+                                                                  .length +
+                                                              rejectGroups
+                                                                  .length,
+                                                          totalSak: grandSak,
+                                                          totalBerat:
+                                                              grandBerat,
+                                                        ),
+                                                      ],
                                                     ),
-
-                                                    // BAHAN BAKU
-                                                    _categorySlot(
-                                                      visible:
-                                                          _selectedInputTab ==
-                                                          'bb',
-                                                      width:
-                                                          constraints.maxWidth,
-                                                      child: _InputCategoryBlock(
-                                                        color: Colors.blue,
-                                                        isLoading:
-                                                            loading, // ✅ TAMBAHKAN
-
-                                                        summaryBuilder: () {
-                                                          int totalSak = 0;
-                                                          double totalBerat =
-                                                              0.0;
-
-                                                          // Loop semua groups
-                                                          for (final entry
-                                                              in bbGroups
-                                                                  .entries) {
-                                                            for (final item
-                                                                in entry
-                                                                    .value) {
-                                                              totalSak +=
-                                                                  1; // Count item (atau item.jumlahSak jika ada)
-                                                              totalBerat +=
-                                                                  (item.berat ??
-                                                                  0.0);
-                                                            }
-                                                          }
-
-                                                          return SectionSummary(
-                                                            totalData:
-                                                                bbGroups.length,
-                                                            totalSak: totalSak,
-                                                            totalBerat:
-                                                                totalBerat,
-                                                          );
-                                                        },
-
-                                                        child: bbGroups.isEmpty
-                                                            ? const Center(
-                                                                child: Text(
-                                                                  'Tidak ada data',
-                                                                  style:
-                                                                      TextStyle(
-                                                                        fontSize:
-                                                                            11,
-                                                                      ),
+                                                  ),
+                                                  const SizedBox(width: 10),
+                                                  FloatingActionButton(
+                                                    heroTag:
+                                                        'fab_scan_broker_input',
+                                                    mini: true,
+                                                    backgroundColor:
+                                                        locked ||
+                                                            vm.isLookupLoading
+                                                        ? Colors.grey.shade300
+                                                        : _kBrokerPrimary,
+                                                    foregroundColor:
+                                                        Colors.white,
+                                                    onPressed:
+                                                        locked ||
+                                                            vm.isLookupLoading
+                                                        ? null
+                                                        : () =>
+                                                              _openScanDialog(),
+                                                    child: vm.isLookupLoading
+                                                        ? const SizedBox(
+                                                            width: 16,
+                                                            height: 16,
+                                                            child:
+                                                                CircularProgressIndicator(
+                                                                  strokeWidth:
+                                                                      2,
+                                                                  color: Colors
+                                                                      .white,
                                                                 ),
-                                                              )
-                                                            : ListView(
-                                                                padding:
-                                                                    const EdgeInsets.all(
-                                                                      8,
-                                                                    ),
-                                                                children: bbGroups.entries.map((
-                                                                  entry,
-                                                                ) {
-                                                                  final hasPartial =
-                                                                      entry
-                                                                          .value
-                                                                          .any(
-                                                                            (
-                                                                              x,
-                                                                            ) =>
-                                                                                x.isPartialRow,
-                                                                          );
-
-                                                                  late final List<
-                                                                    String
-                                                                  >
-                                                                  headers;
-                                                                  late final List<
-                                                                    int
-                                                                  >
-                                                                  columnFlexes;
-
-                                                                  if (hasPartial) {
-                                                                    headers = const [
-                                                                      'Label',
-                                                                      'Sak',
-                                                                      'Berat',
-                                                                      'Action',
-                                                                    ];
-                                                                    columnFlexes =
-                                                                        const [
-                                                                          3,
-                                                                          1,
-                                                                          2,
-                                                                        ];
-                                                                  } else {
-                                                                    headers = const [
-                                                                      'Sak',
-                                                                      'Berat',
-                                                                      'Action',
-                                                                    ];
-                                                                    columnFlexes =
-                                                                        const [
-                                                                          1,
-                                                                          2,
-                                                                        ];
-                                                                  }
-
-                                                                  return _InputGroupExpansionTile(
-                                                                    title: entry
-                                                                        .key,
-                                                                    headerSubtitle:
-                                                                        (entry.value.isNotEmpty
-                                                                            ? entry.value.first.namaJenis
-                                                                            : '-') ??
-                                                                        '-',
-                                                                    tileMetrics: [
-                                                                      (
-                                                                        Icons
-                                                                            .inventory_2_outlined,
-                                                                        '${entry.value.length} sak',
-                                                                      ),
-                                                                      (
-                                                                        Icons
-                                                                            .scale_outlined,
-                                                                        '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
-                                                                      ),
-                                                                    ],
-                                                                    color: Colors
-                                                                        .blue,
-                                                                    expandable:
-                                                                        !hasPartial,
-                                                                    isPartialGroup:
-                                                                        hasPartial,
-                                                                    partialReference:
-                                                                        hasPartial
-                                                                        ? bbPairLabel(
-                                                                            entry.value.firstWhere(
-                                                                              (
-                                                                                x,
-                                                                              ) => x.isPartialRow,
-                                                                            ),
-                                                                          )
-                                                                        : null,
-                                                                    detailsBuilder: () {
-                                                                      final currentInputs =
-                                                                          vm.inputsOf(
-                                                                            widget.noProduksi,
-                                                                          );
-
-                                                                      final dbItems =
-                                                                          currentInputs ==
-                                                                              null
-                                                                          ? <
-                                                                              BbItem
-                                                                            >[]
-                                                                          : currentInputs.bb.where(
-                                                                              (
-                                                                                x,
-                                                                              ) =>
-                                                                                  bbTitleKey(
-                                                                                    x,
-                                                                                  ) ==
-                                                                                  entry.key,
-                                                                            );
-                                                                      final tempFull = vm.tempBb.where(
-                                                                        (x) =>
-                                                                            bbTitleKey(
-                                                                              x,
-                                                                            ) ==
-                                                                            entry.key,
-                                                                      );
-                                                                      final tempPart = vm.tempBbPartial.where(
-                                                                        (x) =>
-                                                                            bbTitleKey(
-                                                                              x,
-                                                                            ) ==
-                                                                            entry.key,
-                                                                      );
-
-                                                                      final items = [
-                                                                        ...tempPart,
-                                                                        ...dbItems,
-                                                                        ...tempFull,
-                                                                      ];
-
-                                                                      return items.map((
-                                                                        item,
-                                                                      ) {
-                                                                        final isTemp =
-                                                                            vm.tempBb.contains(
-                                                                              item,
-                                                                            ) ||
-                                                                            vm.tempBbPartial.contains(
-                                                                              item,
-                                                                            );
-
-                                                                        late final List<
-                                                                          String
-                                                                        >
-                                                                        columns;
-
-                                                                        if (hasPartial) {
-                                                                          columns = [
-                                                                            item.isPartialRow
-                                                                                ? bbPairLabel(
-                                                                                    item,
-                                                                                  )
-                                                                                : '-',
-                                                                            '${item.noSak ?? '-'}',
-                                                                            '${num2(item.berat)} kg',
-                                                                          ];
-                                                                        } else {
-                                                                          columns = [
-                                                                            '${item.noSak ?? '-'}',
-                                                                            '${num2(item.berat)} kg',
-                                                                          ];
-                                                                        }
-
-                                                                        return TooltipTableRow(
-                                                                          columns:
-                                                                              columns,
-                                                                          columnFlexes:
-                                                                              columnFlexes,
-                                                                          showDelete:
-                                                                              isTemp,
-                                                                          onDelete:
-                                                                              isTemp
-                                                                              ? () => vm.deleteTempBbItem(
-                                                                                  item,
-                                                                                )
-                                                                              : null, // ✅ Exist
-                                                                          isTempRow:
-                                                                              isTemp,
-                                                                          isHighlighted:
-                                                                              isTemp,
-                                                                          isDisabled:
-                                                                              !isTemp &&
-                                                                              !canDelete,
-                                                                          itemData:
-                                                                              item, // ✅ PASS item asli
-                                                                        );
-                                                                      }).toList();
-                                                                    },
-                                                                  );
-                                                                }).toList(),
-                                                              ),
-                                                      ),
-                                                    ),
-
-                                                    // WASHING
-                                                    _categorySlot(
-                                                      visible:
-                                                          _selectedInputTab ==
-                                                          'washing',
-                                                      width:
-                                                          constraints.maxWidth,
-                                                      child: _InputCategoryBlock(
-                                                        color: Colors.blue,
-                                                        isLoading:
-                                                            loading, // ✅ TAMBAHKAN
-
-                                                        summaryBuilder: () {
-                                                          int totalSak = 0;
-                                                          double totalBerat =
-                                                              0.0;
-
-                                                          // Loop semua groups
-                                                          for (final entry
-                                                              in washingGroups
-                                                                  .entries) {
-                                                            for (final item
-                                                                in entry
-                                                                    .value) {
-                                                              totalSak +=
-                                                                  1; // Count item (atau item.jumlahSak jika ada)
-                                                              totalBerat +=
-                                                                  (item.berat ??
-                                                                  0.0);
-                                                            }
-                                                          }
-
-                                                          return SectionSummary(
-                                                            totalData:
-                                                                washingGroups
-                                                                    .length,
-                                                            totalSak: totalSak,
-                                                            totalBerat:
-                                                                totalBerat,
-                                                          );
-                                                        },
-
-                                                        child:
-                                                            washingGroups
-                                                                .isEmpty
-                                                            ? const Center(
-                                                                child: Text(
-                                                                  'Tidak ada data',
-                                                                  style:
-                                                                      TextStyle(
-                                                                        fontSize:
-                                                                            11,
-                                                                      ),
-                                                                ),
-                                                              )
-                                                            : ListView(
-                                                                padding:
-                                                                    const EdgeInsets.all(
-                                                                      8,
-                                                                    ),
-                                                                children: washingGroups.entries.map((
-                                                                  entry,
-                                                                ) {
-                                                                  late final List<
-                                                                    int
-                                                                  >
-                                                                  columnFlexes =
-                                                                      [1, 2];
-                                                                  return _InputGroupExpansionTile(
-                                                                    title: entry
-                                                                        .key,
-                                                                    headerSubtitle:
-                                                                        (entry.value.isNotEmpty
-                                                                            ? entry.value.first.namaJenis
-                                                                            : '-') ??
-                                                                        '-',
-                                                                    tileMetrics: [
-                                                                      (
-                                                                        Icons
-                                                                            .inventory_2_outlined,
-                                                                        '${entry.value.length} sak',
-                                                                      ),
-                                                                      (
-                                                                        Icons
-                                                                            .scale_outlined,
-                                                                        '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
-                                                                      ),
-                                                                    ],
-                                                                    color: Colors
-                                                                        .blue,
-                                                                    detailsBuilder: () {
-                                                                      final currentInputs =
-                                                                          vm.inputsOf(
-                                                                            widget.noProduksi,
-                                                                          );
-                                                                      final items = [
-                                                                        if (currentInputs !=
-                                                                            null)
-                                                                          ...currentInputs.washing.where(
-                                                                            (
-                                                                              x,
-                                                                            ) =>
-                                                                                (x.noWashing ??
-                                                                                    '-') ==
-                                                                                entry.key,
-                                                                          ),
-                                                                        ...vm.tempWashing.where(
-                                                                          (x) =>
-                                                                              (x.noWashing ??
-                                                                                  '-') ==
-                                                                              entry.key,
-                                                                        ),
-                                                                      ];
-                                                                      return items.map((
-                                                                        item,
-                                                                      ) {
-                                                                        final isTemp = vm
-                                                                            .tempWashing
-                                                                            .contains(
-                                                                              item,
-                                                                            );
-                                                                        return TooltipTableRow(
-                                                                          columns: [
-                                                                            item.noSak?.toString() ??
-                                                                                '-',
-                                                                            '${num2(item.berat)} kg',
-                                                                          ],
-                                                                          columnFlexes: [
-                                                                            1,
-                                                                            2,
-                                                                          ],
-                                                                          showDelete:
-                                                                              isTemp,
-                                                                          onDelete:
-                                                                              isTemp
-                                                                              ? () => vm.deleteTempWashingItem(
-                                                                                  item,
-                                                                                )
-                                                                              : null, // ✅ Existing tidak ada onDelete
-                                                                          isTempRow:
-                                                                              isTemp,
-                                                                          isHighlighted:
-                                                                              isTemp,
-                                                                          isDisabled:
-                                                                              !isTemp &&
-                                                                              !canDelete,
-                                                                          itemData:
-                                                                              item, // ✅ PASS item asli
-                                                                        );
-                                                                      }).toList();
-                                                                    },
-                                                                  );
-                                                                }).toList(),
-                                                              ),
-                                                      ),
-                                                    ),
-
-                                                    // CRUSHER
-                                                    _categorySlot(
-                                                      visible:
-                                                          _selectedInputTab ==
-                                                          'crusher',
-                                                      width:
-                                                          constraints.maxWidth,
-                                                      child: _InputCategoryBlock(
-                                                        color: Colors.blue,
-                                                        isLoading:
-                                                            loading, // ✅ TAMBAHKAN
-
-                                                        summaryBuilder: () {
-                                                          int totalSak = 0;
-                                                          double totalBerat =
-                                                              0.0;
-
-                                                          // Loop semua groups
-                                                          for (final entry
-                                                              in crusherGroups
-                                                                  .entries) {
-                                                            for (final item
-                                                                in entry
-                                                                    .value) {
-                                                              totalSak +=
-                                                                  1; // Count item (atau item.jumlahSak jika ada)
-                                                              totalBerat +=
-                                                                  (item.berat ??
-                                                                  0.0);
-                                                            }
-                                                          }
-
-                                                          return SectionSummary(
-                                                            totalData:
-                                                                crusherGroups
-                                                                    .length,
-                                                            totalSak: totalSak,
-                                                            totalBerat:
-                                                                totalBerat,
-                                                          );
-                                                        },
-
-                                                        child:
-                                                            crusherGroups
-                                                                .isEmpty
-                                                            ? const Center(
-                                                                child: Text(
-                                                                  'Tidak ada data',
-                                                                  style:
-                                                                      TextStyle(
-                                                                        fontSize:
-                                                                            11,
-                                                                      ),
-                                                                ),
-                                                              )
-                                                            : ListView(
-                                                                padding:
-                                                                    const EdgeInsets.all(
-                                                                      8,
-                                                                    ),
-                                                                children: crusherGroups.entries.map((
-                                                                  entry,
-                                                                ) {
-                                                                  return _InputGroupExpansionTile(
-                                                                    title: entry
-                                                                        .key,
-                                                                    headerSubtitle:
-                                                                        (entry.value.isNotEmpty
-                                                                            ? entry.value.first.namaJenis
-                                                                            : '-') ??
-                                                                        '-',
-                                                                    tileMetrics: [
-                                                                      (
-                                                                        Icons
-                                                                            .category_outlined,
-                                                                        '${entry.value.length} pcs',
-                                                                      ),
-                                                                      (
-                                                                        Icons
-                                                                            .scale_outlined,
-                                                                        '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
-                                                                      ),
-                                                                    ],
-                                                                    color: Colors
-                                                                        .blue,
-                                                                    detailsBuilder: () {
-                                                                      final currentInputs =
-                                                                          vm.inputsOf(
-                                                                            widget.noProduksi,
-                                                                          );
-                                                                      final items = [
-                                                                        if (currentInputs !=
-                                                                            null)
-                                                                          ...currentInputs.crusher.where(
-                                                                            (
-                                                                              x,
-                                                                            ) =>
-                                                                                (x.noCrusher ??
-                                                                                    '-') ==
-                                                                                entry.key,
-                                                                          ),
-                                                                        ...vm.tempCrusher.where(
-                                                                          (x) =>
-                                                                              (x.noCrusher ??
-                                                                                  '-') ==
-                                                                              entry.key,
-                                                                        ),
-                                                                      ];
-                                                                      return items.map((
-                                                                        item,
-                                                                      ) {
-                                                                        final isTemp = vm
-                                                                            .tempCrusher
-                                                                            .contains(
-                                                                              item,
-                                                                            );
-                                                                        return TooltipTableRow(
-                                                                          columns: [
-                                                                            '${num2(item.berat)} kg',
-                                                                          ],
-                                                                          showDelete:
-                                                                              isTemp,
-                                                                          onDelete:
-                                                                              isTemp
-                                                                              ? () => vm.deleteTempCrusherItem(
-                                                                                  item,
-                                                                                )
-                                                                              : null, // ✅ Existing tidak ada onDelete
-                                                                          isTempRow:
-                                                                              isTemp,
-                                                                          isHighlighted:
-                                                                              isTemp,
-                                                                          isDisabled:
-                                                                              !isTemp &&
-                                                                              !canDelete,
-                                                                          itemData:
-                                                                              item, // ✅ PASS item asli
-                                                                        );
-                                                                      }).toList();
-                                                                    },
-                                                                  );
-                                                                }).toList(),
-                                                              ),
-                                                      ),
-                                                    ),
-                                                    // GILINGAN
-                                                    _categorySlot(
-                                                      visible:
-                                                          _selectedInputTab ==
-                                                          'gilingan',
-                                                      width:
-                                                          constraints.maxWidth,
-                                                      child: _InputCategoryBlock(
-                                                        color: Colors.blue,
-                                                        isLoading:
-                                                            loading, // ✅ TAMBAHKAN
-
-                                                        summaryBuilder: () {
-                                                          int totalSak = 0;
-                                                          double totalBerat =
-                                                              0.0;
-
-                                                          // Loop semua groups
-                                                          for (final entry
-                                                              in gilinganGroups
-                                                                  .entries) {
-                                                            for (final item
-                                                                in entry
-                                                                    .value) {
-                                                              totalSak +=
-                                                                  1; // Count item (atau item.jumlahSak jika ada)
-                                                              totalBerat +=
-                                                                  (item.berat ??
-                                                                  0.0);
-                                                            }
-                                                          }
-
-                                                          return SectionSummary(
-                                                            totalData:
-                                                                gilinganGroups
-                                                                    .length,
-                                                            totalSak: totalSak,
-                                                            totalBerat:
-                                                                totalBerat,
-                                                          );
-                                                        },
-
-                                                        child:
-                                                            gilinganGroups
-                                                                .isEmpty
-                                                            ? const Center(
-                                                                child: Text(
-                                                                  'Tidak ada data',
-                                                                  style:
-                                                                      TextStyle(
-                                                                        fontSize:
-                                                                            11,
-                                                                      ),
-                                                                ),
-                                                              )
-                                                            : ListView(
-                                                                padding:
-                                                                    const EdgeInsets.all(
-                                                                      8,
-                                                                    ),
-                                                                children: gilinganGroups.entries.map((
-                                                                  entry,
-                                                                ) {
-                                                                  final hasPartial =
-                                                                      entry
-                                                                          .value
-                                                                          .any(
-                                                                            (
-                                                                              x,
-                                                                            ) =>
-                                                                                x.isPartialRow,
-                                                                          );
-
-                                                                  return _InputGroupExpansionTile(
-                                                                    title: entry
-                                                                        .key,
-                                                                    headerSubtitle:
-                                                                        (entry.value.isNotEmpty
-                                                                            ? entry.value.first.namaJenis
-                                                                            : '-') ??
-                                                                        '-',
-                                                                    tileMetrics: [
-                                                                      (
-                                                                        Icons
-                                                                            .category_outlined,
-                                                                        '${entry.value.length} pcs',
-                                                                      ),
-                                                                      (
-                                                                        Icons
-                                                                            .scale_outlined,
-                                                                        '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
-                                                                      ),
-                                                                    ],
-                                                                    color: Colors
-                                                                        .blue,
-                                                                    expandable:
-                                                                        !hasPartial,
-                                                                    isPartialGroup:
-                                                                        hasPartial,
-                                                                    partialReference:
-                                                                        hasPartial
-                                                                        ? (entry.value
-                                                                                  .firstWhere(
-                                                                                    (
-                                                                                      x,
-                                                                                    ) => x.isPartialRow,
-                                                                                  )
-                                                                                  .noGilingan ??
-                                                                              '-')
-                                                                        : null,
-                                                                    detailsBuilder: () {
-                                                                      final currentInputs =
-                                                                          vm.inputsOf(
-                                                                            widget.noProduksi,
-                                                                          );
-
-                                                                      final dbItems =
-                                                                          currentInputs ==
-                                                                              null
-                                                                          ? <
-                                                                              GilinganItem
-                                                                            >[]
-                                                                          : currentInputs.gilingan.where(
-                                                                              (
-                                                                                x,
-                                                                              ) =>
-                                                                                  gilinganTitleKey(
-                                                                                    x,
-                                                                                  ) ==
-                                                                                  entry.key,
-                                                                            );
-                                                                      final tempFull = vm.tempGilingan.where(
-                                                                        (x) =>
-                                                                            gilinganTitleKey(
-                                                                              x,
-                                                                            ) ==
-                                                                            entry.key,
-                                                                      );
-                                                                      final tempPart = vm.tempGilinganPartial.where(
-                                                                        (x) =>
-                                                                            gilinganTitleKey(
-                                                                              x,
-                                                                            ) ==
-                                                                            entry.key,
-                                                                      );
-
-                                                                      final items = [
-                                                                        ...tempPart,
-                                                                        ...dbItems,
-                                                                        ...tempFull,
-                                                                      ];
-
-                                                                      return items.map((
-                                                                        item,
-                                                                      ) {
-                                                                        final isTemp =
-                                                                            vm.tempGilingan.contains(
-                                                                              item,
-                                                                            ) ||
-                                                                            vm.tempGilinganPartial.contains(
-                                                                              item,
-                                                                            );
-
-                                                                        final columns =
-                                                                            item.isPartialRow
-                                                                            ? <
-                                                                                String
-                                                                              >[
-                                                                                (item.noGilingan ??
-                                                                                    '-'),
-                                                                                '${num2(item.berat)} kg',
-                                                                              ]
-                                                                            : <
-                                                                                String
-                                                                              >[
-                                                                                '${num2(item.berat)} kg',
-                                                                              ];
-
-                                                                        return TooltipTableRow(
-                                                                          columns:
-                                                                              columns,
-                                                                          showDelete:
-                                                                              isTemp,
-                                                                          onDelete:
-                                                                              isTemp
-                                                                              ? () => vm.deleteTempGilinganItem(
-                                                                                  item,
-                                                                                )
-                                                                              : null, // ✅ Existing tidak ada onDelete
-                                                                          isTempRow:
-                                                                              isTemp,
-                                                                          isHighlighted:
-                                                                              isTemp,
-                                                                          isDisabled:
-                                                                              !isTemp &&
-                                                                              !canDelete,
-                                                                          itemData:
-                                                                              item, // ✅ PASS item asli
-                                                                        );
-                                                                      }).toList();
-                                                                    },
-                                                                  );
-                                                                }).toList(),
-                                                              ),
-                                                      ),
-                                                    ),
-
-                                                    // MIXER
-                                                    _categorySlot(
-                                                      visible:
-                                                          _selectedInputTab ==
-                                                          'mixer',
-                                                      width:
-                                                          constraints.maxWidth,
-                                                      child: _InputCategoryBlock(
-                                                        color: Colors.blue,
-                                                        isLoading:
-                                                            loading, // ✅ TAMBAHKAN
-
-                                                        summaryBuilder: () {
-                                                          int totalSak = 0;
-                                                          double totalBerat =
-                                                              0.0;
-
-                                                          // Loop semua groups
-                                                          for (final entry
-                                                              in mixerGroups
-                                                                  .entries) {
-                                                            for (final item
-                                                                in entry
-                                                                    .value) {
-                                                              totalSak +=
-                                                                  1; // Count item (atau item.jumlahSak jika ada)
-                                                              totalBerat +=
-                                                                  (item.berat ??
-                                                                  0.0);
-                                                            }
-                                                          }
-
-                                                          return SectionSummary(
-                                                            totalData:
-                                                                mixerGroups
-                                                                    .length,
-                                                            totalSak: totalSak,
-                                                            totalBerat:
-                                                                totalBerat,
-                                                          );
-                                                        },
-
-                                                        child:
-                                                            mixerGroups.isEmpty
-                                                            ? const Center(
-                                                                child: Text(
-                                                                  'Tidak ada data',
-                                                                  style:
-                                                                      TextStyle(
-                                                                        fontSize:
-                                                                            11,
-                                                                      ),
-                                                                ),
-                                                              )
-                                                            : ListView(
-                                                                padding:
-                                                                    const EdgeInsets.all(
-                                                                      8,
-                                                                    ),
-                                                                children: mixerGroups.entries.map((
-                                                                  entry,
-                                                                ) {
-                                                                  final hasPartial =
-                                                                      entry
-                                                                          .value
-                                                                          .any(
-                                                                            (
-                                                                              x,
-                                                                            ) =>
-                                                                                x.isPartialRow,
-                                                                          );
-
-                                                                  late final List<
-                                                                    String
-                                                                  >
-                                                                  headers;
-                                                                  late final List<
-                                                                    int
-                                                                  >
-                                                                  columnFlexes;
-
-                                                                  if (hasPartial) {
-                                                                    headers = const [
-                                                                      'Label',
-                                                                      'Sak',
-                                                                      'Berat',
-                                                                      'Action',
-                                                                    ];
-                                                                    columnFlexes =
-                                                                        const [
-                                                                          3,
-                                                                          1,
-                                                                          2,
-                                                                        ];
-                                                                  } else {
-                                                                    headers = const [
-                                                                      'Sak',
-                                                                      'Berat',
-                                                                      'Action',
-                                                                    ];
-                                                                    columnFlexes =
-                                                                        const [
-                                                                          1,
-                                                                          2,
-                                                                        ];
-                                                                  }
-
-                                                                  return _InputGroupExpansionTile(
-                                                                    title: entry
-                                                                        .key,
-                                                                    headerSubtitle:
-                                                                        (entry.value.isNotEmpty
-                                                                            ? entry.value.first.namaJenis
-                                                                            : '-') ??
-                                                                        '-',
-                                                                    tileMetrics: [
-                                                                      (
-                                                                        Icons
-                                                                            .inventory_2_outlined,
-                                                                        '${entry.value.length} sak',
-                                                                      ),
-                                                                      (
-                                                                        Icons
-                                                                            .scale_outlined,
-                                                                        '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
-                                                                      ),
-                                                                    ],
-                                                                    color: Colors
-                                                                        .blue,
-                                                                    expandable:
-                                                                        !hasPartial,
-                                                                    isPartialGroup:
-                                                                        hasPartial,
-                                                                    partialReference:
-                                                                        hasPartial
-                                                                        ? (entry.value
-                                                                                  .firstWhere(
-                                                                                    (
-                                                                                      x,
-                                                                                    ) => x.isPartialRow,
-                                                                                  )
-                                                                                  .noMixer ??
-                                                                              '-')
-                                                                        : null,
-                                                                    detailsBuilder: () {
-                                                                      final currentInputs =
-                                                                          vm.inputsOf(
-                                                                            widget.noProduksi,
-                                                                          );
-
-                                                                      final dbItems =
-                                                                          currentInputs ==
-                                                                              null
-                                                                          ? <
-                                                                              MixerItem
-                                                                            >[]
-                                                                          : currentInputs.mixer.where((
-                                                                              x,
-                                                                            ) {
-                                                                              return mixerTitleKey(
-                                                                                    x,
-                                                                                  ) ==
-                                                                                  entry.key;
-                                                                            }).toList();
-
-                                                                      final tempFull = vm
-                                                                          .tempMixer
-                                                                          .where(
-                                                                            (
-                                                                              x,
-                                                                            ) =>
-                                                                                mixerTitleKey(x) ==
-                                                                                entry.key,
-                                                                          )
-                                                                          .toList();
-                                                                      final tempPart = vm
-                                                                          .tempMixerPartial
-                                                                          .where(
-                                                                            (
-                                                                              x,
-                                                                            ) =>
-                                                                                mixerTitleKey(x) ==
-                                                                                entry.key,
-                                                                          )
-                                                                          .toList();
-
-                                                                      final items = [
-                                                                        ...tempPart,
-                                                                        ...dbItems,
-                                                                        ...tempFull,
-                                                                      ];
-
-                                                                      return items.map((
-                                                                        item,
-                                                                      ) {
-                                                                        final isTemp =
-                                                                            vm.tempMixer.contains(
-                                                                              item,
-                                                                            ) ||
-                                                                            vm.tempMixerPartial.contains(
-                                                                              item,
-                                                                            );
-
-                                                                        final columns =
-                                                                            item.isPartialRow
-                                                                            ? [
-                                                                                item.noMixer ??
-                                                                                    '-',
-                                                                                '${item.noSak ?? '-'}',
-                                                                                '${num2(item.berat)} kg',
-                                                                              ]
-                                                                            : [
-                                                                                '${item.noSak ?? '-'}',
-                                                                                '${num2(item.berat)} kg',
-                                                                              ];
-
-                                                                        return TooltipTableRow(
-                                                                          columns:
-                                                                              columns,
-                                                                          columnFlexes:
-                                                                              columnFlexes,
-                                                                          showDelete:
-                                                                              isTemp,
-                                                                          onDelete:
-                                                                              isTemp
-                                                                              ? () => vm.deleteTempMixerItem(
-                                                                                  item,
-                                                                                )
-                                                                              : null, // ✅ Existing tidak ada onDelete
-                                                                          isTempRow:
-                                                                              isTemp,
-                                                                          isHighlighted:
-                                                                              isTemp,
-                                                                          isDisabled:
-                                                                              !isTemp &&
-                                                                              !canDelete,
-                                                                          itemData:
-                                                                              item, // ✅ PASS item asli
-                                                                        );
-                                                                      }).toList();
-                                                                    },
-                                                                  );
-                                                                }).toList(),
-                                                              ),
-                                                      ),
-                                                    ),
-
-                                                    // REJECT
-                                                    _categorySlot(
-                                                      visible:
-                                                          _selectedInputTab ==
-                                                          'reject',
-                                                      width:
-                                                          constraints.maxWidth,
-                                                      child: _InputCategoryBlock(
-                                                        color: Colors.blue,
-                                                        isLoading:
-                                                            loading, // ✅ TAMBAHKAN
-
-                                                        summaryBuilder: () {
-                                                          int totalSak = 0;
-                                                          double totalBerat =
-                                                              0.0;
-
-                                                          // Loop semua groups
-                                                          for (final entry
-                                                              in rejectGroups
-                                                                  .entries) {
-                                                            for (final item
-                                                                in entry
-                                                                    .value) {
-                                                              totalSak +=
-                                                                  1; // Count item (atau item.jumlahSak jika ada)
-                                                              totalBerat +=
-                                                                  (item.berat ??
-                                                                  0.0);
-                                                            }
-                                                          }
-
-                                                          return SectionSummary(
-                                                            totalData:
-                                                                rejectGroups
-                                                                    .length,
-                                                            totalSak: totalSak,
-                                                            totalBerat:
-                                                                totalBerat,
-                                                          );
-                                                        },
-
-                                                        child:
-                                                            rejectGroups.isEmpty
-                                                            ? const Center(
-                                                                child: Text(
-                                                                  'Tidak ada data',
-                                                                  style:
-                                                                      TextStyle(
-                                                                        fontSize:
-                                                                            11,
-                                                                      ),
-                                                                ),
-                                                              )
-                                                            : ListView(
-                                                                padding:
-                                                                    const EdgeInsets.all(
-                                                                      8,
-                                                                    ),
-                                                                children: rejectGroups.entries.map((
-                                                                  entry,
-                                                                ) {
-                                                                  final hasPartial =
-                                                                      entry
-                                                                          .value
-                                                                          .any(
-                                                                            (
-                                                                              x,
-                                                                            ) =>
-                                                                                x.isPartialRow,
-                                                                          );
-
-                                                                  return _InputGroupExpansionTile(
-                                                                    title: entry
-                                                                        .key,
-                                                                    headerSubtitle:
-                                                                        (entry.value.isNotEmpty
-                                                                            ? entry.value.first.namaJenis
-                                                                            : '-') ??
-                                                                        '-',
-                                                                    tileMetrics: [
-                                                                      (
-                                                                        Icons
-                                                                            .category_outlined,
-                                                                        '${entry.value.length} pcs',
-                                                                      ),
-                                                                      (
-                                                                        Icons
-                                                                            .scale_outlined,
-                                                                        '${num2(entry.value.fold<double>(0.0, (sum, item) => sum + (item.berat ?? 0.0)))} kg',
-                                                                      ),
-                                                                    ],
-                                                                    color: Colors
-                                                                        .blue,
-                                                                    expandable:
-                                                                        !hasPartial,
-                                                                    isPartialGroup:
-                                                                        hasPartial,
-                                                                    partialReference:
-                                                                        hasPartial
-                                                                        ? (entry.value
-                                                                                  .firstWhere(
-                                                                                    (
-                                                                                      x,
-                                                                                    ) => x.isPartialRow,
-                                                                                  )
-                                                                                  .noReject ??
-                                                                              '-')
-                                                                        : null,
-                                                                    detailsBuilder: () {
-                                                                      final currentInputs =
-                                                                          vm.inputsOf(
-                                                                            widget.noProduksi,
-                                                                          );
-
-                                                                      final dbItems =
-                                                                          currentInputs ==
-                                                                              null
-                                                                          ? <
-                                                                              RejectItem
-                                                                            >[]
-                                                                          : currentInputs.reject.where(
-                                                                              (
-                                                                                x,
-                                                                              ) =>
-                                                                                  rejectTitleKey(
-                                                                                    x,
-                                                                                  ) ==
-                                                                                  entry.key,
-                                                                            );
-                                                                      final tempFull = vm.tempReject.where(
-                                                                        (x) =>
-                                                                            rejectTitleKey(
-                                                                              x,
-                                                                            ) ==
-                                                                            entry.key,
-                                                                      );
-                                                                      final tempPart = vm.tempRejectPartial.where(
-                                                                        (x) =>
-                                                                            rejectTitleKey(
-                                                                              x,
-                                                                            ) ==
-                                                                            entry.key,
-                                                                      );
-
-                                                                      final items = [
-                                                                        ...tempPart,
-                                                                        ...dbItems,
-                                                                        ...tempFull,
-                                                                      ];
-
-                                                                      return items.map((
-                                                                        item,
-                                                                      ) {
-                                                                        final isTemp =
-                                                                            vm.tempReject.contains(
-                                                                              item,
-                                                                            ) ||
-                                                                            vm.tempRejectPartial.contains(
-                                                                              item,
-                                                                            );
-
-                                                                        final columns =
-                                                                            item.isPartialRow
-                                                                            ? <
-                                                                                String
-                                                                              >[
-                                                                                (item.noReject ??
-                                                                                    '-'),
-                                                                                '${num2(item.berat)} kg',
-                                                                              ]
-                                                                            : <
-                                                                                String
-                                                                              >[
-                                                                                '${num2(item.berat)} kg',
-                                                                              ];
-
-                                                                        return TooltipTableRow(
-                                                                          columns:
-                                                                              columns,
-                                                                          showDelete:
-                                                                              isTemp,
-                                                                          onDelete:
-                                                                              isTemp
-                                                                              ? () => vm.deleteTempRejectItem(
-                                                                                  item,
-                                                                                )
-                                                                              : null, // ✅ Existing tidak ada onDelete
-                                                                          isTempRow:
-                                                                              isTemp,
-                                                                          isHighlighted:
-                                                                              isTemp,
-                                                                          isDisabled:
-                                                                              !isTemp &&
-                                                                              !canDelete,
-                                                                          itemData:
-                                                                              item, // ✅ PASS item asli
-                                                                        );
-                                                                      }).toList();
-                                                                    },
-                                                                  );
-                                                                }).toList(),
-                                                              ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
+                                                          )
+                                                        : const Icon(
+                                                            Icons
+                                                                .qr_code_scanner,
+                                                          ),
+                                                  ),
+                                                ],
                                               );
                                             },
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
-                                  );
-                                },
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: _buildOutputSection(
-                                brokerOutputs: outputs,
-                                bonggolanOutputs: bonggolanOutputs,
-                                isLoading: outputLoading,
-                                error: outputErr,
+                          );
+
+                          // -- build output panel -------------------------
+                          double grandInputBerat = 0.0;
+                          for (final i in brokerAll) {
+                            grandInputBerat += i.berat ?? 0.0;
+                          }
+                          for (final i in bbAll) {
+                            grandInputBerat += i.berat ?? 0.0;
+                          }
+                          for (final i in washingAll) {
+                            grandInputBerat += i.berat ?? 0.0;
+                          }
+                          for (final i in crusherAll) {
+                            grandInputBerat += i.berat ?? 0.0;
+                          }
+                          for (final i in gilinganAll) {
+                            grandInputBerat += i.berat ?? 0.0;
+                          }
+                          for (final i in mixerAll) {
+                            grandInputBerat += i.berat ?? 0.0;
+                          }
+                          for (final i in rejectAll) {
+                            grandInputBerat += i.berat ?? 0.0;
+                          }
+
+                          final outputPanelWidget = _buildOutputSection(
+                            brokerOutputs: outputs,
+                            bonggolanOutputs: bonggolanOutputs,
+                            isLoading: outputLoading,
+                            error: outputErr,
+                            grandInputBerat: grandInputBerat,
+                          );
+
+                          // -- responsive layout --------------------------
+                          if (isWide) {
+                            return Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(child: inputPanelWidget),
+                                  const SizedBox(width: 16),
+                                  Expanded(child: outputPanelWidget),
+                                ],
                               ),
+                            );
+                          }
+
+                          // narrow: stacked, each panel gets half height
+                          final panelH =
+                              (outerConstraints.maxHeight - 16 - 32) / 2;
+                          return SingleChildScrollView(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              children: [
+                                SizedBox(
+                                  height: panelH,
+                                  child: inputPanelWidget,
+                                ),
+                                const SizedBox(height: 16),
+                                SizedBox(
+                                  height: panelH,
+                                  child: outputPanelWidget,
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          );
+                        },
                       ),
                     ),
                   ],
@@ -2842,65 +2350,73 @@ class _BrokerOutputTile extends StatelessWidget {
         onTap: () {
           showDialog<void>(
             context: context,
-            builder: (_) => _BrokerOutputDetailDialog(output: output),
+            builder: (_) => _BrokerOutputDetailDialog(
+              output: output,
+              onPrint: () => _handlePrint(context),
+            ),
           );
         },
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
+              // Title row: noBroker + print count
               Row(
                 children: [
                   Expanded(
-                    child: Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            output.noBroker ?? '-',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF1A1D23),
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        _OutputPrintButton(
-                          onPressed: () => _handlePrint(context),
-                        ),
-                      ],
+                    child: Text(
+                      output.noBroker ?? '-',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1A1D23),
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  _PrintedBadge(isPrinted: output.hasBeenPrinted),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.print_outlined,
+                    size: 11,
+                    color: output.printedCount > 0
+                        ? _kBrokerOutput
+                        : Colors.grey.shade400,
+                  ),
+                  const SizedBox(width: 2),
+                  Text(
+                    'x${output.printedCount}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: output.printedCount > 0
+                          ? _kBrokerOutput
+                          : Colors.grey.shade400,
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 1),
               Text(
                 output.namaJenis ?? '-',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
               ),
-              const SizedBox(height: 6),
-              Row(
+              const SizedBox(height: 4),
+              // Metrics
+              Wrap(
+                spacing: 6,
+                runSpacing: 2,
                 children: [
-                  _MiniMetric(
+                  ProductionMiniMetric(
                     icon: Icons.inventory_2_outlined,
                     text: '${output.totalSak} sak',
                   ),
-                  const SizedBox(width: 8),
-                  _MiniMetric(
+                  ProductionMiniMetric(
                     icon: Icons.scale_outlined,
                     text: '${num2(output.totalBerat)} kg',
-                  ),
-                  const Spacer(),
-                  Icon(
-                    Icons.open_in_new_rounded,
-                    size: 16,
-                    color: Colors.grey.shade500,
                   ),
                 ],
               ),
@@ -2993,197 +2509,74 @@ class _BonggolanOutputTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: _kBrokerBorder),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        output.noBonggolan ?? '-',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF1A1D23),
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    _OutputPrintButton(onPressed: () => _handlePrint(context)),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              _PrintedBadge(isPrinted: output.hasBeenPrinted),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            output.namaBonggolan ?? '-',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-          ),
-          const SizedBox(height: 8),
-          _MiniMetric(
-            icon: Icons.scale_outlined,
-            text: '${num2(output.berat)} kg',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BrokerInputModeDialog extends StatelessWidget {
-  const _BrokerInputModeDialog();
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.white,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 360),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              padding: const EdgeInsets.fromLTRB(18, 16, 14, 14),
-              decoration: const BoxDecoration(
-                color: _kBrokerPrimary,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.tune_rounded, color: Colors.white, size: 18),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'Pilih Mode Input',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close, color: Colors.white),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                children: const [
-                  _BrokerInputModeOption(
-                    value: 'full',
-                    title: 'FULL PALLET',
-                    subtitle: 'Masukkan semua item label yang valid.',
-                    icon: Icons.inventory_2_outlined,
-                  ),
-                  SizedBox(height: 10),
-                  _BrokerInputModeOption(
-                    value: 'select',
-                    title: 'SEBAGIAN PALLET',
-                    subtitle: 'Pilih item tertentu dari hasil lookup label.',
-                    icon: Icons.checklist_rounded,
-                  ),
-                  SizedBox(height: 10),
-                  _BrokerInputModeOption(
-                    value: 'partial',
-                    title: 'PARTIAL',
-                    subtitle: 'Input sebagian berat untuk label tertentu.',
-                    icon: Icons.call_split_rounded,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _BrokerInputModeOption extends StatelessWidget {
-  final String value;
-  final String title;
-  final String subtitle;
-  final IconData icon;
-
-  const _BrokerInputModeOption({
-    required this.value,
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: _kBrokerSurface,
-      borderRadius: BorderRadius.circular(12),
       child: InkWell(
-        onTap: () => Navigator.of(context).pop(value),
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _kBrokerBorder),
-          ),
-          child: Row(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () {
+          showDialog<void>(
+            context: context,
+            builder: (_) => _BonggolanOutputDetailDialog(
+              output: output,
+              onPrint: () => _handlePrint(context),
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: _kBrokerPrimary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: _kBrokerPrimary, size: 18),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      output.noBonggolan ?? '-',
                       style: const TextStyle(
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight: FontWeight.w800,
                         color: Color(0xFF1A1D23),
                       ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade600,
-                      ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.print_outlined,
+                    size: 11,
+                    color: output.printedCount > 0
+                        ? _kBrokerOutput
+                        : Colors.grey.shade400,
+                  ),
+                  const SizedBox(width: 2),
+                  Text(
+                    'x${output.printedCount}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: output.printedCount > 0
+                          ? _kBrokerOutput
+                          : Colors.grey.shade400,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const Icon(Icons.chevron_right_rounded, color: _kBrokerPrimary),
+              const SizedBox(height: 1),
+              Text(
+                output.namaBonggolan ?? '-',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 4),
+              ProductionMiniMetric(
+                icon: Icons.scale_outlined,
+                text: '${num2(output.berat)} kg',
+              ),
             ],
           ),
         ),
@@ -3214,20 +2607,86 @@ class _BrokerOutputSummaryTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Expanded(
-            child: _SummaryMetric(label: 'Label', value: '$totalLabel'),
+          ProductionInlineStat(
+            label: 'Label',
+            value: '$totalLabel',
+            color: _kBrokerOutput,
           ),
-          Expanded(
-            child: _SummaryMetric(label: 'Sak', value: '$totalSak'),
+          const SizedBox(width: 10),
+          ProductionInlineStat(
+            label: 'Sak',
+            value: '$totalSak',
+            color: _kBrokerOutput,
           ),
-          Expanded(
-            child: _SummaryMetric(
-              label: 'Berat',
-              value: '${num2(totalBerat)} kg',
-            ),
+          const SizedBox(width: 10),
+          ProductionInlineStat(
+            label: 'Berat',
+            value: '${num2(totalBerat)} kg',
+            color: _kBrokerOutput,
           ),
         ],
       ),
+    );
+  }
+}
+
+class _OutputGrandTotalBar extends StatelessWidget {
+  final int totalLabel;
+  final int totalSak;
+  final double totalBerat;
+
+  const _OutputGrandTotalBar({
+    required this.totalLabel,
+    required this.totalSak,
+    required this.totalBerat,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Divider(height: 1, thickness: 1),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.summarize_outlined,
+                size: 13,
+                color: _kBrokerOutput,
+              ),
+              const SizedBox(width: 5),
+              const Text(
+                'Total',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: _kBrokerOutput,
+                ),
+              ),
+              const SizedBox(width: 10),
+              ProductionInlineStat(
+                label: 'Label',
+                value: '$totalLabel',
+                color: _kBrokerOutput,
+              ),
+              const SizedBox(width: 10),
+              ProductionInlineStat(
+                label: 'Sak',
+                value: '$totalSak',
+                color: _kBrokerOutput,
+              ),
+              const SizedBox(width: 10),
+              ProductionInlineStat(
+                label: 'Berat',
+                value: '${num2(totalBerat)} kg',
+                color: _kBrokerOutput,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -3252,435 +2711,18 @@ class _BonggolanOutputSummaryTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Expanded(
-            child: _SummaryMetric(label: 'Label', value: '$totalLabel'),
+          ProductionInlineStat(
+            label: 'Label',
+            value: '$totalLabel',
+            color: _kBrokerOutput,
           ),
-          Expanded(
-            child: _SummaryMetric(
-              label: 'Berat',
-              value: '${num2(totalBerat)} kg',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _OutputCategoryContent extends StatelessWidget {
-  final Widget child;
-  final Widget? footer;
-
-  const _OutputCategoryContent({required this.child, this.footer});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(child: child),
-        if (footer != null) ...[const SizedBox(height: 10), footer!],
-      ],
-    );
-  }
-}
-
-class _InputCategoryBlock extends StatelessWidget {
-  final Color color;
-  final bool isLoading;
-  final SectionSummary Function()? summaryBuilder;
-  final Widget child;
-
-  const _InputCategoryBlock({
-    required this.color,
-    required this.child,
-    this.isLoading = false,
-    this.summaryBuilder,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final summary = summaryBuilder?.call();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (isLoading) ...[
-          const Align(
-            alignment: Alignment.centerRight,
-            child: SizedBox(
-              width: 14,
-              height: 14,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          ),
-          const SizedBox(height: 10),
-        ],
-        Expanded(child: child),
-        if (summary != null) ...[
-          const SizedBox(height: 10),
-          _InputCategorySummaryTile(summary: summary, accentColor: color),
-        ],
-      ],
-    );
-  }
-}
-
-class _InputCategorySummaryTile extends StatelessWidget {
-  final SectionSummary summary;
-  final Color accentColor;
-
-  const _InputCategorySummaryTile({
-    required this.summary,
-    required this.accentColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: accentColor.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: accentColor.withValues(alpha: 0.18)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _SummaryMetric(
-              label: 'Label',
-              value: '${summary.totalData}',
-              valueColor: accentColor,
-            ),
-          ),
-          if (summary.totalSak > 0)
-            Expanded(
-              child: _SummaryMetric(
-                label: 'Sak',
-                value: '${summary.totalSak}',
-                valueColor: accentColor,
-              ),
-            ),
-          Expanded(
-            child: _SummaryMetric(
-              label: 'Berat',
-              value: '${num2(summary.totalBerat)} kg',
-              valueColor: accentColor,
-            ),
+          const SizedBox(width: 10),
+          ProductionInlineStat(
+            label: 'Berat',
+            value: '${num2(totalBerat)} kg',
+            color: _kBrokerOutput,
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _InputGroupExpansionTile extends StatelessWidget {
-  final String title;
-  final String? headerSubtitle;
-  final List<(IconData, String)> tileMetrics;
-  final Color color;
-  final List<Widget> Function() detailsBuilder;
-  final bool expandable;
-  final bool isPartialGroup;
-  final String? partialReference;
-
-  const _InputGroupExpansionTile({
-    required this.title,
-    required this.color,
-    required this.detailsBuilder,
-    this.headerSubtitle,
-    this.tileMetrics = const [],
-    this.expandable = true,
-    this.isPartialGroup = false,
-    this.partialReference,
-  });
-
-  Widget _buildHeader(bool hasTempForThis) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          color: hasTempForThis
-                              ? Colors.brown.shade800
-                              : const Color(0xFF1A1D23),
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (isPartialGroup) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.deepOrange.withValues(alpha: 0.14),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Text(
-                          'PARTIAL',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.deepOrange,
-                          ),
-                        ),
-                      ),
-                      if ((partialReference ?? '').trim().isNotEmpty) ...[
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            '-> ${partialReference!.trim()}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.grey.shade800,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                    if (hasTempForThis) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Text(
-                          'Temp',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.orange,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                if ((headerSubtitle ?? '').trim().isNotEmpty) ...[
-                  const SizedBox(height: 3),
-                  Text(
-                    headerSubtitle!.trim(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                  ),
-                ],
-                if (tileMetrics.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 6,
-                    children: tileMetrics
-                        .map((m) => _MiniMetric(icon: m.$1, text: m.$2))
-                        .toList(),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final details = detailsBuilder();
-    final vm = context.watch<BrokerProductionInputViewModel>();
-    final hasTempForThis = vm.hasTemporaryDataForLabel(title);
-
-    final bgColor = hasTempForThis ? Colors.yellow.shade50 : Colors.white;
-    final borderColor = hasTempForThis ? Colors.amber.shade200 : _kBrokerBorder;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: borderColor),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: () {
-          showDialog<void>(
-            context: context,
-            builder: (_) => _InputGroupDetailDialog(
-              title: title,
-              subtitle: headerSubtitle ?? '-',
-              metrics: tileMetrics,
-              details: details,
-            ),
-          );
-        },
-        child: Row(
-          children: [
-            Expanded(child: _buildHeader(hasTempForThis)),
-            Padding(
-              padding: const EdgeInsets.only(right: 10),
-              child: Icon(
-                Icons.open_in_new_rounded,
-                size: 16,
-                color: Colors.grey.shade500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _InputGroupDetailDialog extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final List<(IconData, String)> metrics;
-  final List<Widget> details;
-
-  const _InputGroupDetailDialog({
-    required this.title,
-    required this.subtitle,
-    required this.metrics,
-    required this.details,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.white,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420, maxHeight: 560),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              decoration: const BoxDecoration(
-                color: Color(0xFF1565C0),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.list_alt_rounded,
-                    color: Colors.white,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          subtitle,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(
-                      Icons.close,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              color: const Color(0xFFF0F7FF),
-              child: Wrap(
-                spacing: 16,
-                runSpacing: 6,
-                children: metrics
-                    .map((m) => _MiniMetric(icon: m.$1, text: m.$2))
-                    .toList(),
-              ),
-            ),
-            const Divider(height: 1, color: _kBrokerBorder),
-            Flexible(
-              child: details.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Text(
-                        'Tidak ada detail',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade500,
-                        ),
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      itemBuilder: (_, i) => details[i],
-                      separatorBuilder: (_, __) => Divider(
-                        height: 1,
-                        thickness: 0.5,
-                        color: Colors.grey.shade200,
-                      ),
-                      itemCount: details.length,
-                    ),
-            ),
-            const Divider(height: 1, color: _kBrokerBorder),
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: _kBrokerBorder),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text('Tutup'),
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -3688,8 +2730,9 @@ class _InputGroupDetailDialog extends StatelessWidget {
 
 class _BrokerOutputDetailDialog extends StatelessWidget {
   final BrokerOutput output;
+  final VoidCallback? onPrint;
 
-  const _BrokerOutputDetailDialog({required this.output});
+  const _BrokerOutputDetailDialog({required this.output, this.onPrint});
 
   @override
   Widget build(BuildContext context) {
@@ -3698,10 +2741,12 @@ class _BrokerOutputDetailDialog extends StatelessWidget {
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 380, maxHeight: 500),
+        constraints: const BoxConstraints(maxWidth: 640, maxHeight: 520),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Header
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               decoration: const BoxDecoration(
@@ -3721,7 +2766,7 @@ class _BrokerOutputDetailDialog extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          output.noBroker ?? '-',
+                          output.namaJenis ?? '-',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 14,
@@ -3729,9 +2774,9 @@ class _BrokerOutputDetailDialog extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          output.namaJenis ?? '-',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
+                          output.noBroker ?? '-',
+                          style: const TextStyle(
+                            color: Colors.white70,
                             fontSize: 11,
                           ),
                         ),
@@ -3749,114 +2794,98 @@ class _BrokerOutputDetailDialog extends StatelessWidget {
                 ],
               ),
             ),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              color: const Color(0xFFF0F7FF),
-              child: Row(
-                children: [
-                  _MiniMetric(
-                    icon: Icons.inventory_2_outlined,
-                    text: '${output.totalSak} Sak',
-                  ),
-                  const SizedBox(width: 16),
-                  _MiniMetric(
-                    icon: Icons.scale_outlined,
-                    text: '${num2(output.totalBerat)} kg total',
-                  ),
-                ],
-              ),
-            ),
             const Divider(height: 1, color: _kBrokerBorder),
+            // Grid sak
             Flexible(
               child: output.detailSak.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.all(20),
+                  ? const Padding(
+                      padding: EdgeInsets.all(24),
                       child: Text(
                         'Tidak ada detail sak',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey.shade500,
+                          color: Color(0xFF9CA3AF),
                         ),
                       ),
                     )
-                  : ListView.separated(
-                      shrinkWrap: true,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: output.detailSak.length,
-                      separatorBuilder: (_, __) => const Divider(
-                        height: 1,
-                        indent: 20,
-                        endIndent: 20,
-                        color: _kBrokerBorder,
-                      ),
-                      itemBuilder: (_, i) {
-                        final s = output.detailSak[i];
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 10,
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 36,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFE3F2FD),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    '${s.noSak ?? '-'}',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w800,
-                                      color: Color(0xFF1565C0),
-                                    ),
-                                  ),
-                                ),
+                  : Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: GridView.builder(
+                        shrinkWrap: true,
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 7,
+                              crossAxisSpacing: 5,
+                              mainAxisSpacing: 5,
+                              childAspectRatio: 1.6,
+                            ),
+                        itemCount: output.detailSak.length,
+                        itemBuilder: (_, i) {
+                          final s = output.detailSak[i];
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF0F7FF),
+                              borderRadius: BorderRadius.circular(7),
+                              border: Border.all(
+                                color: const Color(0xFFBFDBFE),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
                                   'Sak ${s.noSak ?? '-'}',
                                   style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF1A1D23),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF1D4ED8),
                                   ),
                                 ),
-                              ),
-                              Text(
-                                '${num2(s.berat)} kg',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF1A1D23),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${num2(s.berat)} kg',
+                                  style: const TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF374151),
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
+                              ],
+                            ),
+                          );
+                        },
+                      ),
                     ),
             ),
             const Divider(height: 1, color: _kBrokerBorder),
+            // Footer total
             Padding(
               padding: const EdgeInsets.all(14),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: _kBrokerBorder),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (onPrint != null)
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        onPrint!();
+                      },
+                      icon: const Icon(Icons.print_outlined, size: 15),
+                      label: const Text('Print'),
                     ),
+                  const SizedBox(width: 8),
+                  OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: _kBrokerBorder),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text('Tutup'),
                   ),
-                  child: const Text('Tutup'),
-                ),
+                ],
               ),
             ),
           ],
@@ -3866,271 +2895,114 @@ class _BrokerOutputDetailDialog extends StatelessWidget {
   }
 }
 
-class _PanelTabItem {
-  final String value;
-  final String label;
-  final int count;
+class _BonggolanOutputDetailDialog extends StatelessWidget {
+  final BonggolanOutput output;
+  final VoidCallback? onPrint;
 
-  const _PanelTabItem({
-    required this.value,
-    required this.label,
-    required this.count,
-  });
-}
-
-class _PanelTabBar extends StatelessWidget {
-  final String selectedValue;
-  final List<_PanelTabItem> tabs;
-  final ValueChanged<String> onChanged;
-  final Color accentColor;
-
-  const _PanelTabBar({
-    required this.selectedValue,
-    required this.tabs,
-    required this.onChanged,
-    this.accentColor = _kBrokerOutput,
-  });
+  const _BonggolanOutputDetailDialog({required this.output, this.onPrint});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: accentColor.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _kBrokerBorder),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: tabs.map((tab) {
-            final isSelected = tab.value == selectedValue;
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              child: Material(
-                color: isSelected ? Colors.white : Colors.transparent,
-                borderRadius: BorderRadius.circular(10),
-                child: InkWell(
-                  onTap: () => onChanged(tab.value),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 10,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          tab.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            color: isSelected
-                                ? accentColor
-                                : Colors.grey.shade700,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? accentColor.withValues(alpha: 0.1)
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: isSelected
-                                  ? accentColor.withValues(alpha: 0.2)
-                                  : _kBrokerBorder,
-                            ),
-                          ),
-                          child: Text(
-                            '${tab.count}',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: isSelected
-                                  ? accentColor
-                                  : Colors.grey.shade700,
-                            ),
-                          ),
-                        ),
-                      ],
+    return Dialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              decoration: const BoxDecoration(
+                color: Color(0xFF1565C0),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.list_alt_rounded,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      output.namaBonggolan ?? '-',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                  ),
+                ],
               ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyOutputCategory extends StatelessWidget {
-  final String message;
-
-  const _EmptyOutputCategory({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Text(
-        message,
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-      ),
-    );
-  }
-}
-
-class _OutputErrorBanner extends StatelessWidget {
-  final String message;
-
-  const _OutputErrorBanner({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.red.shade50,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.red.shade100),
-      ),
-      child: Text(
-        'Sebagian output gagal dimuat:\n$message',
-        style: TextStyle(fontSize: 12, color: Colors.red.shade700),
-      ),
-    );
-  }
-}
-
-class _PrintedBadge extends StatelessWidget {
-  final bool isPrinted;
-
-  const _PrintedBadge({required this.isPrinted});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = isPrinted ? _kBrokerOutput : Colors.orange.shade700;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        isPrinted ? 'Printed' : 'Belum Print',
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
-          color: color,
-        ),
-      ),
-    );
-  }
-}
-
-class _MiniMetric extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const _MiniMetric({required this.icon, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 13, color: Colors.grey.shade600),
-        const SizedBox(width: 4),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: Colors.grey.shade700,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SummaryMetric extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color valueColor;
-
-  const _SummaryMetric({
-    required this.label,
-    required this.value,
-    this.valueColor = _kBrokerOutput,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 9,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey.shade600,
-          ),
-        ),
-        const SizedBox(height: 1),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-            color: valueColor,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _OutputPrintButton extends StatelessWidget {
-  final VoidCallback onPressed;
-
-  const _OutputPrintButton({required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: 'Print',
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(6),
-        child: Container(
-          width: 26,
-          height: 24,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: _kBrokerOutput.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: _kBrokerOutput.withValues(alpha: 0.18)),
-          ),
-          child: const Icon(
-            Icons.print_outlined,
-            size: 14,
-            color: _kBrokerOutput,
-          ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    output.noBonggolan ?? '-',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1A1D23),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ProductionMiniMetric(
+                    icon: Icons.scale_outlined,
+                    text: '${num2(output.berat)} kg',
+                  ),
+                  const SizedBox(height: 8),
+                  ProductionMiniMetric(
+                    icon: Icons.print_outlined,
+                    text: 'Print ${output.printedCount}x',
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1, color: _kBrokerBorder),
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (onPrint != null)
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        onPrint!();
+                      },
+                      icon: const Icon(Icons.print_outlined, size: 15),
+                      label: const Text('Print'),
+                    ),
+                  const SizedBox(width: 8),
+                  OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: _kBrokerBorder),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text('Tutup'),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

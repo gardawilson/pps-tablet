@@ -111,7 +111,7 @@ import 'package:pps_tablet/features/production/spanner/view/spanner_production_s
 import 'package:pps_tablet/features/production/spanner/view_model/spanner_production_input_view_model.dart';
 import 'package:pps_tablet/features/production/spanner/view_model/spanner_production_view_model.dart';
 import 'package:pps_tablet/features/production/washing/repository/washing_production_input_repository.dart';
-import 'package:pps_tablet/features/production/washing/view/washing_production_screen.dart';
+import 'package:pps_tablet/features/production/washing/view/washing_production_mesin_screen.dart';
 import 'package:pps_tablet/features/production/washing/view_model/washing_production_input_view_model.dart';
 import 'package:pps_tablet/features/reject_type/repository/reject_type_repository.dart';
 import 'package:pps_tablet/features/reject_type/view_model/packing_type_view_model.dart';
@@ -557,7 +557,8 @@ class MyApp extends StatelessWidget {
           '/label/mixer': (context) => MixerScreen(),
           '/label/furniture_wip': (context) => FurnitureWipScreen(),
           '/production': (context) => ProductionSelectionScreen(),
-          '/production/washing': (context) => WashingProductionScreen(),
+          '/production/washing': (context) =>
+              const WashingProductionMesinScreen(),
           '/production/broker': (context) => BrokerProductionScreen(),
           '/production/crusher': (context) => CrusherProductionScreen(),
           '/label/packing': (context) => PackingScreen(),

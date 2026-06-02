@@ -10,3 +10,24 @@ export 'utils/title_keys/mixer.dart';
 export 'utils/title_keys/reject.dart';
 export 'utils/title_keys/broker.dart';
 export 'models/input_enums.dart';
+
+// ── Shared UI widgets untuk semua modul production ──────────────────────────
+export 'widgets/production_stat_badge.dart';
+export 'widgets/production_filter_chip.dart';
+export 'widgets/production_status_dot.dart';
+export 'widgets/production_small_info_row.dart';
+export 'widgets/mesin_section_header.dart';
+
+// ── Input screen shared atoms ─────────────────────────────────────────────────
+export 'widgets/production_panel_decoration.dart';
+export 'widgets/production_inline_stat.dart';
+export 'widgets/production_grand_total_bar.dart';
+export 'widgets/production_input_category_block.dart';
+export 'widgets/production_folder_tab_bar.dart';
+export 'widgets/production_input_group_tile.dart';
+export 'widgets/production_action_widgets.dart';
+export 'widgets/production_shift_timeline_dialog.dart';
+export 'widgets/production_ganti_produksi_dialog.dart';
+export 'widgets/production_timeline_factories.dart';
+export 'widgets/production_workspace_toolbar.dart';
+export 'widgets/production_flow_helpers.dart';

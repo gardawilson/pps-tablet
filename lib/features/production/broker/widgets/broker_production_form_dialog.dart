@@ -164,10 +164,7 @@ class _BrokerProductionFormDialogState
       // Reconstruct List<MstOperator> dari idOperators + namaOperators
       // namaOperators adalah string "NAMA1, NAMA2, ..."
       if (h.idOperators.isNotEmpty) {
-        final names = h.namaOperators
-            .split(',')
-            .map((s) => s.trim())
-            .toList();
+        final names = h.namaOperators.split(',').map((s) => s.trim()).toList();
         _selectedOperators = List.generate(h.idOperators.length, (i) {
           return MstOperator(
             idOperator: h.idOperators[i],

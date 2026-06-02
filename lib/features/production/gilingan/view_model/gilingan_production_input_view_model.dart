@@ -3,6 +3,8 @@
 // Supports: Broker (full + partial), Bonggolan (full only), Crusher (full only), Reject (full + partial)
 
 import 'dart:async';
+
+import '../model/gilingan_output_model.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
@@ -431,6 +433,37 @@ class GilinganProductionInputViewModel extends ChangeNotifier {
     }
 
     return null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Temp selections (anti-duplicate)
+  // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // Outputs cache
+  // ---------------------------------------------------------------------------
+  final Map<String, List<GilinganOutput>> _outputsCache = {};
+  final Map<String, bool> _outputsLoading = {};
+  final Map<String, String?> _outputsError = {};
+
+  bool isOutputsLoading(String noProduksi) => _outputsLoading[noProduksi] == true;
+  String? outputsError(String noProduksi) => _outputsError[noProduksi];
+  List<GilinganOutput>? outputsOf(String noProduksi) => _outputsCache[noProduksi];
+
+  Future<void> loadOutputs(String noProduksi, {bool force = false}) async {
+    if (!force && _outputsCache.containsKey(noProduksi)) return;
+    _outputsLoading[noProduksi] = true;
+    _outputsError[noProduksi] = null;
+    notifyListeners();
+    try {
+      final result = await repository.fetchOutputs(noProduksi);
+      _outputsCache[noProduksi] = result;
+    } catch (e) {
+      _outputsError[noProduksi] = e.toString();
+      _outputsCache.remove(noProduksi);
+    } finally {
+      _outputsLoading[noProduksi] = false;
+      notifyListeners();
+    }
   }
 
   // ---------------------------------------------------------------------------

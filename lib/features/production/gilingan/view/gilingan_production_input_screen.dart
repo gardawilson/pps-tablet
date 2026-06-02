@@ -1,40 +1,55 @@
-// lib/features/production/gilingan/view/gilingan_production_input_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:pps_tablet/core/view/app_shell.dart';
+import 'package:pps_tablet/features/production/gilingan/view_model/gilingan_production_input_view_model.dart';
 import '../../../../common/widgets/error_status_dialog.dart';
+import '../../../../common/widgets/scan_label_dialog.dart';
 import '../../../../core/view_model/permission_view_model.dart';
-
 import '../../shared/models/production_label_lookup_result.dart';
 import '../../shared/widgets/confirm_save_temp_dialog.dart';
-import '../../shared/widgets/unsaved_temp_warning_dialog.dart';
 import '../../shared/widgets/partial_mode_not_supported_dialog.dart';
 import '../../shared/widgets/save_button_with_badge.dart';
-
-import 'package:pps_tablet/features/production/shared/shared.dart'; // SectionCard, SectionInputCard, groupBy, helpers
-import '../../shared/utils/format.dart';
-
-// ✅ ganti ke path sesuai struktur project kamu
-import '../view_model/gilingan_production_input_view_model.dart';
+import '../../shared/widgets/unsaved_temp_warning_dialog.dart';
 import '../model/gilingan_inputs_model.dart';
-
-// ✅ ganti ke widgets popover gilingan kamu (hasil copy dari broker, tapi type VM = GilinganProductionInputViewModel)
-import '../widgets/gilingan_input_group_popover.dart';
-
-// ✅ ganti ke dialog lookup gilingan versi kamu
+import '../model/gilingan_output_model.dart';
+import '../model/gilingan_production_model.dart';
+import '../repository/gilingan_production_input_repository.dart';
 import '../widgets/gilingan_lookup_label_dialog.dart';
 import '../widgets/gilingan_lookup_label_partial_dialog.dart';
+import '../widgets/gilingan_output_tile.dart';
+import '../widgets/gilingan_production_output_form_dialog.dart';
+import '../../../gilingan_type/model/gilingan_type_model.dart';
+import '../../../gilingan_type/repository/gilingan_type_repository.dart';
+import '../../../gilingan_type/view_model/gilingan_type_view_model.dart';
+import '../../../gilingan_type/widgets/gilingan_type_dropdown.dart';
+
+import 'package:pps_tablet/features/production/shared/shared.dart';
+
+const _kGilinganPrimary = Color(0xFF0277BD);
+const _kGilinganSurface = Color(0xFFF8F9FB);
+const _kGilinganBorder = Color(0xFFE2E6EA);
 
 class GilinganProductionInputScreen extends StatefulWidget {
   final String noProduksi;
   final bool? isLocked;
   final DateTime? lastClosedDate;
+  final int? outputJenisId;
+  final String? namaJenis;
+  final int? idMesin;
+  final DateTime? tglProduksi;
+  final int? shift;
 
   const GilinganProductionInputScreen({
     super.key,
     required this.noProduksi,
     this.isLocked,
     this.lastClosedDate,
+    this.outputJenisId,
+    this.namaJenis,
+    this.idMesin,
+    this.tglProduksi,
+    this.shift,
   });
 
   @override
@@ -44,24 +59,61 @@ class GilinganProductionInputScreen extends StatefulWidget {
 
 class _GilinganProductionInputScreenState
     extends State<GilinganProductionInputScreen> {
-  String _selectedMode = 'full';
+  final _repo = GilinganProductionInputRepository();
+  bool _isReplacing = false;
+
+  String _selectedMode =
+      'full'; // mutable — diubah via setState saat mode scan berubah
+  String _selectedInputTab = 'broker';
+
+  List<BreadcrumbSegment> _prevBreadcrumb = [];
 
   @override
   void initState() {
     super.initState();
+    _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      AppShell.breadcrumb.value = [
+        ..._prevBreadcrumb.map(
+          (s) => BreadcrumbSegment(
+            s.label,
+            onTap: () {
+              AppShell.breadcrumb.value = _prevBreadcrumb;
+              AppShell.shellNavigatorKey.currentState?.pop();
+            },
+          ),
+        ),
+        BreadcrumbSegment(widget.noProduksi),
+      ];
+
       final vm = context.read<GilinganProductionInputViewModel>();
-      final already = vm.inputsOf(widget.noProduksi) != null;
-      final loading = vm.isInputsLoading(widget.noProduksi);
-      if (!already && !loading) {
+      if (vm.inputsOf(widget.noProduksi) == null &&
+          !vm.isInputsLoading(widget.noProduksi)) {
         vm.loadInputs(widget.noProduksi);
+      }
+      if (vm.outputsOf(widget.noProduksi) == null &&
+          !vm.isOutputsLoading(widget.noProduksi)) {
+        vm.loadOutputs(widget.noProduksi);
       }
     });
   }
 
+  @override
+  void dispose() {
+    if (!_isReplacing) {
+      final current = AppShell.breadcrumb.value;
+      if (current.isNotEmpty && current.last.label == widget.noProduksi) {
+        AppShell.breadcrumb.value = _prevBreadcrumb;
+      }
+    }
+    super.dispose();
+  }
+
+  // ── Back / WillPop ─────────────────────────────────────────────────────────
+
   Future<bool> _onWillPop() async {
     final vm = context.read<GilinganProductionInputViewModel>();
-
     if (vm.totalTempCount == 0) return true;
 
     final shouldPop = await showDialog<bool>(
@@ -72,7 +124,7 @@ class _GilinganProductionInputScreenState
         submitSummary: vm.getSubmitSummary(),
         onSavePressed: () {
           Navigator.of(dialogContext).pop(false);
-          _handleSave(context);
+          _handleSave();
         },
       ),
     );
@@ -83,6 +135,8 @@ class _GilinganProductionInputScreenState
     }
     return false;
   }
+
+  // ── Snack ──────────────────────────────────────────────────────────────────
 
   void _showSnack(String msg, {Color? backgroundColor}) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -95,30 +149,16 @@ class _GilinganProductionInputScreenState
     );
   }
 
-  Future<bool> _handleBulkDelete(List<dynamic> items) async {
-    final vm = context.read<GilinganProductionInputViewModel>();
+  // ── Save ───────────────────────────────────────────────────────────────────
 
-    final success = await vm.deleteItems(widget.noProduksi, items);
-
-    if (!success && mounted) {
-      final errMsg = vm.deleteError ?? 'Gagal menghapus item';
-      await showDialog(
-        context: context,
-        builder: (_) => ErrorStatusDialog(
-          title: 'Gagal Menghapus',
-          message: errMsg,
-        ),
-      );
-    }
-    return success;
-  }
-
-  Future<void> _handleSave(BuildContext context) async {
+  Future<void> _handleSave() async {
     final vm = context.read<GilinganProductionInputViewModel>();
 
     if (vm.totalTempCount == 0) {
-      _showSnack('Tidak ada data untuk disimpan',
-          backgroundColor: Colors.orange);
+      _showSnack(
+        'Tidak ada data untuk disimpan',
+        backgroundColor: Colors.orange,
+      );
       return;
     }
 
@@ -134,7 +174,6 @@ class _GilinganProductionInputScreenState
     if (confirm != true || !mounted) return;
 
     final success = await vm.submitTempItems(widget.noProduksi);
-
     if (!mounted) return;
 
     if (success) {
@@ -143,25 +182,84 @@ class _GilinganProductionInputScreenState
       final errMsg = vm.submitError ?? 'Kesalahan tidak diketahui';
       await showDialog(
         context: context,
-        builder: (_) => ErrorStatusDialog(
-          title: 'Gagal Menyimpan',
-          message: errMsg,
-        ),
+        builder: (_) =>
+            ErrorStatusDialog(title: 'Gagal Menyimpan', message: errMsg),
       );
     }
   }
 
-  Future<void> _onCodeReady(BuildContext context, String code) async {
+  // ── Clear temp ─────────────────────────────────────────────────────────────
+
+  void _confirmClearTemp() {
+    final vm = context.read<GilinganProductionInputViewModel>();
+    if (vm.totalTempCount == 0) return;
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Hapus Semua Temp?'),
+        content: Text(
+          'Apakah Anda yakin ingin menghapus ${vm.totalTempCount} item temp?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              vm.clearAllTempItems();
+              Navigator.of(dialogContext).pop();
+              _showSnack('Semua temp items dihapus');
+            },
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Scan / lookup ──────────────────────────────────────────────────────────
+
+  String _modeLabel(String mode) {
+    switch (mode) {
+      case 'full':
+        return 'FULL PALLET';
+      case 'select':
+        return 'SEBAGIAN PALLET';
+      case 'partial':
+        return 'PARTIAL';
+      default:
+        return mode.toUpperCase();
+    }
+  }
+
+  Future<void> _openScanDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => ScanLabelDialog(
+        manualHint: 'X.XXXXXXXXXX',
+        headerSubtitle: _modeLabel(_selectedMode),
+        acceptedLabels: const [
+          (prefix: 'D', label: 'Broker'),
+          (prefix: 'M', label: 'Bonggolan'),
+          (prefix: 'F', label: 'Crusher'),
+          (prefix: 'BF', label: 'Reject'),
+        ],
+        onLookup: (code) async => _onCodeReady(code),
+      ),
+    );
+  }
+
+  Future<String?> _onCodeReady(String code) async {
     final vm = context.read<GilinganProductionInputViewModel>();
 
-    // ✅ VALIDASI partial mode untuk label yang TIDAK support partial
-    // Di GilinganInputs kamu ada: Broker (D.), Bonggolan (M.), Crusher (F.), Reject (BF.)
-    // Umumnya partial hanya untuk D. dan BF. (sesuaikan aturanmu)
     if (_selectedMode == 'partial') {
       final c = code.trim().toUpperCase();
       final prefix2 = c.length >= 2 ? c.substring(0, 2) : c;
-
-      // Bonggolan M. dan Crusher F. tidak support partial
       if (prefix2 == 'M.' || prefix2 == 'F.') {
         final labelType = prefix2 == 'M.' ? 'Bonggolan' : 'Crusher';
         await PartialModeNotSupportedDialog.show(
@@ -169,81 +267,78 @@ class _GilinganProductionInputScreenState
           labelType: labelType,
           onOk: () {},
         );
-        return;
+        return '$labelType tidak mendukung mode PARTIAL';
       }
     }
 
     final res = await vm.lookupLabel(code, force: true);
-    if (!mounted) return;
+    if (!mounted) return 'Halaman sudah tidak aktif';
 
-    if (vm.lookupError != null) {
-      _showSnack('Gagal ambil data: ${vm.lookupError}',
-          backgroundColor: Colors.red);
-      return;
-    }
+    if (vm.lookupError != null) return 'Gagal ambil data: ${vm.lookupError}';
 
     if (res == null || res.found == false || res.data.isEmpty) {
-      await showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('Data Tidak Ditemukan'),
-          content: Text('Label "$code" tidak memiliki data yang tersedia.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Tutup'),
-            ),
-          ],
-        ),
-      );
-      return;
+      return 'Label "$code" tidak memiliki data yang tersedia.';
+    }
+
+    final tab = _tabForLookupResult(res);
+    if (tab != null && tab != _selectedInputTab) {
+      setState(() => _selectedInputTab = tab);
     }
 
     if (_selectedMode == 'full') {
-      await _handleFullMode(context, vm, res);
+      await _handleFullMode(vm, res);
     } else if (_selectedMode == 'partial') {
-      await _handlePartialMode(context, vm, res);
+      await _handlePartialMode(vm, res);
     } else {
-      await _handleSelectMode(context, vm, res);
+      await _handleSelectMode(vm, res);
     }
+
+    return null;
+  }
+
+  String? _tabForLookupResult(ProductionLabelLookupResult res) {
+    if (res.typedItems.isEmpty) return null;
+    final item = res.typedItems.first;
+    if (item is BrokerItem) return 'broker';
+    if (item is BonggolanItem) return 'bonggolan';
+    if (item is CrusherItem) return 'crusher';
+    if (item is RejectItem) return 'reject';
+    return null;
   }
 
   Future<void> _handleFullMode(
-      BuildContext context,
-      GilinganProductionInputViewModel vm,
-      ProductionLabelLookupResult res,
-      ) async {
+    GilinganProductionInputViewModel vm,
+    ProductionLabelLookupResult res,
+  ) async {
     final freshCount = vm.countNewRowsInLastLookup(widget.noProduksi);
-
     if (freshCount == 0) {
       final labelCode = _labelCodeOfFirst(res);
       final hasTemp =
           labelCode != null && vm.hasTemporaryDataForLabel(labelCode);
-      final suffix =
-      hasTemp ? ' • ${vm.getTemporaryDataSummary(labelCode!)}' : '';
+      final suffix = hasTemp
+          ? ' • ${vm.getTemporaryDataSummary(labelCode)}'
+          : '';
       _showSnack(
-          'Semua item untuk ${labelCode ?? "label ini"} sudah ada.$suffix');
+        'Semua item untuk ${labelCode ?? "label ini"} sudah ada.$suffix',
+      );
       return;
     }
-
     vm.clearPicks();
     vm.pickAllNew(widget.noProduksi);
-
-    final r = vm.commitPickedToTemp(noProduksi: widget.noProduksi);
-
-    final msg = r.added > 0
-        ? '✅ Auto-added ${r.added} item${r.skipped > 0 ? ' • Duplikat terlewati ${r.skipped}' : ''}'
+    final result = vm.commitPickedToTemp(noProduksi: widget.noProduksi);
+    final msg = result.added > 0
+        ? '✅ Auto-added ${result.added} item${result.skipped > 0 ? ' • Duplikat terlewati ${result.skipped}' : ''}'
         : 'Tidak ada item baru ditambahkan';
-
-    _showSnack(msg,
-        backgroundColor: r.added > 0 ? Colors.green : Colors.orange);
+    _showSnack(
+      msg,
+      backgroundColor: result.added > 0 ? Colors.green : Colors.orange,
+    );
   }
 
   Future<void> _handlePartialMode(
-      BuildContext context,
-      GilinganProductionInputViewModel vm,
-      ProductionLabelLookupResult res,
-      ) async {
+    GilinganProductionInputViewModel vm,
+    ProductionLabelLookupResult res,
+  ) async {
     await showDialog(
       context: context,
       barrierDismissible: true,
@@ -255,23 +350,22 @@ class _GilinganProductionInputScreenState
   }
 
   Future<void> _handleSelectMode(
-      BuildContext context,
-      GilinganProductionInputViewModel vm,
-      ProductionLabelLookupResult res,
-      ) async {
+    GilinganProductionInputViewModel vm,
+    ProductionLabelLookupResult res,
+  ) async {
     final freshCount = vm.countNewRowsInLastLookup(widget.noProduksi);
-
     if (freshCount == 0) {
       final labelCode = _labelCodeOfFirst(res);
       final hasTemp =
           labelCode != null && vm.hasTemporaryDataForLabel(labelCode);
-      final suffix =
-      hasTemp ? ' • ${vm.getTemporaryDataSummary(labelCode!)}' : '';
+      final suffix = hasTemp
+          ? ' • ${vm.getTemporaryDataSummary(labelCode)}'
+          : '';
       _showSnack(
-          'Semua item untuk ${labelCode ?? "label ini"} sudah ada.$suffix');
+        'Semua item untuk ${labelCode ?? "label ini"} sudah ada.$suffix',
+      );
       return;
     }
-
     await showDialog(
       context: context,
       barrierDismissible: true,
@@ -285,8 +379,6 @@ class _GilinganProductionInputScreenState
   String? _labelCodeOfFirst(ProductionLabelLookupResult res) {
     if (res.typedItems.isEmpty) return null;
     final item = res.typedItems.first;
-
-    // pakai rule yang sama seperti di Broker screen (prioritas partial code jika ada)
     if (item is BrokerItem) {
       return (item.noBrokerPartial ?? '').trim().isNotEmpty
           ? item.noBrokerPartial
@@ -302,247 +394,667 @@ class _GilinganProductionInputScreenState
     return null;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<GilinganProductionInputViewModel>(
-      builder: (context, vm, _) {
-        final loading = vm.isInputsLoading(widget.noProduksi);
-        final err = vm.inputsError(widget.noProduksi);
-        final inputs = vm.inputsOf(widget.noProduksi);
+  // ── Summary helper ─────────────────────────────────────────────────────────
 
-        final perm = context.watch<PermissionViewModel>();
-        final locked = widget.isLocked == true;
+  SectionSummary _selectedTabSummary({
+    required Map<String, List<BrokerItem>> brokerGroups,
+    required Map<String, List<BonggolanItem>> bonggolGroups,
+    required Map<String, List<CrusherItem>> crusherGroups,
+    required Map<String, List<RejectItem>> rejectGroups,
+  }) {
+    Map<String, List<dynamic>> groups;
+    switch (_selectedInputTab) {
+      case 'broker':
+        groups = brokerGroups;
+        break;
+      case 'bonggolan':
+        groups = bonggolGroups;
+        break;
+      case 'crusher':
+        groups = crusherGroups;
+        break;
+      default:
+        groups = rejectGroups;
+    }
+    int totalSak = 0;
+    double totalBerat = 0.0;
+    for (final items in groups.values) {
+      totalSak += items.length;
+      for (final i in items) {
+        if (i is BrokerItem) totalBerat += i.berat ?? 0.0;
+        if (i is BonggolanItem) totalBerat += i.berat ?? 0.0;
+        if (i is CrusherItem) totalBerat += i.berat ?? 0.0;
+        if (i is RejectItem) totalBerat += i.berat ?? 0.0;
+      }
+    }
+    return SectionSummary(
+      totalData: groups.length,
+      totalSak: totalSak,
+      totalBerat: totalBerat,
+    );
+  }
 
-        final canDeleteByPerm = perm.can('label_washing:delete');
-        final canDelete = canDeleteByPerm && !locked;
+  // ── Input panel ────────────────────────────────────────────────────────────
 
-        return WillPopScope(
-          onWillPop: _onWillPop,
-          child: Scaffold(
-            appBar: AppBar(
-              title: Text('Inputs • ${widget.noProduksi}'),
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () async {
-                  final canPop = await _onWillPop();
-                  if (canPop && mounted) Navigator.pop(context);
-                },
-              ),
-              actions: [
+  Widget _buildInputPanel({
+    required GilinganProductionInputViewModel vm,
+    required bool locked,
+    required bool loading,
+    required bool canDelete,
+    required Map<String, List<BrokerItem>> brokerGroups,
+    required Map<String, List<BonggolanItem>> bonggolGroups,
+    required Map<String, List<CrusherItem>> crusherGroups,
+    required Map<String, List<RejectItem>> rejectGroups,
+    required GilinganInputs? inputs,
+  }) {
+    int grandLabel =
+        brokerGroups.length +
+        bonggolGroups.length +
+        crusherGroups.length +
+        rejectGroups.length;
+    int grandSak = 0;
+    double grandBerat = 0.0;
+    for (final items in brokerGroups.values) {
+      grandSak += items.length;
+      for (final i in items) grandBerat += i.berat ?? 0.0;
+    }
+    for (final items in bonggolGroups.values) {
+      grandSak += items.length;
+      for (final i in items) grandBerat += i.berat ?? 0.0;
+    }
+    for (final items in crusherGroups.values) {
+      grandSak += items.length;
+      for (final i in items) grandBerat += i.berat ?? 0.0;
+    }
+    for (final items in rejectGroups.values) {
+      grandSak += items.length;
+      for (final i in items) grandBerat += i.berat ?? 0.0;
+    }
+
+    final selectedSummary = _selectedTabSummary(
+      brokerGroups: brokerGroups,
+      bonggolGroups: bonggolGroups,
+      crusherGroups: crusherGroups,
+      rejectGroups: rejectGroups,
+    );
+
+    return Container(
+      decoration: productionPanelDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Panel header ──────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 1, 1, 1),
+            child: Row(
+              children: [
+                productionSectionHeader(
+                  Icons.input_rounded,
+                  'Label Input',
+                  primaryColor: _kGilinganPrimary,
+                ),
+                const Spacer(),
                 SaveButtonWithBadge(
                   count: vm.totalTempCount,
                   isLoading: vm.isSubmitting,
-                  onPressed: () => _handleSave(context),
+                  onPressed: _handleSave,
                 ),
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert),
-                  onSelected: (value) {
-                    if (value == 'refresh') {
-                      vm.loadInputs(widget.noProduksi, force: true);
-                      _showSnack('Data di-refresh');
-                    } else if (value == 'clear_temp') {
-                      if (vm.totalTempCount > 0) {
-                        showDialog(
-                          context: context,
-                          builder: (_) => AlertDialog(
-                            title: const Text('Hapus Semua Temp?'),
-                            content: Text(
-                                'Apakah Anda yakin ingin menghapus ${vm.totalTempCount} item temp?'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context),
-                                child: const Text('Batal'),
-                              ),
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red,
-                                  foregroundColor: Colors.white,
-                                ),
-                                onPressed: () {
-                                  vm.clearAllTempItems();
-                                  Navigator.pop(context);
-                                  _showSnack('Semua temp items dihapus');
-                                },
-                                child: const Text('Hapus'),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'refresh',
-                      child: Row(
-                        children: [
-                          Icon(Icons.refresh, size: 20),
-                          SizedBox(width: 8),
-                          Text('Refresh Data'),
-                        ],
-                      ),
-                    ),
-                    if (vm.totalTempCount > 0)
-                      PopupMenuItem(
-                        value: 'clear_temp',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete_sweep,
-                                size: 20, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('Hapus Semua Temp',
-                                style: TextStyle(color: Colors.red)),
-                          ],
-                        ),
-                      ),
-                  ],
+                const SizedBox(width: 4),
+                IconButton(
+                  tooltip: 'Hapus Semua Temp',
+                  onPressed: vm.totalTempCount > 0 ? _confirmClearTemp : null,
+                  icon: Icon(
+                    Icons.delete_sweep,
+                    size: 20,
+                    color: vm.totalTempCount > 0
+                        ? Colors.red.shade700
+                        : Colors.grey.shade400,
+                  ),
                 ),
               ],
             ),
-            body: Builder(
-              builder: (_) {
-                if (err != null) {
-                  return Center(child: Text('Gagal memuat inputs:\n$err'));
-                }
+          ),
+          const Divider(height: 1, color: _kGilinganBorder),
 
-                // ===== MERGE DB + TEMP =====
-                final brokerAll = loading
-                    ? <BrokerItem>[]
-                    : [
-                  ...vm.tempBroker.reversed,
-                  ...vm.tempBrokerPartial.reversed,
-                  ...?inputs?.broker,
-                ];
-
-                final bonggolanAll = loading
-                    ? <BonggolanItem>[]
-                    : [
-                  ...vm.tempBonggolan.reversed,
-                  ...?inputs?.bonggolan,
-                ];
-
-                final crusherAll = loading
-                    ? <CrusherItem>[]
-                    : [
-                  ...vm.tempCrusher.reversed,
-                  ...?inputs?.crusher,
-                ];
-
-                final rejectAll = loading
-                    ? <RejectItem>[]
-                    : [
-                  ...vm.tempReject.reversed,
-                  ...vm.tempRejectPartial.reversed,
-                  ...?inputs?.reject,
-                ];
-
-                // ===== GROUPS =====
-                final brokerGroups = groupBy(brokerAll, brokerTitleKey);
-                final bonggolanGroups = groupBy(
-                  bonggolanAll,
-                      (BonggolanItem e) => e.noBonggolan ?? '-',
-                );
-                final crusherGroups = groupBy(
-                  crusherAll,
-                      (CrusherItem e) => e.noCrusher ?? '-',
-                );
-                final rejectGroups = groupBy(rejectAll, rejectTitleKey);
-
-                return Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    children: [
-                      // === KIRI: Scan / Manual ===
-                      SizedBox(
-                        width: 380,
-                        child: SectionInputCard(
-                          title: 'Input via Scan / Manual',
-                          modeLabel: 'Pilih Mode',
-                          modeItems: const [
-                            DropdownMenuItem(value: 'full', child: Text('FULL PALLET')),
-                            DropdownMenuItem(value: 'select', child: Text('SEBAGIAN PALLET')),
-                            DropdownMenuItem(value: 'partial', child: Text('PARTIAL')),
-                          ],
-                          selectedMode: _selectedMode,
-                          manualHint: 'X.XXXXXXXXXX',
-                          isProcessing: vm.isLookupLoading,
-                          isLocked: locked,
-                          onModeChanged: (mode) => setState(() => _selectedMode = mode),
-                          onCodeScanned: (code) => _onCodeReady(context, code),
-                        ),
+          // ── Panel body ────────────────────────────────────────────────
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ProductionFolderTabBar(
+                    selectedValue: _selectedInputTab,
+                    accentColor: _kGilinganPrimary,
+                    tabs: [
+                      ProductionTabItem(
+                        value: 'broker',
+                        label: 'Broker',
+                        count: brokerGroups.length,
                       ),
-
-                      const SizedBox(width: 12),
-
-                      // === KANAN: 4 Cards ===
-                      Expanded(
-                        child: Column(
-                          children: [
-                            Expanded(
-                              child: Row(
-                                children: [
-                                  // BROKER
-                                  Expanded(
-                                    child: _buildCardBroker(
-                                      loading: loading,
-                                      canDelete: canDelete,
-                                      groups: brokerGroups,
-                                      vm: vm,
-                                      inputs: inputs,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  // BONGGOLAN
-                                  Expanded(
-                                    child: _buildCardBonggolan(
-                                      loading: loading,
-                                      canDelete: canDelete,
-                                      groups: bonggolanGroups,
-                                      vm: vm,
-                                      inputs: inputs,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  // CRUSHER
-                                  Expanded(
-                                    child: _buildCardCrusher(
-                                      loading: loading,
-                                      canDelete: canDelete,
-                                      groups: crusherGroups,
-                                      vm: vm,
-                                      inputs: inputs,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  // REJECT
-                                  Expanded(
-                                    child: _buildCardReject(
-                                      loading: loading,
-                                      canDelete: canDelete,
-                                      groups: rejectGroups,
-                                      vm: vm,
-                                      inputs: inputs,
-                                      onBulkDelete: _handleBulkDelete,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            // const SizedBox(height: 12),
-                            // Expanded(
-                            //   child: Row(
-                            //     children: [
-                            //
-                            //     ],
-                            //   ),
-                            // ),
-                          ],
-                        ),
+                      ProductionTabItem(
+                        value: 'bonggolan',
+                        label: 'Bonggolan',
+                        count: bonggolGroups.length,
+                      ),
+                      ProductionTabItem(
+                        value: 'crusher',
+                        label: 'Crusher',
+                        count: crusherGroups.length,
+                      ),
+                      ProductionTabItem(
+                        value: 'reject',
+                        label: 'Reject',
+                        count: rejectGroups.length,
                       ),
                     ],
+                    onChanged: (value) {
+                      if (_selectedInputTab == value) return;
+                      setState(() => _selectedInputTab = value);
+                    },
                   ),
-                );
-              },
+                  Expanded(
+                    child: ProductionInputCategoryBlock(
+                      color: _kGilinganPrimary,
+                      isLoading: loading,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: LayoutBuilder(
+                              builder: (context, constraints) => SizedBox(
+                                width: constraints.maxWidth,
+                                child: _buildSelectedTabContent(
+                                  vm: vm,
+                                  canDelete: canDelete,
+                                  brokerGroups: brokerGroups,
+                                  bonggolGroups: bonggolGroups,
+                                  crusherGroups: crusherGroups,
+                                  rejectGroups: rejectGroups,
+                                  inputs: inputs,
+                                  maxWidth: constraints.maxWidth,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    ProductionCategorySummaryTile(
+                                      summary: selectedSummary,
+                                      accentColor: _kGilinganPrimary,
+                                    ),
+                                    const SizedBox(height: 10),
+                                    ProductionInputGrandTotalBar(
+                                      totalLabel: grandLabel,
+                                      totalSak: grandSak,
+                                      totalBerat: grandBerat,
+                                      color: _kGilinganPrimary,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              FloatingActionButton(
+                                heroTag: 'fab_scan_gilingan',
+                                mini: true,
+                                backgroundColor: locked
+                                    ? Colors.grey.shade300
+                                    : _kGilinganPrimary,
+                                foregroundColor: Colors.white,
+                                onPressed: locked || vm.isLookupLoading
+                                    ? null
+                                    : _openScanDialog,
+                                child: vm.isLookupLoading
+                                    ? const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Icon(Icons.qr_code_scanner),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSelectedTabContent({
+    required GilinganProductionInputViewModel vm,
+    required bool canDelete,
+    required Map<String, List<BrokerItem>> brokerGroups,
+    required Map<String, List<BonggolanItem>> bonggolGroups,
+    required Map<String, List<CrusherItem>> crusherGroups,
+    required Map<String, List<RejectItem>> rejectGroups,
+    required GilinganInputs? inputs,
+    required double maxWidth,
+  }) {
+    final crossAxisCount = maxWidth < 380 ? 2 : 3;
+    switch (_selectedInputTab) {
+      case 'broker':
+        return _buildBrokerTab(
+          vm: vm,
+          canDelete: canDelete,
+          groups: brokerGroups,
+          inputs: inputs,
+          crossAxisCount: crossAxisCount,
+        );
+      case 'bonggolan':
+        return _buildBonggolTab(
+          vm: vm,
+          canDelete: canDelete,
+          groups: bonggolGroups,
+          inputs: inputs,
+          crossAxisCount: crossAxisCount,
+        );
+      case 'crusher':
+        return _buildCrusherTab(
+          vm: vm,
+          canDelete: canDelete,
+          groups: crusherGroups,
+          inputs: inputs,
+          crossAxisCount: crossAxisCount,
+        );
+      default:
+        return _buildRejectTab(
+          vm: vm,
+          canDelete: canDelete,
+          groups: rejectGroups,
+          inputs: inputs,
+          crossAxisCount: crossAxisCount,
+        );
+    }
+  }
+
+  // ── Broker tab ─────────────────────────────────────────────────────────────
+
+  Widget _buildBrokerTab({
+    required GilinganProductionInputViewModel vm,
+    required bool canDelete,
+    required Map<String, List<BrokerItem>> groups,
+    required GilinganInputs? inputs,
+    required int crossAxisCount,
+  }) {
+    final grid = groups.isEmpty
+        ? const Center(
+            child: Text('Tidak ada data', style: TextStyle(fontSize: 11)),
+          )
+        : GridView(
+            padding: const EdgeInsets.all(6),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: 6,
+              mainAxisSpacing: 6,
+              mainAxisExtent: 72,
+            ),
+            children: groups.entries.map((entry) {
+              final hasPartial = entry.value.any((x) => x.isPartialRow);
+              return ProductionInputGroupTile(
+                title: entry.key,
+                headerSubtitle:
+                    (entry.value.isNotEmpty
+                        ? entry.value.first.namaJenis
+                        : '-') ??
+                    '-',
+                tileMetrics: [
+                  (Icons.inventory_2_outlined, '${entry.value.length} sak'),
+                  (
+                    Icons.scale_outlined,
+                    '${num2(entry.value.fold<double>(0.0, (s, i) => s + (i.berat ?? 0.0)))} kg',
+                  ),
+                ],
+                color: _kGilinganPrimary,
+                isTemp: vm.hasTemporaryDataForLabel(entry.key),
+                expandable: !hasPartial,
+                isPartialGroup: hasPartial,
+                detailsBuilder: () => [],
+                chipItemsBuilder: () {
+                  final dbItems = inputs == null
+                      ? <BrokerItem>[]
+                      : inputs.broker.where(
+                          (x) => brokerTitleKey(x) == entry.key,
+                        );
+                  final tempFull = vm.tempBroker.where(
+                    (x) => brokerTitleKey(x) == entry.key,
+                  );
+                  final tempPart = vm.tempBrokerPartial.where(
+                    (x) => brokerTitleKey(x) == entry.key,
+                  );
+                  final items = [...tempPart, ...dbItems, ...tempFull];
+                  return items.map((item) {
+                    final isTemp =
+                        vm.tempBroker.contains(item) ||
+                        vm.tempBrokerPartial.contains(item);
+                    return ProductionSakChip(
+                      label: 'Sak ${item.noSak ?? '-'}',
+                      berat: item.berat,
+                      isTemp: isTemp,
+                      isPartial: item.isPartialRow,
+                      onDelete: isTemp
+                          ? () => vm.deleteTempBrokerItem(item)
+                          : null,
+                    );
+                  }).toList();
+                },
+              );
+            }).toList(),
+          );
+    return ProductionOutputCategoryContent(
+      footer: const SizedBox.shrink(),
+      child: grid,
+    );
+  }
+
+  // ── Bonggolan tab ──────────────────────────────────────────────────────────
+
+  Widget _buildBonggolTab({
+    required GilinganProductionInputViewModel vm,
+    required bool canDelete,
+    required Map<String, List<BonggolanItem>> groups,
+    required GilinganInputs? inputs,
+    required int crossAxisCount,
+  }) {
+    final grid = groups.isEmpty
+        ? const Center(
+            child: Text('Tidak ada data', style: TextStyle(fontSize: 11)),
+          )
+        : GridView(
+            padding: const EdgeInsets.all(6),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: 6,
+              mainAxisSpacing: 6,
+              mainAxisExtent: 72,
+            ),
+            children: groups.entries.map((entry) {
+              return ProductionInputGroupTile(
+                title: entry.key,
+                headerSubtitle: 'Bonggolan',
+                tileMetrics: [
+                  (Icons.category_outlined, '${entry.value.length} item'),
+                  (
+                    Icons.scale_outlined,
+                    '${num2(entry.value.fold<double>(0.0, (s, i) => s + (i.berat ?? 0.0)))} kg',
+                  ),
+                ],
+                color: _kGilinganPrimary,
+                isTemp: vm.hasTemporaryDataForLabel(entry.key),
+                expandable: true,
+                detailsBuilder: () => [],
+                chipItemsBuilder: () {
+                  final dbItems = inputs == null
+                      ? <BonggolanItem>[]
+                      : inputs.bonggolan.where(
+                          (x) => (x.noBonggolan ?? '-') == entry.key,
+                        );
+                  final tempItems = vm.tempBonggolan.where(
+                    (x) => (x.noBonggolan ?? '-') == entry.key,
+                  );
+                  final items = [...dbItems, ...tempItems];
+                  return items.map((item) {
+                    final isTemp = vm.tempBonggolan.contains(item);
+                    return ProductionSakChip(
+                      label: '${num2(item.berat)} kg',
+                      berat: item.berat,
+                      isTemp: isTemp,
+                      onDelete: isTemp
+                          ? () => vm.deleteTempBonggolanItem(item)
+                          : null,
+                    );
+                  }).toList();
+                },
+              );
+            }).toList(),
+          );
+    return ProductionOutputCategoryContent(
+      footer: const SizedBox.shrink(),
+      child: grid,
+    );
+  }
+
+  // ── Crusher tab ────────────────────────────────────────────────────────────
+
+  Widget _buildCrusherTab({
+    required GilinganProductionInputViewModel vm,
+    required bool canDelete,
+    required Map<String, List<CrusherItem>> groups,
+    required GilinganInputs? inputs,
+    required int crossAxisCount,
+  }) {
+    final grid = groups.isEmpty
+        ? const Center(
+            child: Text('Tidak ada data', style: TextStyle(fontSize: 11)),
+          )
+        : GridView(
+            padding: const EdgeInsets.all(6),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: 6,
+              mainAxisSpacing: 6,
+              mainAxisExtent: 72,
+            ),
+            children: groups.entries.map((entry) {
+              return ProductionInputGroupTile(
+                title: entry.key,
+                headerSubtitle:
+                    (entry.value.isNotEmpty
+                        ? entry.value.first.namaJenis
+                        : '-') ??
+                    '-',
+                tileMetrics: [
+                  (Icons.category_outlined, '${entry.value.length} item'),
+                  (
+                    Icons.scale_outlined,
+                    '${num2(entry.value.fold<double>(0.0, (s, i) => s + (i.berat ?? 0.0)))} kg',
+                  ),
+                ],
+                color: _kGilinganPrimary,
+                isTemp: vm.hasTemporaryDataForLabel(entry.key),
+                expandable: true,
+                detailsBuilder: () => [],
+                chipItemsBuilder: () {
+                  final dbItems = inputs == null
+                      ? <CrusherItem>[]
+                      : inputs.crusher.where(
+                          (x) => (x.noCrusher ?? '-') == entry.key,
+                        );
+                  final tempItems = vm.tempCrusher.where(
+                    (x) => (x.noCrusher ?? '-') == entry.key,
+                  );
+                  final items = [...dbItems, ...tempItems];
+                  return items.map((item) {
+                    final isTemp = vm.tempCrusher.contains(item);
+                    return ProductionSakChip(
+                      label: '${num2(item.berat)} kg',
+                      berat: item.berat,
+                      isTemp: isTemp,
+                      onDelete: isTemp
+                          ? () => vm.deleteTempCrusherItem(item)
+                          : null,
+                    );
+                  }).toList();
+                },
+              );
+            }).toList(),
+          );
+    return ProductionOutputCategoryContent(
+      footer: const SizedBox.shrink(),
+      child: grid,
+    );
+  }
+
+  // ── Reject tab ─────────────────────────────────────────────────────────────
+
+  Widget _buildRejectTab({
+    required GilinganProductionInputViewModel vm,
+    required bool canDelete,
+    required Map<String, List<RejectItem>> groups,
+    required GilinganInputs? inputs,
+    required int crossAxisCount,
+  }) {
+    final grid = groups.isEmpty
+        ? const Center(
+            child: Text('Tidak ada data', style: TextStyle(fontSize: 11)),
+          )
+        : GridView(
+            padding: const EdgeInsets.all(6),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: 6,
+              mainAxisSpacing: 6,
+              mainAxisExtent: 72,
+            ),
+            children: groups.entries.map((entry) {
+              final hasPartial = entry.value.any((x) => x.isPartialRow);
+              return ProductionInputGroupTile(
+                title: entry.key,
+                headerSubtitle:
+                    (entry.value.isNotEmpty
+                        ? entry.value.first.namaJenis
+                        : '-') ??
+                    '-',
+                tileMetrics: [
+                  (Icons.inventory_2_outlined, '${entry.value.length} item'),
+                  (
+                    Icons.scale_outlined,
+                    '${num2(entry.value.fold<double>(0.0, (s, i) => s + (i.berat ?? 0.0)))} kg',
+                  ),
+                ],
+                color: _kGilinganPrimary,
+                isTemp: vm.hasTemporaryDataForLabel(entry.key),
+                expandable: !hasPartial,
+                isPartialGroup: hasPartial,
+                detailsBuilder: () => [],
+                chipItemsBuilder: () {
+                  final dbItems = inputs == null
+                      ? <RejectItem>[]
+                      : inputs.reject.where(
+                          (x) => rejectTitleKey(x) == entry.key,
+                        );
+                  final tempFull = vm.tempReject.where(
+                    (x) => rejectTitleKey(x) == entry.key,
+                  );
+                  final tempPart = vm.tempRejectPartial.where(
+                    (x) => rejectTitleKey(x) == entry.key,
+                  );
+                  final items = [...tempPart, ...dbItems, ...tempFull];
+                  return items.map((item) {
+                    final isTemp =
+                        vm.tempReject.contains(item) ||
+                        vm.tempRejectPartial.contains(item);
+                    return ProductionSakChip(
+                      label: '${num2(item.berat)} kg',
+                      berat: item.berat,
+                      isTemp: isTemp,
+                      isPartial: item.isPartialRow,
+                      onDelete: isTemp
+                          ? () => vm.deleteTempRejectItem(item)
+                          : null,
+                    );
+                  }).toList();
+                },
+              );
+            }).toList(),
+          );
+    return ProductionOutputCategoryContent(
+      footer: const SizedBox.shrink(),
+      child: grid,
+    );
+  }
+
+  // ── Split / Ganti jenis ────────────────────────────────────────────────────
+
+  Future<void> _openSplitDialog() async {
+    if (!mounted) return;
+    await ProductionFlowHelpers.openSplitAndReplace<
+      ({GilinganProduction prod, String namaJenis})
+    >(
+      context: context,
+      idMesin: widget.idMesin,
+      tanggal: widget.tglProduksi,
+      onMissingContext: () => _showSnack(
+        'Data mesin/tanggal tidak tersedia',
+        backgroundColor: Colors.orange,
+      ),
+      showSplitDialog: (idMesin, tgl) {
+        return showDialog<({GilinganProduction prod, String namaJenis})>(
+          context: context,
+          barrierDismissible: true,
+          builder: (_) => ChangeNotifierProvider(
+            create: (_) =>
+                GilinganTypeViewModel(repository: GilinganTypeRepository()),
+            child:
+                ProductionGantiProduksiDialog<
+                  ({GilinganProduction prod, String namaJenis}),
+                  GilinganType
+                >(
+                  tanggal: tgl,
+                  shift: widget.shift ?? 1,
+                  primaryColor: _kGilinganPrimary,
+                  borderColor: _kGilinganBorder,
+                  jenisRequiredMessage: 'Pilih jenis gilingan terlebih dahulu',
+                  submitLabel: 'Ganti Produksi',
+                  dropdownBuilder: (selected, onChanged) =>
+                      GilinganTypeDropdown(
+                        preselectId: selected?.idGilingan,
+                        onChanged: onChanged,
+                      ),
+                  jenisNameOf: (j) => j.namaGilingan,
+                  onSubmit: (hourStart, jenis) async {
+                    final body = await _repo.splitTime(
+                      idMesin: idMesin,
+                      tanggal: tgl,
+                      hourStart: hourStart,
+                      outputJenisId: jenis.idGilingan,
+                    );
+                    final data = body['data'] as Map<String, dynamic>? ?? {};
+                    final header =
+                        data['header'] as Map<String, dynamic>? ?? {};
+                    final prod = GilinganProduction.fromJson(header);
+                    return (prod: prod, namaJenis: jenis.namaGilingan);
+                  },
+                ),
+          ),
+        );
+      },
+      beforeReplace: () {
+        _isReplacing = true;
+        AppShell.breadcrumb.value = _prevBreadcrumb;
+      },
+      replaceToResult: (splitResult) async {
+        if (!mounted) return;
+        final newProd = splitResult.prod;
+        final namaJenis = splitResult.namaJenis.isNotEmpty
+            ? splitResult.namaJenis
+            : (newProd.outputJenisNama ?? '');
+        await Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => GilinganProductionInputScreen(
+              noProduksi: newProd.noProduksi,
+              idMesin: newProd.idMesin,
+              shift: newProd.shift,
+              tglProduksi: newProd.tglProduksi,
+              isLocked: false,
+              lastClosedDate: null,
+              outputJenisId: newProd.outputJenisId,
+              namaJenis: namaJenis,
             ),
           ),
         );
@@ -550,369 +1062,332 @@ class _GilinganProductionInputScreenState
     );
   }
 
-  // ---------------- UI Builders ----------------
+  // ── Add output dialog ──────────────────────────────────────────────────────
 
-  Widget _buildCardBroker({
-    required bool loading,
-    required bool canDelete,
-    required Map<String, List<BrokerItem>> groups,
-    required GilinganProductionInputViewModel vm,
-    required GilinganInputs? inputs,
+  Future<void> _openAddOutputDialog(
+    int? outputJenisId,
+    String? namaJenis,
+  ) async {
+    if (outputJenisId == null) {
+      _showSnack(
+        'Jenis output belum dikonfigurasi pada produksi ini.',
+        backgroundColor: Colors.orange,
+      );
+      return;
+    }
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => GilinganProductionOutputFormDialog(
+        noProduksi: widget.noProduksi,
+        idJenis: outputJenisId,
+        namaJenis: namaJenis ?? '',
+        repository: _repo,
+      ),
+    );
+    if (result == true && mounted) {
+      context.read<GilinganProductionInputViewModel>().loadOutputs(
+        widget.noProduksi,
+        force: true,
+      );
+    }
+  }
+
+  // ── Output section ─────────────────────────────────────────────────────────
+
+  static const _kGilinganOutputColor = Color(0xFF00796B);
+
+  Widget _buildOutputSection({
+    required List<GilinganOutput> outputs,
+    required bool isLoading,
+    required String? error,
+    required int? outputJenisId,
+    required String? namaJenis,
   }) {
-    return SectionCard(
-      title: 'Broker',
-      count: groups.length,
-      color: Colors.blue,
-      isLoading: loading,
-      summaryBuilder: () {
-        int totalSak = 0;
-        double totalBerat = 0.0;
-        for (final entry in groups.entries) {
-          for (final item in entry.value) {
-            totalSak += 1;
-            totalBerat += (item.berat ?? 0.0);
-          }
-        }
-        return SectionSummary(
-          totalData: groups.length,
-          totalSak: totalSak,
-          totalBerat: totalBerat,
-        );
-      },
-      child: groups.isEmpty
-          ? const Center(
-          child: Text('Tidak ada data', style: TextStyle(fontSize: 11)))
-          : ListView(
-        padding: const EdgeInsets.all(8),
-        children: groups.entries.map((entry) {
-          final hasPartial = entry.value.any((x) => x.isPartialRow);
-          final headers = hasPartial
-              ? const ['Label', 'Sak', 'Berat', 'Action']
-              : const ['Sak', 'Berat', 'Action'];
-          final columnFlexes =
-          hasPartial ? const [3, 1, 2] : const [1, 2];
+    final totalBerat = outputs.fold<double>(0.0, (s, o) => s + o.berat);
 
-          return GroupTooltipAnchorTile(
-            title: entry.key,
-            headerSubtitle:
-            (entry.value.isNotEmpty ? entry.value.first.namaJenis : '-') ??
-                '-',
-            color: Colors.blue,
-            tableHeaders: headers,
-            columnFlexes: columnFlexes,
-            canDelete: canDelete,
-            onBulkDelete: (items) => _handleBulkDelete(items),
-            summaryBuilder: () {
-              double totalBerat = 0.0;
-              for (final item in entry.value) {
-                totalBerat += (item.berat ?? 0.0);
-              }
-              return TooltipSummary(totalBerat: totalBerat);
-            },
-            detailsBuilder: () {
-              final dbItems = inputs == null
-                  ? <BrokerItem>[]
-                  : inputs.broker.where((x) => brokerTitleKey(x) == entry.key).toList();
-
-              final tempFull = vm.tempBroker
-                  .where((x) => brokerTitleKey(x) == entry.key)
-                  .toList();
-
-              final tempPart = vm.tempBrokerPartial
-                  .where((x) => brokerTitleKey(x) == entry.key)
-                  .toList();
-
-              final items = <BrokerItem>[
-                ...tempPart,
-                ...dbItems,
-                ...tempFull,
-              ];
-
-              return items.map((item) {
-                final isTemp =
-                    vm.tempBroker.contains(item) ||
-                        vm.tempBrokerPartial.contains(item);
-
-                final columns = hasPartial
-                    ? <String>[
-                  item.isPartialRow ? (item.noBroker ?? '-') : '-',
-                  '${item.noSak ?? '-'}',
-                  '${num2(item.berat)} kg',
-                ]
-                    : <String>[
-                  '${item.noSak ?? '-'}',
-                  '${num2(item.berat)} kg',
-                ];
-
-                return TooltipTableRow(
-                  columns: columns,
-                  columnFlexes: columnFlexes,
-                  showDelete: isTemp,
-                  onDelete: isTemp ? () => vm.deleteTempBrokerItem(item) : null,
-                  isTempRow: isTemp,
-                  isHighlighted: isTemp,
-                  isDisabled: !isTemp && !canDelete,
-                  itemData: item,
-                );
-              }).toList();
-            },
-          );
-        }).toList(),
+    return Container(
+      decoration: productionPanelDecoration(
+        borderColor: _kGilinganOutputColor.withValues(alpha: 0.3),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+            child: Row(
+              children: [
+                productionSectionHeader(
+                  Icons.output_rounded,
+                  'Label Output',
+                  iconColor: _kGilinganOutputColor,
+                  primaryColor: _kGilinganPrimary,
+                ),
+                const Spacer(),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: _kGilinganBorder),
+          Expanded(
+            child: isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (error != null) ...[
+                          ProductionOutputErrorBanner(message: error),
+                          const SizedBox(height: 10),
+                        ],
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ProductionFolderTabBar(
+                                selectedValue: 'gilingan',
+                                accentColor: _kGilinganOutputColor,
+                                tabs: [
+                                  ProductionTabItem(
+                                    value: 'gilingan',
+                                    label: 'Gilingan',
+                                    count: outputs.length,
+                                  ),
+                                ],
+                                onChanged: (_) {},
+                              ),
+                            ),
+                          ],
+                        ),
+                        Expanded(
+                          child: ProductionInputCategoryBlock(
+                            color: _kGilinganOutputColor,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Expanded(
+                                  child: LayoutBuilder(
+                                    builder: (context, constraints) =>
+                                        ProductionOutputCategoryContent(
+                                          footer: const SizedBox.shrink(),
+                                          child: outputs.isEmpty
+                                              ? const Center(
+                                                  child: Text(
+                                                    'Belum ada output gilingan',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Color(0xFF9CA3AF),
+                                                    ),
+                                                  ),
+                                                )
+                                              : GridView(
+                                                  padding: const EdgeInsets.all(
+                                                    6,
+                                                  ),
+                                                  gridDelegate:
+                                                      SliverGridDelegateWithFixedCrossAxisCount(
+                                                        crossAxisCount:
+                                                            constraints
+                                                                    .maxWidth <
+                                                                380
+                                                            ? 2
+                                                            : 3,
+                                                        crossAxisSpacing: 6,
+                                                        mainAxisSpacing: 6,
+                                                        mainAxisExtent: 78,
+                                                      ),
+                                                  children: outputs
+                                                      .map(
+                                                        (o) =>
+                                                            GilinganOutputTile(
+                                                              output: o,
+                                                            ),
+                                                      )
+                                                      .toList(),
+                                                ),
+                                        ),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          GilinganOutputSummaryTile(
+                                            totalLabel: outputs.length,
+                                            totalBerat: totalBerat,
+                                          ),
+                                          const SizedBox(height: 10),
+                                          GilinganOutputGrandTotalBar(
+                                            totalLabel: outputs.length,
+                                            totalBerat: totalBerat,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    FloatingActionButton(
+                                      heroTag: 'fab_add_gilingan_output',
+                                      mini: true,
+                                      backgroundColor: _kGilinganOutputColor,
+                                      foregroundColor: Colors.white,
+                                      onPressed: () => _openAddOutputDialog(
+                                        outputJenisId,
+                                        namaJenis,
+                                      ),
+                                      child: const Icon(Icons.add),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildCardBonggolan({
-    required bool loading,
-    required bool canDelete,
-    required Map<String, List<BonggolanItem>> groups,
-    required GilinganProductionInputViewModel vm,
-    required GilinganInputs? inputs,
-  }) {
-    return SectionCard(
-      title: 'Bonggolan',
-      count: groups.length,
-      color: Colors.blue,
-      isLoading: loading,
-      summaryBuilder: () {
-        int totalSak = 0;
-        double totalBerat = 0.0;
-        for (final entry in groups.entries) {
-          for (final item in entry.value) {
-            totalSak += 1;
-            totalBerat += (item.berat ?? 0.0);
-          }
-        }
-        return SectionSummary(
-          totalData: groups.length,
-          totalSak: totalSak,
-          totalBerat: totalBerat,
-        );
-      },
-      child: groups.isEmpty
-          ? const Center(
-          child: Text('Tidak ada data', style: TextStyle(fontSize: 11)))
-          : ListView(
-        padding: const EdgeInsets.all(8),
-        children: groups.entries.map((entry) {
-          return GroupTooltipAnchorTile(
-            title: entry.key,
-            headerSubtitle:
-            (entry.value.isNotEmpty ? entry.value.first.namaJenis : '-') ??
-                '-',
-            color: Colors.blue,
-            tableHeaders: const ['Berat', 'Action'],
-            canDelete: canDelete,
-            onBulkDelete: (items) => _handleBulkDelete(items),
-            detailsBuilder: () {
-              final dbItems = inputs == null
-                  ? <BonggolanItem>[]
-                  : inputs.bonggolan
-                  .where((x) => (x.noBonggolan ?? '-') == entry.key)
-                  .toList();
+  // ── Build ──────────────────────────────────────────────────────────────────
 
-              final tempItems = vm.tempBonggolan
-                  .where((x) => (x.noBonggolan ?? '-') == entry.key)
-                  .toList();
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<GilinganProductionInputViewModel>(
+      builder: (context, vm, _) {
+        final loading = vm.isInputsLoading(widget.noProduksi);
+        final err = vm.inputsError(widget.noProduksi);
+        final inputs = vm.inputsOf(widget.noProduksi);
+        final perm = context.watch<PermissionViewModel>();
+        final locked = widget.isLocked == true;
 
-              final items = <BonggolanItem>[
-                ...dbItems,
-                ...tempItems,
+        final canDelete = perm.can('label_washing:delete') && !locked;
+
+        final outputs = vm.outputsOf(widget.noProduksi) ?? [];
+        final outputLoading = vm.isOutputsLoading(widget.noProduksi);
+        final outputErr = vm.outputsError(widget.noProduksi);
+
+        final brokerAll = loading
+            ? <BrokerItem>[]
+            : [
+                ...vm.tempBroker.reversed,
+                ...vm.tempBrokerPartial.reversed,
+                ...?inputs?.broker,
+              ];
+        final bonggolAll = loading
+            ? <BonggolanItem>[]
+            : [...vm.tempBonggolan, ...?inputs?.bonggolan];
+        final crusherAll = loading
+            ? <CrusherItem>[]
+            : [...vm.tempCrusher, ...?inputs?.crusher];
+        final rejectAll = loading
+            ? <RejectItem>[]
+            : [
+                ...vm.tempReject.reversed,
+                ...vm.tempRejectPartial.reversed,
+                ...?inputs?.reject,
               ];
 
-              return items.map((item) {
-                final isTemp = vm.tempBonggolan.contains(item);
-                return TooltipTableRow(
-                  columns: ['${num2(item.berat)} kg'],
-                  showDelete: isTemp,
-                  onDelete:
-                  isTemp ? () => vm.deleteTempBonggolanItem(item) : null,
-                  isTempRow: isTemp,
-                  isHighlighted: isTemp,
-                  isDisabled: !isTemp && !canDelete,
-                  itemData: item,
-                );
-              }).toList();
-            },
-          );
-        }).toList(),
-      ),
-    );
-  }
+        final brokerGroups = groupBy(brokerAll, brokerTitleKey);
+        final bonggolGroups = groupBy(
+          bonggolAll,
+          (BonggolanItem e) => e.noBonggolan ?? '-',
+        );
+        final crusherGroups = groupBy(
+          crusherAll,
+          (CrusherItem e) => e.noCrusher ?? '-',
+        );
+        final rejectGroups = groupBy(rejectAll, rejectTitleKey);
 
-  Widget _buildCardCrusher({
-    required bool loading,
-    required bool canDelete,
-    required Map<String, List<CrusherItem>> groups,
-    required GilinganProductionInputViewModel vm,
-    required GilinganInputs? inputs,
-  }) {
-    return SectionCard(
-      title: 'Crusher',
-      count: groups.length,
-      color: Colors.blue,
-      isLoading: loading,
-      summaryBuilder: () {
-        int totalSak = 0;
-        double totalBerat = 0.0;
-        for (final entry in groups.entries) {
-          for (final item in entry.value) {
-            totalSak += 1;
-            totalBerat += (item.berat ?? 0.0);
-          }
-        }
-        return SectionSummary(
-          totalData: groups.length,
-          totalSak: totalSak,
-          totalBerat: totalBerat,
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) async {
+            if (didPop) return;
+            final nav = Navigator.of(
+              this.context,
+            ); // ignore: use_build_context_synchronously
+            final canPop = await _onWillPop();
+            if (canPop && mounted) nav.pop();
+          },
+          child: Scaffold(
+            backgroundColor: _kGilinganSurface,
+            resizeToAvoidBottomInset: false,
+            body: Column(
+              children: [
+                ProductionWorkspaceToolbar(
+                  noProduksi: widget.noProduksi,
+                  isLocked: locked,
+                  primaryColor: _kGilinganPrimary,
+                  idMesin: widget.idMesin,
+                  tglProduksi: widget.tglProduksi,
+                  shift: widget.shift,
+                  namaJenis: widget.namaJenis,
+                  onRefresh: () {
+                    vm.loadInputs(widget.noProduksi, force: true);
+                    _showSnack('Data di-refresh');
+                  },
+                  onGanti: locked ? null : _openSplitDialog,
+                ),
+                Expanded(
+                  child: Builder(
+                    builder: (_) {
+                      if (err != null) {
+                        return Center(
+                          child: Text('Gagal memuat inputs:\n$err'),
+                        );
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: _buildInputPanel(
+                                vm: vm,
+                                locked: locked,
+                                loading: loading,
+                                canDelete: canDelete,
+                                brokerGroups: brokerGroups,
+                                bonggolGroups: bonggolGroups,
+                                crusherGroups: crusherGroups,
+                                rejectGroups: rejectGroups,
+                                inputs: inputs,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _buildOutputSection(
+                                outputs: outputs,
+                                isLoading: outputLoading,
+                                error: outputErr,
+                                outputJenisId:
+                                    widget.outputJenisId ??
+                                    (outputs.isNotEmpty
+                                        ? outputs.first.idJenis
+                                        : null),
+                                namaJenis:
+                                    widget.namaJenis ??
+                                    (outputs.isNotEmpty
+                                        ? outputs.first.namaJenis
+                                        : null),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
         );
       },
-      child: groups.isEmpty
-          ? const Center(
-          child: Text('Tidak ada data', style: TextStyle(fontSize: 11)))
-          : ListView(
-        padding: const EdgeInsets.all(8),
-        children: groups.entries.map((entry) {
-          return GroupTooltipAnchorTile(
-            title: entry.key,
-            headerSubtitle:
-            (entry.value.isNotEmpty ? entry.value.first.namaJenis : '-') ??
-                '-',
-            color: Colors.blue,
-            tableHeaders: const ['Berat', 'Action'],
-            canDelete: canDelete,
-            onBulkDelete: (items) => _handleBulkDelete(items),
-            detailsBuilder: () {
-              final dbItems = inputs == null
-                  ? <CrusherItem>[]
-                  : inputs.crusher
-                  .where((x) => (x.noCrusher ?? '-') == entry.key)
-                  .toList();
-
-              final tempItems = vm.tempCrusher
-                  .where((x) => (x.noCrusher ?? '-') == entry.key)
-                  .toList();
-
-              final items = <CrusherItem>[
-                ...dbItems,
-                ...tempItems,
-              ];
-
-              return items.map((item) {
-                final isTemp = vm.tempCrusher.contains(item);
-                return TooltipTableRow(
-                  columns: ['${num2(item.berat)} kg'],
-                  showDelete: isTemp,
-                  onDelete:
-                  isTemp ? () => vm.deleteTempCrusherItem(item) : null,
-                  isTempRow: isTemp,
-                  isHighlighted: isTemp,
-                  isDisabled: !isTemp && !canDelete,
-                  itemData: item,
-                );
-              }).toList();
-            },
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildCardReject({
-    required bool loading,
-    required bool canDelete,
-    required Map<String, List<RejectItem>> groups,
-    required GilinganProductionInputViewModel vm,
-    required GilinganInputs? inputs,
-    required Future<bool> Function(List<dynamic>) onBulkDelete,
-  }) {
-    return SectionCard(
-      title: 'Reject',
-      count: groups.length,
-      color: Colors.blue,
-      isLoading: loading,
-      summaryBuilder: () {
-        int totalSak = 0;
-        double totalBerat = 0.0;
-        for (final entry in groups.entries) {
-          for (final item in entry.value) {
-            totalSak += 1;
-            totalBerat += (item.berat ?? 0.0);
-          }
-        }
-        return SectionSummary(
-          totalData: groups.length,
-          totalSak: totalSak,
-          totalBerat: totalBerat,
-        );
-      },
-      child: groups.isEmpty
-          ? const Center(
-          child: Text('Tidak ada data', style: TextStyle(fontSize: 11)))
-          : ListView(
-        padding: const EdgeInsets.all(8),
-        children: groups.entries.map((entry) {
-          final hasPartial = entry.value.any((x) => x.isPartialRow);
-
-          return GroupTooltipAnchorTile(
-            title: entry.key,
-            headerSubtitle:
-            (entry.value.isNotEmpty ? entry.value.first.namaJenis : '-') ??
-                '-',
-            color: Colors.blue,
-            tableHeaders:
-            hasPartial ? const ['Label', 'Berat', 'Action'] : const ['Berat', 'Action'],
-            canDelete: canDelete,
-            onBulkDelete: onBulkDelete,
-            detailsBuilder: () {
-              final dbItems = inputs == null
-                  ? <RejectItem>[]
-                  : inputs.reject
-                  .where((x) => rejectTitleKey(x) == entry.key)
-                  .toList();
-
-              final tempFull = vm.tempReject
-                  .where((x) => rejectTitleKey(x) == entry.key)
-                  .toList();
-
-              final tempPart = vm.tempRejectPartial
-                  .where((x) => rejectTitleKey(x) == entry.key)
-                  .toList();
-
-              final items = <RejectItem>[
-                ...tempPart,
-                ...dbItems,
-                ...tempFull,
-              ];
-
-              return items.map((item) {
-                final isTemp =
-                    vm.tempReject.contains(item) ||
-                        vm.tempRejectPartial.contains(item);
-
-                final columns = item.isPartialRow
-                    ? <String>[
-                  (item.noReject ?? '-'),
-                  '${num2(item.berat)} kg',
-                ]
-                    : <String>[
-                  '${num2(item.berat)} kg',
-                ];
-
-                return TooltipTableRow(
-                  columns: columns,
-                  showDelete: isTemp,
-                  onDelete: isTemp ? () => vm.deleteTempRejectItem(item) : null,
-                  isTempRow: isTemp,
-                  isHighlighted: isTemp,
-                  isDisabled: !isTemp && !canDelete,
-                  itemData: item,
-                );
-              }).toList();
-            },
-          );
-        }).toList(),
-      ),
     );
   }
 }

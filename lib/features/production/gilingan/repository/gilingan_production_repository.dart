@@ -228,13 +228,13 @@ class GilinganProductionRepository {
   Future<GilinganProduction> createProduksi({
     required DateTime tglProduksi,
     required int idMesin,
-    required int idOperator,
+    required List<int> idOperators,
     required int shift,
+    required double jam,
+    int? outputJenisId,
+    int? idRegu,
     String? hourStart,
     String? hourEnd,
-    String? checkBy1,
-    String? checkBy2,
-    String? approveBy,
     int? jmlhAnggota,
     int? hadir,
     double? hourMeter,
@@ -242,52 +242,42 @@ class GilinganProductionRepository {
     final token = await TokenStorage.getToken();
     final url = Uri.parse('$_base/api/production/gilingan');
 
-    final tglStr = toDbDateString(tglProduksi);
-
-    // helper kecil biar "08:00" -> "08:00:00"
-    String _normalizeTime(String v) {
+    String normalizeTime(String v) {
       final t = v.trim();
       if (t.isEmpty) return t;
-      if (t.length == 5) {
-        return '$t:00';
-      }
-      return t;
+      return t.length == 5 ? '$t:00' : t;
     }
 
-    final body = <String, String>{
-      'tglProduksi': tglStr,
-      'idMesin': idMesin.toString(),
-      'idOperator': idOperator.toString(),
-      'shift': shift.toString(),
+    final bodyMap = <String, dynamic>{
+      'tanggal': toDbDateString(tglProduksi),
+      'idMesin': idMesin,
+      'idOperators': idOperators,
+      'shift': shift,
+      'jam': jam,
+      if (outputJenisId != null) 'outputJenisId': outputJenisId,
+      if (idRegu != null) 'idRegu': idRegu,
       if (hourStart != null && hourStart.isNotEmpty)
-        'hourStart': _normalizeTime(hourStart),
+        'hourStart': normalizeTime(hourStart),
       if (hourEnd != null && hourEnd.isNotEmpty)
-        'hourEnd': _normalizeTime(hourEnd),
-      if (checkBy1 != null) 'checkBy1': checkBy1,
-      if (checkBy2 != null) 'checkBy2': checkBy2,
-      if (approveBy != null) 'approveBy': approveBy,
-      if (jmlhAnggota != null) 'jmlhAnggota': jmlhAnggota.toString(),
-      if (hadir != null) 'hadir': hadir.toString(),
-      if (hourMeter != null) 'hourMeter': hourMeter.toString(),
+        'hourEnd': normalizeTime(hourEnd),
+      if (jmlhAnggota != null) 'jmlhAnggota': jmlhAnggota,
+      if (hadir != null) 'hadir': hadir,
+      if (hourMeter != null) 'hourMeter': hourMeter,
     };
 
     final headers = {
       'Authorization': 'Bearer $token',
       'Accept': 'application/json',
-      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Type': 'application/json',
     };
 
     print('➡️ [POST] $url');
-    print('📦 form body (gilingan create): $body');
+    print('📦 body (gilingan create): $bodyMap');
 
     late http.Response res;
     try {
       res = await http
-          .post(
-        url,
-        headers: headers,
-        body: body,
-      )
+          .post(url, headers: headers, body: json.encode(bodyMap))
           .timeout(_timeout);
     } on TimeoutException {
       throw Exception('Timeout membuat gilingan produksi');

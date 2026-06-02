@@ -261,8 +261,11 @@ class GilinganProductionViewModel extends ChangeNotifier {
   Future<GilinganProduction?> createProduksi({
     required DateTime tglProduksi,
     required int idMesin,
-    required int idOperator,
+    required List<int> idOperators,
     required int shift,
+    required double jam,
+    int? outputJenisId,
+    int? idRegu,
     String? hourStart,
     String? hourEnd,
     int? jmlhAnggota,
@@ -270,7 +273,7 @@ class GilinganProductionViewModel extends ChangeNotifier {
     double? hourMeter,
   }) async {
     debugPrint(
-        '🆕 [GILINGAN_VM] createProduksi(tglProduksi=$tglProduksi, idMesin=$idMesin, idOperator=$idOperator, shift=$shift, hourStart=$hourStart, hourEnd=$hourEnd, jmlhAnggota=$jmlhAnggota, hadir=$hadir, hourMeter=$hourMeter), VM hash=$hashCode');
+        '🆕 [GILINGAN_VM] createProduksi(tglProduksi=$tglProduksi, idMesin=$idMesin, idOperators=$idOperators, shift=$shift, jam=$jam), VM hash=$hashCode');
     isSaving = true;
     saveError = null;
     notifyListeners();
@@ -279,8 +282,11 @@ class GilinganProductionViewModel extends ChangeNotifier {
       final created = await repository.createProduksi(
         tglProduksi: tglProduksi,
         idMesin: idMesin,
-        idOperator: idOperator,
+        idOperators: idOperators,
         shift: shift,
+        jam: jam,
+        outputJenisId: outputJenisId,
+        idRegu: idRegu,
         hourStart: hourStart,
         hourEnd: hourEnd,
         jmlhAnggota: jmlhAnggota,

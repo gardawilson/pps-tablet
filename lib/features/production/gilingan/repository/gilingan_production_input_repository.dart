@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../../../../core/network/api_client.dart';
+import '../../../../core/utils/date_formatter.dart';
 import '../../shared/models/production_label_lookup_result.dart';
 import '../model/gilingan_inputs_model.dart';
+import '../model/gilingan_output_model.dart';
 
 class GilinganProductionInputRepository {
   final ApiClient _api;
@@ -43,6 +45,55 @@ class GilinganProductionInputRepository {
 
   void invalidateInputs(String noProduksi) => _inputsCache.remove(noProduksi);
   void clearCache() => _inputsCache.clear();
+
+  /* =============================
+   * GET OUTPUTS
+   * ============================= */
+
+  Future<List<GilinganOutput>> fetchOutputs(String noProduksi) async {
+    final path = '/api/production/gilingan/$noProduksi/outputs';
+    final body = await _api.getJson(path);
+    final list = (body['data'] as List? ?? []);
+    return list
+        .map((e) => GilinganOutput.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  /* =============================
+   * CREATE OUTPUT
+   * ============================= */
+
+  Future<void> createOutputs({
+    required String noProduksi,
+    required int idJenis,
+    required double berat,
+    required DateTime tglProduksi,
+  }) async {
+    final path = '/api/production/gilingan/$noProduksi/outputs';
+    await _api.postJson(path, body: {
+      'idJenis': idJenis,
+      'berat': berat,
+      'tglProduksi': toDbDateString(tglProduksi),
+    });
+  }
+
+  /* =============================
+   * SPLIT TIME
+   * ============================= */
+
+  Future<Map<String, dynamic>> splitTime({
+    required int idMesin,
+    required DateTime tanggal,
+    required String hourStart,
+    required int outputJenisId,
+  }) async {
+    final tgl = toDbDateString(tanggal);
+    final path = '/api/production/gilingan/split-time/$idMesin/$tgl';
+    return await _api.postJson(path, body: {
+      'hourStart': hourStart.length == 5 ? '$hourStart:00' : hourStart,
+      'outputJenisId': outputJenisId,
+    });
+  }
 
   /* =============================
    * VALIDATE / LOOKUP LABEL

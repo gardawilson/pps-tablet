@@ -171,6 +171,11 @@ class _GilinganProductionMesinScreenState
             noProduksi: created.noProduksi,
             isLocked: created.isLocked,
             lastClosedDate: created.lastClosedDate,
+            outputJenisId: created.outputJenisId,
+            namaJenis: created.outputJenisNama,
+            idMesin: created.idMesin,
+            tglProduksi: created.tglProduksi,
+            shift: created.shift,
           ),
         ),
       );
@@ -212,6 +217,11 @@ class _GilinganProductionMesinScreenState
               noProduksi: created.noProduksi,
               isLocked: created.isLocked,
               lastClosedDate: created.lastClosedDate,
+              outputJenisId: created.outputJenisId,
+              namaJenis: created.outputJenisNama,
+              idMesin: created.idMesin,
+              tglProduksi: created.tglProduksi,
+              shift: created.shift,
             ),
           ),
         );
@@ -237,6 +247,11 @@ class _GilinganProductionMesinScreenState
           noProduksi: mesin.noProduksi!,
           isLocked: false,
           lastClosedDate: null,
+          outputJenisId: mesin.outputJenisId,
+          namaJenis: mesin.outputJenisNama,
+          idMesin: mesin.idMesin,
+          tglProduksi: mesin.tglProduksi,
+          shift: mesin.shift,
         ),
       ),
     );
@@ -259,8 +274,9 @@ class _GilinganProductionMesinScreenState
                   future: _mesinFuture,
                   builder: (context, snapshot) {
                     final allMesin = snapshot.data ?? [];
-                    final activeCount =
-                        allMesin.where((m) => m.isActive).length;
+                    final activeCount = allMesin
+                        .where((m) => m.isActive)
+                        .length;
                     final inactiveCount = allMesin.length - activeCount;
                     return MesinSectionHeader(
                       title: 'Status Mesin Gilingan',
@@ -368,6 +384,11 @@ class _GilinganProductionMesinScreenState
                                   noProduksi: row.noProduksi,
                                   isLocked: row.isLocked,
                                   lastClosedDate: row.lastClosedDate,
+                                  outputJenisId: row.outputJenisId,
+                                  namaJenis: row.outputJenisNama,
+                                  idMesin: row.idMesin,
+                                  tglProduksi: row.tglProduksi,
+                                  shift: row.shift,
                                 ),
                               ),
                             );
@@ -430,6 +451,11 @@ class _GilinganProductionMesinScreenState
                                   noProduksi: row.noProduksi,
                                   isLocked: row.isLocked,
                                   lastClosedDate: row.lastClosedDate,
+                                  outputJenisId: row.outputJenisId,
+                                  namaJenis: row.outputJenisNama,
+                                  idMesin: row.idMesin,
+                                  tglProduksi: row.tglProduksi,
+                                  shift: row.shift,
                                 ),
                               ),
                             );

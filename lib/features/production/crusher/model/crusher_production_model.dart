@@ -128,7 +128,9 @@ class CrusherProduction {
 
       final asDt = DateTime.tryParse(s);
       if (asDt != null) {
-        return DateFormat('HH:mm').format(asDt.toLocal());
+        // Use UTC to avoid timezone shift on epoch-date time-only values
+        // e.g. "1970-01-01T16:00:00.000Z" must stay 16:00, not 23:00 (UTC+7)
+        return DateFormat('HH:mm').format(asDt.toUtc());
       }
 
       final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(s);
@@ -249,8 +251,10 @@ class CrusherProduction {
     String? hourStart,
     String? hourEnd,
     String? outputNoCrusher,
-
-    // ✅ NEW
+    int? outputJenisId,
+    String? outputJenisNama,
+    int? idRegu,
+    String? namaRegu,
     DateTime? lastClosedDate,
     bool? isLocked,
   }) {
@@ -273,8 +277,10 @@ class CrusherProduction {
       hourStart: hourStart ?? this.hourStart,
       hourEnd: hourEnd ?? this.hourEnd,
       outputNoCrusher: outputNoCrusher ?? this.outputNoCrusher,
-
-      // ✅ NEW
+      outputJenisId: outputJenisId ?? this.outputJenisId,
+      outputJenisNama: outputJenisNama ?? this.outputJenisNama,
+      idRegu: idRegu ?? this.idRegu,
+      namaRegu: namaRegu ?? this.namaRegu,
       lastClosedDate: lastClosedDate ?? this.lastClosedDate,
       isLocked: isLocked ?? this.isLocked,
     );

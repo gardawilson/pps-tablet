@@ -458,12 +458,14 @@ class CrusherProductionRepository {
       '$_base/api/production/crusher?idMesin=$idMesin&tanggal=$dateStr&shift=$shift',
     );
 
+    print('➡️ [GET] $url');
     http.Response res;
     try {
       res = await http.get(url, headers: _headers(token)).timeout(_timeout);
     } on TimeoutException {
       throw Exception('Timeout mengambil riwayat crusher');
     }
+    print('⬅️ [${res.statusCode}] ${res.body}');
 
     if (res.statusCode != 200) {
       throw Exception('Gagal mengambil riwayat crusher (HTTP ${res.statusCode})');

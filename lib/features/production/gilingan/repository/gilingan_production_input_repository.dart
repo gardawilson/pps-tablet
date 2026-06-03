@@ -54,6 +54,7 @@ class GilinganProductionInputRepository {
     final path = '/api/production/gilingan/$noProduksi/outputs';
     final body = await _api.getJson(path);
     final list = (body['data'] as List? ?? []);
+    print('📦 [GILINGAN OUTPUTS] raw: $list');
     return list
         .map((e) => GilinganOutput.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
@@ -69,11 +70,13 @@ class GilinganProductionInputRepository {
     required double berat,
     required DateTime tglProduksi,
   }) async {
-    final path = '/api/production/gilingan/$noProduksi/outputs';
-    await _api.postJson(path, body: {
-      'idJenis': idJenis,
-      'berat': berat,
-      'tglProduksi': toDbDateString(tglProduksi),
+    await _api.postJson('/api/labels/gilingan', body: {
+      'header': {
+        'IdGilingan': idJenis,
+        'Berat': berat,
+        'DateCreate': toDbDateString(tglProduksi),
+      },
+      'outputCode': noProduksi,
     });
   }
 

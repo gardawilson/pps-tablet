@@ -24,10 +24,12 @@ class GilinganLookupLabelPartialDialog extends StatefulWidget {
   });
 
   @override
-  State<GilinganLookupLabelPartialDialog> createState() => _GilinganLookupLabelPartialDialogState();
+  State<GilinganLookupLabelPartialDialog> createState() =>
+      _GilinganLookupLabelPartialDialogState();
 }
 
-class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPartialDialog> {
+class _GilinganLookupLabelPartialDialogState
+    extends State<GilinganLookupLabelPartialDialog> {
   int? _selectedIndex;
   double? _editedWeight;
   bool _inputsReady = false;
@@ -61,10 +63,10 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
   }
 
   _Presence _presenceForRow(
-      GilinganProductionInputViewModel vm,
-      Map<String, dynamic> row,
-      ProductionLabelLookupResult ctx,
-      ) {
+    GilinganProductionInputViewModel vm,
+    Map<String, dynamic> row,
+    ProductionLabelLookupResult ctx,
+  ) {
     final sk = ctx.simpleKey(row);
     if (vm.isInTempKeys(sk)) {
       return _Presence.temp;
@@ -88,7 +90,10 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
     });
   }
 
-  void _commitSelection(GilinganProductionInputViewModel vm, ProductionLabelLookupResult result) {
+  void _commitSelection(
+    GilinganProductionInputViewModel vm,
+    ProductionLabelLookupResult result,
+  ) {
     if (_selectedIndex == null) return;
 
     final row = result.data[_selectedIndex!];
@@ -137,13 +142,18 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
         final result = vm.lastLookup;
         if (result == null) {
           return const Dialog(
-            child: SizedBox(height: 120, child: Center(child: Text('Tidak ada hasil lookup'))),
+            child: SizedBox(
+              height: 120,
+              child: Center(child: Text('Tidak ada hasil lookup')),
+            ),
           );
         }
 
         if (!_inputsReady) {
           return Dialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             child: Container(
               height: 160,
               padding: const EdgeInsets.all(24),
@@ -154,7 +164,10 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
                   const SizedBox(height: 16),
                   Text(
                     'Memuat data...',
-                    style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      color: Colors.grey.shade700,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
@@ -167,7 +180,9 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
 
         if (allTypedItems.isEmpty) {
           return Dialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             child: Container(
               padding: const EdgeInsets.all(32),
               child: Column(
@@ -179,7 +194,11 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
                       color: Colors.orange.shade50,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.info_outline, size: 48, color: Colors.orange.shade700),
+                    child: Icon(
+                      Icons.info_outline,
+                      size: 48,
+                      color: Colors.orange.shade700,
+                    ),
                   ),
                   const SizedBox(height: 20),
                   const Text(
@@ -197,7 +216,10 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
                     onPressed: () => Navigator.pop(context),
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.orange,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -216,9 +238,14 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
         final namaJenis = _namaJenisOf(sample) ?? '-';
 
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           elevation: 8,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 24,
+          ),
           child: Container(
             constraints: const BoxConstraints(maxWidth: 700, maxHeight: 600),
             decoration: BoxDecoration(
@@ -233,10 +260,7 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [
-                        Colors.amber.shade600,
-                        Colors.amber.shade700,
-                      ],
+                      colors: [Colors.amber.shade600, Colors.amber.shade700],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -253,7 +277,11 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
                           color: Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.content_cut, size: 28, color: Colors.white),
+                        child: const Icon(
+                          Icons.content_cut,
+                          size: 28,
+                          color: Colors.white,
+                        ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
@@ -272,7 +300,10 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
                                 ),
                                 const SizedBox(width: 10),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: Colors.white.withOpacity(0.3),
                                     borderRadius: BorderRadius.circular(6),
@@ -302,7 +333,10 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(20),
@@ -326,10 +360,7 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [
-                        Colors.blue.shade50,
-                        Colors.blue.shade100,
-                      ],
+                      colors: [Colors.blue.shade50, Colors.blue.shade100],
                     ),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.blue.shade200),
@@ -342,7 +373,11 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
                           color: Colors.blue.shade200,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Icon(Icons.lightbulb_outline, size: 20, color: Colors.blue.shade700),
+                        child: Icon(
+                          Icons.lightbulb_outline,
+                          size: 20,
+                          color: Colors.blue.shade700,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       const Expanded(
@@ -361,7 +396,10 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
 
                 // COLUMN HEADERS
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade50,
                     border: Border(
@@ -433,11 +471,14 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
                       final displayWeight = isSelected && _editedWeight != null
                           ? _editedWeight!
                           : originalWeight;
-                      final weightText = displayWeight == null ? '-' : num2(displayWeight);
+                      final weightText = displayWeight == null
+                          ? '-'
+                          : num2(displayWeight);
 
                       final isOriginalPartial = _isPartialOf(item, rawRow);
 
-                      final isWeightEdited = isSelected &&
+                      final isWeightEdited =
+                          isSelected &&
                           _editedWeight != null &&
                           _editedWeight != originalWeight;
 
@@ -459,7 +500,9 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
                               color: Colors.transparent,
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(12),
-                                onTap: isDisabled ? null : () => _toggleRow(idx, rawRow, isDisabled),
+                                onTap: isDisabled
+                                    ? null
+                                    : () => _toggleRow(idx, rawRow, isDisabled),
                                 child: Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
@@ -475,12 +518,14 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
                                     borderRadius: BorderRadius.circular(12),
                                     boxShadow: isSelected && !isDisabled
                                         ? [
-                                      BoxShadow(
-                                        color: Colors.amber.withOpacity(0.2),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ]
+                                            BoxShadow(
+                                              color: Colors.amber.withOpacity(
+                                                0.2,
+                                              ),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ]
                                         : null,
                                   ),
                                   child: Row(
@@ -496,8 +541,13 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
                                           activeColor: Colors.amber,
                                           onChanged: isDisabled
                                               ? null
-                                              : (_) => _toggleRow(idx, rawRow, isDisabled),
-                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              : (_) => _toggleRow(
+                                                  idx,
+                                                  rawRow,
+                                                  isDisabled,
+                                                ),
+                                          materialTapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
                                         ),
                                       ),
 
@@ -508,10 +558,14 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
                                           children: [
                                             if (isOriginalPartial) ...[
                                               Container(
-                                                padding: const EdgeInsets.all(4),
+                                                padding: const EdgeInsets.all(
+                                                  4,
+                                                ),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.orange.withOpacity(0.2),
-                                                  borderRadius: BorderRadius.circular(6),
+                                                  color: Colors.orange
+                                                      .withOpacity(0.2),
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
                                                 ),
                                                 child: const Icon(
                                                   Icons.content_cut,
@@ -551,20 +605,24 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
                                               gradient: LinearGradient(
                                                 colors: isWeightEdited
                                                     ? [
-                                                  Colors.amber.shade300,
-                                                  Colors.amber.shade400,
-                                                ]
+                                                        Colors.amber.shade300,
+                                                        Colors.amber.shade400,
+                                                      ]
                                                     : statusText != null
                                                     ? [
-                                                  statusColor!.withOpacity(0.2),
-                                                  statusColor.withOpacity(0.3),
-                                                ]
+                                                        statusColor!
+                                                            .withOpacity(0.2),
+                                                        statusColor.withOpacity(
+                                                          0.3,
+                                                        ),
+                                                      ]
                                                     : [
-                                                  Colors.green.shade100,
-                                                  Colors.green.shade200,
-                                                ],
+                                                        Colors.green.shade100,
+                                                        Colors.green.shade200,
+                                                      ],
                                               ),
-                                              borderRadius: BorderRadius.circular(20),
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
                                             ),
                                             child: Text(
                                               '$weightText kg',
@@ -588,7 +646,8 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
                                       SizedBox(
                                         width: 140,
                                         child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.end,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.end,
                                           children: [
                                             // ✅ Edit button - GUNAKAN WeightInputDialog.show
                                             if (isSelected && !isDisabled)
@@ -596,44 +655,59 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
                                                 height: 32,
                                                 child: OutlinedButton.icon(
                                                   style: OutlinedButton.styleFrom(
-                                                    padding: const EdgeInsets.symmetric(
-                                                      horizontal: 10,
-                                                      vertical: 4,
-                                                    ),
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 10,
+                                                          vertical: 4,
+                                                        ),
                                                     side: BorderSide(
-                                                      color: Colors.amber.shade600,
+                                                      color:
+                                                          Colors.amber.shade600,
                                                       width: 1.5,
                                                     ),
                                                     shape: RoundedRectangleBorder(
-                                                      borderRadius: BorderRadius.circular(8),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            8,
+                                                          ),
                                                     ),
                                                   ),
                                                   icon: Icon(
                                                     Icons.edit_outlined,
                                                     size: 14,
-                                                    color: Colors.amber.shade700,
+                                                    color:
+                                                        Colors.amber.shade700,
                                                   ),
                                                   label: Text(
                                                     'Edit',
                                                     style: TextStyle(
                                                       fontSize: 11,
-                                                      fontWeight: FontWeight.w600,
-                                                      color: Colors.amber.shade700,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color:
+                                                          Colors.amber.shade700,
                                                     ),
                                                   ),
                                                   onPressed: () async {
-                                                    final originalWeight = _beratOf(item);
-                                                    if (originalWeight != null) {
+                                                    final originalWeight =
+                                                        _beratOf(item);
+                                                    if (originalWeight !=
+                                                        null) {
                                                       // ✅ GUNAKAN WeightInputDialog
-                                                      final newWeight = await WeightInputDialog.show(
-                                                        context,
-                                                        maxWeight: originalWeight,
-                                                        currentWeight: _editedWeight,
-                                                      );
+                                                      final newWeight =
+                                                          await WeightInputDialog.show(
+                                                            context,
+                                                            maxWeight:
+                                                                originalWeight,
+                                                            currentWeight:
+                                                                _editedWeight,
+                                                          );
 
-                                                      if (newWeight != null && mounted) {
+                                                      if (newWeight != null &&
+                                                          mounted) {
                                                         setState(() {
-                                                          _editedWeight = newWeight;
+                                                          _editedWeight =
+                                                              newWeight;
                                                         });
                                                       }
                                                     }
@@ -641,20 +715,25 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
                                                 ),
                                               ),
 
-                                            if (isSelected && !isDisabled) const SizedBox(width: 8),
+                                            if (isSelected && !isDisabled)
+                                              const SizedBox(width: 8),
 
                                             // Status badges
                                             if (statusText != null)
                                               Container(
-                                                padding: const EdgeInsets.symmetric(
-                                                  horizontal: 10,
-                                                  vertical: 4,
-                                                ),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 10,
+                                                      vertical: 4,
+                                                    ),
                                                 decoration: BoxDecoration(
-                                                  color: statusColor!.withOpacity(0.15),
-                                                  borderRadius: BorderRadius.circular(6),
+                                                  color: statusColor!
+                                                      .withOpacity(0.15),
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
                                                   border: Border.all(
-                                                    color: statusColor.withOpacity(0.4),
+                                                    color: statusColor
+                                                        .withOpacity(0.4),
                                                   ),
                                                 ),
                                                 child: Text(
@@ -669,15 +748,19 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
                                               )
                                             else if (isWeightEdited)
                                               Container(
-                                                padding: const EdgeInsets.symmetric(
-                                                  horizontal: 10,
-                                                  vertical: 4,
-                                                ),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 10,
+                                                      vertical: 4,
+                                                    ),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.amber.withOpacity(0.15),
-                                                  borderRadius: BorderRadius.circular(6),
+                                                  color: Colors.amber
+                                                      .withOpacity(0.15),
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
                                                   border: Border.all(
-                                                    color: Colors.amber.shade400,
+                                                    color:
+                                                        Colors.amber.shade400,
                                                   ),
                                                 ),
                                                 child: Text(
@@ -685,34 +768,40 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
                                                   style: TextStyle(
                                                     fontSize: 10,
                                                     fontWeight: FontWeight.w800,
-                                                    color: Colors.amber.shade700,
+                                                    color:
+                                                        Colors.amber.shade700,
                                                     letterSpacing: 0.5,
                                                   ),
                                                 ),
                                               )
                                             else if (isOriginalPartial)
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(
-                                                    horizontal: 10,
-                                                    vertical: 4,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.orange.withOpacity(0.15),
-                                                    borderRadius: BorderRadius.circular(6),
-                                                    border: Border.all(
-                                                      color: Colors.orange.shade400,
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 10,
+                                                      vertical: 4,
                                                     ),
-                                                  ),
-                                                  child: Text(
-                                                    'PARTIAL',
-                                                    style: TextStyle(
-                                                      fontSize: 10,
-                                                      fontWeight: FontWeight.w800,
-                                                      color: Colors.orange.shade700,
-                                                      letterSpacing: 0.5,
-                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.orange
+                                                      .withOpacity(0.15),
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                  border: Border.all(
+                                                    color:
+                                                        Colors.orange.shade400,
                                                   ),
                                                 ),
+                                                child: Text(
+                                                  'PARTIAL',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w800,
+                                                    color:
+                                                        Colors.orange.shade700,
+                                                    letterSpacing: 0.5,
+                                                  ),
+                                                ),
+                                              ),
                                           ],
                                         ),
                                       ),
@@ -746,9 +835,9 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
                       TextButton.icon(
                         onPressed: _selectedIndex != null
                             ? () => setState(() {
-                          _selectedIndex = null;
-                          _editedWeight = null;
-                        })
+                                _selectedIndex = null;
+                                _editedWeight = null;
+                              })
                             : null,
                         icon: const Icon(Icons.clear, size: 18),
                         label: const Text('Batal'),
@@ -759,7 +848,10 @@ class _GilinganLookupLabelPartialDialogState extends State<GilinganLookupLabelPa
                       const Spacer(),
                       if (_selectedIndex != null)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           margin: const EdgeInsets.only(right: 12),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(

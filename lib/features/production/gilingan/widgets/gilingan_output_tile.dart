@@ -46,9 +46,20 @@ class GilinganOutputTile extends StatelessWidget {
                   Icon(
                     Icons.print_outlined,
                     size: 11,
-                    color: output.hasBeenPrinted
+                    color: output.hasPrinted > 0
                         ? _kGilinganOutput
                         : Colors.grey.shade400,
+                  ),
+                  const SizedBox(width: 2),
+                  Text(
+                    'x${output.hasPrinted}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: output.hasPrinted > 0
+                          ? _kGilinganOutput
+                          : Colors.grey.shade400,
+                    ),
                   ),
                 ],
               ),
@@ -227,7 +238,7 @@ class GilinganOutputDetailDialog extends StatelessWidget {
                         const Icon(Icons.print_outlined, size: 12, color: Colors.white),
                         const SizedBox(width: 4),
                         Text(
-                          output.hasBeenPrinted ? 'Printed' : 'Belum Print',
+                          output.hasPrinted > 0 ? 'x${output.hasPrinted} Print' : 'Belum Print',
                           style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,

@@ -15,6 +15,7 @@ import '../model/gilingan_inputs_model.dart';
 import '../model/gilingan_output_model.dart';
 import '../model/gilingan_production_model.dart';
 import '../repository/gilingan_production_input_repository.dart';
+import '../repository/gilingan_production_repository.dart';
 import '../widgets/gilingan_lookup_label_dialog.dart';
 import '../widgets/gilingan_lookup_label_partial_dialog.dart';
 import '../widgets/gilingan_output_tile.dart';
@@ -39,6 +40,8 @@ class GilinganProductionInputScreen extends StatefulWidget {
   final int? idMesin;
   final DateTime? tglProduksi;
   final int? shift;
+  final String? hourStart;
+  final String? hourEnd;
 
   const GilinganProductionInputScreen({
     super.key,
@@ -50,6 +53,8 @@ class GilinganProductionInputScreen extends StatefulWidget {
     this.idMesin,
     this.tglProduksi,
     this.shift,
+    this.hourStart,
+    this.hourEnd,
   });
 
   @override
@@ -1055,10 +1060,55 @@ class _GilinganProductionInputScreenState
               lastClosedDate: null,
               outputJenisId: newProd.outputJenisId,
               namaJenis: namaJenis,
+              hourStart: newProd.hourStart,
+              hourEnd: newProd.hourEnd,
             ),
           ),
         );
       },
+    );
+  }
+
+  // ── Riwayat / timeline ────────────────────────────────────────────────────
+
+  Future<void> _openTimelineDialog() async {
+    if (!mounted) return;
+    await ProductionFlowHelpers.openTimeline(
+      context: context,
+      idMesin: widget.idMesin,
+      tanggal: widget.tglProduksi,
+      onMissingContext: () => _showSnack(
+        'Data mesin/tanggal tidak tersedia',
+        backgroundColor: Colors.orange,
+      ),
+      dialogBuilder: (idMesin, tgl) => buildProductionShiftTimelineDialog(
+        namaMesin: widget.namaJenis,
+        tanggal: tgl,
+        shift: widget.shift ?? 1,
+        currentNoProduksi: widget.noProduksi,
+        primaryColor: _kGilinganPrimary,
+        borderColor: _kGilinganBorder,
+        emptyMessage: 'Belum ada riwayat produksi pada shift ini.',
+        loadTimeline: () async {
+          final list = await GilinganProductionRepository()
+              .fetchByMesinTanggalShift(
+                idMesin: idMesin,
+                tanggal: tgl,
+                shift: widget.shift ?? 1,
+              );
+          return list
+              .map(
+                (e) => ProductionShiftTimelineEntry(
+                  noProduksi: e.noProduksi,
+                  hourStart: e.hourStart,
+                  hourEnd: e.hourEnd,
+                  isLocked: e.isLocked,
+                  subtitle: e.outputJenisNama,
+                ),
+              )
+              .toList();
+        },
+      ),
     );
   }
 
@@ -1082,6 +1132,7 @@ class _GilinganProductionInputScreenState
         noProduksi: widget.noProduksi,
         idJenis: outputJenisId,
         namaJenis: namaJenis ?? '',
+        tglProduksi: widget.tglProduksi,
         repository: _repo,
       ),
     );
@@ -1327,11 +1378,14 @@ class _GilinganProductionInputScreenState
                   tglProduksi: widget.tglProduksi,
                   shift: widget.shift,
                   namaJenis: widget.namaJenis,
+                  hourStart: widget.hourStart,
+                  hourEnd: widget.hourEnd,
                   onRefresh: () {
                     vm.loadInputs(widget.noProduksi, force: true);
                     _showSnack('Data di-refresh');
                   },
                   onGanti: locked ? null : _openSplitDialog,
+                  onRiwayat: _openTimelineDialog,
                 ),
                 Expanded(
                   child: Builder(

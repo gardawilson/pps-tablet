@@ -176,6 +176,8 @@ class _GilinganProductionMesinScreenState
             idMesin: created.idMesin,
             tglProduksi: created.tglProduksi,
             shift: created.shift,
+            hourStart: created.hourStart,
+            hourEnd: created.hourEnd,
           ),
         ),
       );
@@ -222,6 +224,8 @@ class _GilinganProductionMesinScreenState
               idMesin: created.idMesin,
               tglProduksi: created.tglProduksi,
               shift: created.shift,
+              hourStart: created.hourStart,
+              hourEnd: created.hourEnd,
             ),
           ),
         );
@@ -252,6 +256,8 @@ class _GilinganProductionMesinScreenState
           idMesin: mesin.idMesin,
           tglProduksi: mesin.tglProduksi,
           shift: mesin.shift,
+          hourStart: mesin.hourStart,
+          hourEnd: mesin.hourEnd,
         ),
       ),
     );
@@ -389,6 +395,8 @@ class _GilinganProductionMesinScreenState
                                   idMesin: row.idMesin,
                                   tglProduksi: row.tglProduksi,
                                   shift: row.shift,
+                                  hourStart: row.hourStart,
+                                  hourEnd: row.hourEnd,
                                 ),
                               ),
                             );
@@ -456,6 +464,8 @@ class _GilinganProductionMesinScreenState
                                   idMesin: row.idMesin,
                                   tglProduksi: row.tglProduksi,
                                   shift: row.shift,
+                                  hourStart: row.hourStart,
+                                  hourEnd: row.hourEnd,
                                 ),
                               ),
                             );

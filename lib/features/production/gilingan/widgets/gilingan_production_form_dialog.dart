@@ -63,8 +63,6 @@ class _GilinganProductionFormDialogState
 
   late final TextEditingController dateCreatedCtrl;
   late final TextEditingController hadirCtrl;
-  late final TextEditingController jmlhAnggotaCtrl;
-  late final TextEditingController hourMeterCtrl;
   late final TextEditingController hourStartCtrl;
   late final TextEditingController hourEndCtrl;
 
@@ -98,12 +96,6 @@ class _GilinganProductionFormDialogState
     hadirCtrl = TextEditingController(
       text: widget.header?.hadir?.toString() ?? '',
     );
-    jmlhAnggotaCtrl = TextEditingController(
-      text: widget.header?.jmlhAnggota?.toString() ?? '',
-    );
-    hourMeterCtrl = TextEditingController(
-      text: widget.header?.hourMeter?.toString() ?? '',
-    );
     hourStartCtrl = TextEditingController(
       text: widget.header?.hourStart ?? widget.initialHourStart ?? '',
     );
@@ -119,8 +111,6 @@ class _GilinganProductionFormDialogState
   void dispose() {
     dateCreatedCtrl.dispose();
     hadirCtrl.dispose();
-    jmlhAnggotaCtrl.dispose();
-    hourMeterCtrl.dispose();
     hourStartCtrl.dispose();
     hourEndCtrl.dispose();
     super.dispose();
@@ -268,9 +258,7 @@ class _GilinganProductionFormDialogState
 
     final hourStartSql = toSqlTime(hourStartCtrl.text);
     final hourEndSql = toSqlTime(hourEndCtrl.text);
-    final jmlhAnggota = int.tryParse(jmlhAnggotaCtrl.text.trim());
     final hadir = int.tryParse(hadirCtrl.text.trim());
-    final hourMeter = double.tryParse(hourMeterCtrl.text.trim());
 
     final prodVm = context.read<GilinganProductionViewModel>();
 
@@ -297,9 +285,7 @@ class _GilinganProductionFormDialogState
           shift: _selectedShift!,
           hourStart: hourStartSql,
           hourEnd: hourEndSql,
-          jmlhAnggota: jmlhAnggota,
           hadir: hadir,
-          hourMeter: hourMeter,
         );
       } else {
         if (_selectedOperators.isEmpty) {
@@ -326,9 +312,7 @@ class _GilinganProductionFormDialogState
           idRegu: _selectedRegu?.idRegu,
           hourStart: hourStartSql,
           hourEnd: hourEndSql,
-          jmlhAnggota: jmlhAnggota,
           hadir: hadir,
-          hourMeter: hourMeter,
         );
       }
     } catch (e) {
@@ -340,6 +324,23 @@ class _GilinganProductionFormDialogState
     if (!mounted) return;
 
     if (result != null) {
+      // Patch field yang tidak/salah dikembalikan API create
+      if (!isEdit) {
+        String? trimHHmm(String s) {
+          final v = s.trim();
+          return v.isEmpty ? null : (v.length >= 5 ? v.substring(0, 5) : v);
+        }
+
+        result = result.copyWith(
+          tglProduksi: result.tglProduksi ?? _selectedDate,
+          hourStart: trimHHmm(hourStartCtrl.text) ?? result.hourStart,
+          hourEnd: trimHHmm(hourEndCtrl.text) ?? result.hourEnd,
+          outputJenisId: result.outputJenisId ?? _selectedGilinganType?.idGilingan,
+          outputJenisNama: _selectedGilinganType?.namaGilingan,
+          namaMesin: _selectedMesin?.namaMesin,
+          namaRegu: _selectedRegu?.namaRegu,
+        );
+      }
       widget.onSave?.call(result);
       Navigator.of(context).pop(result);
     } else {
@@ -636,56 +637,7 @@ class _GilinganProductionFormDialogState
             ],
           ),
 
-          const SizedBox(height: 16),
-
-          // ── Baris 4: Jlh Anggota + Hour Meter ────────────────────
-          Row(
-            children: [
-              Expanded(
-                child: AppNumberField(
-                  controller: jmlhAnggotaCtrl,
-                  label: 'Jumlah Anggota',
-                  icon: Icons.groups_outlined,
-                  allowDecimal: false,
-                  allowNegative: false,
-                  hintText: '0',
-                  isDense: true,
-                  iconSize: 20,
-                  fontSize: 14,
-                  labelFontSize: 14,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Wajib diisi' : null,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: AppNumberField(
-                  controller: hourMeterCtrl,
-                  label: 'Hour Meter',
-                  icon: Icons.timer_outlined,
-                  allowDecimal: true,
-                  allowNegative: false,
-                  hintText: '0',
-                  isDense: true,
-                  iconSize: 20,
-                  fontSize: 14,
-                  labelFontSize: 14,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Wajib diisi' : null,
-                ),
-              ),
-            ],
-          ),
-
-          // ── Baris 5: Jenis Gilingan (hanya create) ───────────────
+          // ── Baris 4: Jenis Gilingan (hanya create) ───────────────
           if (!isEdit) ...[
             const SizedBox(height: 16),
             GilinganTypeDropdown(

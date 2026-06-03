@@ -75,7 +75,9 @@ class _GilinganProductionOutputFormDialogState
   Widget build(BuildContext context) {
     final tglText = widget.tglProduksi == null
         ? '-'
-        : DateFormat('dd MMM yyyy', 'id_ID').format(widget.tglProduksi!.toLocal());
+        : DateFormat('dd MMM yyyy', 'id_ID').format(
+            widget.tglProduksi!.toLocal(),
+          );
 
     return Dialog(
       backgroundColor: Colors.white,
@@ -102,38 +104,36 @@ class _GilinganProductionOutputFormDialogState
   }
 
   Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      decoration: const BoxDecoration(
-        color: _kOutput,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 13, 12, 13),
       child: Row(
         children: [
-          const Icon(Icons.add_box_outlined, color: Colors.white, size: 18),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Tambah Output Gilingan',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                Text(
-                  widget.namaJenis,
-                  style: const TextStyle(color: Colors.white70, fontSize: 11),
-                ),
-              ],
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: _kOutput.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.precision_manufacturing_outlined,
+              color: _kOutput,
+              size: 17,
             ),
           ),
+          const SizedBox(width: 10),
+          const Text(
+            'Tambah Output Gilingan',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1F2937),
+            ),
+          ),
+          const Spacer(),
           IconButton(
             onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.close, color: Colors.white, size: 18),
+            icon: const Icon(Icons.close, size: 18, color: Color(0xFF9CA3AF)),
+            visualDensity: VisualDensity.compact,
           ),
         ],
       ),
@@ -142,12 +142,26 @@ class _GilinganProductionOutputFormDialogState
 
   Widget _buildInfoBar(String tglText) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: Row(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+      child: Wrap(
+        spacing: 18,
+        runSpacing: 6,
         children: [
-          _InfoChip(label: 'No Produksi', value: widget.noProduksi),
-          const SizedBox(width: 12),
-          _InfoChip(label: 'Tanggal', value: tglText),
+          _InfoChip(
+            icon: Icons.receipt_long_outlined,
+            label: 'No Produksi',
+            value: widget.noProduksi,
+          ),
+          _InfoChip(
+            icon: Icons.calendar_today_outlined,
+            label: 'Tanggal',
+            value: tglText,
+          ),
+          _InfoChip(
+            icon: Icons.category_outlined,
+            label: 'Jenis',
+            value: widget.namaJenis,
+          ),
         ],
       ),
     );
@@ -155,46 +169,50 @@ class _GilinganProductionOutputFormDialogState
 
   Widget _buildBody() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Berat Output (kg)',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: _beratCtrl,
-            autofocus: true,
-            enabled: !_isSaving,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-            ],
-            decoration: InputDecoration(
-              hintText: '0.00',
-              suffixText: 'kg',
-              errorText: _beratErr,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: _kOutput, width: 2),
-              ),
-              isDense: true,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            ),
-            onFieldSubmitted: (_) => _save(),
-          ),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      child: TextField(
+        controller: _beratCtrl,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: [
+          FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
         ],
+        autofocus: true,
+        onChanged: (_) => setState(() => _beratErr = null),
+        onSubmitted: (_) => _save(),
+        decoration: InputDecoration(
+          labelText: 'Berat (kg)',
+          prefixIcon: const Icon(Icons.scale_outlined, size: 16),
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 12,
+          ),
+          errorText: _beratErr,
+          filled: true,
+          fillColor: Colors.grey.shade50,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(9),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(9),
+            borderSide: const BorderSide(color: _kBorder),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(9),
+            borderSide: const BorderSide(color: _kOutput, width: 1.5),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(9),
+            borderSide: BorderSide(color: Colors.red.shade400),
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildErrorBanner() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+      margin: const EdgeInsets.fromLTRB(18, 0, 18, 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.red.shade50,
@@ -203,7 +221,7 @@ class _GilinganProductionOutputFormDialogState
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline, size: 16, color: Colors.red.shade700),
+          Icon(Icons.error_outline, size: 15, color: Colors.red.shade600),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -218,34 +236,56 @@ class _GilinganProductionOutputFormDialogState
 
   Widget _buildFooter() {
     return Padding(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           OutlinedButton(
             onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: _kBorder),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              side: BorderSide(color: Colors.grey.shade300),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 18,
+                vertical: 10,
+              ),
             ),
-            child: const Text('Batal'),
+            child: const Text('Batal', style: TextStyle(fontSize: 13)),
           ),
           const SizedBox(width: 10),
-          FilledButton.icon(
+          ElevatedButton.icon(
             onPressed: _isSaving ? null : _save,
-            style: FilledButton.styleFrom(
-              backgroundColor: _kOutput,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
             icon: _isSaving
                 ? const SizedBox(
-                    width: 14,
-                    height: 14,
+                    width: 13,
+                    height: 13,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white),
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   )
-                : const Icon(Icons.save_outlined, size: 16),
-            label: Text(_isSaving ? 'Menyimpan...' : 'Simpan'),
+                : const Icon(Icons.check, size: 15),
+            label: Text(
+              _isSaving ? 'Menyimpan...' : 'Simpan',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _kOutput,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 18,
+                vertical: 10,
+              ),
+            ),
           ),
         ],
       ),
@@ -253,21 +293,38 @@ class _GilinganProductionOutputFormDialogState
   }
 }
 
+// ── Info chip ─────────────────────────────────────────────────────────────────
+
 class _InfoChip extends StatelessWidget {
+  final IconData icon;
   final String label;
   final String value;
 
-  const _InfoChip({required this.label, required this.value});
+  const _InfoChip({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Text(label, style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))),
-        const SizedBox(height: 2),
-        Text(value,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+        Icon(icon, size: 12, color: Colors.grey.shade400),
+        const SizedBox(width: 4),
+        Text(
+          '$label: ',
+          style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF1F2937),
+          ),
+        ),
       ],
     );
   }

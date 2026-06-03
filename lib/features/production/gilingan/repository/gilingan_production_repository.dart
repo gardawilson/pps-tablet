@@ -488,4 +488,42 @@ class GilinganProductionRepository {
       }
     }
   }
+
+  // =========================
+  //  RIWAYAT PER MESIN/TANGGAL/SHIFT
+  //  GET /api/production/gilingan?idMesin=&tanggal=&shift=
+  // =========================
+  Future<List<GilinganProduction>> fetchByMesinTanggalShift({
+    required int idMesin,
+    required DateTime tanggal,
+    required int shift,
+  }) async {
+    final token = await TokenStorage.getToken();
+    final dateStr =
+        '${tanggal.year.toString().padLeft(4, '0')}-'
+        '${tanggal.month.toString().padLeft(2, '0')}-'
+        '${tanggal.day.toString().padLeft(2, '0')}';
+    final url = Uri.parse(
+      '$_base/api/production/gilingan?idMesin=$idMesin&tanggal=$dateStr&shift=$shift',
+    );
+
+    print('➡️ [GET] $url');
+    http.Response res;
+    try {
+      res = await http.get(url, headers: _headers(token)).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout mengambil riwayat gilingan');
+    }
+    print('⬅️ [${res.statusCode}] ${res.body}');
+
+    if (res.statusCode != 200) {
+      throw Exception('Gagal mengambil riwayat gilingan (HTTP ${res.statusCode})');
+    }
+
+    final body = json.decode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    final list = (body['data'] as List? ?? []);
+    return list
+        .map((e) => GilinganProduction.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
 }

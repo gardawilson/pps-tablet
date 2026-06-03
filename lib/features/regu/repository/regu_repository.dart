@@ -17,9 +17,14 @@ class ReguRepository {
         'Accept': 'application/json',
       };
 
-  Future<List<MstRegu>> fetchAll({int? idBagian}) async {
+  Future<List<MstRegu>> fetchAll({int? idBagian, List<int>? idBagianList}) async {
     final token = await TokenStorage.getToken();
-    final query = idBagian != null ? '?idBagian=$idBagian' : '';
+    String query = '';
+    if (idBagianList != null && idBagianList.isNotEmpty) {
+      query = '?idBagian=${idBagianList.join(',')}';
+    } else if (idBagian != null) {
+      query = '?idBagian=$idBagian';
+    }
     final uri = Uri.parse('$_base/api/mst/regu$query');
 
     final started = DateTime.now();

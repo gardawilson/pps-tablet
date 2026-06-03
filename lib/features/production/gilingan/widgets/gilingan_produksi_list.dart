@@ -93,8 +93,10 @@ class _GilinganProduksiRow extends StatelessWidget {
     return DateFormat('dd MMM yyyy', 'id_ID').format(d.toLocal());
   }
 
-  String _fmtTime(String? t) =>
-      (t ?? '--:--').length >= 5 ? t!.substring(0, 5) : (t ?? '--:--');
+  String _fmtTime(String? t) {
+    final s = t ?? '--:--';
+    return s.length >= 5 ? s.substring(0, 5) : s;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -177,20 +179,39 @@ class _GilinganProduksiRow extends StatelessWidget {
                               ),
                             ],
                           ),
-                        ] else if (row.namaOperator.isNotEmpty) ...[
+                        ] else if ((row.namaRegu ?? '').isNotEmpty) ...[
                           const SizedBox(height: 2),
                           Row(
                             children: [
-                              const Icon(Icons.person_outline,
+                              const Icon(Icons.groups_outlined,
                                   size: 11, color: Color(0xFF9CA3AF)),
                               const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
-                                  row.namaOperator,
+                                  row.namaRegu!,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                       fontSize: 11, color: Color(0xFF6B7280)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        if ((row.outputJenisNama ?? '').trim().isNotEmpty) ...[
+                          const SizedBox(height: 1),
+                          Row(
+                            children: [
+                              const Icon(Icons.label_outline,
+                                  size: 11, color: Color(0xFF9CA3AF)),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  row.outputJenisNama!.trim(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 11, color: Color(0xFF374151)),
                                 ),
                               ),
                             ],

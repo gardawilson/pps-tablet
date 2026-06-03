@@ -121,8 +121,7 @@ class _GilinganProductionDropdownState
       await vm.fetchByDate(widget.date!);
       if (!mounted) return;
 
-      final hasMatch =
-      vm.items.any((e) => e.noProduksi == _value?.noProduksi);
+      final hasMatch = vm.items.any((e) => e.noProduksi == _value?.noProduksi);
       setState(() {
         _usePreselectedOnly = false;
         if (!hasMatch) _value = null;
@@ -139,16 +138,16 @@ class _GilinganProductionDropdownState
   Widget build(BuildContext context) {
     return Consumer<GilinganProductionViewModel>(
       builder: (context, vm, _) {
-        List<GilinganProduction> base =
-        _usePreselectedOnly ? _localItems : vm.items;
+        List<GilinganProduction> base = _usePreselectedOnly
+            ? _localItems
+            : vm.items;
 
         // Optional filter by shift
         if (widget.shiftFilter != null) {
           base = base.where((e) => e.shift == widget.shiftFilter).toList();
         }
 
-        final hasMatch =
-        base.any((e) => e.noProduksi == _value?.noProduksi);
+        final hasMatch = base.any((e) => e.noProduksi == _value?.noProduksi);
         final safeValue = hasMatch ? _value : null;
 
         final isLoading = _usePreselectedOnly ? false : vm.isLoading;
@@ -164,17 +163,18 @@ class _GilinganProductionDropdownState
           items: base,
           itemAsString: (e) {
             // Tampilkan NoProduksi | NamaMesin | jam range (kalau ada) | SHIFT
-            final range =
-            (e.hourRangeText.isEmpty) ? '' : ' • ${e.hourRangeText}';
+            final range = (e.hourRangeText.isEmpty)
+                ? ''
+                : ' • ${e.hourRangeText}';
             return '${e.noProduksi} | ${e.namaMesin}$range (SHIFT ${e.shift})';
           },
           compareFn: (a, b) => a.noProduksi == b.noProduksi,
 
           onChanged: widget.enabled
               ? (val) {
-            setState(() => _value = val);
-            widget.onChanged?.call(val);
-          }
+                  setState(() => _value = val);
+                  widget.onChanged?.call(val);
+                }
               : null,
           enabled: widget.enabled,
 
@@ -186,10 +186,10 @@ class _GilinganProductionDropdownState
           hint: isLoading
               ? 'Memuat...'
               : (hasError
-              ? 'Terjadi error'
-              : (base.isEmpty
-              ? (widget.hintText ?? 'Tidak ada data')
-              : 'PILIH')),
+                    ? 'Terjadi error'
+                    : (base.isEmpty
+                          ? (widget.hintText ?? 'Tidak ada data')
+                          : 'PILIH')),
         );
       },
     );

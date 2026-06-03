@@ -79,6 +79,13 @@ class _GilinganProductionScreenState extends State<GilinganProductionScreen> {
                           noProduksi: row.noProduksi,
                           isLocked: row.isLocked,
                           lastClosedDate: row.lastClosedDate,
+                          outputJenisId: row.outputJenisId,
+                          namaJenis: row.outputJenisNama,
+                          idMesin: row.idMesin,
+                          tglProduksi: row.tglProduksi,
+                          shift: row.shift,
+                          hourStart: row.hourStart,
+                          hourEnd: row.hourEnd,
                         ),
                       ),
                     );

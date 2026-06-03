@@ -142,10 +142,14 @@ Future<ReguOperatorResult?> showReguOperatorPicker(
   MstRegu? initialRegu,
   List<MstOperator> initialSelected = const [],
   int? idBagian,
+  List<int>? idBagianList,
 }) async {
   List<MstRegu> allRegu = [];
   try {
-    allRegu = await ReguRepository().fetchAll(idBagian: idBagian);
+    allRegu = await ReguRepository().fetchAll(
+      idBagian: idBagian,
+      idBagianList: idBagianList,
+    );
   } catch (_) {}
 
   if (!context.mounted) return null;

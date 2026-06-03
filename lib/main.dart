@@ -66,7 +66,7 @@ import 'package:pps_tablet/features/production/crusher/view/crusher_production_s
 import 'package:pps_tablet/features/production/crusher/view_model/crusher_production_input_view_model.dart';
 import 'package:pps_tablet/features/production/crusher/view_model/crusher_production_view_model.dart';
 import 'package:pps_tablet/features/production/gilingan/repository/gilingan_production_repository.dart';
-import 'package:pps_tablet/features/production/gilingan/view/gilingan_production_screen.dart';
+import 'package:pps_tablet/features/production/gilingan/view/gilingan_production_mesin_screen.dart';
 import 'package:pps_tablet/features/production/gilingan/view_model/gilingan_production_input_view_model.dart';
 import 'package:pps_tablet/features/production/gilingan/view_model/gilingan_production_view_model.dart';
 import 'package:pps_tablet/features/production/hot_stamp/model/hot_stamp_production_model.dart';
@@ -563,7 +563,7 @@ class MyApp extends StatelessWidget {
           '/production/crusher': (context) => CrusherProductionScreen(),
           '/label/packing': (context) => PackingScreen(),
           '/label/reject': (context) => RejectScreen(),
-          '/production/gilingan': (context) => GilinganProductionScreen(),
+          '/production/gilingan': (context) => const GilinganProductionMesinScreen(),
           '/production/mixer': (context) => MixerProductionScreen(),
           '/shell/hot-stamp': (context) => HotStampProductionScreen(),
           '/production/hot-stamp': (context) => HotStampProductionScreen(),

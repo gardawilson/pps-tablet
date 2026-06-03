@@ -20,8 +20,13 @@ class GilinganProduction {
   final String? hourStart; // "HH:mm"
   final String? hourEnd;   // "HH:mm"
 
-  // ✅ NEW: tutup transaksi flags
-  final DateTime? lastClosedDate; // date only
+  final int? outputJenisId;
+  final String? outputJenisNama;
+  final int? idRegu;
+  final String? namaRegu;
+
+  // ✅ tutup transaksi flags
+  final DateTime? lastClosedDate;
   final bool isLocked;
 
   const GilinganProduction({
@@ -41,8 +46,10 @@ class GilinganProduction {
     this.approveBy,
     this.hourStart,
     this.hourEnd,
-
-    // ✅ NEW
+    this.outputJenisId,
+    this.outputJenisNama,
+    this.idRegu,
+    this.namaRegu,
     this.lastClosedDate,
     this.isLocked = false,
   });
@@ -98,7 +105,9 @@ class GilinganProduction {
 
       final asDt = DateTime.tryParse(s);
       if (asDt != null) {
-        return DateFormat('HH:mm').format(asDt.toLocal());
+        // Use UTC to avoid timezone shift on epoch-date time-only values
+        // e.g. "1970-01-01T16:00:00.000Z" must stay 16:00, not 23:00 (UTC+7)
+        return DateFormat('HH:mm').format(asDt.toUtc());
       }
 
       final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(s);
@@ -118,8 +127,8 @@ class GilinganProduction {
       idOperator: _asIntRequired(j['IdOperator']),
       idMesin: _asIntRequired(j['IdMesin']),
       namaMesin: _asString(j['NamaMesin']),
-      namaOperator: _asString(j['NamaOperator']),
-      tglProduksi: _asDateTime(j['TglProduksi']),
+      namaOperator: _asString(j['NamaOperators'] ?? j['NamaOperator']),
+      tglProduksi: _asDateTime(j['Tanggal'] ?? j['TglProduksi']),
       shift: _asIntRequired(j['Shift']),
       createBy: _asString(j['CreateBy']),
       checkBy1: (j['CheckBy1'] == null || j['CheckBy1'] == '')
@@ -136,8 +145,14 @@ class GilinganProduction {
       hourMeter: _asInt(j['HourMeter']),
       hourStart: _asTimeHHmm(j['HourStart']),
       hourEnd: _asTimeHHmm(j['HourEnd']),
-
-      // ✅ NEW: mapping dari backend
+      outputJenisId: _asInt(j['OutputJenisId']),
+      outputJenisNama: (j['OutputJenisNama'] == null || j['OutputJenisNama'] == '')
+          ? null
+          : _asString(j['OutputJenisNama']),
+      idRegu: _asInt(j['IdRegu']),
+      namaRegu: (j['NamaRegu'] == null || j['NamaRegu'] == '')
+          ? null
+          : _asString(j['NamaRegu']),
       lastClosedDate: _asDateTime(j['LastClosedDate']),
       isLocked: _asBool(j['IsLocked']),
     );
@@ -185,6 +200,43 @@ class GilinganProduction {
     if ((hourStart == null || hourStart!.isEmpty) &&
         (hourEnd == null || hourEnd!.isEmpty)) return '';
     return '${hourStart ?? '--:--'} - ${hourEnd ?? '--:--'}';
+  }
+
+  GilinganProduction copyWith({
+    String? namaMesin,
+    String? namaOperator,
+    DateTime? tglProduksi,
+    String? outputJenisNama,
+    int? outputJenisId,
+    String? namaRegu,
+    int? idRegu,
+    String? hourStart,
+    String? hourEnd,
+  }) {
+    return GilinganProduction(
+      noProduksi: noProduksi,
+      idOperator: idOperator,
+      idMesin: idMesin,
+      namaMesin: namaMesin ?? this.namaMesin,
+      namaOperator: namaOperator ?? this.namaOperator,
+      tglProduksi: tglProduksi ?? this.tglProduksi,
+      shift: shift,
+      createBy: createBy,
+      jmlhAnggota: jmlhAnggota,
+      hadir: hadir,
+      hourMeter: hourMeter,
+      checkBy1: checkBy1,
+      checkBy2: checkBy2,
+      approveBy: approveBy,
+      hourStart: hourStart ?? this.hourStart,
+      hourEnd: hourEnd ?? this.hourEnd,
+      outputJenisId: outputJenisId ?? this.outputJenisId,
+      outputJenisNama: outputJenisNama ?? this.outputJenisNama,
+      idRegu: idRegu ?? this.idRegu,
+      namaRegu: namaRegu ?? this.namaRegu,
+      lastClosedDate: lastClosedDate,
+      isLocked: isLocked,
+    );
   }
 
   // Optional untuk UI

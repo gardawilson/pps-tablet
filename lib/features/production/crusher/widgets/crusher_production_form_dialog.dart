@@ -204,7 +204,7 @@ class _CrusherProductionFormDialogState
       context,
       initialRegu: _selectedRegu,
       initialSelected: _selectedOperators,
-      idBagian: 3,
+      idBagianList: const [2, 7],
     );
     if (mounted) setState(() => _loadingReguOperator = false);
     if (result != null && mounted) {
@@ -324,6 +324,14 @@ class _CrusherProductionFormDialogState
     if (!mounted) return;
 
     if (result != null) {
+      // API response for CREATE omits OutputJenisNama — enrich from form selection
+      if (!isEdit &&
+          _selectedCrusherType != null &&
+          result.outputJenisNama == null) {
+        result = result.copyWith(
+          outputJenisNama: _selectedCrusherType!.namaCrusher,
+        );
+      }
       widget.onSave?.call(result);
       Navigator.of(context).pop(result);
     } else {

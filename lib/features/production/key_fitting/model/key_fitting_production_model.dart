@@ -9,6 +9,11 @@ class KeyFittingProduction {
   final String namaMesin;
   final String namaOperator;
 
+  final int? idRegu;
+  final String? namaRegu;
+  final int? outputJenisId;
+  final String? outputJenisNama;
+
   final DateTime? tglProduksi;
   final int shift;
 
@@ -37,6 +42,10 @@ class KeyFittingProduction {
     required this.idOperator,
     required this.namaMesin,
     required this.namaOperator,
+    this.idRegu,
+    this.namaRegu,
+    this.outputJenisId,
+    this.outputJenisNama,
     required this.tglProduksi,
     required this.shift,
     required this.createBy,
@@ -93,46 +102,83 @@ class KeyFittingProduction {
     return null;
   }
 
-  /// Normalisasi MSSQL TIME ke "HH:mm"
+  /// Normalisasi MSSQL TIME ke "HH:mm" — tanpa konversi timezone
   static String? _asTimeHHmm(dynamic v) {
     if (v == null) return null;
 
-    // TIME kadang dimapping ke DateTime (1900-01-01 + time)
-    if (v is DateTime) {
-      return DateFormat('HH:mm').format(v.toLocal());
-    }
-
-    // String: "HH:mm[:ss[.fff]]" atau "1900-01-01T07:30:00"
     if (v is String) {
       final s = v.trim();
       if (s.isEmpty) return null;
 
-      final asDt = DateTime.tryParse(s);
-      if (asDt != null) {
-        return DateFormat('HH:mm').format(asDt.toLocal());
+      // ISO datetime "1970-01-01T08:00:00.000Z" — ambil jam:menit langsung
+      // dari string tanpa toLocal() agar tidak geser karena UTC offset
+      final isoTime = RegExp(r'T(\d{2}):(\d{2})').firstMatch(s);
+      if (isoTime != null) {
+        return '${isoTime.group(1)}:${isoTime.group(2)}';
       }
 
-      final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(s);
-      if (m != null) {
-        final hh = m.group(1)!.padLeft(2, '0');
-        final mm = m.group(2)!;
-        return '$hh:$mm';
+      // "HH:mm[:ss[.fff]]"
+      final hhmm = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(s);
+      if (hhmm != null) {
+        return '${hhmm.group(1)!.padLeft(2, '0')}:${hhmm.group(2)}';
       }
+    }
+
+    // DateTime object — gunakan UTC agar konsisten dengan ISO string
+    if (v is DateTime) {
+      return DateFormat('HH:mm').format(v.toUtc());
     }
 
     return null;
   }
 
+  static List<int> _parseIdOperators(dynamic v) {
+    if (v is List) {
+      return v.map((e) => _asIntRequired(e)).where((e) => e != 0).toList();
+    }
+    if (v is String) {
+      final s = v.trim();
+      if (s.isEmpty || s == '[]') return [];
+      // coba parse sebagai JSON array string
+      try {
+        final decoded = s
+            .replaceAll('[', '')
+            .replaceAll(']', '')
+            .split(',')
+            .map((e) => int.tryParse(e.trim()))
+            .whereType<int>()
+            .toList();
+        return decoded;
+      } catch (_) {
+        return [];
+      }
+    }
+    final single = _asInt(v);
+    return single != null && single != 0 ? [single] : [];
+  }
+
   factory KeyFittingProduction.fromJson(Map<String, dynamic> j) {
+    final idOperatorsList = _parseIdOperators(j['IdOperators']);
+    final singleId = _asIntRequired(j['IdOperator']);
+    final effectiveIdOperator = idOperatorsList.isNotEmpty
+        ? idOperatorsList.first
+        : singleId;
+
     return KeyFittingProduction(
       noProduksi: _asString(j['NoProduksi']),
       idMesin: _asIntRequired(j['IdMesin']),
-      idOperator: _asIntRequired(j['IdOperator']),
+      idOperator: effectiveIdOperator,
       namaMesin: _asString(j['NamaMesin']),
-      namaOperator: _asString(j['NamaOperator']),
-
-      // backend kamu list bisa pakai 'Tanggal' (PasangKunci_h)
-      // tapi biar seragam di model: simpan ke tglProduksi
+      namaOperator: _asString(j['NamaOperator'] ?? j['Operators'] ?? ''),
+      idRegu: _asInt(j['IdRegu']),
+      namaRegu: j['NamaRegu'] == null || _asString(j['NamaRegu']).trim().isEmpty
+          ? null
+          : _asString(j['NamaRegu']),
+      outputJenisId: _asInt(j['OutputJenisId']),
+      outputJenisNama: j['OutputJenisNama'] == null ||
+              _asString(j['OutputJenisNama']).trim().isEmpty
+          ? null
+          : _asString(j['OutputJenisNama']),
       tglProduksi: _asDateTime(j['Tanggal'] ?? j['TglProduksi']),
       shift: _asIntRequired(j['Shift']),
       createBy: _asString(j['CreateBy']),
@@ -250,6 +296,10 @@ class KeyFittingProduction {
     int? idOperator,
     String? namaMesin,
     String? namaOperator,
+    int? idRegu,
+    String? namaRegu,
+    int? outputJenisId,
+    String? outputJenisNama,
     DateTime? tglProduksi,
     int? shift,
     String? createBy,
@@ -269,6 +319,10 @@ class KeyFittingProduction {
       idOperator: idOperator ?? this.idOperator,
       namaMesin: namaMesin ?? this.namaMesin,
       namaOperator: namaOperator ?? this.namaOperator,
+      idRegu: idRegu ?? this.idRegu,
+      namaRegu: namaRegu ?? this.namaRegu,
+      outputJenisId: outputJenisId ?? this.outputJenisId,
+      outputJenisNama: outputJenisNama ?? this.outputJenisNama,
       tglProduksi: tglProduksi ?? this.tglProduksi,
       shift: shift ?? this.shift,
       createBy: createBy ?? this.createBy,
@@ -281,6 +335,126 @@ class KeyFittingProduction {
       hourEnd: hourEnd ?? this.hourEnd,
       lastClosedDate: lastClosedDate ?? this.lastClosedDate,
       isLocked: isLocked ?? this.isLocked,
+    );
+  }
+}
+
+class KeyFittingProduksiItem {
+  final String noProduksi;
+  final DateTime? tglProduksi;
+  final List<int> idOperators;
+  final String? operators;
+  final int? idRegu;
+  final String? namaRegu;
+  final int? outputJenisId;
+  final String? outputJenisNama;
+  final int? shift;
+  final String? hourStart;
+  final String? hourEnd;
+
+  const KeyFittingProduksiItem({
+    required this.noProduksi,
+    this.tglProduksi,
+    this.idOperators = const [],
+    this.operators,
+    this.idRegu,
+    this.namaRegu,
+    this.outputJenisId,
+    this.outputJenisNama,
+    this.shift,
+    this.hourStart,
+    this.hourEnd,
+  });
+
+  int? get idOperator => idOperators.isNotEmpty ? idOperators.first : null;
+
+  factory KeyFittingProduksiItem.fromJson(Map<String, dynamic> j) {
+    String? s(dynamic v) =>
+        v == null ? null : v.toString().trim().isEmpty ? null : v.toString().trim();
+    int? i(dynamic v) {
+      if (v == null) return null;
+      if (v is num) return v.toInt();
+      return int.tryParse(v.toString());
+    }
+    String? timeHHmm(dynamic v) {
+      final raw = s(v);
+      if (raw == null) return null;
+      final isoTime = RegExp(r'T(\d{2}):(\d{2})').firstMatch(raw);
+      if (isoTime != null) return '${isoTime.group(1)}:${isoTime.group(2)}';
+      final parts = raw.split(':');
+      if (parts.length < 2) return raw;
+      return '${parts[0].padLeft(2, '0')}:${parts[1].padLeft(2, '0')}';
+    }
+    List<int> parseIdOperators(dynamic v) {
+      if (v is List) return v.map((e) => i(e) ?? 0).where((e) => e != 0).toList();
+      final single = i(v);
+      return single != null ? [single] : [];
+    }
+
+    return KeyFittingProduksiItem(
+      noProduksi: s(j['NoProduksi']) ?? '',
+      tglProduksi: j['TglProduksi'] != null
+          ? DateTime.tryParse(j['TglProduksi'].toString())
+          : null,
+      idOperators: parseIdOperators(j['IdOperators'] ?? j['IdOperator']),
+      operators: s(j['Operators']) ?? s(j['Operator']),
+      idRegu: i(j['IdRegu']),
+      namaRegu: s(j['NamaRegu']),
+      outputJenisId: i(j['OutputJenisId']),
+      outputJenisNama: s(j['OutputJenisNama']),
+      shift: i(j['Shift']),
+      hourStart: timeHHmm(j['HourStart']),
+      hourEnd: timeHHmm(j['HourEnd']),
+    );
+  }
+}
+
+class KeyFittingMesinInfo {
+  final int idMesin;
+  final String namaMesin;
+  final String bagian;
+  final List<KeyFittingProduksiItem> produksiList;
+
+  bool get isActive => produksiList.isNotEmpty;
+
+  String? get noProduksi =>
+      produksiList.isNotEmpty ? produksiList.first.noProduksi : null;
+  int? get shift => produksiList.isNotEmpty ? produksiList.first.shift : null;
+  String? get hourStart =>
+      produksiList.isNotEmpty ? produksiList.first.hourStart : null;
+  String? get hourEnd =>
+      produksiList.isNotEmpty ? produksiList.first.hourEnd : null;
+  String? get namaRegu =>
+      produksiList.isNotEmpty ? produksiList.first.namaRegu : null;
+  String? get outputJenisNama =>
+      produksiList.isNotEmpty ? produksiList.first.outputJenisNama : null;
+
+  const KeyFittingMesinInfo({
+    required this.idMesin,
+    required this.namaMesin,
+    required this.bagian,
+    this.produksiList = const [],
+  });
+
+  factory KeyFittingMesinInfo.fromJson(Map<String, dynamic> j) {
+    String? s(dynamic v) =>
+        v == null ? null : v.toString().trim().isEmpty ? null : v.toString().trim();
+    int? i(dynamic v) {
+      if (v == null) return null;
+      if (v is num) return v.toInt();
+      return int.tryParse(v.toString());
+    }
+
+    final List<KeyFittingProduksiItem> items = [];
+    if (s(j['NoProduksi']) != null) {
+      items.add(KeyFittingProduksiItem.fromJson(j));
+    }
+
+    return KeyFittingMesinInfo(
+      idMesin: i(j['IdMesin']) ?? 0,
+      namaMesin: s(j['NamaMesin']) ?? '',
+      bagian: s(j['Bagian']) ?? '',
+      produksiList: items,
     );
   }
 }

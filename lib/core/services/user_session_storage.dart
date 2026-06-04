@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class UserSessionStorage {
   static const String _usernameKey = 'logged_username';
   static const String _fullNameKey = 'logged_full_name';
+  static const String _lastLoginKey = 'logged_last_login_at';
 
   static Future<void> saveUser({
     required String username,
@@ -17,6 +18,11 @@ class UserSessionStorage {
     } else {
       await prefs.setString(_fullNameKey, normalizedFullName);
     }
+
+    await prefs.setString(
+      _lastLoginKey,
+      DateTime.now().toIso8601String(),
+    );
   }
 
   static Future<String> getUsername({String fallback = 'unknown'}) async {
@@ -31,9 +37,17 @@ class UserSessionStorage {
     return fullName == null || fullName.isEmpty ? null : fullName;
   }
 
+  static Future<DateTime?> getLastLoginAt() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_lastLoginKey);
+    if (raw == null) return null;
+    return DateTime.tryParse(raw);
+  }
+
   static Future<void> clear() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_usernameKey);
     await prefs.remove(_fullNameKey);
+    await prefs.remove(_lastLoginKey);
   }
 }

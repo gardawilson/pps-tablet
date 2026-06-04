@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../repository/key_fitting_production_input_repository.dart';
 import '../model/key_fitting_inputs_model.dart';
+import '../../hot_stamp/model/hot_stamp_output_model.dart';
 
 // ⬇️ shared lookup result model (dipakai untuk lookup FWIP)
 import 'package:pps_tablet/features/production/shared/models/production_label_lookup_result.dart';
@@ -1026,6 +1027,37 @@ class KeyFittingProductionInputViewModel extends ChangeNotifier {
       return false;
     } finally {
       isDeleting = false;
+      notifyListeners();
+    }
+  }
+
+  // ── Outputs ──────────────────────────────────────────────────────
+
+  final Map<String, List<HotStampOutput>> _outputsCache = {};
+  final Map<String, bool> _outputsLoading = {};
+  final Map<String, String?> _outputsError = {};
+
+  List<HotStampOutput>? outputsOf(String noProduksi) =>
+      _outputsCache[noProduksi];
+  bool isOutputsLoading(String noProduksi) =>
+      _outputsLoading[noProduksi] ?? false;
+  String? outputsError(String noProduksi) => _outputsError[noProduksi];
+
+  Future<void> loadOutputs(String noProduksi, {bool force = false}) async {
+    if (!force && _outputsCache.containsKey(noProduksi)) return;
+    if (_outputsLoading[noProduksi] == true) return;
+
+    _outputsLoading[noProduksi] = true;
+    _outputsError[noProduksi] = null;
+    notifyListeners();
+
+    try {
+      final data = await repository.fetchOutputs(noProduksi);
+      _outputsCache[noProduksi] = data;
+    } catch (e) {
+      _outputsError[noProduksi] = e.toString();
+    } finally {
+      _outputsLoading[noProduksi] = false;
       notifyListeners();
     }
   }

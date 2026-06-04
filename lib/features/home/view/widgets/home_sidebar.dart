@@ -20,12 +20,12 @@ class HomeSidebar extends StatefulWidget {
 
 class _HomeSidebarState extends State<HomeSidebar> {
   String? _selectedRoute;
-  int? _expandedGroup;
+  String? _expandedGroup;
 
   static const Color _primaryColor = Color(0xFF0D47A1);
   static const String _logoAsset = 'assets/images/icon_without_bg.png';
 
-  static List<_MenuGroup> get _menuGroups => <_MenuGroup>[
+  static List<_MenuGroup> get _labelGroups => <_MenuGroup>[
     _MenuGroup(
       title: 'Label',
       icon: Icons.label_outlined,
@@ -82,9 +82,12 @@ class _HomeSidebarState extends State<HomeSidebar> {
         ),
       ],
     ),
+  ];
+
+  static List<_MenuGroup> get _divisiGroups => <_MenuGroup>[
     _MenuGroup(
-      title: 'Proses Produksi',
-      icon: Icons.precision_manufacturing_outlined,
+      title: 'W&B',
+      icon: Icons.water_outlined,
       children: [
         _SubItem(
           title: 'Proses Washing',
@@ -101,11 +104,12 @@ class _HomeSidebarState extends State<HomeSidebar> {
           icon: Icons.construction_outlined,
           route: '/production/crusher',
         ),
-        _SubItem(
-          title: 'Proses Gilingan',
-          icon: Icons.settings_outlined,
-          route: '/production/gilingan',
-        ),
+      ],
+    ),
+    _MenuGroup(
+      title: 'Pin Hulu',
+      icon: Icons.precision_manufacturing_outlined,
+      children: [
         _SubItem(
           title: 'Proses Mixer',
           icon: Icons.blender_outlined,
@@ -116,46 +120,63 @@ class _HomeSidebarState extends State<HomeSidebar> {
           icon: Icons.invert_colors_outlined,
           route: '/production/inject',
         ),
+        _SubItem(
+          title: 'Proses Gilingan',
+          icon: Icons.settings_outlined,
+          route: '/production/gilingan',
+        ),
+      ],
+    ),
+    _MenuGroup(
+      title: 'Pin Hilir',
+      icon: Icons.account_tree_outlined,
+      children: [
+        _SubItem(
+          title: 'Stamping',
+          icon: Icons.local_fire_department_outlined,
+          route: '/shell/hot-stamp',
+        ),
+        _SubItem(
+          title: 'Pasang Kunci Long Door',
+          icon: Icons.key_outlined,
+          route: '/shell/key-fitting',
+        ),
+        _SubItem(
+          title: 'Packing Spanner',
+          icon: Icons.hardware_outlined,
+          route: '/shell/spanner',
+        ),
+        _SubItem(
+          title: 'Packing',
+          icon: Icons.inventory_outlined,
+          route: '/shell/packing',
+        ),
+      ],
+    ),
+    _MenuGroup(
+      title: 'Warehouse',
+      icon: Icons.warehouse_outlined,
+      children: [
+        _SubItem(
+          title: 'Return',
+          icon: Icons.undo_outlined,
+          route: '/shell/return',
+        ),
+        _SubItem(
+          title: 'BJ Jual',
+          icon: Icons.sell_outlined,
+          route: '/shell/bj-jual',
+        ),
       ],
     ),
   ];
 
-  static List<_MenuItem> get _menuItems => <_MenuItem>[
+  static List<_MenuItem> get _operasionalItems => <_MenuItem>[
     _MenuItem(
       title: 'Bongkar Susun',
       subtitle: 'Input data Bongkar Susun',
       icon: Icons.layers_outlined,
       route: '/shell/bongkar-susun',
-    ),
-    _MenuItem(
-      title: 'Stamping',
-      subtitle: 'Input data Stamping',
-      icon: Icons.local_fire_department_outlined,
-      route: '/shell/hot-stamp',
-    ),
-    _MenuItem(
-      title: 'Pasang Kunci Long Door',
-      subtitle: 'Input data Pasang Kunci Long Door',
-      icon: Icons.key_outlined,
-      route: '/shell/key-fitting',
-    ),
-    _MenuItem(
-      title: 'Packing Spanner',
-      subtitle: 'Input data Packing Spanner',
-      icon: Icons.hardware_outlined,
-      route: '/shell/spanner',
-    ),
-    _MenuItem(
-      title: 'Packing',
-      subtitle: 'Input data Packing',
-      icon: Icons.inventory_outlined,
-      route: '/shell/packing',
-    ),
-    _MenuItem(
-      title: 'Return',
-      subtitle: 'Input data Return',
-      icon: Icons.undo_outlined,
-      route: '/shell/return',
     ),
     _MenuItem(
       title: 'Sortir Reject',
@@ -169,12 +190,9 @@ class _HomeSidebarState extends State<HomeSidebar> {
       icon: Icons.checklist_rtl_rounded,
       route: '/stockopname',
     ),
-    _MenuItem(
-      title: 'BJ Jual',
-      subtitle: 'Kelola BJ Jual',
-      icon: Icons.sell_outlined,
-      route: '/shell/bj-jual',
-    ),
+  ];
+
+  static List<_MenuItem> get _laporanItems => <_MenuItem>[
     _MenuItem(
       title: 'Laporan',
       subtitle: 'Lihat laporan',
@@ -204,18 +222,18 @@ class _HomeSidebarState extends State<HomeSidebar> {
     );
   }
 
-  void _toggleGroup(int index) {
-    setState(() => _expandedGroup = _expandedGroup == index ? null : index);
+  void _toggleGroup(String title) {
+    setState(() => _expandedGroup = _expandedGroup == title ? null : title);
   }
 
-  void _handleGroupTap(int index) {
+  void _handleGroupTap(String title) {
     if (_collapsed) {
-      setState(() => _expandedGroup = index);
+      setState(() => _expandedGroup = title);
       widget.onToggleCollapse();
       return;
     }
 
-    _toggleGroup(index);
+    _toggleGroup(title);
   }
 
   bool get _collapsed => widget.isCollapsed;
@@ -257,9 +275,17 @@ class _HomeSidebarState extends State<HomeSidebar> {
                           route: '/shell/welcome',
                         ),
                       ),
-                      for (int i = 0; i < _menuGroups.length; i++)
-                        _buildGroup(i),
-                      for (final item in _menuItems) _buildFlatItem(item),
+                      _buildSectionHeader('Label'),
+                      for (int i = 0; i < _labelGroups.length; i++)
+                        _buildGroup(i, _labelGroups),
+                      _buildSectionHeader('Proses Produksi'),
+                      for (int i = 0; i < _divisiGroups.length; i++)
+                        _buildGroup(i, _divisiGroups),
+                      _buildSectionHeader('Operasional'),
+                      for (final item in _operasionalItems)
+                        _buildFlatItem(item),
+                      _buildSectionHeader('Laporan & Monitoring'),
+                      for (final item in _laporanItems) _buildFlatItem(item),
                     ],
                   ),
                 ),
@@ -355,9 +381,25 @@ class _HomeSidebarState extends State<HomeSidebar> {
     );
   }
 
-  Widget _buildGroup(int index) {
-    final group = _menuGroups[index];
-    final isExpanded = _expandedGroup == index && !_collapsed;
+  Widget _buildSectionHeader(String title) {
+    if (_collapsed) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Text(
+        title.toUpperCase(),
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.4),
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGroup(int index, List<_MenuGroup> groups) {
+    final group = groups[index];
+    final isExpanded = _expandedGroup == group.title && !_collapsed;
     final hasActiveChild = group.children.any((c) => c.route == _selectedRoute);
     final isActive = isExpanded || hasActiveChild;
 
@@ -373,7 +415,7 @@ class _HomeSidebarState extends State<HomeSidebar> {
               borderRadius: BorderRadius.circular(10),
               child: InkWell(
                 borderRadius: BorderRadius.circular(10),
-                onTap: () => _handleGroupTap(index),
+                onTap: () => _handleGroupTap(group.title),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
                   padding: EdgeInsets.symmetric(

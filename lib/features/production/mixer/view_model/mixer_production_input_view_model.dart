@@ -8,6 +8,7 @@ import 'package:pps_tablet/features/production/mixer/repository/mixer_production
 
 import '../model/mixer_production_model.dart';
 import '../model/mixer_inputs_model.dart';
+import '../model/mixer_output_model.dart';
 
 // ⬇️ shared lookup result model
 import 'package:pps_tablet/features/production/shared/models/production_label_lookup_result.dart';
@@ -282,6 +283,35 @@ class MixerProductionInputViewModel extends ChangeNotifier {
       _inputsError.remove(noProduksi);
     }
     notifyListeners();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Outputs cache
+  // ---------------------------------------------------------------------------
+  final Map<String, List<MixerOutput>> _outputsCache = {};
+  final Map<String, bool> _outputsLoading = {};
+  final Map<String, String?> _outputsError = {};
+
+  bool isOutputsLoading(String noProduksi) => _outputsLoading[noProduksi] == true;
+  String? outputsError(String noProduksi) => _outputsError[noProduksi];
+  List<MixerOutput>? outputsOf(String noProduksi) => _outputsCache[noProduksi];
+
+  Future<void> loadOutputs(String noProduksi, {bool force = false}) async {
+    if (!force && _outputsCache.containsKey(noProduksi)) return;
+
+    _outputsLoading[noProduksi] = true;
+    _outputsError[noProduksi] = null;
+    notifyListeners();
+
+    try {
+      final result = await repository.fetchOutputs(noProduksi);
+      _outputsCache[noProduksi] = result;
+    } catch (e) {
+      _outputsError[noProduksi] = e.toString();
+    } finally {
+      _outputsLoading[noProduksi] = false;
+      notifyListeners();
+    }
   }
 
   // ---------------------------------------------------------------------------

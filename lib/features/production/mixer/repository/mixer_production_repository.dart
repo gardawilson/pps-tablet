@@ -9,6 +9,7 @@ import '../../../../core/services/token_storage.dart';
 import '../../../../core/utils/date_formatter.dart';
 
 import '../model/mixer_production_model.dart';
+export '../model/mixer_production_model.dart' show MixerMesinInfo;
 
 class MixerProductionRepository {
   static const _timeout = Duration(seconds: 25);
@@ -19,6 +20,39 @@ class MixerProductionRepository {
     'Authorization': 'Bearer $token',
     'Accept': 'application/json',
   };
+
+  // =========================
+  //  MIXER MESIN LIST
+  // =========================
+  Future<List<MixerMesinInfo>> fetchMixerMesin() async {
+    final token = await TokenStorage.getToken();
+    final apiBaseUri = Uri.parse(ApiConstants.baseUrl);
+    final url = Uri(
+      scheme: apiBaseUri.scheme.isEmpty ? 'http' : apiBaseUri.scheme,
+      host: apiBaseUri.host,
+      port: 7500,
+      path: '/api/mst-mesin/mixer',
+    );
+
+    late http.Response res;
+    try {
+      res = await http.get(url, headers: _headers(token)).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout mengambil data mesin mixer');
+    } catch (e) {
+      throw Exception('Gagal terhubung ke server: $e');
+    }
+
+    if (res.statusCode != 200) {
+      throw Exception('Gagal memuat mesin mixer (${res.statusCode})');
+    }
+
+    final body = json.decode(utf8.decode(res.bodyBytes));
+    final data = body['data'] as List<dynamic>? ?? [];
+    return data
+        .map((e) => MixerMesinInfo.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
 
   /// Get MixerProduksi_h by date
   /// Backend: GET /api/production/mixer/:date (YYYY-MM-DD)
@@ -68,21 +102,29 @@ class MixerProductionRepository {
     int pageSize = 20,
     String? search,
     String? noProduksi,
+    int? idMesin,
+    int? shift,
+    DateTime? date,
   }) async {
     final token = await TokenStorage.getToken();
 
-    // Prefer explicit noProduksi over generic search
     final String? effectiveSearch =
-    (noProduksi != null && noProduksi.trim().isNotEmpty)
-        ? noProduksi.trim()
-        : (search != null && search.trim().isNotEmpty
-        ? search.trim()
-        : null);
+        (noProduksi != null && noProduksi.trim().isNotEmpty)
+            ? noProduksi.trim()
+            : (search != null && search.trim().isNotEmpty
+                ? search.trim()
+                : null);
+
+    final String? df = date != null ? toDbDateString(date) : null;
 
     final qp = <String, String>{
       'page': '$page',
       'pageSize': '$pageSize',
       if (effectiveSearch != null) 'search': effectiveSearch,
+      if (idMesin != null) 'idMesin': '$idMesin',
+      if (shift != null) 'shift': '$shift',
+      if (df != null) 'dateFrom': df,
+      if (df != null) 'dateTo': df,
     };
 
     final url = Uri.parse('$_base/api/production/mixer').replace(
@@ -139,14 +181,95 @@ class MixerProductionRepository {
     int pageSize = 20,
     String? search,
     String? noProduksi,
+    int? idMesin,
   }) async {
     final r = await fetchAll(
       page: page,
       pageSize: pageSize,
       search: search,
       noProduksi: noProduksi,
+      idMesin: idMesin,
     );
     return (r['items'] as List<MixerProduction>);
+  }
+
+  // =========================
+  //  CREATE V2 (POST JSON)
+  //  POST /api/production/mixer
+  //  {tglProduksi, idMesin, idOperators[], outputJenisId, idRegu, shift, hourStart, hourEnd}
+  // =========================
+  Future<MixerProduction> createProduksiWithJenis({
+    required DateTime tglProduksi,
+    required int idMesin,
+    required List<int> idOperators,
+    required int outputJenisId,
+    required int shift,
+    String? hourStart,
+    String? hourEnd,
+    int? idRegu,
+    int? hadir,
+  }) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/production/mixer');
+
+    String normalizeTime(String v) {
+      final t = v.trim();
+      return t.length == 5 ? '$t:00' : t;
+    }
+
+    final bodyMap = <String, dynamic>{
+      'tglProduksi': toDbDateString(tglProduksi),
+      'idMesin': idMesin,
+      'idOperators': idOperators,
+      'outputJenisId': outputJenisId,
+      'shift': shift,
+      if (hourStart != null && hourStart.isNotEmpty) 'hourStart': normalizeTime(hourStart),
+      if (hourEnd != null && hourEnd.isNotEmpty) 'hourEnd': normalizeTime(hourEnd),
+      if (idRegu != null) 'idRegu': idRegu,
+      if (hadir != null) 'hadir': hadir,
+    };
+
+    final headers = {
+      'Authorization': 'Bearer $token',
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    };
+
+    print('➡️ [POST] $url');
+    print('📦 json body (mixer v2): $bodyMap');
+
+    late http.Response res;
+    try {
+      res = await http
+          .post(url, headers: headers, body: json.encode(bodyMap))
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout membuat mixer produksi');
+    } catch (e) {
+      print('❌ Request error (mixer v2 create): $e');
+      rethrow;
+    }
+
+    print('⬅️ [${res.statusCode}] ${res.body}');
+
+    if (res.statusCode != 201 && res.statusCode != 200) {
+      String msg = 'Gagal membuat mixer produksi (${res.statusCode})';
+      try {
+        final decoded = json.decode(utf8.decode(res.bodyBytes));
+        msg = (decoded['message'] as String?) ?? msg;
+      } catch (_) {}
+      throw Exception(msg);
+    }
+
+    final decoded = utf8.decode(res.bodyBytes);
+    final bodyJson = json.decode(decoded) as Map<String, dynamic>;
+    final data = bodyJson['data'] as Map<String, dynamic>?;
+
+    if (data == null) {
+      throw Exception('Response tidak mengandung data header mixer');
+    }
+
+    return MixerProduction.fromJson(data);
   }
 
   // =========================
@@ -371,6 +494,107 @@ class MixerProductionRepository {
     }
 
     return MixerProduction.fromJson(data);
+  }
+
+  // =========================
+  //  FETCH BY MESIN + TANGGAL + SHIFT
+  //  GET /api/production/mixer?idMesin=&tanggal=&shift=
+  // =========================
+  Future<List<MixerProduction>> fetchByMesinTanggalShift({
+    required int idMesin,
+    required DateTime tanggal,
+    required int shift,
+  }) async {
+    final token = await TokenStorage.getToken();
+    final dateStr = toDbDateString(tanggal);
+    final url = Uri.parse('$_base/api/production/mixer').replace(
+      queryParameters: {
+        'idMesin': '$idMesin',
+        'tanggal': dateStr,
+        'shift': '$shift',
+      },
+    );
+
+    late http.Response res;
+    try {
+      res = await http.get(url, headers: _headers(token)).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout mengambil riwayat mixer produksi');
+    } catch (e) {
+      rethrow;
+    }
+
+    if (res.statusCode != 200) {
+      throw Exception('Gagal memuat riwayat mixer (${res.statusCode})');
+    }
+
+    final body = json.decode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    final list = (body['data'] ?? []) as List;
+    return list
+        .map((e) => MixerProduction.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  // =========================
+  //  SPLIT TIME
+  //  POST /api/production/mixer/split-time/:idMesin/:tanggal
+  //  { hourStart, outputJenisId }
+  // =========================
+  Future<Map<String, dynamic>> splitTime({
+    required int idMesin,
+    required DateTime tanggal,
+    required String hourStart,
+    required int outputJenisId,
+  }) async {
+    final token = await TokenStorage.getToken();
+    final dateStr = toDbDateString(tanggal);
+    final url = Uri.parse(
+      '$_base/api/production/mixer/split-time/$idMesin/$dateStr',
+    );
+
+    String normalizeTime(String v) {
+      final t = v.trim();
+      return t.length == 5 ? '$t:00' : t;
+    }
+
+    final bodyMap = {
+      'hourStart': normalizeTime(hourStart),
+      'outputJenisId': outputJenisId,
+    };
+
+    final headers = {
+      'Authorization': 'Bearer $token',
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    };
+
+    print('➡️ [POST] $url');
+    print('📦 json body (mixer split-time): $bodyMap');
+
+    late http.Response res;
+    try {
+      res = await http
+          .post(url, headers: headers, body: json.encode(bodyMap))
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout split-time mixer produksi');
+    } catch (e) {
+      print('❌ Request error (mixer split-time): $e');
+      rethrow;
+    }
+
+    print('⬅️ [${res.statusCode}] ${res.body}');
+
+    if (res.statusCode != 200 && res.statusCode != 201) {
+      String msg = 'Gagal split-time mixer produksi (${res.statusCode})';
+      try {
+        final decoded = json.decode(utf8.decode(res.bodyBytes));
+        msg = (decoded['message'] as String?) ?? msg;
+      } catch (_) {}
+      throw Exception(msg);
+    }
+
+    return json.decode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
   }
 
   // =========================

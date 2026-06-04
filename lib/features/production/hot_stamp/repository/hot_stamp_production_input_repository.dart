@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import '../../../../core/network/api_client.dart';
 import '../../shared/models/production_label_lookup_result.dart';
 import '../../shared/models/cabinet_material_item.dart';
+import '../model/hot_stamp_output_model.dart';
 import '../model/hot_stamping_inputs_model.dart';
 
 class HotStampingProductionInputRepository {
@@ -211,5 +212,70 @@ class HotStampingProductionInputRepository {
     } catch (_) {
       return <String, dynamic>{'message': raw};
     }
+  }
+
+  // ===========================================================================
+  // SPLIT TIME (GANTI PRODUKSI)
+  // POST /api/production/hot-stamp/split-time/{idMesin}/{tanggal}
+  // Body: { "hourStart": "13:35", "outputJenisId": 12 }
+  // ===========================================================================
+  Future<Map<String, dynamic>> splitTime({
+    required int idMesin,
+    required DateTime tanggal,
+    required String hourStart,
+    required int outputJenisId,
+  }) async {
+    final dateStr =
+        '${tanggal.year.toString().padLeft(4, '0')}-'
+        '${tanggal.month.toString().padLeft(2, '0')}-'
+        '${tanggal.day.toString().padLeft(2, '0')}';
+    final path = '/api/production/hot-stamp/split-time/$idMesin/$dateStr';
+    return api.postJson(path, body: {
+      'hourStart': hourStart,
+      'outputJenisId': outputJenisId,
+    });
+  }
+
+  // ===========================================================================
+  // OUTPUTS — furniture WIP labels that have been produced
+  // GET /api/production/hot-stamp/:noProduksi/outputs/furniture-wip
+  // GET /api/production/hot-stamp/:noProduksi/outputs/reject
+  // ===========================================================================
+  Future<List<HotStampOutput>> fetchOutputs(String noProduksi) async {
+    Future<List<HotStampOutput>> loadCategory(
+      String path,
+      String category,
+    ) async {
+      try {
+        final body = await api.getJson(path);
+        final list = (body['data'] as List<dynamic>? ?? []);
+        return list
+            .map(
+              (e) => HotStampOutput.fromJson(
+                e as Map<String, dynamic>,
+                category: category,
+              ),
+            )
+            .toList();
+      } on ApiException catch (e) {
+        if (category == 'reject' && e.statusCode == 404) {
+          return <HotStampOutput>[];
+        }
+        rethrow;
+      }
+    }
+
+    final results = await Future.wait([
+      loadCategory(
+        '/api/production/hot-stamp/$noProduksi/outputs/furniture-wip',
+        'fwip',
+      ),
+      loadCategory(
+        '/api/production/hot-stamp/$noProduksi/outputs/reject',
+        'reject',
+      ),
+    ]);
+
+    return [...results[0], ...results[1]];
   }
 }

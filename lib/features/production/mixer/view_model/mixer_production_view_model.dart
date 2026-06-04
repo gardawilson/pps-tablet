@@ -360,6 +360,51 @@ class MixerProductionViewModel extends ChangeNotifier {
     }
   }
 
+  // ====== CREATE V2 (multi-operator + outputJenisId + idRegu) ======
+  Future<MixerProduction?> createProduksiWithJenis({
+    required DateTime tglProduksi,
+    required int idMesin,
+    required List<int> idOperators,
+    required int outputJenisId,
+    required int shift,
+    String? hourStart,
+    String? hourEnd,
+    int? idRegu,
+    int? hadir,
+  }) async {
+    isSaving = true;
+    saveError = null;
+    notifyListeners();
+
+    try {
+      final created = await repository.createProduksiWithJenis(
+        tglProduksi: tglProduksi,
+        idMesin: idMesin,
+        idOperators: idOperators,
+        outputJenisId: outputJenisId,
+        shift: shift,
+        hourStart: hourStart,
+        hourEnd: hourEnd,
+        idRegu: idRegu,
+        hadir: hadir,
+      );
+
+      if (_isByDateMode) {
+        await fetchByDate(tglProduksi);
+      } else {
+        refreshPaged();
+      }
+
+      return created;
+    } catch (e) {
+      saveError = e.toString().replaceFirst('Exception: ', '').trim();
+      return null;
+    } finally {
+      isSaving = false;
+      notifyListeners();
+    }
+  }
+
   Future<bool> deleteProduksi(String noProduksi) async {
     debugPrint('🗑 [MIXER_VM] deleteProduksi(noProduksi=$noProduksi), VM hash=$hashCode');
     try {

@@ -73,6 +73,11 @@ class _GilinganProductionInputScreenState
 
   List<BreadcrumbSegment> _prevBreadcrumb = [];
 
+  String get _breadcrumbLabel {
+    final m = (widget.namaJenis ?? '').trim();
+    return m.isNotEmpty ? m : widget.noProduksi;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -89,7 +94,7 @@ class _GilinganProductionInputScreenState
             },
           ),
         ),
-        BreadcrumbSegment(widget.noProduksi),
+        BreadcrumbSegment(_breadcrumbLabel),
       ];
 
       final vm = context.read<GilinganProductionInputViewModel>();
@@ -108,7 +113,7 @@ class _GilinganProductionInputScreenState
   void dispose() {
     if (!_isReplacing) {
       final current = AppShell.breadcrumb.value;
-      if (current.isNotEmpty && current.last.label == widget.noProduksi) {
+      if (current.isNotEmpty && current.last.label == _breadcrumbLabel) {
         AppShell.breadcrumb.value = _prevBreadcrumb;
       }
     }

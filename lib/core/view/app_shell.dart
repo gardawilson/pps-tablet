@@ -25,10 +25,11 @@ import 'package:pps_tablet/features/mapping/view/mapping_screen.dart';
 import 'package:pps_tablet/features/production/broker/view/broker_production_mesin_screen.dart';
 import 'package:pps_tablet/features/production/crusher/view/crusher_production_mesin_screen.dart';
 import 'package:pps_tablet/features/production/gilingan/view/gilingan_production_mesin_screen.dart';
+import 'package:pps_tablet/features/production/hot_stamp/view/hot_stamp_production_mesin_screen.dart';
 import 'package:pps_tablet/features/production/hot_stamp/view/hot_stamp_production_screen.dart';
 import 'package:pps_tablet/features/production/inject/view/inject_production_screen.dart';
-import 'package:pps_tablet/features/production/key_fitting/view/key_fitting_production_screen.dart';
-import 'package:pps_tablet/features/production/mixer/view/mixer_production_screen.dart';
+import 'package:pps_tablet/features/production/key_fitting/view/key_fitting_production_mesin_screen.dart';
+import 'package:pps_tablet/features/production/mixer/view/mixer_production_mesin_screen.dart';
 import 'package:pps_tablet/features/production/packing/view/packing_production_screen.dart';
 import 'package:pps_tablet/features/production/return/view/return_production_screen.dart';
 import 'package:pps_tablet/features/production/selection/view/production_selection_screen.dart';
@@ -62,11 +63,18 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   bool _sidebarCollapsed = false;
+  String? _username;
 
   @override
   void initState() {
     super.initState();
     AppShell.breadcrumb.addListener(_onBreadcrumbChanged);
+    _loadUserInfo();
+  }
+
+  Future<void> _loadUserInfo() async {
+    final username = await UserSessionStorage.getUsername(fallback: '-');
+    if (mounted) setState(() => _username = username);
   }
 
   void _onBreadcrumbChanged() {
@@ -139,9 +147,12 @@ class _AppShellState extends State<AppShell> {
 
   Widget _buildCompactAppBar(BuildContext context) {
     final backgroundColor = Theme.of(context).scaffoldBackgroundColor;
+    final segments = AppShell.breadcrumb.value;
+    final pageTitle = segments.isNotEmpty ? segments.last.label : 'Dashboard';
+    final username = _username ?? '-';
 
     return Container(
-      height: 42,
+      height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 18),
       decoration: BoxDecoration(
         color: backgroundColor,
@@ -150,195 +161,210 @@ class _AppShellState extends State<AppShell> {
         ),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          _BreadcrumbRow(segments: AppShell.breadcrumb.value),
-          const Spacer(),
-          _buildUserMenu(context),
-          const SizedBox(width: 10),
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.notifications_outlined),
-            tooltip: 'Notifikasi',
-            color: const Color(0xFF64748B),
-            iconSize: 20,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+          // Left: title + breadcrumb
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  pageTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                _BreadcrumbRow(segments: segments),
+              ],
+            ),
           ),
+
+          _buildUserChip(context, username),
         ],
       ),
     );
   }
 
-  Widget _buildUserMenu(BuildContext context) {
-    return FutureBuilder<String>(
-      future: UserSessionStorage.getUsername(fallback: '-'),
-      builder: (_, snapshot) {
-        final username = snapshot.data ?? '-';
-
-        return PopupMenuButton<_UserMenuAction>(
-          tooltip: 'Akun',
-          offset: const Offset(0, 34),
-          color: Colors.white,
-          elevation: 10,
-          shadowColor: Colors.black.withValues(alpha: 0.18),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: const BorderSide(color: Color(0xFFE2E8F0), width: 0.8),
-          ),
-          onSelected: (action) {
-            switch (action) {
-              case _UserMenuAction.account:
-                _showAccountDialog();
-                break;
-              case _UserMenuAction.logout:
-                _handleLogout(context);
-                break;
-            }
-          },
-          itemBuilder: (_) => [
-            PopupMenuItem<_UserMenuAction>(
-              enabled: false,
-              height: 70,
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: const Color(0xFF0D47A1),
-                    child: Text(
-                      _initials(username),
+  Widget _buildUserChip(BuildContext context, String username) {
+    return PopupMenuButton<_UserMenuAction>(
+      tooltip: 'Akun',
+      offset: const Offset(0, 44),
+      color: Colors.white,
+      elevation: 10,
+      shadowColor: Colors.black.withValues(alpha: 0.18),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: Color(0xFFE2E8F0), width: 0.8),
+      ),
+      onSelected: (action) {
+        switch (action) {
+          case _UserMenuAction.account:
+            _showAccountDialog();
+            break;
+          case _UserMenuAction.logout:
+            _handleLogout(context);
+            break;
+        }
+      },
+      itemBuilder: (_) => [
+        PopupMenuItem<_UserMenuAction>(
+          enabled: false,
+          height: 70,
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: const Color(0xFF0D47A1),
+                child: Text(
+                  _initials(username),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Masuk sebagai',
+                      style: TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      username,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
+                        color: Color(0xFF1E293B),
+                        fontSize: 15,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Masuk sebagai',
-                          style: TextStyle(
-                            color: Color(0xFF94A3B8),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        Text(
-                          username,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFF1E293B),
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const PopupMenuDivider(height: 1),
-            PopupMenuItem<_UserMenuAction>(
-              value: _UserMenuAction.account,
-              height: 44,
-              child: Row(
-                children: [
-                  Container(
-                    width: 30,
-                    height: 30,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.manage_accounts_outlined,
-                      color: Color(0xFF0D47A1),
-                      size: 18,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  const Text(
-                    'Akun',
-                    style: TextStyle(
-                      color: Color(0xFF334155),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            PopupMenuItem<_UserMenuAction>(
-              value: _UserMenuAction.logout,
-              height: 44,
-              child: Row(
-                children: [
-                  Container(
-                    width: 30,
-                    height: 30,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFEF2F2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.logout,
-                      color: Color(0xFFDC2626),
-                      size: 18,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  const Text(
-                    'Logout',
-                    style: TextStyle(
-                      color: Color(0xFFDC2626),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 180),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.account_circle_outlined,
-                  color: Color(0xFF64748B),
-                  size: 20,
+                  ],
                 ),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    username,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF475569),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+              ),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(height: 1),
+        PopupMenuItem<_UserMenuAction>(
+          value: _UserMenuAction.account,
+          height: 44,
+          child: Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                const SizedBox(width: 2),
-                const Icon(
-                  Icons.keyboard_arrow_down,
-                  color: Color(0xFF64748B),
+                child: const Icon(
+                  Icons.manage_accounts_outlined,
+                  color: Color(0xFF0D47A1),
                   size: 18,
                 ),
-              ],
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'Akun',
+                style: TextStyle(
+                  color: Color(0xFF334155),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        PopupMenuItem<_UserMenuAction>(
+          value: _UserMenuAction.logout,
+          height: 44,
+          child: Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.logout,
+                  color: Color(0xFFDC2626),
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'Logout',
+                style: TextStyle(
+                  color: Color(0xFFDC2626),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: const Color(0xFF0D47A1),
+            child: Text(
+              _initials(username),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
-        );
-      },
+          const SizedBox(width: 8),
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                username,
+                style: const TextStyle(
+                  color: Color(0xFF1E293B),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Text(
+                'Employee',
+                style: TextStyle(color: Color(0xFF64748B), fontSize: 10.5),
+              ),
+            ],
+          ),
+          const SizedBox(width: 4),
+          const Icon(
+            Icons.keyboard_arrow_down,
+            color: Color(0xFF64748B),
+            size: 16,
+          ),
+        ],
+      ),
     );
   }
 
@@ -432,15 +458,16 @@ class _AppShellState extends State<AppShell> {
       case '/production/gilingan':
         return const GilinganProductionMesinScreen();
       case '/production/mixer':
-        return MixerProductionScreen();
+        return const MixerProductionMesinScreen();
       case '/shell/hot-stamp':
+        return const HotStampProductionMesinScreen();
       case '/production/hot-stamp':
         return HotStampProductionScreen();
       case '/production/inject':
         return InjectProductionScreen();
       case '/shell/key-fitting':
       case '/production/key-fitting':
-        return KeyFittingProductionScreen();
+        return KeyFittingProductionMesinScreen();
       case '/shell/spanner':
       case '/production/spanner':
         return SpannerProductionScreen();
@@ -518,9 +545,9 @@ class _BreadcrumbRow extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          color: isLast ? const Color(0xFF1F2937) : const Color(0xFF6B7280),
-          fontSize: 15,
-          fontWeight: isLast ? FontWeight.w700 : FontWeight.w500,
+          color: isLast ? const Color(0xFF374151) : const Color(0xFF9CA3AF),
+          fontSize: 11,
+          fontWeight: isLast ? FontWeight.w600 : FontWeight.w400,
         ),
       );
 
@@ -543,10 +570,10 @@ class _BreadcrumbRow extends StatelessWidget {
       if (!isLast) {
         items.add(
           const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 4),
+            padding: EdgeInsets.symmetric(horizontal: 2),
             child: Icon(
               Icons.chevron_right_rounded,
-              size: 16,
+              size: 12,
               color: Color(0xFFD1D5DB),
             ),
           ),

@@ -6,10 +6,24 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../model/spanner_production_model.dart';
 
+
+
 class SpannerProductionRepository {
   final ApiClient api;
 
   SpannerProductionRepository({ApiClient? api}) : api = api ?? ApiClient();
+
+  // =========================
+  //  GET MESIN STATUS
+  //  GET /api/mst-mesin/spanner
+  // =========================
+  Future<List<SpannerMesinInfo>> fetchSpannerMesin() async {
+    final body = await api.getJson('/api/mst-mesin/spanner');
+    final List data = (body['data'] ?? []) as List;
+    return data
+        .map((e) => SpannerMesinInfo.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
 
   // =========================
   //  GET BY DATE
@@ -101,46 +115,33 @@ class SpannerProductionRepository {
 
   // =========================
   //  CREATE (POST)
-  //  POST /api/spanner/spanner
-  //  backend: hourStart & hourEnd required
+  //  POST /api/production/spanner
   // =========================
   Future<SpannerProduction> createProduksi({
     required DateTime tglProduksi,
     required int idMesin,
-    required int idOperator,
-    required dynamic jamKerja, // int atau String (backend kamu parseJamToInt juga)
+    required List<int> idOperators,
+    required int outputJenisId,
+    required int idRegu,
     required int shift,
     required String hourStart,
     required String hourEnd,
-    String? checkBy1,
-    String? checkBy2,
-    String? approveBy,
-    double? hourMeter,
   }) async {
-    final tglStr = toDbDateString(tglProduksi);
-
-    String _normalizeTime(String v) {
+    String norm(String v) {
       final t = v.trim();
-      if (t.isEmpty) return t;
-      if (t.length == 5) return '$t:00'; // HH:mm -> HH:mm:00
-      return t;
+      return t.length == 5 ? '$t:00' : t;
     }
 
     final payload = <String, dynamic>{
-      'tglProduksi': tglStr,
+      'tglProduksi': toDbDateString(tglProduksi),
       'idMesin': idMesin,
-      'idOperator': idOperator,
+      'idOperators': idOperators,
+      'outputJenisId': outputJenisId,
+      'idRegu': idRegu,
       'shift': shift,
-      'jamKerja': jamKerja, // optional sebenarnya, tapi biar konsisten
-      'hourStart': _normalizeTime(hourStart),
-      'hourEnd': _normalizeTime(hourEnd),
-      if (checkBy1 != null) 'checkBy1': checkBy1,
-      if (checkBy2 != null) 'checkBy2': checkBy2,
-      if (approveBy != null) 'approveBy': approveBy,
-      if (hourMeter != null) 'hourMeter': hourMeter,
+      'hourStart': norm(hourStart),
+      'hourEnd': norm(hourEnd),
     };
-
-    print('📦 Spanner create payload: $payload');
 
     final body = await api.postJson('/api/production/spanner', body: payload);
 

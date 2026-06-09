@@ -40,6 +40,7 @@ class _KeyFittingProductionMesinScreenState
   final _produksiScrollCtl = ScrollController();
   int? _filterIdMesin;
   KeyFittingMesinInfo? _selectedMesinInfo;
+  bool _isRiwayatExpanded = true;
 
   @override
   void initState() {
@@ -316,7 +317,9 @@ class _KeyFittingProductionMesinScreenState
                     final inactiveCount = allMesin.length - activeCount;
                     return MesinSectionHeader(
                       title: 'Status Mesin Pasang Kunci',
-                      onRefresh: _refreshAll,
+                      onToggleRiwayat: () =>
+                          setState(() => _isRiwayatExpanded = !_isRiwayatExpanded),
+                      isRiwayatVisible: _isRiwayatExpanded,
                       activeCount: activeCount,
                       inactiveCount: inactiveCount,
                       isLoading:
@@ -347,21 +350,27 @@ class _KeyFittingProductionMesinScreenState
                         );
                       }
                       final allMesin = snapshot.data ?? [];
-                      return GridView.builder(
-                        padding: const EdgeInsets.all(12),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 3,
-                              mainAxisExtent: 110,
-                              crossAxisSpacing: 10,
-                              mainAxisSpacing: 10,
-                            ),
-                        itemCount: allMesin.length,
-                        itemBuilder: (context, index) {
-                          final mesin = allMesin[index];
-                          return ProductionMesinCard(
-                            data: _toMesinCardData(mesin),
-                            onTap: () => _onMesinTap(mesin),
+                      return LayoutBuilder(
+                        builder: (context, constraints) {
+                          final cols =
+                              (constraints.maxWidth / 150).floor().clamp(2, 6);
+                          return GridView.builder(
+                            padding: const EdgeInsets.all(12),
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: cols,
+                                  mainAxisExtent: 110,
+                                  crossAxisSpacing: 10,
+                                  mainAxisSpacing: 10,
+                                ),
+                            itemCount: allMesin.length,
+                            itemBuilder: (context, index) {
+                              final mesin = allMesin[index];
+                              return ProductionMesinCard(
+                                data: _toMesinCardData(mesin),
+                                onTap: () => _onMesinTap(mesin),
+                              );
+                            },
                           );
                         },
                       );
@@ -376,6 +385,7 @@ class _KeyFittingProductionMesinScreenState
           const VerticalDivider(width: 1, color: Color(0xFFE5E7EB)),
 
           // ── RIGHT: riwayat produksi (2/5) ───────────────────────
+          if (_isRiwayatExpanded)
           Expanded(
             flex: 2,
             child: Column(

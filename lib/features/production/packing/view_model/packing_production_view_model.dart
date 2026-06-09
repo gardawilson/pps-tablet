@@ -232,18 +232,17 @@ class PackingProductionViewModel extends ChangeNotifier {
   Future<PackingProduction?> createProduksi({
     required DateTime tglProduksi,
     required int idMesin,
-    required int idOperator,
-    required dynamic jamKerja, // int or String
+    required List<int> idOperators,
+    required int outputJenisId,
+    required int idRegu,
     required int shift,
     required String hourStart,
     required String hourEnd,
-    String? checkBy1,
-    String? checkBy2,
-    String? approveBy,
+    int? jamKerja,
     double? hourMeter,
   }) async {
     debugPrint(
-        '🆕 [PACKING_VM] createProduksi(tglProduksi=$tglProduksi, idMesin=$idMesin, idOperator=$idOperator, jamKerja=$jamKerja, shift=$shift, hourStart=$hourStart, hourEnd=$hourEnd, hourMeter=$hourMeter), VM hash=$hashCode');
+        '🆕 [PACKING_VM] createProduksi(tglProduksi=$tglProduksi, idMesin=$idMesin, idOperators=$idOperators, outputJenisId=$outputJenisId, idRegu=$idRegu, shift=$shift, hourStart=$hourStart, hourEnd=$hourEnd, hourMeter=$hourMeter), VM hash=$hashCode');
 
     isSaving = true;
     saveError = null;
@@ -253,14 +252,13 @@ class PackingProductionViewModel extends ChangeNotifier {
       final created = await repository.createProduksi(
         tglProduksi: tglProduksi,
         idMesin: idMesin,
-        idOperator: idOperator,
-        jamKerja: jamKerja,
+        idOperators: idOperators,
+        outputJenisId: outputJenisId,
+        idRegu: idRegu,
         shift: shift,
         hourStart: hourStart,
         hourEnd: hourEnd,
-        checkBy1: checkBy1,
-        checkBy2: checkBy2,
-        approveBy: approveBy,
+        jamKerja: jamKerja,
         hourMeter: hourMeter,
       );
 

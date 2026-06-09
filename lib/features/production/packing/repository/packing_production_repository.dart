@@ -29,6 +29,18 @@ class PackingProductionRepository {
   }
 
   // ==========================================
+  //  MESIN STATUS
+  //  GET /api/mst-mesin/packing
+  // ==========================================
+  Future<List<PackingMesinInfo>> fetchPackingMesin() async {
+    final body = await api.getJson('/api/mst-mesin/packing');
+    final list = (body['data'] as List<dynamic>? ?? []);
+    return list
+        .map((e) => PackingMesinInfo.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  // ==========================================
   //  PAGINATED LIST
   //  GET /api/production/packing?page=&pageSize=&search=
   //  return: { items, page, totalPages, total }
@@ -40,6 +52,7 @@ class PackingProductionRepository {
     String? noPacking,
     String? dateFrom, // optional: 'yyyy-MM-dd'
     String? dateTo, // optional: 'yyyy-MM-dd'
+    int? idMesin,
   }) async {
     final String? effectiveSearch =
     (noPacking != null && noPacking.trim().isNotEmpty)
@@ -52,6 +65,7 @@ class PackingProductionRepository {
       if (effectiveSearch != null) 'search': effectiveSearch,
       if (dateFrom != null && dateFrom.trim().isNotEmpty) 'dateFrom': dateFrom,
       if (dateTo != null && dateTo.trim().isNotEmpty) 'dateTo': dateTo,
+      if (idMesin != null) 'idMesin': idMesin,
     };
 
     final body = await api.getJson('/api/production/packing', query: qp);
@@ -113,14 +127,13 @@ class PackingProductionRepository {
   Future<PackingProduction> createProduksi({
     required DateTime tglProduksi,
     required int idMesin,
-    required int idOperator,
-    required dynamic jamKerja, // int atau String (backend parseJamToInt)
+    required List<int> idOperators,
+    required int outputJenisId,
+    required int idRegu,
     required int shift,
     required String hourStart,
     required String hourEnd,
-    String? checkBy1,
-    String? checkBy2,
-    String? approveBy,
+    int? jamKerja,
     double? hourMeter,
   }) async {
     final tglStr = toDbDateString(tglProduksi);
@@ -135,14 +148,13 @@ class PackingProductionRepository {
     final payload = <String, dynamic>{
       'tglProduksi': tglStr,
       'idMesin': idMesin,
-      'idOperator': idOperator,
+      'idOperators': idOperators,
+      'outputJenisId': outputJenisId,
+      'idRegu': idRegu,
       'shift': shift,
-      'jamKerja': jamKerja,
       'hourStart': _normalizeTime(hourStart),
       'hourEnd': _normalizeTime(hourEnd),
-      if (checkBy1 != null) 'checkBy1': checkBy1,
-      if (checkBy2 != null) 'checkBy2': checkBy2,
-      if (approveBy != null) 'approveBy': approveBy,
+      if (jamKerja != null) 'jamKerja': jamKerja,
       if (hourMeter != null) 'hourMeter': hourMeter,
     };
 

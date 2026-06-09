@@ -92,7 +92,7 @@ import 'package:pps_tablet/features/production/mixer/view_model/mixer_production
 import 'package:pps_tablet/features/production/mixer/view_model/mixer_production_view_model.dart';
 import 'package:pps_tablet/features/production/packing/repository/packing_production_input_repository.dart';
 import 'package:pps_tablet/features/production/packing/repository/packing_production_repository.dart';
-import 'package:pps_tablet/features/production/packing/view/packing_production_screen.dart';
+import 'package:pps_tablet/features/production/packing/view/packing_production_mesin_screen.dart';
 import 'package:pps_tablet/features/production/packing/view_model/packing_production_input_view_model.dart';
 import 'package:pps_tablet/features/production/packing/view_model/packing_production_view_model.dart';
 import 'package:pps_tablet/features/production/return/repository/return_production_repository.dart';
@@ -569,8 +569,8 @@ class MyApp extends StatelessWidget {
           '/production/key-fitting': (context) => KeyFittingProductionScreen(),
           '/shell/spanner': (context) => SpannerProductionScreen(),
           '/production/spanner': (context) => SpannerProductionScreen(),
-          '/shell/packing': (context) => PackingProductionScreen(),
-          '/production/packing': (context) => PackingProductionScreen(),
+          '/shell/packing': (context) => PackingProductionMesinScreen(),
+          '/production/packing': (context) => PackingProductionMesinScreen(),
           '/production/sortir-reject': (context) =>
               SortirRejectProductionScreen(),
           '/shell/return': (context) => ReturnProductionScreen(),

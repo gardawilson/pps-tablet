@@ -5,6 +5,10 @@ class PackingProduction {
   final String noPacking;
   final int idMesin;
   final int idOperator;
+  final List<int> idOperators;
+  final int? idRegu;
+  final int? outputJenisId;
+  final String? outputJenisNama;
 
   final String namaMesin;
   final String namaOperator;
@@ -17,7 +21,7 @@ class PackingProduction {
 
   final String createBy;
 
-  final int? hourMeter;
+  final double? hourMeter;
 
   final String? checkBy1;
   final String? checkBy2;
@@ -40,6 +44,10 @@ class PackingProduction {
     required this.tglProduksi,
     required this.shift,
     required this.createBy,
+    this.idOperators = const [],
+    this.idRegu,
+    this.outputJenisId,
+    this.outputJenisNama,
     this.jamKerja,
     this.hourMeter,
     this.checkBy1,
@@ -65,6 +73,14 @@ class PackingProduction {
     if (v is double) return v.toInt();
     if (v is num) return v.toInt();
     if (v is String) return int.tryParse(v);
+    return null;
+  }
+
+  static double? _asDouble(dynamic v) {
+    if (v == null) return null;
+    if (v is double) return v;
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v);
     return null;
   }
 
@@ -99,17 +115,19 @@ class PackingProduction {
 
     // TIME kadang dimapping ke DateTime (1900-01-01 + time)
     if (v is DateTime) {
-      return DateFormat('HH:mm').format(v.toLocal());
+      return DateFormat('HH:mm').format(v.isUtc ? v : v.toUtc());
     }
 
-    // String: "HH:mm[:ss[.fff]]" atau "1900-01-01T07:30:00"
+    // String: "HH:mm[:ss[.fff]]" atau "1900-01-01T07:30:00.000Z"
     if (v is String) {
       final s = v.trim();
       if (s.isEmpty) return null;
 
       final asDt = DateTime.tryParse(s);
       if (asDt != null) {
-        return DateFormat('HH:mm').format(asDt.toLocal());
+        // Backend mengirim time-only sebagai datetime dengan tanggal dummy (1900/1970).
+        // Selalu baca jam dari UTC agar tidak terkena konversi timezone.
+        return DateFormat('HH:mm').format(asDt.toUtc());
       }
 
       final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(s);
@@ -128,6 +146,12 @@ class PackingProduction {
       noPacking: _asString(j['NoPacking']),
       idMesin: _asIntRequired(j['IdMesin']),
       idOperator: _asIntRequired(j['IdOperator']),
+      idOperators: (j['IdOperators'] as List<dynamic>? ?? [])
+          .map((e) => _asIntRequired(e))
+          .toList(),
+      idRegu: _asInt(j['IdRegu']),
+      outputJenisId: _asInt(j['OutputJenisId']),
+      outputJenisNama: j['OutputJenisNama']?.toString(),
       namaMesin: _asString(j['NamaMesin']),
       namaOperator: _asString(j['NamaOperator']),
 
@@ -147,7 +171,7 @@ class PackingProduction {
           : _asString(j['ApproveBy']),
 
       jamKerja: _asInt(j['JamKerja']),
-      hourMeter: _asInt(j['HourMeter']),
+      hourMeter: _asDouble(j['HourMeter']),
       hourStart: _asTimeHHmm(j['HourStart']),
       hourEnd: _asTimeHHmm(j['HourEnd']),
 
@@ -252,13 +276,17 @@ class PackingProduction {
     String? noPacking,
     int? idMesin,
     int? idOperator,
+    List<int>? idOperators,
+    int? idRegu,
+    int? outputJenisId,
+    String? outputJenisNama,
     String? namaMesin,
     String? namaOperator,
     DateTime? tglProduksi,
     int? shift,
     String? createBy,
     int? jamKerja,
-    int? hourMeter,
+    double? hourMeter,
     String? checkBy1,
     String? checkBy2,
     String? approveBy,
@@ -271,6 +299,10 @@ class PackingProduction {
       noPacking: noPacking ?? this.noPacking,
       idMesin: idMesin ?? this.idMesin,
       idOperator: idOperator ?? this.idOperator,
+      idOperators: idOperators ?? this.idOperators,
+      idRegu: idRegu ?? this.idRegu,
+      outputJenisId: outputJenisId ?? this.outputJenisId,
+      outputJenisNama: outputJenisNama ?? this.outputJenisNama,
       namaMesin: namaMesin ?? this.namaMesin,
       namaOperator: namaOperator ?? this.namaOperator,
       tglProduksi: tglProduksi ?? this.tglProduksi,
@@ -285,6 +317,87 @@ class PackingProduction {
       hourEnd: hourEnd ?? this.hourEnd,
       lastClosedDate: lastClosedDate ?? this.lastClosedDate,
       isLocked: isLocked ?? this.isLocked,
+    );
+  }
+}
+
+// ── Mesin Info (from /api/mst-mesin/packing) ─────────────────────────────────
+
+class PackingMesinInfo {
+  final int idMesin;
+  final String namaMesin;
+  final String? bagian;
+
+  final String? noProduksi;
+  final DateTime? tglProduksi;
+  final int? idRegu;
+  final String? namaRegu;
+  final int? outputJenisId;
+  final String? outputJenisNama;
+  final int? shift;
+  final String? hourStart;
+  final String? hourEnd;
+
+  const PackingMesinInfo({
+    required this.idMesin,
+    required this.namaMesin,
+    this.bagian,
+    this.noProduksi,
+    this.tglProduksi,
+    this.idRegu,
+    this.namaRegu,
+    this.outputJenisId,
+    this.outputJenisNama,
+    this.shift,
+    this.hourStart,
+    this.hourEnd,
+  });
+
+  bool get isActive => noProduksi != null;
+
+  static String? _asTimeHHmm(dynamic v) {
+    if (v == null) return null;
+    if (v is String) {
+      final s = v.trim();
+      if (s.isEmpty) return null;
+      final dt = DateTime.tryParse(s);
+      if (dt != null) return DateFormat('HH:mm').format(dt.toUtc());
+      final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(s);
+      if (m != null) {
+        return '${m.group(1)!.padLeft(2, '0')}:${m.group(2)!}';
+      }
+    }
+    return null;
+  }
+
+  factory PackingMesinInfo.fromJson(Map<String, dynamic> j) {
+    int? asInt(dynamic v) {
+      if (v == null) return null;
+      if (v is int) return v;
+      if (v is num) return v.toInt();
+      return int.tryParse(v.toString());
+    }
+
+    DateTime? asDateTime(dynamic v) {
+      if (v == null) return null;
+      if (v is DateTime) return v;
+      if (v is String && v.trim().isNotEmpty) return DateTime.tryParse(v.trim());
+      return null;
+    }
+
+    return PackingMesinInfo(
+      idMesin: asInt(j['IdMesin']) ?? 0,
+      namaMesin: j['NamaMesin']?.toString() ?? '',
+      bagian: j['Bagian']?.toString(),
+      noProduksi: j['NoProduksi']?.toString(),
+      tglProduksi: asDateTime(j['TglProduksi']),
+      idRegu: asInt(j['IdRegu']),
+      namaRegu: j['NamaRegu']?.toString(),
+      outputJenisId: asInt(j['OutputJenisId']),
+      outputJenisNama: j['OutputJenisNama']?.toString(),
+      shift: asInt(j['Shift']),
+      hourStart: _asTimeHHmm(j['HourStart']),
+      hourEnd: _asTimeHHmm(j['HourEnd']),
     );
   }
 }

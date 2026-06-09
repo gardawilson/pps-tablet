@@ -8,6 +8,7 @@ import '../../../../core/network/api_client.dart';
 import '../../shared/models/production_label_lookup_result.dart';
 import '../../shared/models/cabinet_material_item.dart';
 import '../model/spanner_inputs_model.dart';
+import '../model/spanner_output_model.dart';
 
 class SpannerProductionInputRepository {
   final ApiClient api;
@@ -54,6 +55,68 @@ class SpannerProductionInputRepository {
 
   void invalidateInputs(String noProduksi) => _inputsCache.remove(noProduksi);
   void clearCache() => _inputsCache.clear();
+
+  /* =============================
+   * GET OUTPUTS (FWIP + REJECT)
+   * ============================= */
+
+  Future<List<SpannerOutput>> fetchOutputs(String noProduksi) async {
+    Future<List<SpannerOutput>> loadCategory(
+      String path,
+      String category,
+    ) async {
+      try {
+        final body = await api.getJson(path);
+        final list = (body['data'] as List<dynamic>? ?? []);
+        return list
+            .map(
+              (e) => SpannerOutput.fromJson(
+                e as Map<String, dynamic>,
+                category: category,
+              ),
+            )
+            .toList();
+      } on ApiException catch (e) {
+        if (e.statusCode == 404) return <SpannerOutput>[];
+        rethrow;
+      }
+    }
+
+    final results = await Future.wait([
+      loadCategory(
+        '/api/production/spanner/$noProduksi/outputs/furniture-wip',
+        'fwip',
+      ),
+      loadCategory(
+        '/api/production/spanner/$noProduksi/outputs/reject',
+        'reject',
+      ),
+    ]);
+
+    return [...results[0], ...results[1]];
+  }
+
+  /* =============================
+   * SPLIT TIME (GANTI PRODUKSI)
+   * POST /api/production/spanner/split-time/{idMesin}/{tanggal}
+   * ============================= */
+
+  Future<Map<String, dynamic>> splitTime({
+    required int idMesin,
+    required DateTime tanggal,
+    required String hourStart,
+    required int outputJenisId,
+  }) async {
+    final dateStr =
+        '${tanggal.year.toString().padLeft(4, '0')}-'
+        '${tanggal.month.toString().padLeft(2, '0')}-'
+        '${tanggal.day.toString().padLeft(2, '0')}';
+    final path = '/api/production/spanner/split-time/$idMesin/$dateStr';
+    return api.postJson(path, body: {
+      'hourStart': hourStart,
+      'outputJenisId': outputJenisId,
+    });
+  }
 
   /* =============================
    * GET MASTER CABINET MATERIALS (MASTER + STOCK)

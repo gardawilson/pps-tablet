@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
+import '../model/packing_output_model.dart';
 import '../repository/packing_production_input_repository.dart';
 import '../model/packing_production_inputs_model.dart';
 
@@ -220,6 +221,40 @@ class PackingProductionInputViewModel extends ChangeNotifier {
       _inputsError.remove(key);
     }
     notifyListeners();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Outputs (Barang Jadi)
+  // ---------------------------------------------------------------------------
+  final Map<String, List<PackingOutput>> _outputsCache = {};
+  final Map<String, bool> _outputsLoading = {};
+  final Map<String, String?> _outputsError = {};
+
+  bool isOutputsLoading(String noPacking) =>
+      _outputsLoading[noPacking] == true;
+  String? outputsError(String noPacking) => _outputsError[noPacking];
+  List<PackingOutput>? outputsOf(String noPacking) =>
+      _outputsCache[noPacking];
+
+  Future<void> loadOutputs(String noPacking, {bool force = false}) async {
+    final key = noPacking.trim();
+    if (key.isEmpty) return;
+
+    if (!force && _outputsCache.containsKey(key)) return;
+
+    _outputsLoading[key] = true;
+    _outputsError[key] = null;
+    notifyListeners();
+
+    try {
+      final result = await repository.fetchOutputs(key, force: force);
+      _outputsCache[key] = result;
+    } catch (e) {
+      _outputsError[key] = e.toString();
+    } finally {
+      _outputsLoading[key] = false;
+      notifyListeners();
+    }
   }
 
   // ---------------------------------------------------------------------------

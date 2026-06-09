@@ -30,10 +30,11 @@ import 'package:pps_tablet/features/production/hot_stamp/view/hot_stamp_producti
 import 'package:pps_tablet/features/production/inject/view/inject_production_screen.dart';
 import 'package:pps_tablet/features/production/key_fitting/view/key_fitting_production_mesin_screen.dart';
 import 'package:pps_tablet/features/production/mixer/view/mixer_production_mesin_screen.dart';
-import 'package:pps_tablet/features/production/packing/view/packing_production_screen.dart';
+import 'package:pps_tablet/features/production/packing/view/packing_production_mesin_screen.dart';
 import 'package:pps_tablet/features/production/return/view/return_production_screen.dart';
 import 'package:pps_tablet/features/production/selection/view/production_selection_screen.dart';
 import 'package:pps_tablet/features/production/sortir_reject/view/sortir_reject_production_screen.dart';
+import 'package:pps_tablet/features/production/spanner/view/spanner_production_mesin_screen.dart';
 import 'package:pps_tablet/features/production/spanner/view/spanner_production_screen.dart';
 import 'package:pps_tablet/features/production/washing/view/washing_production_mesin_screen.dart';
 import 'package:pps_tablet/features/report/view/report_list_screen.dart';
@@ -469,11 +470,12 @@ class _AppShellState extends State<AppShell> {
       case '/production/key-fitting':
         return KeyFittingProductionMesinScreen();
       case '/shell/spanner':
+        return const SpannerProductionMesinScreen();
       case '/production/spanner':
         return SpannerProductionScreen();
       case '/shell/packing':
       case '/production/packing':
-        return PackingProductionScreen();
+        return PackingProductionMesinScreen();
       case '/production/sortir-reject':
         return SortirRejectProductionScreen();
       case '/shell/return':

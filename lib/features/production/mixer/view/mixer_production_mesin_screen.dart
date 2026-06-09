@@ -6,14 +6,14 @@ import '../../../../common/widgets/success_status_dialog.dart';
 import '../../../../features/mesin/model/mesin_model.dart';
 import '../../../shift/repository/shift_repository.dart';
 import '../../shared/widgets/mesin_section_header.dart';
+import '../../shared/widgets/production_mesin_card.dart';
+import '../../shared/widgets/production_produksi_list.dart';
+import '../../shared/widgets/production_riwayat_header.dart';
 import '../model/mixer_production_model.dart';
 import '../repository/mixer_production_repository.dart';
 import '../view_model/mixer_production_view_model.dart';
-import '../widgets/mixer_mesin_card.dart';
-import '../widgets/mixer_produksi_list.dart';
 import '../widgets/mixer_production_delete_dialog.dart';
 import '../widgets/mixer_production_form_dialog.dart';
-import '../widgets/mixer_riwayat_section_header.dart';
 import 'mixer_production_input_screen.dart';
 
 class MixerProductionMesinScreen extends StatefulWidget {
@@ -38,6 +38,7 @@ class _MixerProductionMesinScreenState
   final _produksiScrollCtl = ScrollController();
   int? _filterIdMesin;
   MixerMesinInfo? _selectedMesinInfo;
+  bool _isRiwayatExpanded = true;
 
   @override
   void initState() {
@@ -122,6 +123,42 @@ class _MixerProductionMesinScreenState
     _loadMesin();
     _loadProduksiPage();
   }
+
+  // ── Card / row data converters ────────────────────────────────────────────
+
+  static MesinCardData _toMesinCardData(MixerMesinInfo mesin) {
+    String? shiftTimeText;
+    if (mesin.isActive) {
+      final parts = <String>[];
+      if (mesin.shift != null) parts.add('Shift ${mesin.shift}');
+      parts.add('${mesin.hourStart ?? '--:--'} – ${mesin.hourEnd ?? '--:--'}');
+      shiftTimeText = parts.join('  |  ');
+    }
+    return MesinCardData(
+      namaMesin: mesin.namaMesin,
+      isActive: mesin.isActive,
+      shiftTimeText: shiftTimeText,
+      namaRegu: mesin.namaRegu,
+      outputJenisNama: mesin.produksiList.isNotEmpty
+          ? mesin.produksiList.first.outputJenisNama
+          : null,
+    );
+  }
+
+  static ProduksiRowData _toRowData(MixerProduction row) {
+    return ProduksiRowData(
+      tglProduksi: row.tglProduksi,
+      hourStart: row.hourStart,
+      hourEnd: row.hourEnd,
+      shift: row.shift,
+      isLocked: row.isLocked,
+      namaMesin: row.namaMesin,
+      namaRegu: row.namaRegu,
+      outputJenisNama: row.outputJenisNama,
+    );
+  }
+
+  // ── Navigation helpers ────────────────────────────────────────────────────
 
   Future<void> _openBackdateDialog(MixerMesinInfo mesin) async {
     if (!mounted) return;
@@ -263,6 +300,8 @@ class _MixerProductionMesinScreenState
     _refreshAll();
   }
 
+  // ── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -284,7 +323,9 @@ class _MixerProductionMesinScreenState
                     final inactiveCount = allMesin.length - activeCount;
                     return MesinSectionHeader(
                       title: 'Status Mesin Mixer',
-                      onRefresh: _refreshAll,
+                      onToggleRiwayat: () =>
+                          setState(() => _isRiwayatExpanded = !_isRiwayatExpanded),
+                      isRiwayatVisible: _isRiwayatExpanded,
                       activeCount: activeCount,
                       inactiveCount: inactiveCount,
                       isLoading:
@@ -315,21 +356,27 @@ class _MixerProductionMesinScreenState
                         );
                       }
                       final allMesin = snapshot.data ?? [];
-                      return GridView.builder(
-                        padding: const EdgeInsets.all(12),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 3,
-                              mainAxisExtent: 110,
-                              crossAxisSpacing: 10,
-                              mainAxisSpacing: 10,
-                            ),
-                        itemCount: allMesin.length,
-                        itemBuilder: (context, index) {
-                          final mesin = allMesin[index];
-                          return MixerMesinCard(
-                            mesin: mesin,
-                            onTap: () => _onMesinTap(mesin),
+                      return LayoutBuilder(
+                        builder: (context, constraints) {
+                          final cols =
+                              (constraints.maxWidth / 150).floor().clamp(2, 6);
+                          return GridView.builder(
+                            padding: const EdgeInsets.all(12),
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: cols,
+                                  mainAxisExtent: 110,
+                                  crossAxisSpacing: 10,
+                                  mainAxisSpacing: 10,
+                                ),
+                            itemCount: allMesin.length,
+                            itemBuilder: (context, index) {
+                              final mesin = allMesin[index];
+                              return ProductionMesinCard(
+                                data: _toMesinCardData(mesin),
+                                onTap: () => _onMesinTap(mesin),
+                              );
+                            },
                           );
                         },
                       );
@@ -344,6 +391,7 @@ class _MixerProductionMesinScreenState
           const VerticalDivider(width: 1, color: Color(0xFFE5E7EB)),
 
           // ── RIGHT: riwayat produksi (2/5) ───────────────────────
+          if (_isRiwayatExpanded)
           Expanded(
             flex: 2,
             child: Column(
@@ -352,8 +400,15 @@ class _MixerProductionMesinScreenState
                 FutureBuilder<List<MixerMesinInfo>>(
                   future: _mesinFuture,
                   builder: (context, snapshot) {
-                    return MixerRiwayatSectionHeader(
-                      mesinList: snapshot.data ?? [],
+                    return ProductionRiwayatHeader(
+                      mesinList: (snapshot.data ?? [])
+                          .map(
+                            (m) => MesinFilterItem(
+                              idMesin: m.idMesin,
+                              namaMesin: m.namaMesin,
+                            ),
+                          )
+                          .toList(),
                       selectedIdMesin: _filterIdMesin,
                       onFilterChanged: (id) {
                         final mesinData = snapshot.data ?? [];
@@ -375,12 +430,13 @@ class _MixerProductionMesinScreenState
                     children: [
                       RefreshIndicator(
                         onRefresh: _loadProduksiPage,
-                        child: MixerProduksiList(
+                        child: ProductionProduksiList<MixerProduction>(
                           items: _produksiItems,
+                          dataOf: _toRowData,
                           isLoading: _produksiLoading,
                           isFetchingMore: _produksiFetchingMore,
                           scrollController: _produksiScrollCtl,
-                          filterIdMesin: _filterIdMesin,
+                          showMesin: _filterIdMesin == null,
                           onTap: (row) async {
                             await Navigator.of(context).push(
                               MaterialPageRoute(

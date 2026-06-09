@@ -3,35 +3,37 @@ import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
-import '../../../../features/mesin/model/mesin_model.dart';
-import '../../../shift/repository/shift_repository.dart';
 import '../../shared/widgets/mesin_section_header.dart';
 import '../../shared/widgets/production_mesin_card.dart';
 import '../../shared/widgets/production_produksi_list.dart';
 import '../../shared/widgets/production_riwayat_header.dart';
-import '../model/gilingan_production_model.dart';
-import '../repository/gilingan_production_repository.dart';
-import '../view_model/gilingan_production_view_model.dart';
-import '../widgets/gilingan_production_delete_dialog.dart';
-import '../widgets/gilingan_production_form_dialog.dart';
-import 'gilingan_production_input_screen.dart';
+import '../../../mesin/model/mesin_model.dart';
+import '../../../shift/repository/shift_repository.dart';
+import '../model/packing_production_model.dart';
+import '../repository/packing_production_repository.dart';
+import '../view_model/packing_production_view_model.dart';
+import '../widgets/packing_production_delete_dialog.dart';
+import '../widgets/packing_production_form_dialog.dart';
+import 'packing_production_input_screen.dart';
 
-class GilinganProductionMesinScreen extends StatefulWidget {
-  const GilinganProductionMesinScreen({super.key});
+class PackingProductionMesinScreen extends StatefulWidget {
+  const PackingProductionMesinScreen({super.key});
 
   @override
-  State<GilinganProductionMesinScreen> createState() =>
-      _GilinganProductionMesinScreenState();
+  State<PackingProductionMesinScreen> createState() =>
+      _PackingProductionMesinScreenState();
 }
 
-class _GilinganProductionMesinScreenState
-    extends State<GilinganProductionMesinScreen> {
-  final _repo = GilinganProductionRepository();
-  late final GilinganProductionViewModel _editVmPool;
+class _PackingProductionMesinScreenState
+    extends State<PackingProductionMesinScreen> {
+  final _repo = PackingProductionRepository();
+  late final PackingProductionViewModel _editVmPool;
 
-  Future<List<GilinganMesinInfo>> _mesinFuture = Future.value([]);
+  Future<List<PackingMesinInfo>> _mesinFuture = Future.value(
+    <PackingMesinInfo>[],
+  );
 
-  final List<GilinganProduction> _produksiItems = [];
+  final List<PackingProduction> _produksiItems = [];
   bool _produksiLoading = false;
   bool _produksiFetchingMore = false;
   bool _produksiHasMore = true;
@@ -39,13 +41,13 @@ class _GilinganProductionMesinScreenState
   static const _pageSize = 30;
   final _produksiScrollCtl = ScrollController();
   int? _filterIdMesin;
-  GilinganMesinInfo? _selectedMesinInfo;
+  PackingMesinInfo? _selectedMesinInfo;
   bool _isRiwayatExpanded = true;
 
   @override
   void initState() {
     super.initState();
-    _editVmPool = GilinganProductionViewModel(repository: _repo);
+    _editVmPool = PackingProductionViewModel(repository: _repo);
     _loadMesin();
     _loadProduksiPage();
     _produksiScrollCtl.addListener(_onProduksiScroll);
@@ -59,12 +61,8 @@ class _GilinganProductionMesinScreenState
   }
 
   Future<void> _loadMesin() async {
-    final future = _repo.fetchGilinganMesin();
-    if (!mounted) return;
-    setState(() => _mesinFuture = future);
-    try {
-      await future;
-    } catch (_) {}
+    final future = _repo.fetchPackingMesin();
+    if (mounted) setState(() => _mesinFuture = future);
   }
 
   void _onProduksiScroll() {
@@ -91,7 +89,7 @@ class _GilinganProductionMesinScreenState
         idMesin: _filterIdMesin,
       );
       if (!mounted) return;
-      final newItems = res['items'] as List<GilinganProduction>;
+      final newItems = res['items'] as List<PackingProduction>;
       final totalPages = (res['totalPages'] as int?) ?? 1;
       setState(() {
         _produksiItems.addAll(newItems);
@@ -114,7 +112,7 @@ class _GilinganProductionMesinScreenState
         idMesin: _filterIdMesin,
       );
       if (!mounted) return;
-      final newItems = res['items'] as List<GilinganProduction>;
+      final newItems = res['items'] as List<PackingProduction>;
       final totalPages = (res['totalPages'] as int?) ?? 1;
       setState(() {
         _produksiItems.addAll(newItems);
@@ -134,13 +132,12 @@ class _GilinganProductionMesinScreenState
 
   // ── Card / row data converters ────────────────────────────────────────────
 
-  static MesinCardData _toMesinCardData(GilinganMesinInfo mesin) {
+  static MesinCardData _toMesinCardData(PackingMesinInfo mesin) {
     String? shiftTimeText;
     if (mesin.isActive) {
       final parts = <String>[];
       if (mesin.shift != null) parts.add('Shift ${mesin.shift}');
-      parts.add(
-          '${mesin.hourStart ?? '--:--'} – ${mesin.hourEnd ?? '--:--'}');
+      parts.add('${mesin.hourStart ?? '--:--'} – ${mesin.hourEnd ?? '--:--'}');
       shiftTimeText = parts.join('  |  ');
     }
     return MesinCardData(
@@ -152,7 +149,7 @@ class _GilinganProductionMesinScreenState
     );
   }
 
-  static ProduksiRowData _toRowData(GilinganProduction row) {
+  static ProduksiRowData _toRowData(PackingProduction row) {
     return ProduksiRowData(
       tglProduksi: row.tglProduksi,
       hourStart: row.hourStart,
@@ -160,88 +157,48 @@ class _GilinganProductionMesinScreenState
       shift: row.shift,
       isLocked: row.isLocked,
       namaMesin: row.namaMesin,
-      namaRegu: row.namaRegu,
-      outputJenisNama: row.outputJenisNama,
+      namaRegu: row.namaOperator,
+      outputJenisNama: null,
     );
   }
 
   // ── Navigation helpers ────────────────────────────────────────────────────
 
-  Future<void> _openCreateDialog({required GilinganMesinInfo mesin}) async {
+  Future<void> _openCreateDialog({
+    PackingMesinInfo? mesin,
+    bool isBackdate = false,
+  }) async {
     if (!mounted) return;
+    final initialMesin = mesin == null
+        ? null
+        : MstMesin(
+            idMesin: mesin.idMesin,
+            namaMesin: mesin.namaMesin,
+            bagian: mesin.bagian ?? '',
+            enable: true,
+          );
 
-    final mstMesin = MstMesin(
-      idMesin: mesin.idMesin,
-      namaMesin: mesin.namaMesin,
-      bagian: mesin.bagian,
-      enable: true,
-    );
-
-    final defaultShift = await ShiftRepository.fetchCurrentShift();
-    if (!mounted) return;
-
-    final created = await showDialog<GilinganProduction>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => ChangeNotifierProvider.value(
-        value: _editVmPool,
-        child: GilinganProductionFormDialog(
-          initialMesin: mstMesin,
-          initialDate: DateTime.now(),
-          initialShift: defaultShift?.shift,
-          initialHourStart: defaultShift?.hourStart,
-          initialHourEnd: defaultShift?.hourEnd,
-          lockShiftFields: defaultShift != null,
-          onSave: (p) => Navigator.of(context).pop(p),
-        ),
-      ),
-    );
-
-    if (!mounted) return;
-    if (created != null) {
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => GilinganProductionInputScreen(
-            noProduksi: created.noProduksi,
-            isLocked: created.isLocked,
-            lastClosedDate: created.lastClosedDate,
-            outputJenisId: created.outputJenisId,
-            namaJenis: created.outputJenisNama,
-            idMesin: created.idMesin,
-            tglProduksi: created.tglProduksi,
-            shift: created.shift,
-            hourStart: created.hourStart,
-            hourEnd: created.hourEnd,
-          ),
-        ),
-      );
+    // Fetch current shift hanya saat realtime (isBackdate=false, dari klik kartu mesin)
+    ActiveShift? activeShift;
+    if (!isBackdate && mesin != null) {
+      activeShift = await ShiftRepository.fetchCurrentShift();
       if (!mounted) return;
     }
-    _refreshAll();
-  }
 
-  Future<void> _openBackdateDialog(GilinganMesinInfo mesin) async {
-    if (!mounted) return;
-    final yesterday = DateTime.now().subtract(const Duration(days: 1));
-    final mstMesin = MstMesin(
-      idMesin: mesin.idMesin,
-      namaMesin: mesin.namaMesin,
-      bagian: mesin.bagian,
-      enable: true,
-    );
-    final editVm = GilinganProductionViewModel(repository: _repo);
+    final editVm = PackingProductionViewModel(repository: _repo);
     try {
-      final created = await showDialog<GilinganProduction>(
+      final created = await showDialog<PackingProduction>(
         context: context,
         barrierDismissible: false,
         builder: (_) => ChangeNotifierProvider.value(
           value: editVm,
-          child: GilinganProductionFormDialog(
-            initialMesin: mstMesin,
-            initialDate: yesterday,
-            lockShiftFields: false,
-            isBackdateInput: true,
-            onSave: (p) => Navigator.of(context).pop(p),
+          child: PackingProductionFormDialog(
+            initialMesin: initialMesin,
+            initialDate: !isBackdate ? DateTime.now() : null,
+            initialShift: activeShift?.shift,
+            initialHourStart: activeShift?.hourStart,
+            initialHourEnd: activeShift?.hourEnd,
+            isBackdateInput: isBackdate,
           ),
         ),
       );
@@ -249,14 +206,14 @@ class _GilinganProductionMesinScreenState
       if (created != null) {
         await Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => GilinganProductionInputScreen(
-              noProduksi: created.noProduksi,
+            builder: (_) => PackingProductionInputScreen(
+              noProduksi: created.noPacking,
               isLocked: created.isLocked,
               lastClosedDate: created.lastClosedDate,
               outputJenisId: created.outputJenisId,
               namaJenis: created.outputJenisNama,
-              idMesin: created.idMesin,
               tglProduksi: created.tglProduksi,
+              idMesin: created.idMesin,
               shift: created.shift,
               hourStart: created.hourStart,
               hourEnd: created.hourEnd,
@@ -271,24 +228,24 @@ class _GilinganProductionMesinScreenState
     _refreshAll();
   }
 
-  Future<void> _onMesinTap(GilinganMesinInfo mesin) async {
+  Future<void> _onMesinTap(PackingMesinInfo mesin) async {
     if (!mounted) return;
 
     if (!mesin.isActive) {
-      await _openCreateDialog(mesin: mesin);
+      await _openCreateDialog(mesin: mesin, isBackdate: false);
       return;
     }
 
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => GilinganProductionInputScreen(
+        builder: (_) => PackingProductionInputScreen(
           noProduksi: mesin.noProduksi!,
           isLocked: false,
           lastClosedDate: null,
           outputJenisId: mesin.outputJenisId,
           namaJenis: mesin.outputJenisNama,
-          idMesin: mesin.idMesin,
           tglProduksi: mesin.tglProduksi,
+          idMesin: mesin.idMesin,
           shift: mesin.shift,
           hourStart: mesin.hourStart,
           hourEnd: mesin.hourEnd,
@@ -312,15 +269,16 @@ class _GilinganProductionMesinScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                FutureBuilder<List<GilinganMesinInfo>>(
+                FutureBuilder<List<PackingMesinInfo>>(
                   future: _mesinFuture,
                   builder: (context, snapshot) {
                     final allMesin = snapshot.data ?? [];
-                    final activeCount =
-                        allMesin.where((m) => m.isActive).length;
+                    final activeCount = allMesin
+                        .where((m) => m.isActive)
+                        .length;
                     final inactiveCount = allMesin.length - activeCount;
                     return MesinSectionHeader(
-                      title: 'Status Mesin Gilingan',
+                      title: 'Status Mesin Packing',
                       onToggleRiwayat: () =>
                           setState(() => _isRiwayatExpanded = !_isRiwayatExpanded),
                       isRiwayatVisible: _isRiwayatExpanded,
@@ -332,7 +290,7 @@ class _GilinganProductionMesinScreenState
                   },
                 ),
                 Expanded(
-                  child: FutureBuilder<List<GilinganMesinInfo>>(
+                  child: FutureBuilder<List<PackingMesinInfo>>(
                     future: _mesinFuture,
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
@@ -385,25 +343,27 @@ class _GilinganProductionMesinScreenState
             ),
           ),
 
-          // ── DIVIDER ──────────────────────────────────────────────
+          // ── DIVIDER ─────────────────────────────────────────────
           const VerticalDivider(width: 1, color: Color(0xFFE5E7EB)),
 
-          // ── RIGHT: riwayat produksi (2/5) ────────────────────────
+          // ── RIGHT: riwayat produksi (2/5) ───────────────────────
           if (_isRiwayatExpanded)
           Expanded(
             flex: 2,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                FutureBuilder<List<GilinganMesinInfo>>(
+                FutureBuilder<List<PackingMesinInfo>>(
                   future: _mesinFuture,
                   builder: (context, snapshot) {
                     return ProductionRiwayatHeader(
                       mesinList: (snapshot.data ?? [])
-                          .map((m) => MesinFilterItem(
-                                idMesin: m.idMesin,
-                                namaMesin: m.namaMesin,
-                              ))
+                          .map(
+                            (m) => MesinFilterItem(
+                              idMesin: m.idMesin,
+                              namaMesin: m.namaMesin,
+                            ),
+                          )
                           .toList(),
                       selectedIdMesin: _filterIdMesin,
                       onFilterChanged: (id) {
@@ -426,7 +386,7 @@ class _GilinganProductionMesinScreenState
                     children: [
                       RefreshIndicator(
                         onRefresh: _loadProduksiPage,
-                        child: ProductionProduksiList<GilinganProduction>(
+                        child: ProductionProduksiList<PackingProduction>(
                           items: _produksiItems,
                           dataOf: _toRowData,
                           isLoading: _produksiLoading,
@@ -436,14 +396,14 @@ class _GilinganProductionMesinScreenState
                           onTap: (row) async {
                             await Navigator.of(context).push(
                               MaterialPageRoute(
-                                builder: (_) => GilinganProductionInputScreen(
-                                  noProduksi: row.noProduksi,
+                                builder: (_) => PackingProductionInputScreen(
+                                  noProduksi: row.noPacking,
                                   isLocked: row.isLocked,
                                   lastClosedDate: row.lastClosedDate,
                                   outputJenisId: row.outputJenisId,
                                   namaJenis: row.outputJenisNama,
-                                  idMesin: row.idMesin,
                                   tglProduksi: row.tglProduksi,
+                                  idMesin: row.idMesin,
                                   shift: row.shift,
                                   hourStart: row.hourStart,
                                   hourEnd: row.hourEnd,
@@ -458,9 +418,7 @@ class _GilinganProductionMesinScreenState
                               barrierDismissible: false,
                               builder: (_) => ChangeNotifierProvider.value(
                                 value: _editVmPool,
-                                child: GilinganProductionFormDialog(
-                                  header: row,
-                                ),
+                                child: PackingProductionFormDialog(header: row),
                               ),
                             );
                             if (mounted) _refreshAll();
@@ -470,11 +428,11 @@ class _GilinganProductionMesinScreenState
                             await showDialog<void>(
                               context: screenCtx,
                               barrierDismissible: false,
-                              builder: (ctx) => GilinganProductionDeleteDialog(
+                              builder: (ctx) => PackingProductionDeleteDialog(
                                 header: row,
                                 onConfirm: () async {
                                   final success = await _editVmPool
-                                      .deleteProduksi(row.noProduksi);
+                                      .deleteProduksi(row.noPacking);
                                   final errMsg = _editVmPool.saveError;
                                   if (ctx.mounted) Navigator.of(ctx).pop();
                                   if (!screenCtx.mounted) return;
@@ -484,7 +442,7 @@ class _GilinganProductionMesinScreenState
                                       builder: (_) => SuccessStatusDialog(
                                         title: 'Berhasil Menghapus',
                                         message:
-                                            'No. Produksi ${row.noProduksi} berhasil dihapus.',
+                                            'No. Packing ${row.noPacking} berhasil dihapus.',
                                       ),
                                     );
                                   } else {
@@ -505,14 +463,14 @@ class _GilinganProductionMesinScreenState
                           onInput: (row) async {
                             await Navigator.of(context).push(
                               MaterialPageRoute(
-                                builder: (_) => GilinganProductionInputScreen(
-                                  noProduksi: row.noProduksi,
+                                builder: (_) => PackingProductionInputScreen(
+                                  noProduksi: row.noPacking,
                                   isLocked: row.isLocked,
                                   lastClosedDate: row.lastClosedDate,
                                   outputJenisId: row.outputJenisId,
                                   namaJenis: row.outputJenisNama,
-                                  idMesin: row.idMesin,
                                   tglProduksi: row.tglProduksi,
+                                  idMesin: row.idMesin,
                                   shift: row.shift,
                                   hourStart: row.hourStart,
                                   hourEnd: row.hourEnd,
@@ -528,12 +486,14 @@ class _GilinganProductionMesinScreenState
                           right: 16,
                           bottom: 16,
                           child: FloatingActionButton.small(
-                            heroTag: 'fab_backdate_gilingan',
-                            onPressed: () =>
-                                _openBackdateDialog(_selectedMesinInfo!),
-                            backgroundColor: const Color(0xFF0277BD),
+                            heroTag: 'fab_add_packing',
+                            onPressed: () => _openCreateDialog(
+                              mesin: _selectedMesinInfo,
+                              isBackdate: true,
+                            ),
+                            backgroundColor: const Color(0xFF1D4ED8),
                             foregroundColor: Colors.white,
-                            tooltip: 'Tambah Backdate',
+                            tooltip: 'Tambah Produksi',
                             child: const Icon(Icons.add),
                           ),
                         ),

@@ -18,13 +18,11 @@ import '../../shared/widgets/add_cabinet_material_dialog.dart';
 import '../../shared/widgets/confirm_save_temp_dialog.dart';
 import '../../shared/widgets/save_button_with_badge.dart';
 import '../../shared/widgets/unsaved_temp_warning_dialog.dart';
-import '../../shared/models/cabinet_material_item.dart';
+
 import '../../hot_stamp/model/hot_stamp_output_model.dart';
 import '../../hot_stamp/widgets/hot_stamp_output_tile.dart';
 import '../model/key_fitting_inputs_model.dart';
 import '../model/key_fitting_production_model.dart';
-import '../widgets/key_fitting_lookup_label_dialog.dart';
-import '../widgets/key_fitting_lookup_label_partial_dialog.dart';
 import '../widgets/key_fitting_production_output_form_dialog.dart';
 import '../../hot_stamp/widgets/hot_stamp_reject_output_form_dialog.dart';
 import 'package:pps_tablet/features/production/shared/shared.dart';
@@ -67,7 +65,6 @@ class KeyFittingProductionInputScreen extends StatefulWidget {
 
 class _KeyFittingProductionInputScreenState
     extends State<KeyFittingProductionInputScreen> {
-  String _selectedMode = 'full';
   String _selectedInputTab = 'fwip';
   String _selectedOutputTab = 'fwip';
 
@@ -216,7 +213,6 @@ class _KeyFittingProductionInputScreenState
       context: context,
       builder: (_) => ScanLabelDialog(
         manualHint: 'F.XXXXXXXXXX',
-        headerSubtitle: _selectedMode.toUpperCase(),
         acceptedLabels: const [(prefix: 'F', label: 'Furniture WIP')],
         onLookup: _onCodeReady,
       ),
@@ -231,85 +227,75 @@ class _KeyFittingProductionInputScreenState
     if (res == null || res.found == false || res.data.isEmpty) {
       return 'Label "$code" tidak memiliki data yang tersedia.';
     }
-    if (_selectedMode == 'full') {
-      await _handleFullMode(vm, res);
-    } else if (_selectedMode == 'partial') {
-      await _handlePartialMode(vm, res);
-    } else {
-      await _handleSelectMode(vm, res);
-    }
+    await _handlePcsInputFlow(vm, res);
     return null;
   }
 
-  Future<void> _handleFullMode(
+  Future<void> _handlePcsInputFlow(
     KeyFittingProductionInputViewModel vm,
     ProductionLabelLookupResult res,
   ) async {
-    final freshCount = vm.countNewRowsInLastLookup(widget.noProduksi);
-    if (freshCount == 0) {
-      final code = _labelCodeOfFirst(res);
-      final hasTemp = code != null && vm.hasTemporaryDataForLabel(code);
-      final suffix = hasTemp ? ' • ${vm.getTemporaryDataSummary(code)}' : '';
-      _showSnack('Semua item untuk ${code ?? "label ini"} sudah ada.$suffix');
-      return;
+    int totalAdded = 0;
+    int totalSkipped = 0;
+
+    for (int i = 0; i < res.typedItems.length; i++) {
+      final item = res.typedItems[i];
+      if (item is! FurnitureWipItem) continue;
+
+      final rawRow = res.data[i];
+      final simpleKey = res.simpleKey(rawRow);
+
+      if (vm.isInTempKeys(simpleKey)) {
+        totalSkipped++;
+        continue;
+      }
+
+      if (!mounted) break;
+
+      final result = await showDialog<ProductionPcsInputResult>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => ProductionPcsInputDialog(
+          item: item,
+          itemIndex: i,
+          totalItems: res.typedItems.length,
+          primaryColor: _kPrimary,
+        ),
+      );
+
+      if (result == null) continue;
+
+      final originalPcs = rawRow['pcs'] ?? rawRow['Pcs'];
+      final originalIsPartial = rawRow['isPartial'];
+
+      if (result.isPartial) {
+        rawRow['pcs'] = result.pcs;
+        rawRow['Pcs'] = result.pcs;
+        rawRow['isPartial'] = true;
+        rawRow['IsPartial'] = true;
+      }
+
+      vm.clearPicks();
+      vm.togglePick(rawRow);
+      final r = vm.commitPickedToTemp(noProduksi: widget.noProduksi);
+
+      rawRow['pcs'] = originalPcs;
+      rawRow['Pcs'] = originalPcs;
+      rawRow['isPartial'] = originalIsPartial;
+      rawRow['IsPartial'] = originalIsPartial;
+
+      totalAdded += r.added;
+      totalSkipped += r.skipped;
     }
-    vm.clearPicks();
-    vm.pickAllNew(widget.noProduksi);
-    final result = vm.commitPickedToTemp(noProduksi: widget.noProduksi);
-    final msg = result.added > 0
-        ? '✅ Auto-added ${result.added} item${result.skipped > 0 ? ' • Duplikat terlewati ${result.skipped}' : ''}'
-        : 'Tidak ada item baru ditambahkan';
+
+    if (!mounted) return;
+    final msg = totalAdded > 0
+        ? '✅ Ditambahkan $totalAdded item${totalSkipped > 0 ? ' • $totalSkipped terlewati' : ''}'
+        : 'Tidak ada item yang ditambahkan';
     _showSnack(
       msg,
-      backgroundColor: result.added > 0 ? Colors.green : Colors.orange,
+      backgroundColor: totalAdded > 0 ? Colors.green : Colors.orange,
     );
-  }
-
-  Future<void> _handlePartialMode(
-    KeyFittingProductionInputViewModel vm,
-    ProductionLabelLookupResult res,
-  ) async {
-    await showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (_) => KeyFittingLookupLabelPartialDialog(
-        noProduksi: widget.noProduksi,
-        selectedMode: _selectedMode,
-      ),
-    );
-  }
-
-  Future<void> _handleSelectMode(
-    KeyFittingProductionInputViewModel vm,
-    ProductionLabelLookupResult res,
-  ) async {
-    final freshCount = vm.countNewRowsInLastLookup(widget.noProduksi);
-    if (freshCount == 0) {
-      final code = _labelCodeOfFirst(res);
-      final hasTemp = code != null && vm.hasTemporaryDataForLabel(code);
-      final suffix = hasTemp ? ' • ${vm.getTemporaryDataSummary(code)}' : '';
-      _showSnack('Semua item untuk ${code ?? "label ini"} sudah ada.$suffix');
-      return;
-    }
-    await showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (_) => KeyFittingLookupLabelDialog(
-        noProduksi: widget.noProduksi,
-        selectedMode: _selectedMode,
-      ),
-    );
-  }
-
-  String? _labelCodeOfFirst(ProductionLabelLookupResult res) {
-    if (res.typedItems.isEmpty) return null;
-    final item = res.typedItems.first;
-    if (item is FurnitureWipItem) {
-      return (item.noFurnitureWIPPartial ?? '').trim().isNotEmpty
-          ? item.noFurnitureWIPPartial
-          : item.noFurnitureWIP;
-    }
-    return null;
   }
 
   Future<void> _openAddMaterialDialog(
@@ -736,11 +722,7 @@ class _KeyFittingProductionInputScreenState
                     tileMetrics: [
                       (
                         Icons.inventory_2_outlined,
-                        '${entry.value.length} item',
-                      ),
-                      (
-                        Icons.scale_outlined,
-                        '${num2(entry.value.fold<double>(0, (s, i) => s + (i.berat ?? 0)))} kg',
+                        '${entry.value.fold<int>(0, (s, i) => s + (i.pcs ?? 0))} pcs',
                       ),
                     ],
                     color: _kPrimary,

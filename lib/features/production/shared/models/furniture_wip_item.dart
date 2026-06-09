@@ -10,6 +10,7 @@ class FurnitureWipItem {
   final String? jam;
 
   final int? pcs;
+  final int? pcsHeader; // pcs asli label sebelum partial
   final int? idJenis; // IDFurnitureWIP
   final String? namaJenis;
 
@@ -46,6 +47,7 @@ class FurnitureWipItem {
     this.dateCreate,
     this.jam,
     this.pcs,
+    this.pcsHeader,
     this.idJenis,
     this.namaJenis,
     this.berat,
@@ -79,6 +81,7 @@ class FurnitureWipItem {
     jam: pickS(j, ['jam', 'Jam']),
 
     pcs: pickI(j, ['pcs', 'Pcs']),
+    pcsHeader: pickI(j, ['pcsHeader', 'PcsHeader', 'pcs_header']),
     idJenis: pickI(j, ['idJenis', 'IdJenis', 'id_jenis']),
     namaJenis: pickS(j, ['namaJenis', 'NamaJenis', 'nama_jenis']),
 
@@ -110,6 +113,7 @@ class FurnitureWipItem {
     DateTime? dateCreate,
     String? jam,
     int? pcs,
+    int? pcsHeader,
     int? idJenis,
     String? namaJenis,
     double? berat,
@@ -129,6 +133,7 @@ class FurnitureWipItem {
       dateCreate: dateCreate ?? this.dateCreate,
       jam: jam ?? this.jam,
       pcs: pcs ?? this.pcs,
+      pcsHeader: pcsHeader ?? this.pcsHeader,
       idJenis: idJenis ?? this.idJenis,
       namaJenis: namaJenis ?? this.namaJenis,
       berat: berat ?? this.berat,

@@ -86,7 +86,7 @@ class _HomeSidebarState extends State<HomeSidebar> {
 
   static List<_MenuGroup> get _divisiGroups => <_MenuGroup>[
     _MenuGroup(
-      title: 'W&B',
+      title: 'Washing & Broker',
       icon: Icons.water_outlined,
       children: [
         _SubItem(

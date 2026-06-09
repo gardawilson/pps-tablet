@@ -21,8 +21,6 @@ import '../../shared/widgets/unsaved_temp_warning_dialog.dart';
 import '../model/spanner_inputs_model.dart';
 import '../model/spanner_output_model.dart';
 import '../model/spanner_production_model.dart';
-import '../widgets/spanner_lookup_label_dialog.dart';
-import '../widgets/spanner_lookup_label_partial_dialog.dart';
 import '../widgets/spanner_production_output_form_dialog.dart';
 import '../widgets/spanner_reject_output_form_dialog.dart';
 import 'package:pps_tablet/features/production/shared/shared.dart';
@@ -67,7 +65,6 @@ class SpannerProductionInputScreen extends StatefulWidget {
 
 class _SpannerProductionInputScreenState
     extends State<SpannerProductionInputScreen> {
-  String _selectedMode = 'full';
   String _selectedInputTab = 'fwip';
   String _selectedOutputTab = 'fwip';
 
@@ -164,38 +161,39 @@ class _SpannerProductionInputScreenState
               create: (_) => FurnitureWipTypeViewModel(
                 repository: FurnitureWipTypeRepository(api: ApiClient()),
               ),
-              child: ProductionGantiProduksiDialog<
-                ({SpannerProduction prod, String namaJenis}),
-                FurnitureWipType
-              >(
-                tanggal: tanggal,
-                shift: widget.shift ?? 1,
-                primaryColor: _kSpannerPrimary,
-                borderColor: _kSpannerBorder,
-                jenisRequiredMessage:
-                    'Pilih jenis Furniture WIP terlebih dahulu',
-                submitLabel: 'Ganti Produksi',
-                dropdownBuilder: (selected, onChanged) =>
-                    FurnitureWipTypeDropdown(
-                      preselectId: selected?.idCabinetWip,
-                      onChanged: onChanged,
-                    ),
-                jenisNameOf: (j) => j.nama,
-                onSubmit: (hourStart, jenis) async {
-                  final body = await vm.repository.splitTime(
-                    idMesin: idMesin,
+              child:
+                  ProductionGantiProduksiDialog<
+                    ({SpannerProduction prod, String namaJenis}),
+                    FurnitureWipType
+                  >(
                     tanggal: tanggal,
-                    hourStart: hourStart,
-                    outputJenisId: jenis.idCabinetWip,
-                  );
-                  final header =
-                      body['data']['header'] as Map<String, dynamic>;
-                  return (
-                    prod: SpannerProduction.fromJson(header),
-                    namaJenis: jenis.nama,
-                  );
-                },
-              ),
+                    shift: widget.shift ?? 1,
+                    primaryColor: _kSpannerPrimary,
+                    borderColor: _kSpannerBorder,
+                    jenisRequiredMessage:
+                        'Pilih jenis Furniture WIP terlebih dahulu',
+                    submitLabel: 'Ganti Produksi',
+                    dropdownBuilder: (selected, onChanged) =>
+                        FurnitureWipTypeDropdown(
+                          preselectId: selected?.idCabinetWip,
+                          onChanged: onChanged,
+                        ),
+                    jenisNameOf: (j) => j.nama,
+                    onSubmit: (hourStart, jenis) async {
+                      final body = await vm.repository.splitTime(
+                        idMesin: idMesin,
+                        tanggal: tanggal,
+                        hourStart: hourStart,
+                        outputJenisId: jenis.idCabinetWip,
+                      );
+                      final header =
+                          body['data']['header'] as Map<String, dynamic>;
+                      return (
+                        prod: SpannerProduction.fromJson(header),
+                        namaJenis: jenis.nama,
+                      );
+                    },
+                  ),
             ),
           ),
       beforeReplace: () {
@@ -244,7 +242,10 @@ class _SpannerProductionInputScreenState
   Future<void> _handleSave() async {
     final vm = context.read<SpannerProductionInputViewModel>();
     if (vm.totalTempCount == 0) {
-      _showSnack('Tidak ada data untuk disimpan', backgroundColor: Colors.orange);
+      _showSnack(
+        'Tidak ada data untuk disimpan',
+        backgroundColor: Colors.orange,
+      );
       return;
     }
     final confirm = await showDialog<bool>(
@@ -311,7 +312,6 @@ class _SpannerProductionInputScreenState
       context: context,
       builder: (_) => ScanLabelDialog(
         manualHint: 'F.XXXXXXXXXX',
-        headerSubtitle: _selectedMode.toUpperCase(),
         acceptedLabels: const [(prefix: 'F', label: 'Furniture WIP')],
         onLookup: _onCodeReady,
       ),
@@ -320,90 +320,81 @@ class _SpannerProductionInputScreenState
 
   Future<String?> _onCodeReady(String code) async {
     final vm = context.read<SpannerProductionInputViewModel>();
-
     final res = await vm.lookupFwipLabel(code, force: true);
     if (!mounted) return 'Halaman sudah tidak aktif';
     if (vm.lookupError != null) return 'Gagal ambil data: ${vm.lookupError}';
     if (res == null || res.found == false || res.data.isEmpty) {
       return 'Label "$code" tidak memiliki data yang tersedia.';
     }
-
-    if (_selectedMode == 'full') {
-      await _handleFullMode(vm, res);
-    } else if (_selectedMode == 'partial') {
-      await _handlePartialMode(vm, res);
-    } else {
-      await _handleSelectMode(vm, res);
-    }
+    await _handlePcsInputFlow(vm, res);
     return null;
   }
 
-  Future<void> _handleFullMode(
+  Future<void> _handlePcsInputFlow(
     SpannerProductionInputViewModel vm,
     ProductionLabelLookupResult res,
   ) async {
-    final freshCount = vm.countNewRowsInLastLookup(widget.noProduksi);
-    if (freshCount == 0) {
-      final code = _labelCodeOfFirst(res);
-      final hasTemp = code != null && vm.hasTemporaryDataForLabel(code);
-      final suffix = hasTemp ? ' • ${vm.getTemporaryDataSummary(code)}' : '';
-      _showSnack('Semua item untuk ${code ?? "label ini"} sudah ada.$suffix');
-      return;
-    }
-    vm.clearPicks();
-    vm.pickAllNew(widget.noProduksi);
-    final result = vm.commitPickedToTemp(noProduksi: widget.noProduksi);
-    final msg = result.added > 0
-        ? '✅ Auto-added ${result.added} item${result.skipped > 0 ? ' • Duplikat terlewati ${result.skipped}' : ''}'
-        : 'Tidak ada item baru ditambahkan';
-    _showSnack(msg, backgroundColor: result.added > 0 ? Colors.green : Colors.orange);
-  }
+    int totalAdded = 0;
+    int totalSkipped = 0;
 
-  Future<void> _handlePartialMode(
-    SpannerProductionInputViewModel vm,
-    ProductionLabelLookupResult res,
-  ) async {
-    await showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (_) => SpannerLookupLabelPartialDialog(
-        noProduksi: widget.noProduksi,
-        selectedMode: _selectedMode,
-      ),
+    for (int i = 0; i < res.typedItems.length; i++) {
+      final item = res.typedItems[i];
+      if (item is! FurnitureWipItem) continue;
+
+      final rawRow = res.data[i];
+      final simpleKey = res.simpleKey(rawRow);
+
+      if (vm.isInTempKeys(simpleKey)) {
+        totalSkipped++;
+        continue;
+      }
+
+      if (!mounted) break;
+
+      final result = await showDialog<ProductionPcsInputResult>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => ProductionPcsInputDialog(
+          item: item,
+          itemIndex: i,
+          totalItems: res.typedItems.length,
+          primaryColor: _kSpannerPrimary,
+        ),
+      );
+
+      if (result == null) continue;
+
+      final originalPcs = rawRow['pcs'] ?? rawRow['Pcs'];
+      final originalIsPartial = rawRow['isPartial'];
+
+      if (result.isPartial) {
+        rawRow['pcs'] = result.pcs;
+        rawRow['Pcs'] = result.pcs;
+        rawRow['isPartial'] = true;
+        rawRow['IsPartial'] = true;
+      }
+
+      vm.clearPicks();
+      vm.togglePick(rawRow);
+      final r = vm.commitPickedToTemp(noProduksi: widget.noProduksi);
+
+      rawRow['pcs'] = originalPcs;
+      rawRow['Pcs'] = originalPcs;
+      rawRow['isPartial'] = originalIsPartial;
+      rawRow['IsPartial'] = originalIsPartial;
+
+      totalAdded += r.added;
+      totalSkipped += r.skipped;
+    }
+
+    if (!mounted) return;
+    final msg = totalAdded > 0
+        ? '✅ Ditambahkan $totalAdded item${totalSkipped > 0 ? ' • $totalSkipped terlewati' : ''}'
+        : 'Tidak ada item yang ditambahkan';
+    _showSnack(
+      msg,
+      backgroundColor: totalAdded > 0 ? Colors.green : Colors.orange,
     );
-  }
-
-  Future<void> _handleSelectMode(
-    SpannerProductionInputViewModel vm,
-    ProductionLabelLookupResult res,
-  ) async {
-    final freshCount = vm.countNewRowsInLastLookup(widget.noProduksi);
-    if (freshCount == 0) {
-      final code = _labelCodeOfFirst(res);
-      final hasTemp = code != null && vm.hasTemporaryDataForLabel(code);
-      final suffix = hasTemp ? ' • ${vm.getTemporaryDataSummary(code)}' : '';
-      _showSnack('Semua item untuk ${code ?? "label ini"} sudah ada.$suffix');
-      return;
-    }
-    await showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (_) => SpannerLookupLabelDialog(
-        noProduksi: widget.noProduksi,
-        selectedMode: _selectedMode,
-      ),
-    );
-  }
-
-  String? _labelCodeOfFirst(ProductionLabelLookupResult res) {
-    if (res.typedItems.isEmpty) return null;
-    final item = res.typedItems.first;
-    if (item is FurnitureWipItem) {
-      return (item.noFurnitureWIPPartial ?? '').trim().isNotEmpty
-          ? item.noFurnitureWIPPartial
-          : item.noFurnitureWIP;
-    }
-    return null;
   }
 
   // ── Cabinet Material helpers ───────────────────────────────────────────────
@@ -415,8 +406,8 @@ class _SpannerProductionInputScreenState
       context: context,
       builder: (_) => AddCabinetMaterialDialog(
         idWarehouse: 5,
-        loadMaterials: ({required idWarehouse, bool force = false}) =>
-            vm.loadMasterCabinetMaterials(idWarehouse: idWarehouse, force: force),
+        loadMaterials: ({required idWarehouse, bool force = false}) => vm
+            .loadMasterCabinetMaterials(idWarehouse: idWarehouse, force: force),
         isAlreadyInTemp: (id) => vm.hasCabinetMaterialInTemp(id),
         onAddTemp: ({required masterItem, required jumlah}) =>
             vm.addTempCabinetMaterialFromMaster(
@@ -485,7 +476,10 @@ class _SpannerProductionInputScreenState
     }
     final fwipLabelCount = fwipGroups.length;
     final materialLabelCount = materialAll.length;
-    final materialPcs = materialAll.fold<int>(0, (s, i) => s + (i.Jumlah ?? 0).toInt());
+    final materialPcs = materialAll.fold<int>(
+      0,
+      (s, i) => s + (i.Jumlah ?? 0).toInt(),
+    );
     final totalInputLabel = fwipLabelCount + materialLabelCount;
     final totalInputPcs = fwipPcs + materialPcs;
 
@@ -609,10 +603,9 @@ class _SpannerProductionInputScreenState
                                       ? Colors.grey.shade300
                                       : _kSpannerPrimary,
                                   foregroundColor: Colors.white,
-                                  onPressed:
-                                      locked || vm.isLookupLoading
-                                          ? null
-                                          : _openScanDialog,
+                                  onPressed: locked || vm.isLookupLoading
+                                      ? null
+                                      : _openScanDialog,
                                   child: vm.isLookupLoading
                                       ? const SizedBox(
                                           width: 16,
@@ -704,11 +697,7 @@ class _SpannerProductionInputScreenState
                     tileMetrics: [
                       (
                         Icons.inventory_2_outlined,
-                        '${entry.value.length} item',
-                      ),
-                      (
-                        Icons.scale_outlined,
-                        '${num2(entry.value.fold<double>(0, (s, i) => s + (i.berat ?? 0)))} kg',
+                        '${entry.value.fold<int>(0, (s, i) => s + (i.pcs ?? 0))} pcs',
                       ),
                     ],
                     color: _kSpannerPrimary,
@@ -791,8 +780,10 @@ class _SpannerProductionInputScreenState
           onDeleteTemp: isTemp
               ? () {
                   vm.deleteTempCabinetMaterialItem(item);
-                  _showSnack('✅ Material TEMP dihapus',
-                      backgroundColor: Colors.green);
+                  _showSnack(
+                    '✅ Material TEMP dihapus',
+                    backgroundColor: Colors.green,
+                  );
                 }
               : null,
           onDeleteExisting: (!isTemp && canDelete)
@@ -878,14 +869,16 @@ class _SpannerProductionInputScreenState
     final rejectOutputs = outputs.where((o) => o.isReject).toList();
     final selectedOutputs = isRejectTab ? rejectOutputs : fwipOutputs;
     final totalOutputLabel = outputs.length;
-    final totalFwipPcs =
-        fwipOutputs.fold<int>(0, (s, o) => s + o.pcs);
-    final totalPcs =
-        selectedOutputs.fold<int>(0, (s, o) => s + o.pcs);
-    final totalRejectBerat =
-        selectedOutputs.fold<double>(0, (s, o) => s + o.berat);
-    final grandRejectBerat =
-        rejectOutputs.fold<double>(0, (s, o) => s + o.berat);
+    final totalFwipPcs = fwipOutputs.fold<int>(0, (s, o) => s + o.pcs);
+    final totalPcs = selectedOutputs.fold<int>(0, (s, o) => s + o.pcs);
+    final totalRejectBerat = selectedOutputs.fold<double>(
+      0,
+      (s, o) => s + o.berat,
+    );
+    final grandRejectBerat = rejectOutputs.fold<double>(
+      0,
+      (s, o) => s + o.berat,
+    );
     final emptyMessage = isRejectTab
         ? 'Belum ada label output reject'
         : 'Belum ada label output furniture WIP';
@@ -972,8 +965,9 @@ class _SpannerProductionInputScreenState
                                                 child: SizedBox.shrink(),
                                               )
                                             : GridView(
-                                                padding:
-                                                    const EdgeInsets.all(6),
+                                                padding: const EdgeInsets.all(
+                                                  6,
+                                                ),
                                                 gridDelegate:
                                                     SliverGridDelegateWithFixedCrossAxisCount(
                                                       crossAxisCount:
@@ -987,10 +981,9 @@ class _SpannerProductionInputScreenState
                                                     ),
                                                 children: selectedOutputs
                                                     .map(
-                                                      (o) =>
-                                                          _SpannerOutputTile(
-                                                            output: o,
-                                                          ),
+                                                      (o) => _SpannerOutputTile(
+                                                        output: o,
+                                                      ),
                                                     )
                                                     .toList(),
                                               ),
@@ -1013,8 +1006,7 @@ class _SpannerProductionInputScreenState
                                   ),
                                 const SizedBox(height: 10),
                                 Row(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
                                     Expanded(
                                       child: Column(
@@ -1036,8 +1028,7 @@ class _SpannerProductionInputScreenState
                                           _SpannerOutputOverallBar(
                                             totalLabel: totalOutputLabel,
                                             totalFwipPcs: totalFwipPcs,
-                                            totalRejectBerat:
-                                                grandRejectBerat,
+                                            totalRejectBerat: grandRejectBerat,
                                           ),
                                         ],
                                       ),
@@ -1175,13 +1166,11 @@ class _SpannerProductionInputScreenState
                             const SizedBox(width: 16),
                             Expanded(
                               child: _buildOutputPanel(
-                                outputs:
-                                    vm.outputsOf(widget.noProduksi) ?? [],
+                                outputs: vm.outputsOf(widget.noProduksi) ?? [],
                                 isLoading: vm.isOutputsLoading(
                                   widget.noProduksi,
                                 ),
-                                error:
-                                    vm.outputsError(widget.noProduksi),
+                                error: vm.outputsError(widget.noProduksi),
                                 locked: locked,
                                 onRefresh: () => vm.loadOutputs(
                                   widget.noProduksi,
@@ -1314,17 +1303,18 @@ class _SpannerOutputDetailDialog extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               decoration: const BoxDecoration(
                 color: _kSpannerOutput,
-                borderRadius:
-                    BorderRadius.vertical(top: Radius.circular(16)),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.build_outlined,
-                      color: Colors.white, size: 16),
+                  const Icon(
+                    Icons.build_outlined,
+                    color: Colors.white,
+                    size: 16,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
@@ -1343,25 +1333,33 @@ class _SpannerOutputDetailDialog extends StatelessWidget {
                         Text(
                           output.labelCode,
                           style: const TextStyle(
-                              color: Colors.white70, fontSize: 11),
+                            color: Colors.white70,
+                            fontSize: 11,
+                          ),
                         ),
                       ],
                     ),
                   ),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.25)),
+                        color: Colors.white.withValues(alpha: 0.25),
+                      ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.print_outlined,
-                            size: 12, color: Colors.white),
+                        const Icon(
+                          Icons.print_outlined,
+                          size: 12,
+                          color: Colors.white,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           output.hasBeenPrinted ? 'Printed' : 'Belum Print',
@@ -1377,8 +1375,11 @@ class _SpannerOutputDetailDialog extends StatelessWidget {
                   const SizedBox(width: 8),
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close,
-                        color: Colors.white, size: 16),
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 16,
+                    ),
                   ),
                 ],
               ),
@@ -1390,18 +1391,19 @@ class _SpannerOutputDetailDialog extends StatelessWidget {
                 children: [
                   Expanded(
                     child: _InfoCell(
-                        label: 'No Furniture WIP',
-                        value: output.labelCode),
+                      label: 'No Furniture WIP',
+                      value: output.labelCode,
+                    ),
                   ),
                   Expanded(
-                    child: _InfoCell(
-                        label: 'PCS', value: '${output.pcs} pcs'),
+                    child: _InfoCell(label: 'PCS', value: '${output.pcs} pcs'),
                   ),
                   if (output.berat > 0)
                     Expanded(
                       child: _InfoCell(
-                          label: 'Berat',
-                          value: '${num2(output.berat)} kg'),
+                        label: 'Berat',
+                        value: '${num2(output.berat)} kg',
+                      ),
                     ),
                 ],
               ),
@@ -1417,7 +1419,8 @@ class _SpannerOutputDetailDialog extends StatelessWidget {
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: _kSpannerBorder),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                     child: const Text('Tutup'),
                   ),
@@ -1442,12 +1445,15 @@ class _InfoCell extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+        ),
         const SizedBox(height: 3),
-        Text(value,
-            style: const TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w700)),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+        ),
       ],
     );
   }
@@ -1477,7 +1483,11 @@ class _SpannerInputSummaryBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          ProductionInlineStat(label: 'Label', value: '$totalLabel', color: color),
+          ProductionInlineStat(
+            label: 'Label',
+            value: '$totalLabel',
+            color: color,
+          ),
           const SizedBox(width: 10),
           ProductionInlineStat(label: 'PCS', value: '$totalPcs', color: color),
         ],
@@ -1518,9 +1528,17 @@ class _SpannerGrandTotalBar extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              ProductionInlineStat(label: 'Item', value: '$totalItem', color: color),
+              ProductionInlineStat(
+                label: 'Item',
+                value: '$totalItem',
+                color: color,
+              ),
               const SizedBox(width: 10),
-              ProductionInlineStat(label: 'PCS', value: '$totalPcs', color: color),
+              ProductionInlineStat(
+                label: 'PCS',
+                value: '$totalPcs',
+                color: color,
+              ),
             ],
           ),
         ),
@@ -1537,8 +1555,7 @@ class _SpannerMaterialSummaryBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalPcs =
-        items.fold<num>(0, (s, i) => s + (i.Jumlah ?? 0));
+    final totalPcs = items.fold<num>(0, (s, i) => s + (i.Jumlah ?? 0));
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -1549,7 +1566,10 @@ class _SpannerMaterialSummaryBar extends StatelessWidget {
       child: Row(
         children: [
           ProductionInlineStat(
-              label: 'Material', value: '${items.length}', color: color),
+            label: 'Material',
+            value: '${items.length}',
+            color: color,
+          ),
           const SizedBox(width: 10),
           ProductionInlineStat(label: 'PCS', value: '$totalPcs', color: color),
         ],
@@ -1579,10 +1599,16 @@ class _SpannerOutputSummaryBar extends StatelessWidget {
       child: Row(
         children: [
           ProductionInlineStat(
-              label: 'Label', value: '$totalLabel', color: _kSpannerOutput),
+            label: 'Label',
+            value: '$totalLabel',
+            color: _kSpannerOutput,
+          ),
           const SizedBox(width: 10),
           ProductionInlineStat(
-              label: 'PCS', value: '$totalPcs', color: _kSpannerOutput),
+            label: 'PCS',
+            value: '$totalPcs',
+            color: _kSpannerOutput,
+          ),
         ],
       ),
     );
@@ -1610,12 +1636,16 @@ class _SpannerRejectSummaryBar extends StatelessWidget {
       child: Row(
         children: [
           ProductionInlineStat(
-              label: 'Label', value: '$totalLabel', color: _kSpannerOutput),
+            label: 'Label',
+            value: '$totalLabel',
+            color: _kSpannerOutput,
+          ),
           const SizedBox(width: 10),
           ProductionInlineStat(
-              label: 'Berat',
-              value: '${num2(totalBerat)} kg',
-              color: _kSpannerOutput),
+            label: 'Berat',
+            value: '${num2(totalBerat)} kg',
+            color: _kSpannerOutput,
+          ),
         ],
       ),
     );
@@ -1643,8 +1673,11 @@ class _SpannerOutputOverallBar extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           child: Row(
             children: [
-              const Icon(Icons.summarize_outlined,
-                  size: 13, color: _kSpannerOutput),
+              const Icon(
+                Icons.summarize_outlined,
+                size: 13,
+                color: _kSpannerOutput,
+              ),
               const SizedBox(width: 5),
               const Text(
                 'Total',
@@ -1656,15 +1689,22 @@ class _SpannerOutputOverallBar extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               ProductionInlineStat(
-                  label: 'Label', value: '$totalLabel', color: _kSpannerOutput),
+                label: 'Label',
+                value: '$totalLabel',
+                color: _kSpannerOutput,
+              ),
               const SizedBox(width: 10),
               ProductionInlineStat(
-                  label: 'PCS', value: '$totalFwipPcs', color: _kSpannerOutput),
+                label: 'PCS',
+                value: '$totalFwipPcs',
+                color: _kSpannerOutput,
+              ),
               const SizedBox(width: 10),
               ProductionInlineStat(
-                  label: 'Berat',
-                  value: '${num2(totalRejectBerat)} kg',
-                  color: _kSpannerOutput),
+                label: 'Berat',
+                value: '${num2(totalRejectBerat)} kg',
+                color: _kSpannerOutput,
+              ),
             ],
           ),
         ),
@@ -1750,8 +1790,11 @@ class _MaterialListTile extends StatelessWidget {
             )
           else if (onDeleteExisting != null)
             IconButton(
-              icon: Icon(Icons.delete_outline,
-                  size: 16, color: Colors.grey.shade400),
+              icon: Icon(
+                Icons.delete_outline,
+                size: 16,
+                color: Colors.grey.shade400,
+              ),
               tooltip: 'Hapus material',
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 28, minHeight: 28),

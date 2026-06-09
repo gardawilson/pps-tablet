@@ -12,8 +12,7 @@ import '../../shared/models/production_label_lookup_result.dart';
 import '../model/packing_output_model.dart';
 import '../view_model/packing_production_input_view_model.dart';
 import '../model/packing_production_inputs_model.dart';
-import '../widgets/packing_lookup_label_dialog.dart';
-import '../widgets/packing_lookup_label_partial_dialog.dart';
+
 import '../widgets/packing_production_output_form_dialog.dart';
 import 'package:pps_tablet/features/production/shared/shared.dart';
 
@@ -56,7 +55,6 @@ class PackingProductionInputScreen extends StatefulWidget {
 
 class _PackingProductionInputScreenState
     extends State<PackingProductionInputScreen> {
-  String _selectedMode = 'full';
   String _selectedInputTab = 'fwip';
   String _selectedOutputTab = 'bj';
 
@@ -192,7 +190,6 @@ class _PackingProductionInputScreenState
       context: context,
       builder: (_) => ScanLabelDialog(
         manualHint: 'F.XXXXXXXXXX',
-        headerSubtitle: _selectedMode.toUpperCase(),
         acceptedLabels: const [(prefix: 'F', label: 'Furniture WIP')],
         onLookup: _onCodeReady,
       ),
@@ -207,86 +204,74 @@ class _PackingProductionInputScreenState
     if (res == null || res.found == false || res.data.isEmpty) {
       return 'Label "$code" tidak memiliki data yang tersedia.';
     }
-
-    if (_selectedMode == 'full') {
-      await _handleFullMode(vm, res);
-    } else if (_selectedMode == 'partial') {
-      await _handlePartialMode(vm, res);
-    } else {
-      await _handleSelectMode(vm, res);
-    }
+    await _handlePcsInputFlow(vm, res);
     return null;
   }
 
-  Future<void> _handleFullMode(
+  Future<void> _handlePcsInputFlow(
     PackingProductionInputViewModel vm,
     ProductionLabelLookupResult res,
   ) async {
-    final freshCount = vm.countNewRowsInLastLookup(widget.noProduksi);
-    if (freshCount == 0) {
-      final code = _labelCodeOfFirst(res);
-      final hasTemp = code != null && vm.hasTemporaryDataForLabel(code);
-      final suffix = hasTemp ? ' • ${vm.getTemporaryDataSummary(code)}' : '';
-      _showSnack('Semua item untuk ${code ?? "label ini"} sudah ada.$suffix');
-      return;
+    int totalAdded = 0;
+    int totalSkipped = 0;
+
+    for (int i = 0; i < res.typedItems.length; i++) {
+      final item = res.typedItems[i];
+      if (item is! FurnitureWipItem) continue;
+
+      final rawRow = res.data[i];
+      final simpleKey = res.simpleKey(rawRow);
+
+      if (vm.isInTempKeys(simpleKey)) {
+        totalSkipped++;
+        continue;
+      }
+
+      if (!mounted) break;
+
+      final result = await showDialog<ProductionPcsInputResult>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => ProductionPcsInputDialog(
+          item: item,
+          itemIndex: i,
+          totalItems: res.typedItems.length,
+        ),
+      );
+
+      if (result == null) continue;
+
+      final originalPcs = rawRow['pcs'] ?? rawRow['Pcs'];
+      final originalIsPartial = rawRow['isPartial'];
+
+      if (result.isPartial) {
+        rawRow['pcs'] = result.pcs;
+        rawRow['Pcs'] = result.pcs;
+        rawRow['isPartial'] = true;
+        rawRow['IsPartial'] = true;
+      }
+
+      vm.clearPicks();
+      vm.togglePick(rawRow);
+      final r = vm.commitPickedToTemp(noPacking: widget.noProduksi);
+
+      rawRow['pcs'] = originalPcs;
+      rawRow['Pcs'] = originalPcs;
+      rawRow['isPartial'] = originalIsPartial;
+      rawRow['IsPartial'] = originalIsPartial;
+
+      totalAdded += r.added;
+      totalSkipped += r.skipped;
     }
-    vm.clearPicks();
-    vm.pickAllNew(widget.noProduksi);
-    final result = vm.commitPickedToTemp(noPacking: widget.noProduksi);
-    final msg = result.added > 0
-        ? '✅ Auto-added ${result.added} item${result.skipped > 0 ? ' • Duplikat terlewati ${result.skipped}' : ''}'
-        : 'Tidak ada item baru ditambahkan';
+
+    if (!mounted) return;
+    final msg = totalAdded > 0
+        ? '✅ Ditambahkan $totalAdded item${totalSkipped > 0 ? ' • $totalSkipped terlewati' : ''}'
+        : 'Tidak ada item yang ditambahkan';
     _showSnack(
       msg,
-      backgroundColor: result.added > 0 ? Colors.green : Colors.orange,
+      backgroundColor: totalAdded > 0 ? Colors.green : Colors.orange,
     );
-  }
-
-  Future<void> _handlePartialMode(
-    PackingProductionInputViewModel vm,
-    ProductionLabelLookupResult res,
-  ) async {
-    await showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (_) => PackingLookupLabelPartialDialog(
-        noPacking: widget.noProduksi,
-        selectedMode: _selectedMode,
-      ),
-    );
-  }
-
-  Future<void> _handleSelectMode(
-    PackingProductionInputViewModel vm,
-    ProductionLabelLookupResult res,
-  ) async {
-    final freshCount = vm.countNewRowsInLastLookup(widget.noProduksi);
-    if (freshCount == 0) {
-      final code = _labelCodeOfFirst(res);
-      final hasTemp = code != null && vm.hasTemporaryDataForLabel(code);
-      final suffix = hasTemp ? ' • ${vm.getTemporaryDataSummary(code)}' : '';
-      _showSnack('Semua item untuk ${code ?? "label ini"} sudah ada.$suffix');
-      return;
-    }
-    await showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (_) => PackingLookupLabelDialog(
-        noPacking: widget.noProduksi,
-        selectedMode: _selectedMode,
-      ),
-    );
-  }
-
-  String? _labelCodeOfFirst(ProductionLabelLookupResult res) {
-    if (res.typedItems.isEmpty) return null;
-    final item = res.typedItems.first;
-    if (item is FurnitureWipItem) {
-      return (item.noFurnitureWIPPartial ?? '').trim().isNotEmpty
-          ? item.noFurnitureWIPPartial
-          : item.noFurnitureWIP;
-    }
-    return null;
   }
 
   // ── Cabinet Material helpers ───────────────────────────────────────────────
@@ -588,11 +573,7 @@ class _PackingProductionInputScreenState
                     tileMetrics: [
                       (
                         Icons.inventory_2_outlined,
-                        '${entry.value.length} item',
-                      ),
-                      (
-                        Icons.scale_outlined,
-                        '${num2(entry.value.fold<double>(0, (s, i) => s + (i.berat ?? 0)))} kg',
+                        '${entry.value.fold<int>(0, (s, i) => s + (i.pcs ?? 0))} pcs',
                       ),
                     ],
                     color: _kPrimary,

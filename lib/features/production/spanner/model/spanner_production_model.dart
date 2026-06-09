@@ -1,6 +1,111 @@
 // lib/features/shared/spanner_production/model/spanner_production_model.dart
 import 'package:intl/intl.dart';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SpannerMesinInfo — untuk panel kiri mesin screen
+// Hasil dari GET /api/mst-mesin/spanner
+// ─────────────────────────────────────────────────────────────────────────────
+class SpannerMesinInfo {
+  final int idMesin;
+  final String namaMesin;
+  final String bagian;
+  final String? noProduksi;
+  final DateTime? tglProduksi;
+  final int? idRegu;
+  final String? namaRegu;
+  final int? outputJenisId;
+  final String? outputJenisNama;
+  final List<int> idOperators;
+  final String? operators;
+  final int? shift;
+  final String? hourStart;
+  final String? hourEnd;
+
+  bool get isActive => noProduksi != null && noProduksi!.isNotEmpty;
+
+  const SpannerMesinInfo({
+    required this.idMesin,
+    required this.namaMesin,
+    required this.bagian,
+    this.noProduksi,
+    this.tglProduksi,
+    this.idRegu,
+    this.namaRegu,
+    this.outputJenisId,
+    this.outputJenisNama,
+    this.idOperators = const [],
+    this.operators,
+    this.shift,
+    this.hourStart,
+    this.hourEnd,
+  });
+
+  static String? _s(dynamic v) {
+    final t = v?.toString().trim();
+    return (t == null || t.isEmpty) ? null : t;
+  }
+
+  static int? _i(dynamic v) {
+    if (v == null) return null;
+    if (v is num) return v.toInt();
+    return int.tryParse(v.toString());
+  }
+
+  static DateTime? _dt(dynamic v) {
+    if (v == null) return null;
+    if (v is DateTime) return v;
+    if (v is String) return DateTime.tryParse(v.trim());
+    return null;
+  }
+
+  static String? _time(dynamic v) {
+    if (v == null) return null;
+    if (v is DateTime) return DateFormat('HH:mm').format(v.toUtc());
+    if (v is String) {
+      final s = v.trim();
+      if (s.isEmpty) return null;
+      final dt = DateTime.tryParse(s);
+      if (dt != null) return DateFormat('HH:mm').format(dt.toUtc());
+      final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(s);
+      if (m != null) {
+        return '${m.group(1)!.padLeft(2, '0')}:${m.group(2)!}';
+      }
+    }
+    return null;
+  }
+
+  factory SpannerMesinInfo.fromJson(Map<String, dynamic> j) {
+    List<int> parseIdOperators(dynamic v) {
+      if (v is List) {
+        return v
+            .map((e) => _i(e))
+            .whereType<int>()
+            .where((e) => e != 0)
+            .toList();
+      }
+      final single = _i(v);
+      return single != null ? [single] : [];
+    }
+
+    return SpannerMesinInfo(
+      idMesin: _i(j['IdMesin']) ?? 0,
+      namaMesin: _s(j['NamaMesin']) ?? '',
+      bagian: _s(j['Bagian']) ?? '',
+      noProduksi: _s(j['NoProduksi']),
+      tglProduksi: _dt(j['TglProduksi']),
+      idRegu: _i(j['IdRegu']),
+      namaRegu: _s(j['NamaRegu']),
+      outputJenisId: _i(j['OutputJenisId']),
+      outputJenisNama: _s(j['OutputJenisNama']),
+      idOperators: parseIdOperators(j['IdOperators']),
+      operators: _s(j['Operators']),
+      shift: _i(j['Shift']),
+      hourStart: _time(j['HourStart']),
+      hourEnd: _time(j['HourEnd']),
+    );
+  }
+}
+
 class SpannerProduction {
   final String noProduksi;
   final int idMesin;
@@ -31,6 +136,13 @@ class SpannerProduction {
   final DateTime? lastClosedDate; // date only
   final bool isLocked;
 
+  // ── New fields (API v2) ─────────────────────────────────────────
+  final int? outputJenisId;
+  final String? outputJenisNama;
+  final int? idRegu;
+  final String? namaRegu;
+  final List<int> idOperators;
+
   const SpannerProduction({
     required this.noProduksi,
     required this.idMesin,
@@ -49,6 +161,11 @@ class SpannerProduction {
     this.hourEnd,
     this.lastClosedDate,
     this.isLocked = false,
+    this.outputJenisId,
+    this.outputJenisNama,
+    this.idRegu,
+    this.namaRegu,
+    this.idOperators = const [],
   });
 
   // ---------- tolerant parsers ----------
@@ -123,6 +240,18 @@ class SpannerProduction {
     return null;
   }
 
+  static List<int> _parseIdOperators(dynamic v) {
+    if (v is List) {
+      return v
+          .map((e) => _asInt(e))
+          .whereType<int>()
+          .where((e) => e != 0)
+          .toList();
+    }
+    final single = _asInt(v);
+    return single != null && single != 0 ? [single] : [];
+  }
+
   factory SpannerProduction.fromJson(Map<String, dynamic> j) {
     return SpannerProduction(
       noProduksi: _asString(j['NoProduksi']),
@@ -131,8 +260,6 @@ class SpannerProduction {
       namaMesin: _asString(j['NamaMesin']),
       namaOperator: _asString(j['NamaOperator']),
 
-      // backend spanner list pakai 'Tanggal' (Spanner_h)
-      // tapi biar seragam: simpan ke tglProduksi
       tglProduksi: _asDateTime(j['Tanggal'] ?? j['TglProduksi']),
       shift: _asIntRequired(j['Shift']),
       createBy: _asString(j['CreateBy']),
@@ -151,9 +278,18 @@ class SpannerProduction {
       hourStart: _asTimeHHmm(j['HourStart']),
       hourEnd: _asTimeHHmm(j['HourEnd']),
 
-      // ✅ optional lock flags jika backend kirim
       lastClosedDate: _asDateTime(j['LastClosedDate']),
       isLocked: _asBool(j['IsLocked']),
+
+      outputJenisId: _asInt(j['OutputJenisId']),
+      outputJenisNama: j['OutputJenisNama']?.toString().trim().isEmpty ?? true
+          ? null
+          : j['OutputJenisNama']?.toString(),
+      idRegu: _asInt(j['IdRegu']),
+      namaRegu: j['NamaRegu']?.toString().trim().isEmpty ?? true
+          ? null
+          : j['NamaRegu']?.toString(),
+      idOperators: _parseIdOperators(j['IdOperators']),
     );
   }
 
@@ -262,6 +398,11 @@ class SpannerProduction {
     String? hourEnd,
     DateTime? lastClosedDate,
     bool? isLocked,
+    int? outputJenisId,
+    String? outputJenisNama,
+    int? idRegu,
+    String? namaRegu,
+    List<int>? idOperators,
   }) {
     return SpannerProduction(
       noProduksi: noProduksi ?? this.noProduksi,
@@ -281,6 +422,11 @@ class SpannerProduction {
       hourEnd: hourEnd ?? this.hourEnd,
       lastClosedDate: lastClosedDate ?? this.lastClosedDate,
       isLocked: isLocked ?? this.isLocked,
+      outputJenisId: outputJenisId ?? this.outputJenisId,
+      outputJenisNama: outputJenisNama ?? this.outputJenisNama,
+      idRegu: idRegu ?? this.idRegu,
+      namaRegu: namaRegu ?? this.namaRegu,
+      idOperators: idOperators ?? this.idOperators,
     );
   }
 }

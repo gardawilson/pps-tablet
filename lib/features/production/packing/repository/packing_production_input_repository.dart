@@ -9,6 +9,7 @@ import '../../../../core/network/api_client.dart';
 import '../../shared/models/production_label_lookup_result.dart';
 import '../../shared/models/cabinet_material_item.dart';
 
+import '../model/packing_output_model.dart';
 import '../model/packing_production_inputs_model.dart';
 
 class PackingProductionInputRepository {
@@ -58,6 +59,37 @@ class PackingProductionInputRepository {
 
   void invalidateInputs(String noPacking) => _inputsCache.remove(noPacking);
   void clearInputsCache() => _inputsCache.clear();
+
+  /* =============================
+   * GET OUTPUTS (Barang Jadi)
+   * ============================= */
+
+  final Map<String, List<PackingOutput>> _outputsCache = {};
+
+  Future<List<PackingOutput>> fetchOutputs(
+    String noPacking, {
+    bool force = false,
+  }) async {
+    final key = noPacking.trim();
+    if (key.isEmpty) throw ArgumentError('noPacking tidak boleh kosong');
+
+    if (!force && _outputsCache.containsKey(key)) {
+      return _outputsCache[key]!;
+    }
+
+    final body = await api.getJson('/api/production/packing/$key/outputs');
+    final list = (body['data'] as List<dynamic>? ?? []);
+    final outputs = list
+        .whereType<Map<String, dynamic>>()
+        .map((e) => PackingOutput.fromJson(e))
+        .toList();
+
+    _outputsCache[key] = outputs;
+    return outputs;
+  }
+
+  void invalidateOutputs(String noPacking) => _outputsCache.remove(noPacking);
+  void clearOutputsCache() => _outputsCache.clear();
 
   /* =============================
    * GET MASTER CABINET MATERIALS (MASTER + STOCK)

@@ -4,16 +4,21 @@ import 'package:intl/intl.dart';
 class MixerProduction {
   final String noProduksi;
   final int idOperator;
+  final List<int> idOperators;
   final int idMesin;
 
   final String namaMesin;
   final String namaOperator;
 
+  final int? outputJenisId;
+  final String? outputJenisNama;
+
+  final int? idRegu;
+  final String? namaRegu;
+
   final DateTime? tglProduksi;
   final int shift;
 
-  /// Backend field biasanya "JamKerja" (select/list).
-  /// Untuk create/update biasanya backend minta key "jam".
   final int? jamKerja;
 
   final String createBy;
@@ -26,20 +31,23 @@ class MixerProduction {
   final String? checkBy2;
   final String? approveBy;
 
-  /// Jam kerja dalam format "HH:mm"
   final String? hourStart;
   final String? hourEnd;
 
-  // ✅ NEW: tutup transaksi flags
-  final DateTime? lastClosedDate; // date only
+  final DateTime? lastClosedDate;
   final bool isLocked;
 
   const MixerProduction({
     required this.noProduksi,
     required this.idOperator,
+    this.idOperators = const [],
     required this.idMesin,
     required this.namaMesin,
     required this.namaOperator,
+    this.outputJenisId,
+    this.outputJenisNama,
+    this.idRegu,
+    this.namaRegu,
     required this.tglProduksi,
     required this.shift,
     required this.createBy,
@@ -52,8 +60,6 @@ class MixerProduction {
     this.approveBy,
     this.hourStart,
     this.hourEnd,
-
-    // ✅ NEW
     this.lastClosedDate,
     this.isLocked = false,
   });
@@ -133,12 +139,25 @@ class MixerProduction {
   }
 
   factory MixerProduction.fromJson(Map<String, dynamic> j) {
+    final rawIdOps = j['IdOperators'] ?? j['idOperators'];
+    final List<int> idOperatorsList = rawIdOps is List
+        ? rawIdOps.map((e) => _asIntRequired(e)).toList()
+        : [];
+    final singleId = _asIntRequired(j['IdOperator']);
+
     return MixerProduction(
       noProduksi: _asString(j['NoProduksi']),
-      idOperator: _asIntRequired(j['IdOperator']),
+      idOperator: idOperatorsList.isNotEmpty ? idOperatorsList.first : singleId,
+      idOperators: idOperatorsList.isNotEmpty ? idOperatorsList : (singleId != 0 ? [singleId] : []),
       idMesin: _asIntRequired(j['IdMesin']),
       namaMesin: _asString(j['NamaMesin']),
-      namaOperator: _asString(j['NamaOperator']),
+      namaOperator: _asString(j['NamaOperator'] ?? j['NamaOperators'] ?? ''),
+      outputJenisId: _asInt(j['OutputJenisId']),
+      outputJenisNama: j['OutputJenisNama'] == null || _asString(j['OutputJenisNama']).trim().isEmpty
+          ? null : _asString(j['OutputJenisNama']),
+      idRegu: _asInt(j['IdRegu']),
+      namaRegu: j['NamaRegu'] == null || _asString(j['NamaRegu']).trim().isEmpty
+          ? null : _asString(j['NamaRegu']),
       tglProduksi: _asDateTime(j['TglProduksi']),
       shift: _asIntRequired(j['Shift']),
       createBy: _asString(j['CreateBy']),
@@ -151,8 +170,6 @@ class MixerProduction {
       hourMeter: _asInt(j['HourMeter']),
       hourStart: _asTimeHHmm(j['HourStart']),
       hourEnd: _asTimeHHmm(j['HourEnd']),
-
-      // ✅ NEW: mapping dari backend
       lastClosedDate: _asDateTime(j['LastClosedDate']),
       isLocked: _asBool(j['IsLocked']),
     );
@@ -246,9 +263,14 @@ class MixerProduction {
   MixerProduction copyWith({
     String? noProduksi,
     int? idOperator,
+    List<int>? idOperators,
     int? idMesin,
     String? namaMesin,
     String? namaOperator,
+    int? outputJenisId,
+    String? outputJenisNama,
+    int? idRegu,
+    String? namaRegu,
     DateTime? tglProduksi,
     int? shift,
     String? createBy,
@@ -261,17 +283,20 @@ class MixerProduction {
     String? approveBy,
     String? hourStart,
     String? hourEnd,
-
-    // ✅ NEW
     DateTime? lastClosedDate,
     bool? isLocked,
   }) {
     return MixerProduction(
       noProduksi: noProduksi ?? this.noProduksi,
       idOperator: idOperator ?? this.idOperator,
+      idOperators: idOperators ?? this.idOperators,
       idMesin: idMesin ?? this.idMesin,
       namaMesin: namaMesin ?? this.namaMesin,
       namaOperator: namaOperator ?? this.namaOperator,
+      outputJenisId: outputJenisId ?? this.outputJenisId,
+      outputJenisNama: outputJenisNama ?? this.outputJenisNama,
+      idRegu: idRegu ?? this.idRegu,
+      namaRegu: namaRegu ?? this.namaRegu,
       tglProduksi: tglProduksi ?? this.tglProduksi,
       shift: shift ?? this.shift,
       createBy: createBy ?? this.createBy,
@@ -284,10 +309,130 @@ class MixerProduction {
       approveBy: approveBy ?? this.approveBy,
       hourStart: hourStart ?? this.hourStart,
       hourEnd: hourEnd ?? this.hourEnd,
-
-      // ✅ NEW
       lastClosedDate: lastClosedDate ?? this.lastClosedDate,
       isLocked: isLocked ?? this.isLocked,
+    );
+  }
+}
+
+class MixerProduksiItem {
+  final String noProduksi;
+  final DateTime? tglProduksi;
+  final int? outputJenisId;
+  final String? outputJenisNama;
+  final String? outputJenisItemCode;
+  final List<int> idOperators;
+  final String? operators;
+  final int? idRegu;
+  final String? namaRegu;
+  final int? shift;
+  final String? hourStart;
+  final String? hourEnd;
+
+  const MixerProduksiItem({
+    required this.noProduksi,
+    this.tglProduksi,
+    this.outputJenisId,
+    this.outputJenisNama,
+    this.outputJenisItemCode,
+    this.idOperators = const [],
+    this.operators,
+    this.idRegu,
+    this.namaRegu,
+    this.shift,
+    this.hourStart,
+    this.hourEnd,
+  });
+
+  int? get idOperator => idOperators.isNotEmpty ? idOperators.first : null;
+
+  factory MixerProduksiItem.fromJson(Map<String, dynamic> j) {
+    String? s(dynamic v) =>
+        v == null ? null : v.toString().trim().isEmpty ? null : v.toString().trim();
+    int? i(dynamic v) {
+      if (v == null) return null;
+      if (v is num) return v.toInt();
+      return int.tryParse(v.toString());
+    }
+    String? timeHHmm(dynamic v) {
+      final raw = s(v);
+      if (raw == null) return null;
+      final dt = DateTime.tryParse(raw);
+      if (dt != null) return DateFormat('HH:mm').format(dt.toUtc());
+      final parts = raw.split(':');
+      if (parts.length < 2) return raw;
+      return '${parts[0].padLeft(2, '0')}:${parts[1].padLeft(2, '0')}';
+    }
+
+    List<int> parseIdOperators(dynamic v) {
+      if (v is List) return v.map((e) => i(e) ?? 0).where((e) => e != 0).toList();
+      final single = i(v);
+      return single != null ? [single] : [];
+    }
+
+    return MixerProduksiItem(
+      noProduksi: s(j['NoProduksi']) ?? '',
+      tglProduksi: j['TglProduksi'] != null
+          ? DateTime.tryParse(j['TglProduksi'].toString())
+          : null,
+      outputJenisId: i(j['OutputJenisId']),
+      outputJenisNama: s(j['OutputJenisNama']),
+      outputJenisItemCode: s(j['OutputJenisItemCode']),
+      idOperators: parseIdOperators(j['IdOperators'] ?? j['IdOperator']),
+      operators: s(j['Operators']) ?? s(j['Operator']),
+      idRegu: i(j['IdRegu']),
+      namaRegu: s(j['NamaRegu']),
+      shift: i(j['Shift']),
+      hourStart: timeHHmm(j['HourStart']),
+      hourEnd: timeHHmm(j['HourEnd']),
+    );
+  }
+}
+
+class MixerMesinInfo {
+  final int idMesin;
+  final String namaMesin;
+  final String bagian;
+  final List<MixerProduksiItem> produksiList;
+
+  bool get isActive => produksiList.isNotEmpty;
+
+  String? get noProduksi =>
+      produksiList.isNotEmpty ? produksiList.first.noProduksi : null;
+  String? get namaRegu =>
+      produksiList.isNotEmpty ? produksiList.first.namaRegu : null;
+  int? get shift => produksiList.isNotEmpty ? produksiList.first.shift : null;
+  String? get hourStart =>
+      produksiList.isNotEmpty ? produksiList.first.hourStart : null;
+  String? get hourEnd =>
+      produksiList.isNotEmpty ? produksiList.first.hourEnd : null;
+
+  const MixerMesinInfo({
+    required this.idMesin,
+    required this.namaMesin,
+    required this.bagian,
+    this.produksiList = const [],
+  });
+
+  factory MixerMesinInfo.fromJson(Map<String, dynamic> j) {
+    String? s(dynamic v) =>
+        v == null ? null : v.toString().trim().isEmpty ? null : v.toString().trim();
+    int? i(dynamic v) {
+      if (v == null) return null;
+      if (v is num) return v.toInt();
+      return int.tryParse(v.toString());
+    }
+
+    final List<MixerProduksiItem> items = [];
+    if (s(j['NoProduksi']) != null) {
+      items.add(MixerProduksiItem.fromJson(j));
+    }
+
+    return MixerMesinInfo(
+      idMesin: i(j['IdMesin']) ?? 0,
+      namaMesin: s(j['NamaMesin']) ?? '',
+      bagian: s(j['Bagian']) ?? '',
+      produksiList: items,
     );
   }
 }

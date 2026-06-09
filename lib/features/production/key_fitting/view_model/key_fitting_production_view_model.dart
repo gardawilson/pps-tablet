@@ -241,19 +241,15 @@ class KeyFittingProductionViewModel extends ChangeNotifier {
   Future<KeyFittingProduction?> createProduksi({
     required DateTime tglProduksi,
     required int idMesin,
-    required int idOperator,
-    required dynamic jamKerja, // int or String ('HH:mm-HH:mm')
+    required List<int> idOperators,
+    required int outputJenisId,
     required int shift,
+    int? idRegu,
+    int? jamKerja,
+    int? hourMeter,
     String? hourStart,
     String? hourEnd,
-    String? checkBy1,
-    String? checkBy2,
-    String? approveBy,
-    double? hourMeter,
   }) async {
-    debugPrint(
-        '🆕 [KEYFITTING_VM] createProduksi(tglProduksi=$tglProduksi, idMesin=$idMesin, idOperator=$idOperator, jamKerja=$jamKerja, shift=$shift, hourStart=$hourStart, hourEnd=$hourEnd, hourMeter=$hourMeter), VM hash=$hashCode');
-
     isSaving = true;
     saveError = null;
     notifyListeners();
@@ -262,35 +258,24 @@ class KeyFittingProductionViewModel extends ChangeNotifier {
       final created = await repository.createProduksi(
         tglProduksi: tglProduksi,
         idMesin: idMesin,
-        idOperator: idOperator,
-        jamKerja: jamKerja,
+        idOperators: idOperators,
+        outputJenisId: outputJenisId,
         shift: shift,
+        idRegu: idRegu,
+        jamKerja: jamKerja,
+        hourMeter: hourMeter,
         hourStart: hourStart,
         hourEnd: hourEnd,
-        checkBy1: checkBy1,
-        checkBy2: checkBy2,
-        approveBy: approveBy,
-        hourMeter: hourMeter,
       );
 
-      debugPrint(
-          '🆕 [KEYFITTING_VM] createProduksi success, noProduksi=${created.noProduksi}, VM hash=$hashCode');
-
-      // 🔄 AUTO REFRESH LIST SETELAH CREATE
       if (_isByDateMode) {
-        debugPrint(
-            '🆕 [KEYFITTING_VM] create in BY_DATE mode -> fetchByDate, VM hash=$hashCode');
         await fetchByDate(tglProduksi);
       } else {
-        debugPrint(
-            '🆕 [KEYFITTING_VM] create in PAGED mode -> refreshPaged, VM hash=$hashCode');
         refreshPaged();
       }
 
       return created;
-    } catch (e, st) {
-      debugPrint('❌ [KEYFITTING_VM] createProduksi error: $e, VM hash=$hashCode');
-      debugPrint('❌ [KEYFITTING_VM] createProduksi stack: $st');
+    } catch (e) {
       saveError = e.toString();
       return null;
     } finally {
@@ -304,19 +289,15 @@ class KeyFittingProductionViewModel extends ChangeNotifier {
     required String noProduksi,
     DateTime? tglProduksi,
     int? idMesin,
-    int? idOperator,
-    dynamic jamKerja,
+    List<int>? idOperators,
+    int? outputJenisId,
+    int? idRegu,
     int? shift,
+    int? jamKerja,
+    int? hourMeter,
     String? hourStart,
     String? hourEnd,
-    String? checkBy1,
-    String? checkBy2,
-    String? approveBy,
-    double? hourMeter,
   }) async {
-    debugPrint(
-        '✏️ [KEYFITTING_VM] updateProduksi(noProduksi=$noProduksi, tglProduksi=$tglProduksi, idMesin=$idMesin, idOperator=$idOperator, jamKerja=$jamKerja, shift=$shift, hourStart=$hourStart, hourEnd=$hourEnd, hourMeter=$hourMeter), VM hash=$hashCode');
-
     isSaving = true;
     saveError = null;
     notifyListeners();
@@ -326,41 +307,24 @@ class KeyFittingProductionViewModel extends ChangeNotifier {
         noProduksi: noProduksi,
         tglProduksi: tglProduksi,
         idMesin: idMesin,
-        idOperator: idOperator,
-        jamKerja: jamKerja,
+        idOperators: idOperators,
+        outputJenisId: outputJenisId,
+        idRegu: idRegu,
         shift: shift,
+        jamKerja: jamKerja,
+        hourMeter: hourMeter,
         hourStart: hourStart,
         hourEnd: hourEnd,
-        checkBy1: checkBy1,
-        checkBy2: checkBy2,
-        approveBy: approveBy,
-        hourMeter: hourMeter,
       );
 
-      debugPrint(
-          '✏️ [KEYFITTING_VM] updateProduksi success, noProduksi=${updated.noProduksi}, VM hash=$hashCode');
-
-      // 🔄 AUTO REFRESH LIST SETELAH UPDATE
-      if (_isByDateMode) {
-        if (tglProduksi != null) {
-          debugPrint(
-              '✏️ [KEYFITTING_VM] update in BY_DATE mode, tglProduksi!=null -> fetchByDate($tglProduksi), VM hash=$hashCode');
-          await fetchByDate(tglProduksi);
-        } else {
-          debugPrint(
-              '✏️ [KEYFITTING_VM] update in BY_DATE mode, no tglProduksi -> refreshPaged(), VM hash=$hashCode');
-          refreshPaged();
-        }
+      if (_isByDateMode && tglProduksi != null) {
+        await fetchByDate(tglProduksi);
       } else {
-        debugPrint(
-            '✏️ [KEYFITTING_VM] update in PAGED mode -> refreshPaged(), VM hash=$hashCode');
         refreshPaged();
       }
 
       return updated;
-    } catch (e, st) {
-      debugPrint('❌ [KEYFITTING_VM] updateProduksi error: $e, VM hash=$hashCode');
-      debugPrint('❌ [KEYFITTING_VM] updateProduksi stack: $st');
+    } catch (e) {
       saveError = e.toString();
       return null;
     } finally {

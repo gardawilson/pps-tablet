@@ -171,10 +171,7 @@ class _PackingProductionScreenState extends State<PackingProductionScreen> {
     }
   }
 
-  Future<void> _openEditDialog(
-    BuildContext ctx,
-    PackingProduction row,
-  ) async {
+  Future<void> _openEditDialog(BuildContext ctx, PackingProduction row) async {
     final updated = await showDialog<PackingProduction>(
       context: ctx,
       barrierDismissible: false,

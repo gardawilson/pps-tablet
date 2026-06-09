@@ -153,10 +153,11 @@ class _KeyFittingProductionScreenState
     final created = await showDialog<KeyFittingProduction>(
       context: ctx,
       barrierDismissible: false,
-      builder: (_) => ChangeNotifierProvider<KeyFittingProductionViewModel>.value(
-        value: _viewModel,
-        child: const KeyFittingProductionFormDialog(),
-      ),
+      builder: (_) =>
+          ChangeNotifierProvider<KeyFittingProductionViewModel>.value(
+            value: _viewModel,
+            child: const KeyFittingProductionFormDialog(),
+          ),
     );
     if (!mounted || !ctx.mounted) return;
     if (created != null) {
@@ -179,10 +180,11 @@ class _KeyFittingProductionScreenState
     final updated = await showDialog<KeyFittingProduction>(
       context: ctx,
       barrierDismissible: false,
-      builder: (_) => ChangeNotifierProvider<KeyFittingProductionViewModel>.value(
-        value: _viewModel,
-        child: KeyFittingProductionFormDialog(header: row),
-      ),
+      builder: (_) =>
+          ChangeNotifierProvider<KeyFittingProductionViewModel>.value(
+            value: _viewModel,
+            child: KeyFittingProductionFormDialog(header: row),
+          ),
     );
     if (!mounted || !ctx.mounted) return;
     if (updated != null) {

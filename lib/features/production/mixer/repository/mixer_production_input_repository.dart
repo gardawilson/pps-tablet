@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import '../../../../core/network/api_client.dart';
 import '../../shared/models/production_label_lookup_result.dart';
 import '../model/mixer_inputs_model.dart';
+import '../model/mixer_output_model.dart';
 
 class MixerProductionInputRepository {
   final ApiClient _api;
@@ -167,6 +168,53 @@ class MixerProductionInputRepository {
             : 'Request delete inputs tidak valid');
       }
 
+      throw Exception(msg);
+    }
+  }
+
+  /* =============================
+   * GET OUTPUTS
+   * ============================= */
+
+  Future<List<MixerOutput>> fetchOutputs(String noProduksi) async {
+    final path = '/api/production/mixer/$noProduksi/outputs';
+    final body = await _api.getJson(path);
+    final data = body['data'] as List? ?? [];
+    return data
+        .map((e) => MixerOutput.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  /// POST /api/labels/mixer
+  /// Body: { header: {IdMixer, DateCreate, Berat}, details: [{NoSak, Berat}], outputCode }
+  /// Returns noMixer from response data.header.NoMixer
+  Future<String> createMixerLabel({
+    required String noProduksi,
+    required int idMixer,
+    required DateTime dateCreate,
+    required List<Map<String, dynamic>> details,
+  }) async {
+    final totalBerat = details.fold<double>(
+      0.0, (s, e) => s + ((e['Berat'] as num?)?.toDouble() ?? 0.0));
+
+    final payload = {
+      'header': {
+        'IdMixer': idMixer,
+        'DateCreate': dateCreate.toIso8601String().substring(0, 10),
+        'Berat': totalBerat,
+      },
+      'details': details,
+      'outputCode': noProduksi,
+    };
+
+    try {
+      final body = await _api.postJson('/api/labels/mixer', body: payload);
+      final data = body['data'] as Map<String, dynamic>?;
+      final header = data?['header'] as Map<String, dynamic>?;
+      return (header?['NoMixer'] as String?) ?? '';
+    } on ApiException catch (e) {
+      final parsed = _tryDecodeMap(e.responseBody);
+      final msg = (parsed['message'] as String?) ?? (e.message.isNotEmpty ? e.message : 'Gagal membuat label mixer');
       throw Exception(msg);
     }
   }

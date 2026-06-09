@@ -5,15 +5,20 @@ class HotStampProduction {
   final String noProduksi;
   final int idMesin;
   final int idOperator;
+  final List<int> idOperators;
 
   final String namaMesin;
   final String namaOperator;
 
+  final int? idRegu;
+  final String? namaRegu;
+
+  final int? outputJenisId;
+  final String? outputJenisNama;
+
   final DateTime? tglProduksi;
   final int shift;
 
-  /// Backend field biasanya "JamKerja" (select/list).
-  /// Untuk create/update endpoint yang minta key "jam".
   final int? jamKerja;
 
   final String createBy;
@@ -24,20 +29,23 @@ class HotStampProduction {
   final String? checkBy2;
   final String? approveBy;
 
-  /// Jam kerja dalam format "HH:mm"
   final String? hourStart;
   final String? hourEnd;
 
-  // ✅ Tutup transaksi flags
-  final DateTime? lastClosedDate; // date only
+  final DateTime? lastClosedDate;
   final bool isLocked;
 
   const HotStampProduction({
     required this.noProduksi,
     required this.idMesin,
     required this.idOperator,
+    this.idOperators = const [],
     required this.namaMesin,
     required this.namaOperator,
+    this.idRegu,
+    this.namaRegu,
+    this.outputJenisId,
+    this.outputJenisNama,
     required this.tglProduksi,
     required this.shift,
     required this.createBy,
@@ -100,40 +108,59 @@ class HotStampProduction {
   static String? _asTimeHHmm(dynamic v) {
     if (v == null) return null;
 
-    // TIME kadang dimapping ke DateTime (1900-01-01 + time)
-    if (v is DateTime) {
-      return DateFormat('HH:mm').format(v.toLocal());
-    }
-
-    // String: "HH:mm[:ss[.fff]]" atau "1900-01-01T07:30:00"
     if (v is String) {
       final s = v.trim();
       if (s.isEmpty) return null;
 
-      final asDt = DateTime.tryParse(s);
-      if (asDt != null) {
-        return DateFormat('HH:mm').format(asDt.toLocal());
+      // ISO datetime (e.g. "1970-01-01T08:00:00.000Z") — ambil bagian waktu
+      // langsung tanpa konversi timezone agar tidak geser karena UTC offset
+      final isoTime = RegExp(r'T(\d{2}):(\d{2})').firstMatch(s);
+      if (isoTime != null) {
+        return '${isoTime.group(1)}:${isoTime.group(2)}';
       }
 
-      final m = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(s);
-      if (m != null) {
-        final hh = m.group(1)!.padLeft(2, '0');
-        final mm = m.group(2)!;
-        return '$hh:$mm';
+      // "HH:mm[:ss[.fff]]"
+      final hhmm = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(s);
+      if (hhmm != null) {
+        return '${hhmm.group(1)!.padLeft(2, '0')}:${hhmm.group(2)}';
       }
+    }
+
+    // DateTime object — gunakan UTC agar konsisten dengan ISO string di atas
+    if (v is DateTime) {
+      return DateFormat('HH:mm').format(v.toUtc());
     }
 
     return null;
   }
 
   factory HotStampProduction.fromJson(Map<String, dynamic> j) {
+    final rawIdOps = j['IdOperators'] ?? j['idOperators'];
+    final List<int> idOperatorsList = rawIdOps is List
+        ? rawIdOps.map((e) => _asIntRequired(e)).toList()
+        : [];
+    final singleId = _asIntRequired(j['IdOperator']);
+
     return HotStampProduction(
       noProduksi: _asString(j['NoProduksi']),
       idMesin: _asIntRequired(j['IdMesin']),
-      idOperator: _asIntRequired(j['IdOperator']),
+      idOperator: idOperatorsList.isNotEmpty ? idOperatorsList.first : singleId,
+      idOperators: idOperatorsList.isNotEmpty
+          ? idOperatorsList
+          : (singleId != 0 ? [singleId] : []),
       namaMesin: _asString(j['NamaMesin']),
-      namaOperator: _asString(j['NamaOperator']),
-      tglProduksi: _asDateTime(j['TglProduksi']),
+      namaOperator: _asString(j['NamaOperator'] ?? j['NamaOperators'] ?? ''),
+      idRegu: _asInt(j['IdRegu']),
+      namaRegu: j['NamaRegu'] == null ||
+              _asString(j['NamaRegu']).trim().isEmpty
+          ? null
+          : _asString(j['NamaRegu']),
+      outputJenisId: _asInt(j['OutputJenisId']),
+      outputJenisNama: j['OutputJenisNama'] == null ||
+              _asString(j['OutputJenisNama']).trim().isEmpty
+          ? null
+          : _asString(j['OutputJenisNama']),
+      tglProduksi: _asDateTime(j['TglProduksi'] ?? j['Tanggal']),
       shift: _asIntRequired(j['Shift']),
       createBy: _asString(j['CreateBy']),
       checkBy1: j['CheckBy1'] == null || j['CheckBy1'] == ''
@@ -149,8 +176,6 @@ class HotStampProduction {
       hourMeter: _asInt(j['HourMeter']),
       hourStart: _asTimeHHmm(j['HourStart']),
       hourEnd: _asTimeHHmm(j['HourEnd']),
-
-      // ✅ Mapping dari backend
       lastClosedDate: _asDateTime(j['LastClosedDate']),
       isLocked: _asBool(j['IsLocked']),
     );
@@ -256,8 +281,13 @@ class HotStampProduction {
     String? noProduksi,
     int? idMesin,
     int? idOperator,
+    List<int>? idOperators,
     String? namaMesin,
     String? namaOperator,
+    int? idRegu,
+    String? namaRegu,
+    int? outputJenisId,
+    String? outputJenisNama,
     DateTime? tglProduksi,
     int? shift,
     String? createBy,
@@ -275,8 +305,13 @@ class HotStampProduction {
       noProduksi: noProduksi ?? this.noProduksi,
       idMesin: idMesin ?? this.idMesin,
       idOperator: idOperator ?? this.idOperator,
+      idOperators: idOperators ?? this.idOperators,
       namaMesin: namaMesin ?? this.namaMesin,
       namaOperator: namaOperator ?? this.namaOperator,
+      idRegu: idRegu ?? this.idRegu,
+      namaRegu: namaRegu ?? this.namaRegu,
+      outputJenisId: outputJenisId ?? this.outputJenisId,
+      outputJenisNama: outputJenisNama ?? this.outputJenisNama,
       tglProduksi: tglProduksi ?? this.tglProduksi,
       shift: shift ?? this.shift,
       createBy: createBy ?? this.createBy,
@@ -289,6 +324,129 @@ class HotStampProduction {
       hourEnd: hourEnd ?? this.hourEnd,
       lastClosedDate: lastClosedDate ?? this.lastClosedDate,
       isLocked: isLocked ?? this.isLocked,
+    );
+  }
+}
+
+class HotStampProduksiItem {
+  final String noProduksi;
+  final DateTime? tglProduksi;
+  final int? outputJenisId;
+  final String? outputJenisNama;
+  final List<int> idOperators;
+  final String? operators;
+  final int? idRegu;
+  final String? namaRegu;
+  final int? shift;
+  final String? hourStart;
+  final String? hourEnd;
+
+  const HotStampProduksiItem({
+    required this.noProduksi,
+    this.tglProduksi,
+    this.outputJenisId,
+    this.outputJenisNama,
+    this.idOperators = const [],
+    this.operators,
+    this.idRegu,
+    this.namaRegu,
+    this.shift,
+    this.hourStart,
+    this.hourEnd,
+  });
+
+  int? get idOperator => idOperators.isNotEmpty ? idOperators.first : null;
+
+  factory HotStampProduksiItem.fromJson(Map<String, dynamic> j) {
+    String? s(dynamic v) =>
+        v == null ? null : v.toString().trim().isEmpty ? null : v.toString().trim();
+    int? i(dynamic v) {
+      if (v == null) return null;
+      if (v is num) return v.toInt();
+      return int.tryParse(v.toString());
+    }
+    String? timeHHmm(dynamic v) {
+      final raw = s(v);
+      if (raw == null) return null;
+      final dt = DateTime.tryParse(raw);
+      if (dt != null) return DateFormat('HH:mm').format(dt.toUtc());
+      final parts = raw.split(':');
+      if (parts.length < 2) return raw;
+      return '${parts[0].padLeft(2, '0')}:${parts[1].padLeft(2, '0')}';
+    }
+
+    List<int> parseIdOperators(dynamic v) {
+      if (v is List) return v.map((e) => i(e) ?? 0).where((e) => e != 0).toList();
+      final single = i(v);
+      return single != null ? [single] : [];
+    }
+
+    return HotStampProduksiItem(
+      noProduksi: s(j['NoProduksi']) ?? '',
+      tglProduksi: j['TglProduksi'] != null
+          ? DateTime.tryParse(j['TglProduksi'].toString())
+          : null,
+      outputJenisId: i(j['OutputJenisId']),
+      outputJenisNama: s(j['OutputJenisNama']),
+      idOperators: parseIdOperators(j['IdOperators'] ?? j['IdOperator']),
+      operators: s(j['Operators']) ?? s(j['Operator']),
+      idRegu: i(j['IdRegu']),
+      namaRegu: s(j['NamaRegu']),
+      shift: i(j['Shift']),
+      hourStart: timeHHmm(j['HourStart']),
+      hourEnd: timeHHmm(j['HourEnd']),
+    );
+  }
+}
+
+class HotStampMesinInfo {
+  final int idMesin;
+  final String namaMesin;
+  final String bagian;
+  final List<HotStampProduksiItem> produksiList;
+
+  bool get isActive => produksiList.isNotEmpty;
+
+  String? get noProduksi =>
+      produksiList.isNotEmpty ? produksiList.first.noProduksi : null;
+  int? get shift => produksiList.isNotEmpty ? produksiList.first.shift : null;
+  String? get hourStart =>
+      produksiList.isNotEmpty ? produksiList.first.hourStart : null;
+  String? get hourEnd =>
+      produksiList.isNotEmpty ? produksiList.first.hourEnd : null;
+  String? get namaRegu =>
+      produksiList.isNotEmpty ? produksiList.first.namaRegu : null;
+  String? get outputJenisNama =>
+      produksiList.isNotEmpty ? produksiList.first.outputJenisNama : null;
+  int? get outputJenisId =>
+      produksiList.isNotEmpty ? produksiList.first.outputJenisId : null;
+
+  const HotStampMesinInfo({
+    required this.idMesin,
+    required this.namaMesin,
+    required this.bagian,
+    this.produksiList = const [],
+  });
+
+  factory HotStampMesinInfo.fromJson(Map<String, dynamic> j) {
+    String? s(dynamic v) =>
+        v == null ? null : v.toString().trim().isEmpty ? null : v.toString().trim();
+    int? i(dynamic v) {
+      if (v == null) return null;
+      if (v is num) return v.toInt();
+      return int.tryParse(v.toString());
+    }
+
+    final List<HotStampProduksiItem> items = [];
+    if (s(j['NoProduksi']) != null) {
+      items.add(HotStampProduksiItem.fromJson(j));
+    }
+
+    return HotStampMesinInfo(
+      idMesin: i(j['IdMesin']) ?? 0,
+      namaMesin: s(j['NamaMesin']) ?? '',
+      bagian: s(j['Bagian']) ?? '',
+      produksiList: items,
     );
   }
 }

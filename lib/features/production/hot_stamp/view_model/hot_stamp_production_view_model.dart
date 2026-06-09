@@ -224,6 +224,47 @@ class HotStampProductionViewModel extends ChangeNotifier {
     });
   }
 
+  // ====== CREATE WITH JENIS (req body baru) ======
+  Future<HotStampProduction?> createProduksiWithJenis({
+    required DateTime tglProduksi,
+    required int idMesin,
+    required List<int> idOperators,
+    required int outputJenisId,
+    required int shift,
+    String? hourStart,
+    String? hourEnd,
+    int? idRegu,
+  }) async {
+    isSaving = true;
+    saveError = null;
+    notifyListeners();
+
+    try {
+      final created = await repository.createProduksiWithJenis(
+        tglProduksi: tglProduksi,
+        idMesin: idMesin,
+        idOperators: idOperators,
+        outputJenisId: outputJenisId,
+        shift: shift,
+        hourStart: hourStart,
+        hourEnd: hourEnd,
+        idRegu: idRegu,
+      );
+      if (_isByDateMode) {
+        await fetchByDate(tglProduksi);
+      } else {
+        refreshPaged();
+      }
+      return created;
+    } catch (e) {
+      saveError = e.toString();
+      return null;
+    } finally {
+      isSaving = false;
+      notifyListeners();
+    }
+  }
+
   // ====== CREATE / SAVE ======
   Future<HotStampProduction?> createProduksi({
     required DateTime tglProduksi,

@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../repository/hot_stamp_production_input_repository.dart';
+import '../model/hot_stamp_output_model.dart';
 import '../model/hot_stamping_inputs_model.dart';
 
 // ⬇️ shared lookup result model (masih dipakai untuk lookup FWIP)
@@ -1004,6 +1005,39 @@ class HotStampingProductionInputViewModel extends ChangeNotifier {
     }
 
     return 'Total $totalTempCount items:\n${parts.join(', ')}';
+  }
+
+  // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // Outputs — furniture WIP labels produced
+  // ---------------------------------------------------------------------------
+  final Map<String, List<HotStampOutput>> _outputsCache = {};
+  final Map<String, bool> _outputsLoading = {};
+  final Map<String, String?> _outputsError = {};
+
+  List<HotStampOutput>? outputsOf(String noProduksi) =>
+      _outputsCache[noProduksi];
+  bool isOutputsLoading(String noProduksi) =>
+      _outputsLoading[noProduksi] ?? false;
+  String? outputsError(String noProduksi) => _outputsError[noProduksi];
+
+  Future<void> loadOutputs(String noProduksi, {bool force = false}) async {
+    if (!force && _outputsCache.containsKey(noProduksi)) return;
+    if (_outputsLoading[noProduksi] == true) return;
+
+    _outputsLoading[noProduksi] = true;
+    _outputsError[noProduksi] = null;
+    notifyListeners();
+
+    try {
+      final data = await repository.fetchOutputs(noProduksi);
+      _outputsCache[noProduksi] = data;
+    } catch (e) {
+      _outputsError[noProduksi] = e.toString();
+    } finally {
+      _outputsLoading[noProduksi] = false;
+      notifyListeners();
+    }
   }
 
   // ---------------------------------------------------------------------------

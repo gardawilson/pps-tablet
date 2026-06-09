@@ -3,14 +3,57 @@ import 'dart:async';
 import 'dart:convert';
 
 import '../../../../core/network/api_client.dart';
+import '../../../../core/network/endpoints.dart';
+import '../../../../core/services/token_storage.dart';
 import '../../../../core/utils/date_formatter.dart';
+import 'package:http/http.dart' as http;
 import '../model/key_fitting_production_model.dart';
+export '../model/key_fitting_production_model.dart' show KeyFittingMesinInfo;
 
 class KeyFittingProductionRepository {
   final ApiClient api;
 
   KeyFittingProductionRepository({ApiClient? api})
       : api = api ?? ApiClient();
+
+  static const _timeout = Duration(seconds: 25);
+
+  // =========================
+  //  PASANG KUNCI MESIN LIST
+  //  GET :7500/api/mst-mesin/pasang-kunci
+  // =========================
+  Future<List<KeyFittingMesinInfo>> fetchPasangKunciMesin() async {
+    final token = await TokenStorage.getToken();
+    final apiBaseUri = Uri.parse(ApiConstants.baseUrl);
+    final url = Uri(
+      scheme: apiBaseUri.scheme.isEmpty ? 'http' : apiBaseUri.scheme,
+      host: apiBaseUri.host,
+      port: 7500,
+      path: '/api/mst-mesin/pasang-kunci',
+    );
+
+    late http.Response res;
+    try {
+      res = await http.get(url, headers: {
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+      }).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout mengambil data mesin pasang kunci');
+    } catch (e) {
+      throw Exception('Gagal terhubung ke server: $e');
+    }
+
+    if (res.statusCode != 200) {
+      throw Exception('Gagal memuat mesin pasang kunci (${res.statusCode})');
+    }
+
+    final body = json.decode(utf8.decode(res.bodyBytes));
+    final data = body['data'] as List<dynamic>? ?? [];
+    return data
+        .map((e) => KeyFittingMesinInfo.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
 
   /// Get PasangKunci_h (Key Fitting) by date
   /// Backend: GET /api/production/key-fitting/:date (YYYY-MM-DD)
@@ -37,6 +80,7 @@ class KeyFittingProductionRepository {
     int pageSize = 20,
     String? search,
     String? noProduksi,
+    int? idMesin,
   }) async {
     final String? effectiveSearch =
     (noProduksi != null && noProduksi.trim().isNotEmpty)
@@ -47,6 +91,7 @@ class KeyFittingProductionRepository {
       'page': page,
       'pageSize': pageSize,
       if (effectiveSearch != null) 'search': effectiveSearch,
+      if (idMesin != null) 'idMesin': idMesin,
     };
 
     final body = await api.getJson('/api/production/key-fitting', query: qp);
@@ -78,12 +123,14 @@ class KeyFittingProductionRepository {
     int pageSize = 20,
     String? search,
     String? noProduksi,
+    int? idMesin,
   }) async {
     final r = await fetchAll(
       page: page,
       pageSize: pageSize,
       search: search,
       noProduksi: noProduksi,
+      idMesin: idMesin,
     );
     return (r['items'] as List<KeyFittingProduction>);
   }
@@ -91,50 +138,43 @@ class KeyFittingProductionRepository {
   // =========================
   //  CREATE (POST)
   //  POST /api/production/key-fitting
-  //  jamKerja bisa int atau 'HH:mm-HH:mm'
   // =========================
   Future<KeyFittingProduction> createProduksi({
     required DateTime tglProduksi,
     required int idMesin,
-    required int idOperator,
-    required dynamic jamKerja, // int atau String 'HH:mm-HH:mm'
+    required List<int> idOperators,
+    required int outputJenisId,
     required int shift,
+    int? idRegu,
+    int? jamKerja,
+    int? hourMeter,
     String? hourStart,
     String? hourEnd,
-    String? checkBy1,
-    String? checkBy2,
-    String? approveBy,
-    double? hourMeter,
   }) async {
-    final tglStr = toDbDateString(tglProduksi);
-
     String _normalizeTime(String v) {
       final t = v.trim();
-      if (t.isEmpty) return t;
-      if (t.length == 5) return '$t:00'; // HH:mm -> HH:mm:00
-      return t;
+      return t.length == 5 ? '$t:00' : t;
     }
 
     final payload = <String, dynamic>{
-      'tglProduksi': tglStr,
+      'tglProduksi': toDbDateString(tglProduksi),
       'idMesin': idMesin,
-      'idOperator': idOperator,
-      'jamKerja': jamKerja, // ✅ backend parse int / "HH:mm-HH:mm"
+      'idOperators': idOperators,
+      'outputJenisId': outputJenisId,
       'shift': shift,
+      if (idRegu != null) 'idRegu': idRegu,
+      if (jamKerja != null) 'jamKerja': jamKerja,
+      if (hourMeter != null) 'hourMeter': hourMeter,
       if (hourStart != null && hourStart.isNotEmpty)
         'hourStart': _normalizeTime(hourStart),
       if (hourEnd != null && hourEnd.isNotEmpty)
         'hourEnd': _normalizeTime(hourEnd),
-      if (checkBy1 != null) 'checkBy1': checkBy1,
-      if (checkBy2 != null) 'checkBy2': checkBy2,
-      if (approveBy != null) 'approveBy': approveBy,
-      if (hourMeter != null) 'hourMeter': hourMeter,
     };
 
     print('📦 Key fitting create payload: $payload');
 
     final body =
-    await api.postJson('/api/production/key-fitting', body: payload);
+        await api.postJson('/api/production/key-fitting', body: payload);
 
     final data = body['data'] as Map<String, dynamic>?;
     if (data == null) {
@@ -147,48 +187,41 @@ class KeyFittingProductionRepository {
   // =========================
   //  UPDATE (PUT)
   //  PUT /api/production/key-fitting/:noProduksi
-  //  Partial update (kirim hanya yang berubah)
   // =========================
   Future<KeyFittingProduction> updateProduksi({
     required String noProduksi,
     DateTime? tglProduksi,
     int? idMesin,
-    int? idOperator,
-    dynamic jamKerja, // int atau String
+    List<int>? idOperators,
+    int? outputJenisId,
+    int? idRegu,
     int? shift,
+    int? jamKerja,
+    int? hourMeter,
     String? hourStart,
     String? hourEnd,
-    String? checkBy1,
-    String? checkBy2,
-    String? approveBy,
-    double? hourMeter,
   }) async {
     String _normalizeTime(String v) {
       final t = v.trim();
-      if (t.isEmpty) return t;
-      if (t.length == 5) return '$t:00';
-      return t;
+      return t.length == 5 ? '$t:00' : t;
     }
 
     final payload = <String, dynamic>{};
 
     if (tglProduksi != null) payload['tglProduksi'] = toDbDateString(tglProduksi);
     if (idMesin != null) payload['idMesin'] = idMesin;
-    if (idOperator != null) payload['idOperator'] = idOperator;
-    if (jamKerja != null) payload['jamKerja'] = jamKerja;
+    if (idOperators != null) payload['idOperators'] = idOperators;
+    if (outputJenisId != null) payload['outputJenisId'] = outputJenisId;
+    if (idRegu != null) payload['idRegu'] = idRegu;
     if (shift != null) payload['shift'] = shift;
-
+    if (jamKerja != null) payload['jamKerja'] = jamKerja;
+    if (hourMeter != null) payload['hourMeter'] = hourMeter;
     if (hourStart != null && hourStart.isNotEmpty) {
       payload['hourStart'] = _normalizeTime(hourStart);
     }
     if (hourEnd != null && hourEnd.isNotEmpty) {
       payload['hourEnd'] = _normalizeTime(hourEnd);
     }
-
-    if (checkBy1 != null) payload['checkBy1'] = checkBy1;
-    if (checkBy2 != null) payload['checkBy2'] = checkBy2;
-    if (approveBy != null) payload['approveBy'] = approveBy;
-    if (hourMeter != null) payload['hourMeter'] = hourMeter;
 
     print('📦 Key fitting update payload: $payload');
 

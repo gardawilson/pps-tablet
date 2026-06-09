@@ -3,9 +3,14 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:http/http.dart' as http;
+
 import '../../../../core/network/api_client.dart';
+import '../../../../core/network/endpoints.dart';
+import '../../../../core/services/token_storage.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../model/hot_stamp_production_model.dart';
+export '../model/hot_stamp_production_model.dart' show HotStampMesinInfo;
 
 
 class HotStampProductionRepository {
@@ -13,6 +18,45 @@ class HotStampProductionRepository {
 
   HotStampProductionRepository({ApiClient? api})
       : api = api ?? ApiClient();
+
+  static const _timeout = Duration(seconds: 25);
+
+  // =========================
+  //  STAMPING MESIN LIST
+  //  GET :7500/api/mst-mesin/stamping
+  // =========================
+  Future<List<HotStampMesinInfo>> fetchStampingMesin() async {
+    final token = await TokenStorage.getToken();
+    final apiBaseUri = Uri.parse(ApiConstants.baseUrl);
+    final url = Uri(
+      scheme: apiBaseUri.scheme.isEmpty ? 'http' : apiBaseUri.scheme,
+      host: apiBaseUri.host,
+      port: 7500,
+      path: '/api/mst-mesin/stamping',
+    );
+
+    late http.Response res;
+    try {
+      res = await http.get(url, headers: {
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+      }).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout mengambil data mesin stamping');
+    } catch (e) {
+      throw Exception('Gagal terhubung ke server: $e');
+    }
+
+    if (res.statusCode != 200) {
+      throw Exception('Gagal memuat mesin stamping (${res.statusCode})');
+    }
+
+    final body = json.decode(utf8.decode(res.bodyBytes));
+    final data = body['data'] as List<dynamic>? ?? [];
+    return data
+        .map((e) => HotStampMesinInfo.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
 
   /// Get HotStamping_h by date
   /// Backend: GET /api/production/hot-stamp/:date (YYYY-MM-DD)
@@ -39,6 +83,7 @@ class HotStampProductionRepository {
     int pageSize = 20,
     String? search,
     String? noProduksi,
+    int? idMesin,
   }) async {
     // Prefer explicit noProduksi over generic search
     final String? effectiveSearch =
@@ -52,6 +97,7 @@ class HotStampProductionRepository {
       'page': page,
       'pageSize': pageSize,
       if (effectiveSearch != null) 'search': effectiveSearch,
+      if (idMesin != null) 'idMesin': idMesin,
     };
 
     final body = await api.getJson('/api/production/hot-stamp', query: qp);
@@ -83,14 +129,57 @@ class HotStampProductionRepository {
     int pageSize = 20,
     String? search,
     String? noProduksi,
+    int? idMesin,
   }) async {
     final r = await fetchAll(
       page: page,
       pageSize: pageSize,
       search: search,
       noProduksi: noProduksi,
+      idMesin: idMesin,
     );
     return (r['items'] as List<HotStampProduction>);
+  }
+
+  // =========================
+  //  CREATE V2 — req body baru
+  //  POST /api/production/hot-stamp
+  //  { tglProduksi, idMesin, idOperators[], outputJenisId, idRegu, shift, hourStart, hourEnd }
+  // =========================
+  Future<HotStampProduction> createProduksiWithJenis({
+    required DateTime tglProduksi,
+    required int idMesin,
+    required List<int> idOperators,
+    required int outputJenisId,
+    required int shift,
+    String? hourStart,
+    String? hourEnd,
+    int? idRegu,
+  }) async {
+    String normalizeTime(String v) {
+      final t = v.trim();
+      return t.length == 5 ? '$t:00' : t;
+    }
+
+    final payload = <String, dynamic>{
+      'tglProduksi': toDbDateString(tglProduksi),
+      'idMesin': idMesin,
+      'idOperators': idOperators,
+      'outputJenisId': outputJenisId,
+      'shift': shift,
+      if (hourStart != null && hourStart.isNotEmpty)
+        'hourStart': normalizeTime(hourStart),
+      if (hourEnd != null && hourEnd.isNotEmpty)
+        'hourEnd': normalizeTime(hourEnd),
+      if (idRegu != null) 'idRegu': idRegu,
+    };
+
+    final body = await api.postJson('/api/production/hot-stamp', body: payload);
+    final data = body['data'] as Map<String, dynamic>?;
+    if (data == null) {
+      throw Exception('Response tidak mengandung data header hot stamp');
+    }
+    return HotStampProduction.fromJson(data);
   }
 
   // =========================

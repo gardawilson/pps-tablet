@@ -9,17 +9,19 @@ class MesinSectionHeader extends StatelessWidget {
   const MesinSectionHeader({
     super.key,
     required this.title,
-    required this.onRefresh,
     required this.activeCount,
     required this.inactiveCount,
     required this.isLoading,
+    this.onToggleRiwayat,
+    this.isRiwayatVisible = true,
   });
 
   final String title;
-  final VoidCallback onRefresh;
   final int activeCount;
   final int inactiveCount;
   final bool isLoading;
+  final VoidCallback? onToggleRiwayat;
+  final bool isRiwayatVisible;
 
   @override
   Widget build(BuildContext context) {
@@ -57,17 +59,24 @@ class MesinSectionHeader extends StatelessWidget {
             ),
           ],
           const Spacer(),
-          IconButton(
-            onPressed: onRefresh,
-            icon: const Icon(
-              Icons.refresh,
-              size: 16,
-              color: Color(0xFF6B7280),
+          if (onToggleRiwayat != null)
+            IconButton(
+              onPressed: onToggleRiwayat,
+              icon: Icon(
+                isRiwayatVisible
+                    ? Icons.view_list_rounded
+                    : Icons.view_list_outlined,
+                size: 16,
+                color: isRiwayatVisible
+                    ? const Color(0xFF2563EB)
+                    : const Color(0xFF6B7280),
+              ),
+              tooltip: isRiwayatVisible
+                  ? 'Sembunyikan Riwayat'
+                  : 'Tampilkan Riwayat',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
             ),
-            tooltip: 'Refresh',
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-          ),
         ],
       ),
     );

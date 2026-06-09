@@ -3,17 +3,17 @@ import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
-import '../../../shift/repository/shift_repository.dart';
 import '../../../../features/mesin/model/mesin_model.dart';
+import '../../../shift/repository/shift_repository.dart';
 import '../../shared/widgets/mesin_section_header.dart';
+import '../../shared/widgets/production_mesin_card.dart';
+import '../../shared/widgets/production_produksi_list.dart';
+import '../../shared/widgets/production_riwayat_header.dart';
 import '../model/gilingan_production_model.dart';
 import '../repository/gilingan_production_repository.dart';
 import '../view_model/gilingan_production_view_model.dart';
-import '../widgets/gilingan_mesin_card.dart';
-import '../widgets/gilingan_produksi_list.dart';
 import '../widgets/gilingan_production_delete_dialog.dart';
 import '../widgets/gilingan_production_form_dialog.dart';
-import '../widgets/gilingan_riwayat_section_header.dart';
 import 'gilingan_production_input_screen.dart';
 
 class GilinganProductionMesinScreen extends StatefulWidget {
@@ -40,6 +40,7 @@ class _GilinganProductionMesinScreenState
   final _produksiScrollCtl = ScrollController();
   int? _filterIdMesin;
   GilinganMesinInfo? _selectedMesinInfo;
+  bool _isRiwayatExpanded = true;
 
   @override
   void initState() {
@@ -60,9 +61,7 @@ class _GilinganProductionMesinScreenState
   Future<void> _loadMesin() async {
     final future = _repo.fetchGilinganMesin();
     if (!mounted) return;
-    setState(() {
-      _mesinFuture = future;
-    });
+    setState(() => _mesinFuture = future);
     try {
       await future;
     } catch (_) {}
@@ -132,6 +131,41 @@ class _GilinganProductionMesinScreenState
     _loadMesin();
     _loadProduksiPage();
   }
+
+  // ── Card / row data converters ────────────────────────────────────────────
+
+  static MesinCardData _toMesinCardData(GilinganMesinInfo mesin) {
+    String? shiftTimeText;
+    if (mesin.isActive) {
+      final parts = <String>[];
+      if (mesin.shift != null) parts.add('Shift ${mesin.shift}');
+      parts.add(
+          '${mesin.hourStart ?? '--:--'} – ${mesin.hourEnd ?? '--:--'}');
+      shiftTimeText = parts.join('  |  ');
+    }
+    return MesinCardData(
+      namaMesin: mesin.namaMesin,
+      isActive: mesin.isActive,
+      shiftTimeText: shiftTimeText,
+      namaRegu: mesin.namaRegu,
+      outputJenisNama: mesin.outputJenisNama,
+    );
+  }
+
+  static ProduksiRowData _toRowData(GilinganProduction row) {
+    return ProduksiRowData(
+      tglProduksi: row.tglProduksi,
+      hourStart: row.hourStart,
+      hourEnd: row.hourEnd,
+      shift: row.shift,
+      isLocked: row.isLocked,
+      namaMesin: row.namaMesin,
+      namaRegu: row.namaRegu,
+      outputJenisNama: row.outputJenisNama,
+    );
+  }
+
+  // ── Navigation helpers ────────────────────────────────────────────────────
 
   Future<void> _openCreateDialog({required GilinganMesinInfo mesin}) async {
     if (!mounted) return;
@@ -265,6 +299,8 @@ class _GilinganProductionMesinScreenState
     _refreshAll();
   }
 
+  // ── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -280,13 +316,14 @@ class _GilinganProductionMesinScreenState
                   future: _mesinFuture,
                   builder: (context, snapshot) {
                     final allMesin = snapshot.data ?? [];
-                    final activeCount = allMesin
-                        .where((m) => m.isActive)
-                        .length;
+                    final activeCount =
+                        allMesin.where((m) => m.isActive).length;
                     final inactiveCount = allMesin.length - activeCount;
                     return MesinSectionHeader(
                       title: 'Status Mesin Gilingan',
-                      onRefresh: _refreshAll,
+                      onToggleRiwayat: () =>
+                          setState(() => _isRiwayatExpanded = !_isRiwayatExpanded),
+                      isRiwayatVisible: _isRiwayatExpanded,
                       activeCount: activeCount,
                       inactiveCount: inactiveCount,
                       isLoading:
@@ -317,21 +354,27 @@ class _GilinganProductionMesinScreenState
                         );
                       }
                       final allMesin = snapshot.data ?? [];
-                      return GridView.builder(
-                        padding: const EdgeInsets.all(12),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 3,
-                              mainAxisExtent: 110,
-                              crossAxisSpacing: 10,
-                              mainAxisSpacing: 10,
-                            ),
-                        itemCount: allMesin.length,
-                        itemBuilder: (context, index) {
-                          final mesin = allMesin[index];
-                          return GilinganMesinCard(
-                            mesin: mesin,
-                            onTap: () => _onMesinTap(mesin),
+                      return LayoutBuilder(
+                        builder: (context, constraints) {
+                          final cols =
+                              (constraints.maxWidth / 150).floor().clamp(2, 6);
+                          return GridView.builder(
+                            padding: const EdgeInsets.all(12),
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: cols,
+                                  mainAxisExtent: 110,
+                                  crossAxisSpacing: 10,
+                                  mainAxisSpacing: 10,
+                                ),
+                            itemCount: allMesin.length,
+                            itemBuilder: (context, index) {
+                              final mesin = allMesin[index];
+                              return ProductionMesinCard(
+                                data: _toMesinCardData(mesin),
+                                onTap: () => _onMesinTap(mesin),
+                              );
+                            },
                           );
                         },
                       );
@@ -346,6 +389,7 @@ class _GilinganProductionMesinScreenState
           const VerticalDivider(width: 1, color: Color(0xFFE5E7EB)),
 
           // ── RIGHT: riwayat produksi (2/5) ────────────────────────
+          if (_isRiwayatExpanded)
           Expanded(
             flex: 2,
             child: Column(
@@ -354,16 +398,21 @@ class _GilinganProductionMesinScreenState
                 FutureBuilder<List<GilinganMesinInfo>>(
                   future: _mesinFuture,
                   builder: (context, snapshot) {
-                    return GilinganRiwayatSectionHeader(
-                      mesinList: snapshot.data ?? [],
+                    return ProductionRiwayatHeader(
+                      mesinList: (snapshot.data ?? [])
+                          .map((m) => MesinFilterItem(
+                                idMesin: m.idMesin,
+                                namaMesin: m.namaMesin,
+                              ))
+                          .toList(),
                       selectedIdMesin: _filterIdMesin,
                       onFilterChanged: (id) {
-                        final mesinList = snapshot.data ?? [];
+                        final mesinData = snapshot.data ?? [];
                         setState(() {
                           _filterIdMesin = id;
                           _selectedMesinInfo = id == null
                               ? null
-                              : mesinList
+                              : mesinData
                                     .where((m) => m.idMesin == id)
                                     .firstOrNull;
                         });
@@ -377,12 +426,13 @@ class _GilinganProductionMesinScreenState
                     children: [
                       RefreshIndicator(
                         onRefresh: _loadProduksiPage,
-                        child: GilinganProduksiList(
+                        child: ProductionProduksiList<GilinganProduction>(
                           items: _produksiItems,
+                          dataOf: _toRowData,
                           isLoading: _produksiLoading,
                           isFetchingMore: _produksiFetchingMore,
                           scrollController: _produksiScrollCtl,
-                          filterIdMesin: _filterIdMesin,
+                          showMesin: _filterIdMesin == null,
                           onTap: (row) async {
                             await Navigator.of(context).push(
                               MaterialPageRoute(
@@ -482,6 +532,8 @@ class _GilinganProductionMesinScreenState
                             onPressed: () =>
                                 _openBackdateDialog(_selectedMesinInfo!),
                             backgroundColor: const Color(0xFF0277BD),
+                            foregroundColor: Colors.white,
+                            tooltip: 'Tambah Backdate',
                             child: const Icon(Icons.add),
                           ),
                         ),

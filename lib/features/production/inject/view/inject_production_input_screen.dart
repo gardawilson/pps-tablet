@@ -17,6 +17,11 @@ import '../../shared/widgets/unsaved_temp_warning_dialog.dart';
 import '../model/inject_output_model.dart';
 import '../model/inject_production_inputs_model.dart';
 import '../view_model/inject_production_input_view_model.dart';
+import '../model/inject_formula_model.dart';
+import '../model/inject_validate_label_model.dart';
+import '../repository/inject_validate_label_repository.dart';
+import '../view_model/inject_formula_view_model.dart';
+import '../widgets/inject_formula_dialog.dart';
 import '../widgets/inject_split_time_dialog.dart';
 
 // ── Colour palette ─────────────────────────────────────────────────────────────
@@ -73,6 +78,40 @@ class _InjectProductionInputScreenState
   late String _selectedOutputTab;
   bool _outputOnLeft = false;
 
+  // ── Formula-driven tab filtering ──────────────────────────────────────────
+
+  /// Kode kategori formula → tab value pada input panel
+  static const _kKodeToTab = {
+    'furniturewip': 'fwip',
+    'mixer': 'mixer',
+    'broker': 'broker',
+    'gilingan': 'gilingan',
+  };
+
+  /// Hitung tab yang boleh tampil berdasarkan formula.
+  /// - null (belum load)  → semua tab tampil
+  /// - ada tapi kode kosong → tidak ada tab yang tampil
+  /// - ada dengan kode     → hanya tab sesuai kode + material
+  Set<String> _visibleInputTabs(InjectFormulaData? formula) {
+    if (formula == null) return _kKodeToTab.values.toSet()..add('material');
+
+    final kodes = <String>{};
+    for (final out in formula.outputs) {
+      for (final f in out.formulas) {
+        kodes.add(f.inputKategoriKode.toLowerCase());
+      }
+    }
+
+    if (kodes.isEmpty) return const {};
+
+    final allowed = <String>{};
+    for (final entry in _kKodeToTab.entries) {
+      if (kodes.contains(entry.key)) allowed.add(entry.value);
+    }
+    allowed.add('material');
+    return allowed;
+  }
+
   List<BreadcrumbSegment> _prevBreadcrumb = [];
   String get _breadcrumbLabel => widget.noProduksi;
 
@@ -119,6 +158,8 @@ class _InjectProductionInputScreenState
           !vm.isBonggolanOutputsLoading(widget.noProduksi)) {
         vm.loadBonggolanOutputs(widget.noProduksi);
       }
+
+      context.read<InjectFormulaViewModel>().load(widget.noProduksi);
     });
   }
 
@@ -281,6 +322,26 @@ class _InjectProductionInputScreenState
   }
 
   Future<String?> _onCodeReady(String code) async {
+    // ── Validasi formula terlebih dahulu ──────────────────────────────────────
+    try {
+      final validateResult =
+          await InjectValidateLabelRepository().validate(widget.noProduksi, code);
+      if (!mounted) return 'Halaman sudah tidak aktif';
+      if (!validateResult.valid) {
+        await showDialog<void>(
+          context: context,
+          builder: (_) => ErrorStatusDialog(
+            title: 'Label Tidak Valid',
+            message: validateResult.reason ?? 'Label tidak valid untuk produksi ini',
+          ),
+        );
+        return null;
+      }
+    } catch (_) {
+      // Jika endpoint tidak tersedia / error jaringan, lanjut ke alur normal
+    }
+
+    // ── Lookup & tambah ke temp ───────────────────────────────────────────────
     final vm = context.read<InjectProductionInputViewModel>();
     final res = await vm.lookupLabel(code, force: true);
     if (!mounted) return 'Halaman sudah tidak aktif';
@@ -552,40 +613,96 @@ class _InjectProductionInputScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  ProductionFolderTabBar(
-                    selectedValue: _selectedInputTab,
-                    accentColor: _kInjectPrimary,
-                    tabs: [
-                      ProductionTabItem(
-                        value: 'fwip',
-                        label: 'Furniture WIP',
-                        count: tabCounts['fwip']!,
-                      ),
-                      ProductionTabItem(
-                        value: 'broker',
-                        label: 'Broker',
-                        count: tabCounts['broker']!,
-                      ),
-                      ProductionTabItem(
-                        value: 'mixer',
-                        label: 'Mixer',
-                        count: tabCounts['mixer']!,
-                      ),
-                      ProductionTabItem(
-                        value: 'gilingan',
-                        label: 'Gilingan',
-                        count: tabCounts['gilingan']!,
-                      ),
-                      ProductionTabItem(
-                        value: 'material',
-                        label: 'Material',
-                        count: tabCounts['material']!,
-                      ),
-                    ],
-                    onChanged: (v) {
-                      if (_selectedInputTab != v) {
-                        setState(() => _selectedInputTab = v);
+                  Builder(
+                    builder: (ctx) {
+                      final formulaVm = ctx.watch<InjectFormulaViewModel>();
+                      final visible = _visibleInputTabs(formulaVm.data);
+
+                      // Formula sudah load & tidak ada kategori → tampilkan notice
+                      if (formulaVm.data != null && visible.isEmpty) {
+                        return Expanded(
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: _kInjectPrimary.withValues(
+                                      alpha: 0.06,
+                                    ),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.science_outlined,
+                                    size: 28,
+                                    color: _kInjectPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                const Text(
+                                  'Silahkan isi formula terlebih dahulu',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF374151),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Gunakan tombol Formula di toolbar\nuntuk mengatur kategori input',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade500,
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
                       }
+
+                      // Jika tab aktif tidak lagi visible, pindah ke tab pertama
+                      if (visible.isNotEmpty &&
+                          !visible.contains(_selectedInputTab)) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted) {
+                            setState(() {
+                              _selectedInputTab = visible.first;
+                            });
+                          }
+                        });
+                      }
+
+                      const allTabs = [
+                        (value: 'fwip', label: 'Furniture WIP'),
+                        (value: 'broker', label: 'Broker'),
+                        (value: 'mixer', label: 'Mixer'),
+                        (value: 'gilingan', label: 'Gilingan'),
+                        (value: 'material', label: 'Material'),
+                      ];
+
+                      return ProductionFolderTabBar(
+                        selectedValue: _selectedInputTab,
+                        accentColor: _kInjectPrimary,
+                        tabs: [
+                          for (final t in allTabs)
+                            if (visible.contains(t.value))
+                              ProductionTabItem(
+                                value: t.value,
+                                label: t.label,
+                                count: tabCounts[t.value] ?? 0,
+                              ),
+                        ],
+                        onChanged: (v) {
+                          if (_selectedInputTab != v) {
+                            setState(() => _selectedInputTab = v);
+                          }
+                        },
+                      );
                     },
                   ),
                   Expanded(
@@ -1631,6 +1748,52 @@ class _InjectProductionInputScreenState
                     _showSnack('Data di-refresh');
                   },
                   trailingActions: [
+                    const SizedBox(width: 4),
+                    Consumer<InjectFormulaViewModel>(
+                      builder: (_, fvm, __) => SizedBox(
+                        height: 26,
+                        child: TextButton.icon(
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 0,
+                            ),
+                            foregroundColor: _kInjectPrimary,
+                            backgroundColor: _kInjectPrimary.withValues(
+                              alpha: 0.07,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          onPressed: fvm.isLoading
+                              ? null
+                              : () {
+                                  final data = fvm.data;
+                                  if (data == null) return;
+                                  showDialog<void>(
+                                    context: context,
+                                    builder: (_) =>
+                                        InjectFormulaDialog(data: data),
+                                  );
+                                },
+                          icon: fvm.isLoading
+                              ? const SizedBox(
+                                  width: 11,
+                                  height: 11,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 1.5,
+                                  ),
+                                )
+                              : const Icon(Icons.science_outlined, size: 13),
+                          label: const Text(
+                            'Formula',
+                            style: TextStyle(fontSize: 11),
+                          ),
+                        ),
+                      ),
+                    ),
                     const SizedBox(width: 4),
                     SizedBox(
                       width: 26,

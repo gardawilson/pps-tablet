@@ -79,6 +79,7 @@ import 'package:pps_tablet/features/production/inject/repository/inject_producti
 import 'package:pps_tablet/features/production/inject/repository/inject_production_repository.dart';
 import 'package:pps_tablet/features/production/inject/view/inject_production_screen.dart';
 import 'package:pps_tablet/features/production/inject/view_model/inject_production_input_view_model.dart';
+import 'package:pps_tablet/features/production/inject/view_model/inject_formula_view_model.dart';
 import 'package:pps_tablet/features/production/inject/view_model/inject_production_view_model.dart';
 import 'package:pps_tablet/features/production/key_fitting/repository/key_fitting_production_input_repository.dart';
 import 'package:pps_tablet/features/production/key_fitting/repository/key_fitting_production_repository.dart';
@@ -371,6 +372,10 @@ class MyApp extends StatelessWidget {
           create: (ctx) => InjectProductionInputViewModel(
             repository: InjectProductionInputRepository(),
           ),
+        ),
+
+        ChangeNotifierProvider<InjectFormulaViewModel>(
+          create: (_) => InjectFormulaViewModel(),
         ),
 
         ChangeNotifierProvider<SpannerProductionViewModel>(

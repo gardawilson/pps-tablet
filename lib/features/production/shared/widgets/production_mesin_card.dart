@@ -9,6 +9,9 @@ class MesinCardData {
   final String? shiftTimeText;
   final String? namaRegu;
   final String? outputJenisNama;
+  final String? namaCetakan;
+  final String? namaWarna;
+  final String? namaFurnitureMaterial;
 
   const MesinCardData({
     required this.namaMesin,
@@ -16,6 +19,9 @@ class MesinCardData {
     this.shiftTimeText,
     this.namaRegu,
     this.outputJenisNama,
+    this.namaCetakan,
+    this.namaWarna,
+    this.namaFurnitureMaterial,
   });
 }
 
@@ -90,7 +96,30 @@ class ProductionMesinCard extends StatelessWidget {
                     text: data.namaRegu!,
                   ),
                 ],
-                if ((data.outputJenisNama ?? '').trim().isNotEmpty) ...[
+                if ((data.namaCetakan ?? '').trim().isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  ProductionSmallInfoRow(
+                    icon: Icons.view_in_ar_rounded,
+                    text: data.namaCetakan!.trim(),
+                    color: const Color(0xFF374151),
+                  ),
+                ],
+                if ((data.namaWarna ?? '').trim().isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  ProductionSmallInfoRow(
+                    icon: Icons.palette_outlined,
+                    text: data.namaWarna!.trim(),
+                    color: const Color(0xFF374151),
+                  ),
+                ],
+                if ((data.namaFurnitureMaterial ?? '').trim().isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  ProductionSmallInfoRow(
+                    icon: Icons.category_outlined,
+                    text: data.namaFurnitureMaterial!.trim(),
+                    color: const Color(0xFF374151),
+                  ),
+                ] else if ((data.outputJenisNama ?? '').trim().isNotEmpty) ...[
                   const SizedBox(height: 2),
                   ProductionSmallInfoRow(
                     icon: Icons.inventory_2_outlined,

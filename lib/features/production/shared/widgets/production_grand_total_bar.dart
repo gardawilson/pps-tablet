@@ -13,6 +13,7 @@ class ProductionInputGrandTotalBar extends StatelessWidget {
   final int totalSak;
   final double totalBerat;
   final Color color;
+  final String sakLabel;
 
   const ProductionInputGrandTotalBar({
     super.key,
@@ -20,6 +21,7 @@ class ProductionInputGrandTotalBar extends StatelessWidget {
     required this.totalSak,
     required this.totalBerat,
     this.color = kProductionPrimary,
+    this.sakLabel = 'Sak',
   });
 
   @override
@@ -50,7 +52,7 @@ class ProductionInputGrandTotalBar extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               ProductionInlineStat(
-                label: 'Sak',
+                label: sakLabel,
                 value: '$totalSak',
                 color: color,
               ),

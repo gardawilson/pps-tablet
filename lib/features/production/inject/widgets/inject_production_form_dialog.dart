@@ -114,6 +114,9 @@ class _InjectProductionFormDialogState
     final initEnd = widget.header?.hourEnd ?? widget.initialHourEnd;
     hourStartCtrl = TextEditingController(text: initStart ?? '');
     hourEndCtrl = TextEditingController(text: initEnd ?? '');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _checkOverlap();
+    });
 
     hourMeterCtrl = TextEditingController(
       text: widget.header?.hourMeter?.toString() ?? '',
@@ -138,6 +141,20 @@ class _InjectProductionFormDialogState
       }
       // Cetakan/warna/material: model hanya punya ID, nama tidak tersedia.
       // User perlu re-pick lewat dialog saat edit.
+    }
+  }
+
+  bool _didInitialOverlapCheck = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_didInitialOverlapCheck) {
+      _didInitialOverlapCheck = true;
+      // Check overlap pada nilai pre-filled saat dialog pertama kali terbuka
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _checkOverlap();
+      });
     }
   }
 
@@ -205,17 +222,25 @@ class _InjectProductionFormDialogState
     final start = hourStartCtrl.text.trim();
     final end = hourEndCtrl.text.trim();
     final idMesin = _selectedMesin?.idMesin ?? widget.header?.idMesin;
+    debugPrint(
+      '🔍 [OVERLAP] _checkOverlap called → start="$start", end="$end", idMesin=$idMesin',
+    );
     if (start.isEmpty || end.isEmpty || idMesin == null) {
+      debugPrint('🔍 [OVERLAP] early-return: start.isEmpty=${start.isEmpty}, end.isEmpty=${end.isEmpty}, idMesin==null=${idMesin == null}');
       vm.clear();
       return;
     }
+    final excludeNo = isEdit ? widget.header!.noProduksi : null;
+    debugPrint(
+      '🔍 [OVERLAP] hitting API → kind=$_kind, date=${_selectedDate.toIso8601String()}, idMesin=$idMesin, start=$start, end=$end, exclude=$excludeNo',
+    );
     await vm.check(
       kind: _kind,
       date: _selectedDate,
       idMesin: idMesin,
       hourStart: start,
       hourEnd: end,
-      excludeNo: isEdit ? widget.header!.noProduksi : null,
+      excludeNo: excludeNo,
     );
   }
 
@@ -393,6 +418,15 @@ class _InjectProductionFormDialogState
     if (!mounted) return;
 
     if (result != null) {
+      result = result.copyWith(
+        namaJenis: result.namaJenis ?? _selectedCetakan?.namaCetakan,
+        namaCetakan: result.namaCetakan ?? _selectedCetakan?.namaCetakan,
+        namaWarna: result.namaWarna ?? _selectedWarna?.warna,
+        namaFurnitureMaterial: result.namaFurnitureMaterial ??
+            (_selectedFurnitureMaterial?.idFurnitureMaterial == _noneFurnitureId
+                ? null
+                : _selectedFurnitureMaterial?.nama),
+      );
       widget.onSave?.call(result);
       Navigator.of(context).pop(result);
     } else {
@@ -555,6 +589,7 @@ class _InjectProductionFormDialogState
                 width: 190,
                 child: ShiftDropdown(
                   preselectId: widget.header?.shift ?? widget.initialShift,
+                  enabled: widget.isBackdateInput || isEdit,
                   onChangedId: (id) {
                     setState(() => _selectedShift = id);
                     if (id != null && widget.isBackdateInput) {
@@ -572,6 +607,7 @@ class _InjectProductionFormDialogState
                   controller: hourStartCtrl,
                   label: 'Jam Mulai',
                   hintText: 'HH:mm',
+                  enabled: widget.isBackdateInput || isEdit,
                   onPick: () async {
                     final picked = await pickTime24h(
                       context,
@@ -606,6 +642,7 @@ class _InjectProductionFormDialogState
                   controller: hourEndCtrl,
                   label: 'Jam Selesai',
                   hintText: 'HH:mm',
+                  enabled: widget.isBackdateInput || isEdit,
                   onPick: () async {
                     final picked = await pickTime24h(
                       context,

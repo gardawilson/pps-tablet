@@ -8,6 +8,7 @@
     final String hintText;
     final String? Function(String?)? validator;
     final VoidCallback onPick;
+    final bool enabled;
 
     const TimeFormField({
       required this.controller,
@@ -15,6 +16,7 @@
       required this.hintText,
       required this.onPick,
       this.validator,
+      this.enabled = true,
     });
 
     @override
@@ -22,7 +24,8 @@
       return TextFormField(
         controller: controller,
         readOnly: true,
-        onTap: onPick,
+        enabled: enabled,
+        onTap: enabled ? onPick : null,
         validator: validator,
         decoration: InputDecoration(
           labelText: label,

@@ -324,6 +324,39 @@ class InjectProductionRepository {
   }
 
   /* =============================
+   * SPLIT TIME
+   * POST /api/production/inject/split-time/:idMesin/:tgl
+   * ============================= */
+
+  Future<Map<String, dynamic>> splitTime({
+    required int idMesin,
+    required DateTime tglProduksi,
+    required String hourStart,
+    required int idCetakan,
+    required int idWarna,
+    int? idFurnitureMaterial,
+  }) async {
+    final tgl =
+        '${tglProduksi.year.toString().padLeft(4, '0')}-${tglProduksi.month.toString().padLeft(2, '0')}-${tglProduksi.day.toString().padLeft(2, '0')}';
+    final path = '/api/production/inject/split-time/$idMesin/$tgl';
+    final body = <String, dynamic>{
+      'hourStart': hourStart,
+      'idCetakan': idCetakan,
+      'idWarna': idWarna,
+      if (idFurnitureMaterial != null)
+        'idFurnitureMaterial': idFurnitureMaterial,
+    };
+    try {
+      return await api.postJson(path, body: body);
+    } on ApiException catch (e) {
+      final parsed = _tryDecodeMap(e.responseBody);
+      final msg = (parsed['message'] as String?) ??
+          'Gagal split time (HTTP ${e.statusCode})';
+      throw Exception(msg);
+    }
+  }
+
+  /* =============================
    * Helpers
    * ============================= */
 

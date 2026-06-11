@@ -52,6 +52,9 @@ class OverlapViewModel extends ChangeNotifier {
       _isChecking = false;
       _conflicts = res.conflicts;
       _errorMessage = null;
+      debugPrint(
+        '🟩 [OVERLAP-VM] result → isOverlap=${res.isOverlap}, conflicts=${res.conflicts.map((c) => '${c.noDoc} ${c.hourStart}-${c.hourEnd}').toList()}',
+      );
       notifyListeners();
     } catch (e) {
       _isChecking = false;

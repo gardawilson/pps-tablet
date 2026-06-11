@@ -1,38 +1,38 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
-import '../../../../features/mesin/model/mesin_model.dart';
+import '../../../mesin/model/mesin_model.dart';
 import '../../../shift/repository/shift_repository.dart';
 import '../../shared/widgets/mesin_section_header.dart';
 import '../../shared/widgets/production_mesin_card.dart';
 import '../../shared/widgets/production_produksi_list.dart';
 import '../../shared/widgets/production_riwayat_header.dart';
 import '../../shared/widgets/riwayat_animated_panel.dart';
-import '../model/hot_stamp_production_model.dart';
-import '../repository/hot_stamp_production_repository.dart';
-import '../view_model/hot_stamp_production_view_model.dart';
-import '../widgets/hot_stamp_production_delete_dialog.dart';
-import '../widgets/hot_stamp_production_form_dialog.dart';
-import 'hot_stamp_production_input_screen.dart';
+import '../model/inject_production_model.dart';
+import '../repository/inject_production_repository.dart';
+import '../view_model/inject_production_view_model.dart';
+import '../widgets/inject_production_delete_dialog.dart';
+import '../widgets/inject_production_form_dialog.dart';
+import 'inject_production_input_screen.dart';
 
-class HotStampProductionMesinScreen extends StatefulWidget {
-  const HotStampProductionMesinScreen({super.key});
+class InjectProductionMesinScreen extends StatefulWidget {
+  const InjectProductionMesinScreen({super.key});
 
   @override
-  State<HotStampProductionMesinScreen> createState() =>
-      _HotStampProductionMesinScreenState();
+  State<InjectProductionMesinScreen> createState() =>
+      _InjectProductionMesinScreenState();
 }
 
-class _HotStampProductionMesinScreenState
-    extends State<HotStampProductionMesinScreen> {
-  final _prodRepo = HotStampProductionRepository();
-  Future<List<HotStampMesinInfo>> _mesinFuture = Future.value(
-    <HotStampMesinInfo>[],
+class _InjectProductionMesinScreenState
+    extends State<InjectProductionMesinScreen> {
+  final _prodRepo = InjectProductionRepository();
+  Future<List<InjectMesinInfo>> _mesinFuture = Future.value(
+    <InjectMesinInfo>[],
   );
 
-  final List<HotStampProduction> _produksiItems = [];
+  final List<InjectProduction> _produksiItems = [];
   bool _produksiLoading = false;
   bool _produksiFetchingMore = false;
   bool _produksiHasMore = true;
@@ -40,7 +40,7 @@ class _HotStampProductionMesinScreenState
   static const _pageSize = 30;
   final _produksiScrollCtl = ScrollController();
   int? _filterIdMesin;
-  HotStampMesinInfo? _selectedMesinInfo;
+  InjectMesinInfo? _selectedMesinInfo;
   bool _isRiwayatExpanded = true;
 
   @override
@@ -58,7 +58,7 @@ class _HotStampProductionMesinScreenState
   }
 
   Future<void> _loadMesin() async {
-    final future = _prodRepo.fetchStampingMesin();
+    final future = _prodRepo.fetchInjectMesin();
     if (mounted) setState(() => _mesinFuture = future);
   }
 
@@ -86,7 +86,7 @@ class _HotStampProductionMesinScreenState
         idMesin: _filterIdMesin,
       );
       if (!mounted) return;
-      final newItems = res['items'] as List<HotStampProduction>;
+      final newItems = res['items'] as List<InjectProduction>;
       final totalPages = (res['totalPages'] as int?) ?? 1;
       setState(() {
         _produksiItems.addAll(newItems);
@@ -109,7 +109,7 @@ class _HotStampProductionMesinScreenState
         idMesin: _filterIdMesin,
       );
       if (!mounted) return;
-      final newItems = res['items'] as List<HotStampProduction>;
+      final newItems = res['items'] as List<InjectProduction>;
       final totalPages = (res['totalPages'] as int?) ?? 1;
       setState(() {
         _produksiItems.addAll(newItems);
@@ -127,26 +127,29 @@ class _HotStampProductionMesinScreenState
     _loadProduksiPage();
   }
 
-  Future<void> _openBackdateDialog(HotStampMesinInfo mesin) async {
+  Future<void> _openCreateDialog({required InjectMesinInfo mesin}) async {
     if (!mounted) return;
-    final yesterday = DateTime.now().subtract(const Duration(days: 1));
+    final defaultShift = await ShiftRepository.fetchCurrentShift();
+    if (!mounted) return;
     final mstMesin = MstMesin(
       idMesin: mesin.idMesin,
       namaMesin: mesin.namaMesin,
       bagian: mesin.bagian,
       enable: true,
     );
-    final editVm = HotStampProductionViewModel();
+    final vm = InjectProductionViewModel(repository: _prodRepo);
     try {
-      final created = await showDialog<HotStampProduction>(
+      final created = await showDialog<InjectProduction>(
         context: context,
         barrierDismissible: false,
-        builder: (_) => ChangeNotifierProvider.value(
-          value: editVm,
-          child: HotStampProductionFormDialog(
+        builder: (_) => ChangeNotifierProvider<InjectProductionViewModel>.value(
+          value: vm,
+          child: InjectProductionFormDialog(
             initialMesin: mstMesin,
-            initialDate: yesterday,
-            isBackdateInput: true,
+            initialDate: DateTime.now(),
+            initialShift: defaultShift?.shift,
+            initialHourStart: defaultShift?.hourStart,
+            initialHourEnd: defaultShift?.hourEnd,
           ),
         ),
       );
@@ -154,13 +157,12 @@ class _HotStampProductionMesinScreenState
       if (created != null) {
         await Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => HotStampingProductionInputScreen(
+            builder: (_) => InjectProductionInputScreen(
               noProduksi: created.noProduksi,
-              idMesin: created.idMesin,
               isLocked: created.isLocked,
               lastClosedDate: created.lastClosedDate,
-              namaJenis: created.outputJenisNama,
-              outputJenisId: created.outputJenisId,
+              idMesin: created.idMesin,
+              namaJenis: created.namaJenis,
               tglProduksi: created.tglProduksi,
               shift: created.shift,
               hourStart: created.hourStart,
@@ -172,85 +174,26 @@ class _HotStampProductionMesinScreenState
         _refreshAll();
       }
     } finally {
-      editVm.dispose();
+      vm.dispose();
     }
   }
 
-  Future<void> _openCreateDialog({
-    required HotStampMesinInfo mesin,
-    required DateTime today,
-  }) async {
+  Future<void> _onMesinTap(InjectMesinInfo mesin) async {
     if (!mounted) return;
-    final mstMesin = MstMesin(
-      idMesin: mesin.idMesin,
-      namaMesin: mesin.namaMesin,
-      bagian: mesin.bagian,
-      enable: true,
-    );
-    final defaultShift = await ShiftRepository.fetchCurrentShift();
-    if (!mounted) return;
-    final editVm = HotStampProductionViewModel();
-    try {
-      final created = await showDialog<HotStampProduction>(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => ChangeNotifierProvider.value(
-          value: editVm,
-          child: HotStampProductionFormDialog(
-            initialMesin: mstMesin,
-            initialDate: today,
-            initialShift: defaultShift?.shift,
-            initialHourStart: defaultShift?.hourStart,
-            initialHourEnd: defaultShift?.hourEnd,
-          ),
-        ),
-      );
-      if (!mounted) return;
-      if (created != null) {
-        await Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => HotStampingProductionInputScreen(
-              noProduksi: created.noProduksi,
-              idMesin: created.idMesin,
-              isLocked: created.isLocked,
-              lastClosedDate: created.lastClosedDate,
-              namaJenis: created.outputJenisNama,
-              outputJenisId: created.outputJenisId,
-              tglProduksi: created.tglProduksi,
-              shift: created.shift,
-              hourStart: created.hourStart,
-              hourEnd: created.hourEnd,
-            ),
-          ),
-        );
-        if (!mounted) return;
-      }
-    } finally {
-      editVm.dispose();
-    }
-    _refreshAll();
-  }
-
-  Future<void> _onMesinTap(HotStampMesinInfo mesin) async {
-    if (!mounted) return;
-    final item = mesin.produksiList.isNotEmpty
-        ? mesin.produksiList.first
-        : null;
-    if (item == null) {
-      await _openCreateDialog(mesin: mesin, today: DateTime.now());
+    if (!mesin.isActive) {
+      await _openCreateDialog(mesin: mesin);
       return;
     }
+    final item = mesin.produksiList.first;
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => HotStampingProductionInputScreen(
+        builder: (_) => InjectProductionInputScreen(
           noProduksi: item.noProduksi,
-          idMesin: mesin.idMesin,
           isLocked: false,
           lastClosedDate: null,
-          namaJenis: item.outputJenisNama,
-          outputJenisId: item.outputJenisId,
-          tglProduksi: item.tglProduksi,
+          idMesin: mesin.idMesin,
           shift: item.shift,
+          tglProduksi: item.tglProduksi,
           hourStart: item.hourStart,
           hourEnd: item.hourEnd,
         ),
@@ -260,9 +203,9 @@ class _HotStampProductionMesinScreenState
     _refreshAll();
   }
 
-  // ── helpers untuk shared widgets ────────────────────────────────
+  // ── helpers ──────────────────────────────────────────────────────
 
-  static HotStampProduksiItem? _currentItem(HotStampMesinInfo mesin) {
+  static InjectProduksiItem? _currentItem(InjectMesinInfo mesin) {
     final now = TimeOfDay.now();
     final nowMin = now.hour * 60 + now.minute;
     TimeOfDay? parse(String? s) {
@@ -289,7 +232,7 @@ class _HotStampProductionMesinScreenState
     return mesin.produksiList.isNotEmpty ? mesin.produksiList.first : null;
   }
 
-  static MesinCardData _toMesinCardData(HotStampMesinInfo mesin) {
+  static MesinCardData _toMesinCardData(InjectMesinInfo mesin) {
     final current = mesin.isActive ? _currentItem(mesin) : null;
     String? shiftTimeText;
     if (current != null) {
@@ -305,11 +248,11 @@ class _HotStampProductionMesinScreenState
       isActive: mesin.isActive,
       shiftTimeText: shiftTimeText,
       namaRegu: current?.namaRegu,
-      outputJenisNama: current?.outputJenisNama,
+      outputJenisNama: current?.namaCetakan,
     );
   }
 
-  static ProduksiRowData _toRowData(HotStampProduction row) {
+  static ProduksiRowData _toRowData(InjectProduction row) {
     return ProduksiRowData(
       tglProduksi: row.tglProduksi,
       hourStart: row.hourStart,
@@ -317,8 +260,8 @@ class _HotStampProductionMesinScreenState
       shift: row.shift,
       isLocked: row.isLocked,
       namaMesin: row.namaMesin,
-      namaRegu: row.namaRegu,
-      outputJenisNama: row.outputJenisNama,
+      namaRegu: null,
+      outputJenisNama: row.namaJenis,
     );
   }
 
@@ -334,7 +277,7 @@ class _HotStampProductionMesinScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  FutureBuilder<List<HotStampMesinInfo>>(
+                  FutureBuilder<List<InjectMesinInfo>>(
                     future: _mesinFuture,
                     builder: (context, snapshot) {
                       final allMesin = snapshot.data ?? [];
@@ -343,7 +286,7 @@ class _HotStampProductionMesinScreenState
                           .length;
                       final inactiveCount = allMesin.length - activeCount;
                       return MesinSectionHeader(
-                        title: 'Status Mesin Hot Stamping',
+                        title: 'Status Mesin Inject',
                         activeCount: activeCount,
                         inactiveCount: inactiveCount,
                         isLoading:
@@ -352,7 +295,7 @@ class _HotStampProductionMesinScreenState
                     },
                   ),
                   Expanded(
-                    child: FutureBuilder<List<HotStampMesinInfo>>(
+                    child: FutureBuilder<List<InjectMesinInfo>>(
                       future: _mesinFuture,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
@@ -409,7 +352,7 @@ class _HotStampProductionMesinScreenState
               ),
             ),
 
-            // ── RIGHT: riwayat produksi ──────────────────────────
+            // ── RIGHT: riwayat produksi ──────────────────────────────
             RiwayatAnimatedPanel(
               expandedWidth: c.maxWidth * 0.4,
               isExpanded: _isRiwayatExpanded,
@@ -418,7 +361,7 @@ class _HotStampProductionMesinScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  FutureBuilder<List<HotStampMesinInfo>>(
+                  FutureBuilder<List<InjectMesinInfo>>(
                     future: _mesinFuture,
                     builder: (context, snapshot) {
                       return ProductionRiwayatHeader(
@@ -455,7 +398,7 @@ class _HotStampProductionMesinScreenState
                       children: [
                         RefreshIndicator(
                           onRefresh: _loadProduksiPage,
-                          child: ProductionProduksiList<HotStampProduction>(
+                          child: ProductionProduksiList<InjectProduction>(
                             items: _produksiItems,
                             dataOf: _toRowData,
                             isLoading: _produksiLoading,
@@ -465,38 +408,41 @@ class _HotStampProductionMesinScreenState
                             onTap: (row) async {
                               await Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) =>
-                                      HotStampingProductionInputScreen(
-                                        noProduksi: row.noProduksi,
-                                        idMesin: row.idMesin,
-                                        isLocked: row.isLocked,
-                                        lastClosedDate: row.lastClosedDate,
-                                        namaJenis: row.outputJenisNama,
-                                        outputJenisId: row.outputJenisId,
-                                        tglProduksi: row.tglProduksi,
-                                        shift: row.shift,
-                                        hourStart: row.hourStart,
-                                        hourEnd: row.hourEnd,
-                                      ),
+                                  builder: (_) => InjectProductionInputScreen(
+                                    noProduksi: row.noProduksi,
+                                    isLocked: row.isLocked,
+                                    lastClosedDate: row.lastClosedDate,
+                                    idMesin: row.idMesin,
+                                    namaJenis: row.namaJenis,
+                                    tglProduksi: row.tglProduksi,
+                                    shift: row.shift,
+                                    hourStart: row.hourStart,
+                                    hourEnd: row.hourEnd,
+                                  ),
                                 ),
                               );
                               if (mounted) _refreshAll();
                             },
                             onEdit: (row) async {
-                              final editVm = HotStampProductionViewModel();
+                              final vm = InjectProductionViewModel(
+                                repository: _prodRepo,
+                              );
                               try {
                                 await showDialog<void>(
                                   context: context,
                                   barrierDismissible: false,
-                                  builder: (_) => ChangeNotifierProvider.value(
-                                    value: editVm,
-                                    child: HotStampProductionFormDialog(
-                                      header: row,
-                                    ),
-                                  ),
+                                  builder: (_) =>
+                                      ChangeNotifierProvider<
+                                        InjectProductionViewModel
+                                      >.value(
+                                        value: vm,
+                                        child: InjectProductionFormDialog(
+                                          header: row,
+                                        ),
+                                      ),
                                 );
                               } finally {
-                                editVm.dispose();
+                                vm.dispose();
                               }
                               if (mounted) _refreshAll();
                             },
@@ -504,15 +450,17 @@ class _HotStampProductionMesinScreenState
                               await showDialog<void>(
                                 context: context,
                                 barrierDismissible: false,
-                                builder: (ctx) => HotStampProductionDeleteDialog(
+                                builder: (ctx) => InjectProductionDeleteDialog(
                                   header: row,
                                   onConfirm: () async {
-                                    final deleteVm =
-                                        HotStampProductionViewModel();
-                                    final success = await deleteVm
-                                        .deleteProduksi(row.noProduksi);
-                                    final errMsg = deleteVm.saveError;
-                                    deleteVm.dispose();
+                                    final vm = InjectProductionViewModel(
+                                      repository: _prodRepo,
+                                    );
+                                    final success = await vm.deleteProduksi(
+                                      row.noProduksi,
+                                    );
+                                    final errMsg = vm.saveError;
+                                    vm.dispose();
                                     if (ctx.mounted) Navigator.of(ctx).pop();
                                     if (!mounted) return;
                                     if (success) {
@@ -544,19 +492,17 @@ class _HotStampProductionMesinScreenState
                             onInput: (row) async {
                               await Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) =>
-                                      HotStampingProductionInputScreen(
-                                        noProduksi: row.noProduksi,
-                                        idMesin: row.idMesin,
-                                        isLocked: row.isLocked,
-                                        lastClosedDate: row.lastClosedDate,
-                                        namaJenis: row.outputJenisNama,
-                                        outputJenisId: row.outputJenisId,
-                                        tglProduksi: row.tglProduksi,
-                                        shift: row.shift,
-                                        hourStart: row.hourStart,
-                                        hourEnd: row.hourEnd,
-                                      ),
+                                  builder: (_) => InjectProductionInputScreen(
+                                    noProduksi: row.noProduksi,
+                                    isLocked: row.isLocked,
+                                    lastClosedDate: row.lastClosedDate,
+                                    idMesin: row.idMesin,
+                                    namaJenis: row.namaJenis,
+                                    tglProduksi: row.tglProduksi,
+                                    shift: row.shift,
+                                    hourStart: row.hourStart,
+                                    hourEnd: row.hourEnd,
+                                  ),
                                 ),
                               );
                               if (mounted) _refreshAll();
@@ -568,9 +514,9 @@ class _HotStampProductionMesinScreenState
                             right: 16,
                             bottom: 16,
                             child: FloatingActionButton.small(
-                              heroTag: 'fab_backdate_hotstamp',
+                              heroTag: 'fab_backdate_inject',
                               onPressed: () =>
-                                  _openBackdateDialog(_selectedMesinInfo!),
+                                  _openCreateDialog(mesin: _selectedMesinInfo!),
                               backgroundColor: const Color(0xFF1D4ED8),
                               foregroundColor: Colors.white,
                               tooltip: 'Tambah Backdate',

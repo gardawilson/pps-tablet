@@ -9,10 +9,10 @@ import 'package:pps_tablet/features/operator/model/operator_model.dart';
 import 'package:pps_tablet/features/production/shared/widgets/regu_operator_picker.dart';
 import 'package:pps_tablet/features/production/shared/widgets/time_form_field.dart';
 import 'package:pps_tablet/features/regu/model/regu_model.dart';
-import 'package:pps_tablet/features/furniture_wip_type/model/furniture_wip_type_model.dart';
-import 'package:pps_tablet/features/furniture_wip_type/repository/furniture_wip_type_repository.dart';
-import 'package:pps_tablet/features/furniture_wip_type/view_model/furniture_wip_type_view_model.dart';
-import 'package:pps_tablet/features/furniture_wip_type/widgets/furniture_wip_type_dropdown.dart';
+import 'package:pps_tablet/features/packing_type/model/packing_type_model.dart';
+import 'package:pps_tablet/features/packing_type/repository/packing_type_repository.dart';
+import 'package:pps_tablet/features/packing_type/view_model/packing_type_view_model.dart';
+import 'package:pps_tablet/features/packing_type/widgets/packing_type_dropdown.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/endpoints.dart';
@@ -70,7 +70,7 @@ class _PackingProductionFormDialogState
   List<MstOperator> _selectedOperators = [];
   bool _loadingReguOperator = false;
   int? _selectedShift;
-  FurnitureWipType? _selectedOutputJenis;
+  PackingType? _selectedOutputJenis;
 
   DateTime _selectedDate = DateTime.now();
   TimeOfDay? _startTime;
@@ -318,7 +318,7 @@ class _PackingProductionFormDialogState
           tglProduksi: _selectedDate,
           idMesin: mesinId,
           idOperators: idOperatorList,
-          outputJenisId: _selectedOutputJenis!.idCabinetWip,
+          outputJenisId: _selectedOutputJenis!.idBj,
           idRegu: _selectedRegu!.idRegu,
           shift: _selectedShift!,
           hourStart: toSqlTime(start),
@@ -334,7 +334,7 @@ class _PackingProductionFormDialogState
 
     if (result != null) {
       if (!isEdit && _selectedOutputJenis != null) {
-        result = result.copyWith(outputJenisNama: _selectedOutputJenis!.nama);
+        result = result.copyWith(outputJenisNama: _selectedOutputJenis!.namaBj);
       }
       widget.onSave?.call(result);
       Navigator.of(context).pop(result);
@@ -359,8 +359,8 @@ class _PackingProductionFormDialogState
           create: (_) => OverlapViewModel(repository: OverlapRepository()),
         ),
         ChangeNotifierProvider(
-          create: (_) => FurnitureWipTypeViewModel(
-            repository: FurnitureWipTypeRepository(api: ApiClient()),
+          create: (_) => PackingTypeViewModel(
+            repository: PackingTypeRepository(api: ApiClient()),
           ),
         ),
       ],
@@ -606,11 +606,11 @@ class _PackingProductionFormDialogState
           const SizedBox(height: 16),
 
           // ── Baris 3: Jenis Output ─────────────────────────────────
-          FurnitureWipTypeDropdown(
+          PackingTypeDropdown(
             preselectId: widget.header?.outputJenisId,
             label: 'Jenis Output',
             hintText: 'Pilih jenis output packing',
-            onChanged: (fw) => setState(() => _selectedOutputJenis = fw),
+            onChanged: (pt) => setState(() => _selectedOutputJenis = pt),
             validator: isEdit
                 ? null
                 : (v) => v == null ? 'Wajib pilih jenis output' : null,

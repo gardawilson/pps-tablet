@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
@@ -9,6 +9,7 @@ import '../../shared/widgets/mesin_section_header.dart';
 import '../../shared/widgets/production_mesin_card.dart';
 import '../../shared/widgets/production_produksi_list.dart';
 import '../../shared/widgets/production_riwayat_header.dart';
+import '../../shared/widgets/riwayat_animated_panel.dart';
 import '../model/broker_production_model.dart';
 import '../repository/broker_production_repository.dart';
 import '../view_model/broker_production_view_model.dart';
@@ -298,7 +299,8 @@ class _BrokerProductionMesinScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Row(
+      body: LayoutBuilder(
+        builder: (_, c) => Row(
         children: [
           // ── LEFT: mesin grid (3/5) ──────────────────────────────
           Expanded(
@@ -316,10 +318,6 @@ class _BrokerProductionMesinScreenState
                     final inactiveCount = allMesin.length - activeCount;
                     return MesinSectionHeader(
                       title: 'Status Mesin Broker',
-                      onToggleRiwayat: () => setState(
-                        () => _isRiwayatExpanded = !_isRiwayatExpanded,
-                      ),
-                      isRiwayatVisible: _isRiwayatExpanded,
                       activeCount: activeCount,
                       inactiveCount: inactiveCount,
                       isLoading:
@@ -382,14 +380,12 @@ class _BrokerProductionMesinScreenState
             ),
           ),
 
-          // ── DIVIDER ─────────────────────────────────────────────
-          const VerticalDivider(width: 1, color: Color(0xFFE5E7EB)),
-
-          // ── RIGHT: riwayat produksi (2/5) ───────────────────────
-          if (_isRiwayatExpanded)
-            Expanded(
-              flex: 2,
-              child: Column(
+          // ── RIGHT: riwayat produksi ──────────────────────────
+          RiwayatAnimatedPanel(
+            expandedWidth: c.maxWidth * 0.4,
+            isExpanded: _isRiwayatExpanded,
+            onToggle: () => setState(() => _isRiwayatExpanded = !_isRiwayatExpanded),
+            child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   FutureBuilder<List<BrokerMesinInfo>>(
@@ -417,6 +413,8 @@ class _BrokerProductionMesinScreenState
                           });
                           _loadProduksiPage();
                         },
+                        onToggle: () => setState(() => _isRiwayatExpanded = !_isRiwayatExpanded),
+                        isExpanded: _isRiwayatExpanded,
                       );
                     },
                   ),
@@ -555,6 +553,7 @@ class _BrokerProductionMesinScreenState
             ),
         ],
       ),
+    ),
     );
   }
 }

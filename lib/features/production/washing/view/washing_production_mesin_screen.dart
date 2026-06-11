@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
@@ -9,6 +9,7 @@ import '../../shared/widgets/mesin_section_header.dart';
 import '../../shared/widgets/production_mesin_card.dart';
 import '../../shared/widgets/production_produksi_list.dart';
 import '../../shared/widgets/production_riwayat_header.dart';
+import '../../shared/widgets/riwayat_animated_panel.dart';
 import '../model/washing_production_model.dart';
 import '../repository/washing_production_repository.dart';
 import '../view_model/washing_production_view_model.dart';
@@ -292,7 +293,8 @@ class _WashingProductionMesinScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Row(
+      body: LayoutBuilder(
+        builder: (_, c) => Row(
         children: [
           // ── LEFT: mesin grid (3/5) ────────────────────────────
           Expanded(
@@ -314,9 +316,6 @@ class _WashingProductionMesinScreenState
                       inactiveCount: inactiveCount,
                       isLoading:
                           snapshot.connectionState == ConnectionState.waiting,
-                      onToggleRiwayat: () =>
-                          setState(() => _isRiwayatExpanded = !_isRiwayatExpanded),
-                      isRiwayatVisible: _isRiwayatExpanded,
                     );
                   },
                 ),
@@ -374,18 +373,12 @@ class _WashingProductionMesinScreenState
             ),
           ),
 
-          // ── DIVIDER ──────────────────────────────────────────────
-          const VerticalDivider(
-            width: 1,
-            thickness: 1,
-            color: Color(0xFFE5E7EB),
-          ),
-
-          // ── RIGHT: riwayat produksi (collapsible) ────────────────
-          if (_isRiwayatExpanded)
-            Expanded(
-              flex: 2,
-              child: Column(
+          // ── RIGHT: riwayat produksi ──────────────────────────
+          RiwayatAnimatedPanel(
+            expandedWidth: c.maxWidth * 0.4,
+            isExpanded: _isRiwayatExpanded,
+            onToggle: () => setState(() => _isRiwayatExpanded = !_isRiwayatExpanded),
+            child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   FutureBuilder<List<WashingMesinInfo>>(
@@ -413,6 +406,8 @@ class _WashingProductionMesinScreenState
                           });
                           _loadProduksiPage();
                         },
+                        onToggle: () => setState(() => _isRiwayatExpanded = !_isRiwayatExpanded),
+                        isExpanded: _isRiwayatExpanded,
                       );
                     },
                   ),
@@ -556,6 +551,7 @@ class _WashingProductionMesinScreenState
             ),
         ],
       ),
+    ),
     );
   }
 }

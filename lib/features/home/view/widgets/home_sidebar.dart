@@ -118,7 +118,7 @@ class _HomeSidebarState extends State<HomeSidebar> {
         _SubItem(
           title: 'Proses Inject',
           icon: Icons.invert_colors_outlined,
-          route: '/production/inject',
+          route: '/shell/inject',
         ),
         _SubItem(
           title: 'Proses Gilingan',

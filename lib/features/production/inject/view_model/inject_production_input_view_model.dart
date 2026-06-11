@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../repository/inject_production_input_repository.dart';
+import '../model/inject_output_model.dart';
 import '../model/inject_production_inputs_model.dart';
 
 // ⬇️ shared lookup result model
@@ -274,6 +275,35 @@ class InjectProductionInputViewModel extends ChangeNotifier {
       _inputsError.remove(noProduksi);
     }
     notifyListeners();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Outputs (Furniture WIP)
+  // ---------------------------------------------------------------------------
+  final Map<String, List<InjectOutputItem>> _outputsCache = {};
+  final Map<String, bool> _outputsLoading = {};
+  final Map<String, String?> _outputsError = {};
+
+  bool isOutputsLoading(String noProduksi) =>
+      _outputsLoading[noProduksi] == true;
+  String? outputsError(String noProduksi) => _outputsError[noProduksi];
+  List<InjectOutputItem>? outputsOf(String noProduksi) =>
+      _outputsCache[noProduksi];
+
+  Future<void> loadOutputs(String noProduksi, {bool force = false}) async {
+    if (!force && _outputsCache.containsKey(noProduksi)) return;
+    _outputsLoading[noProduksi] = true;
+    _outputsError[noProduksi] = null;
+    notifyListeners();
+    try {
+      final items = await repository.fetchOutputs(noProduksi, force: force);
+      _outputsCache[noProduksi] = items;
+    } catch (e) {
+      _outputsError[noProduksi] = e.toString();
+    } finally {
+      _outputsLoading[noProduksi] = false;
+      notifyListeners();
+    }
   }
 
   // ---------------------------------------------------------------------------

@@ -27,6 +27,7 @@ import 'package:pps_tablet/features/production/crusher/view/crusher_production_m
 import 'package:pps_tablet/features/production/gilingan/view/gilingan_production_mesin_screen.dart';
 import 'package:pps_tablet/features/production/hot_stamp/view/hot_stamp_production_mesin_screen.dart';
 import 'package:pps_tablet/features/production/hot_stamp/view/hot_stamp_production_screen.dart';
+import 'package:pps_tablet/features/production/inject/view/inject_production_mesin_screen.dart';
 import 'package:pps_tablet/features/production/inject/view/inject_production_screen.dart';
 import 'package:pps_tablet/features/production/key_fitting/view/key_fitting_production_mesin_screen.dart';
 import 'package:pps_tablet/features/production/mixer/view/mixer_production_mesin_screen.dart';
@@ -464,6 +465,8 @@ class _AppShellState extends State<AppShell> {
         return const HotStampProductionMesinScreen();
       case '/production/hot-stamp':
         return HotStampProductionScreen();
+      case '/shell/inject':
+        return const InjectProductionMesinScreen();
       case '/production/inject':
         return InjectProductionScreen();
       case '/shell/key-fitting':

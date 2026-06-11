@@ -8,7 +8,7 @@ import '../../../regu/repository/regu_repository.dart';
 typedef ReguOperatorResult = ({MstRegu regu, List<MstOperator> operators});
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Field: satu field gabungan regu + operator (tap → buka picker dialog)
+// Field: container 2 kolom berlabel (Regu | Operator) — tap → buka dialog
 // ─────────────────────────────────────────────────────────────────────────────
 class ReguOperatorPickerField extends StatelessWidget {
   const ReguOperatorPickerField({
@@ -26,109 +26,180 @@ class ReguOperatorPickerField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasValue = selectedRegu != null || selectedOperators.isNotEmpty;
+    final hasRegu = selectedRegu != null;
+    final hasOperator = selectedOperators.isNotEmpty;
+    final hasAny = hasRegu || hasOperator;
 
-    return GestureDetector(
+    final reguValue = hasRegu ? selectedRegu!.namaRegu : null;
+    final operatorValue = hasOperator
+        ? selectedOperators.map((o) => o.namaOperator).join(', ')
+        : null;
+
+    return _PickerContainer(
+      hasValue: hasAny,
+      isLoading: isLoading,
       onTap: onTap,
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: 'Regu & Operator',
-          labelStyle:
-              const TextStyle(fontSize: 14, color: Color(0xFF374151)),
-          border:
-              OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFF9CA3AF)),
-          ),
-          isDense: true,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          suffixIcon: isLoading
-              ? const Padding(
-                  padding: EdgeInsets.all(10),
-                  child: SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                )
-              : const Icon(Icons.groups_outlined,
-                  size: 18, color: Color(0xFF6B7280)),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _Col(
+              icon: Icons.groups_outlined,
+              label: 'REGU',
+              value: reguValue,
+              hint: 'Pilih regu',
+            ),
+            Container(
+              width: 1,
+              margin: const EdgeInsets.symmetric(horizontal: 10),
+              color: const Color(0xFFE5E7EB),
+            ),
+            _Col(
+              icon: Icons.person_outline,
+              label: 'OPERATOR',
+              value: operatorValue,
+              hint: 'Pilih operator',
+              extraLabel: hasOperator
+                  ? '${selectedOperators.length} orang'
+                  : null,
+            ),
+          ],
         ),
-        child: !hasValue
-            ? const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.groups_2_outlined,
-                      size: 15, color: Color(0xFFBEC8D5)),
-                  SizedBox(width: 8),
-                  Text(
-                    'Pilih regu & operator',
-                    style:
-                        TextStyle(fontSize: 13, color: Color(0xFFADB8C4)),
-                  ),
-                ],
-              )
-            : Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (selectedRegu != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.groups_outlined,
-                              size: 13, color: Color(0xFF64748B)),
-                          const SizedBox(width: 5),
-                          Text(
-                            selectedRegu!.namaRegu,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF334155),
-                            ),
-                          ),
-                        ],
-                      ),
+      ),
+    );
+  }
+}
+
+class _PickerContainer extends StatelessWidget {
+  const _PickerContainer({
+    required this.hasValue,
+    required this.isLoading,
+    required this.onTap,
+    required this.child,
+  });
+
+  final bool hasValue;
+  final bool isLoading;
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: isLoading ? null : onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: hasValue ? Colors.white : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: hasValue
+                  ? const Color(0xFF6B7280)
+                  : const Color(0xFFD1D5DB),
+              width: hasValue ? 1.0 : 1.2,
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(child: child),
+              const SizedBox(width: 8),
+              isLoading
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 1.5),
+                    )
+                  : Icon(
+                      hasValue
+                          ? Icons.edit_outlined
+                          : Icons.chevron_right_rounded,
+                      size: 16,
+                      color: hasValue
+                          ? const Color(0xFF9CA3AF)
+                          : const Color(0xFF9CA3AF),
                     ),
-                  if (selectedOperators.isNotEmpty) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.person_outline,
-                              size: 13, color: Color(0xFF64748B)),
-                          const SizedBox(width: 5),
-                          Text(
-                            '${selectedOperators.length} Operator',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF475569),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Col extends StatelessWidget {
+  const _Col({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.hint,
+    this.extraLabel,
+  });
+
+  final IconData icon;
+  final String label;
+  final String? value;
+  final String hint;
+  final String? extraLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final isEmpty = value == null || value!.isEmpty;
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 10, color: const Color(0xFF9CA3AF)),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF9CA3AF),
+                  letterSpacing: 0.5,
+                ),
               ),
+              if (extraLabel != null) ...[
+                const SizedBox(width: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFCCFBF1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    extraLabel!,
+                    style: const TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF0F766E),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            isEmpty ? hint : value!,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isEmpty ? FontWeight.w400 : FontWeight.w600,
+              color: isEmpty ? const Color(0xFFD1D5DB) : const Color(0xFF374151),
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }

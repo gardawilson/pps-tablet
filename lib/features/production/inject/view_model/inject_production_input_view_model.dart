@@ -307,6 +307,108 @@ class InjectProductionInputViewModel extends ChangeNotifier {
   }
 
   // ---------------------------------------------------------------------------
+  // BJ Outputs (Barang Jadi)
+  // ---------------------------------------------------------------------------
+  final Map<String, List<InjectBjOutputItem>> _bjOutputsCache = {};
+  final Map<String, bool> _bjOutputsLoading = {};
+  final Map<String, String?> _bjOutputsError = {};
+
+  bool isBjOutputsLoading(String noProduksi) =>
+      _bjOutputsLoading[noProduksi] == true;
+  String? bjOutputsError(String noProduksi) => _bjOutputsError[noProduksi];
+  List<InjectBjOutputItem>? bjOutputsOf(String noProduksi) =>
+      _bjOutputsCache[noProduksi];
+
+  Future<void> loadBjOutputs(String noProduksi, {bool force = false}) async {
+    if (!force && _bjOutputsCache.containsKey(noProduksi)) return;
+    _bjOutputsLoading[noProduksi] = true;
+    _bjOutputsError[noProduksi] = null;
+    notifyListeners();
+    try {
+      final items = await repository.fetchBjOutputs(noProduksi, force: force);
+      _bjOutputsCache[noProduksi] = items;
+    } catch (e) {
+      _bjOutputsError[noProduksi] = e.toString();
+    } finally {
+      _bjOutputsLoading[noProduksi] = false;
+      notifyListeners();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Reject Outputs
+  // ---------------------------------------------------------------------------
+  final Map<String, List<InjectRejectOutputItem>> _rejectOutputsCache = {};
+  final Map<String, bool> _rejectOutputsLoading = {};
+  final Map<String, String?> _rejectOutputsError = {};
+
+  bool isRejectOutputsLoading(String noProduksi) =>
+      _rejectOutputsLoading[noProduksi] == true;
+  String? rejectOutputsError(String noProduksi) =>
+      _rejectOutputsError[noProduksi];
+  List<InjectRejectOutputItem>? rejectOutputsOf(String noProduksi) =>
+      _rejectOutputsCache[noProduksi];
+
+  Future<void> loadRejectOutputs(
+    String noProduksi, {
+    bool force = false,
+  }) async {
+    if (!force && _rejectOutputsCache.containsKey(noProduksi)) return;
+    _rejectOutputsLoading[noProduksi] = true;
+    _rejectOutputsError[noProduksi] = null;
+    notifyListeners();
+    try {
+      final items = await repository.fetchRejectOutputs(
+        noProduksi,
+        force: force,
+      );
+      _rejectOutputsCache[noProduksi] = items;
+    } catch (e) {
+      _rejectOutputsError[noProduksi] = e.toString();
+    } finally {
+      _rejectOutputsLoading[noProduksi] = false;
+      notifyListeners();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bonggolan Outputs
+  // ---------------------------------------------------------------------------
+  final Map<String, List<InjectBonggolanOutputItem>> _bonggolanOutputsCache =
+      {};
+  final Map<String, bool> _bonggolanOutputsLoading = {};
+  final Map<String, String?> _bonggolanOutputsError = {};
+
+  bool isBonggolanOutputsLoading(String noProduksi) =>
+      _bonggolanOutputsLoading[noProduksi] == true;
+  String? bonggolanOutputsError(String noProduksi) =>
+      _bonggolanOutputsError[noProduksi];
+  List<InjectBonggolanOutputItem>? bonggolanOutputsOf(String noProduksi) =>
+      _bonggolanOutputsCache[noProduksi];
+
+  Future<void> loadBonggolanOutputs(
+    String noProduksi, {
+    bool force = false,
+  }) async {
+    if (!force && _bonggolanOutputsCache.containsKey(noProduksi)) return;
+    _bonggolanOutputsLoading[noProduksi] = true;
+    _bonggolanOutputsError[noProduksi] = null;
+    notifyListeners();
+    try {
+      final items = await repository.fetchBonggolanOutputs(
+        noProduksi,
+        force: force,
+      );
+      _bonggolanOutputsCache[noProduksi] = items;
+    } catch (e) {
+      _bonggolanOutputsError[noProduksi] = e.toString();
+    } finally {
+      _bonggolanOutputsLoading[noProduksi] = false;
+      notifyListeners();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Master Cabinet Materials (fetch all from endpoint)
   // ---------------------------------------------------------------------------
   final Map<int, List<CabinetMaterialItem>> _masterCabinetByWh = {};

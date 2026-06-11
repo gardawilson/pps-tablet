@@ -27,13 +27,16 @@ class InjectProduction {
   final num? hourMeter;
 
   final int? idCetakan;
+  final String? namaCetakan;
   final int? idWarna;
+  final String? namaWarna;
 
   final bool enableOffset;
   final num? offsetCurrent;
   final num? offsetNext;
 
   final int? idFurnitureMaterial;
+  final String? namaFurnitureMaterial;
   final String? idJenis;
   final String? namaJenis;
 
@@ -47,6 +50,9 @@ class InjectProduction {
   final DateTime? lastClosedDate;
 
   final bool isLocked;
+
+  final String? outputCategory;
+  final List<InjectOutputJenis> outputs;
 
   const InjectProduction({
     required this.noProduksi,
@@ -65,11 +71,14 @@ class InjectProduction {
     required this.hadir,
     this.hourMeter,
     this.idCetakan,
+    this.namaCetakan,
     this.idWarna,
+    this.namaWarna,
     required this.enableOffset,
     this.offsetCurrent,
     this.offsetNext,
     this.idFurnitureMaterial,
+    this.namaFurnitureMaterial,
     this.idJenis,
     this.namaJenis,
     this.beratProdukHasilTimbang,
@@ -77,6 +86,8 @@ class InjectProduction {
     this.hourEnd,
     this.lastClosedDate,
     required this.isLocked,
+    this.outputCategory,
+    this.outputs = const [],
   });
 
   // -------------------- tolerant parsers --------------------
@@ -188,13 +199,17 @@ class InjectProduction {
 
       hourMeter: _asNum(j['HourMeter']),
       idCetakan: (j['IdCetakan'] as num?)?.toInt(),
+      namaCetakan: j['NamaCetakan']?.toString(),
       idWarna: (j['IdWarna'] as num?)?.toInt(),
+      namaWarna: j['Warna']?.toString() ?? j['NamaWarna']?.toString(),
 
       enableOffset: _asBool(j['EnableOffset'], fallback: false),
       offsetCurrent: _asNum(j['OffsetCurrent']),
       offsetNext: _asNum(j['OffsetNext']),
 
       idFurnitureMaterial: (j['IdFurnitureMaterial'] as num?)?.toInt(),
+      namaFurnitureMaterial: j['NamaFurnitureMaterial']?.toString() ??
+          j['NamaFurnitureMat']?.toString(),
       idJenis:
           j['IdJenis']?.toString() ??
           j['idJenis']?.toString() ??
@@ -213,6 +228,10 @@ class InjectProduction {
 
       lastClosedDate: _asDateTime(j['LastClosedDate']),
       isLocked: _asBool(j['IsLocked'], fallback: false),
+      outputCategory: j['OutputCategory']?.toString(),
+      outputs: (j['Outputs'] as List<dynamic>? ?? [])
+          .map((e) => InjectOutputJenis.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
   }
 
@@ -259,6 +278,50 @@ class InjectProduction {
     };
   }
 
+  InjectProduction copyWith({
+    String? namaJenis,
+    String? namaMesin,
+    String? namaCetakan,
+    String? namaWarna,
+    String? namaFurnitureMaterial,
+    String? hourStart,
+    String? hourEnd,
+  }) {
+    return InjectProduction(
+      noProduksi: noProduksi,
+      tglProduksi: tglProduksi,
+      idMesin: idMesin,
+      namaMesin: namaMesin ?? this.namaMesin,
+      idOperator: idOperator,
+      namaOperator: namaOperator,
+      jam: jam,
+      shift: shift,
+      createBy: createBy,
+      checkBy1: checkBy1,
+      checkBy2: checkBy2,
+      approveBy: approveBy,
+      jmlhAnggota: jmlhAnggota,
+      hadir: hadir,
+      hourMeter: hourMeter,
+      idCetakan: idCetakan,
+      namaCetakan: namaCetakan ?? this.namaCetakan,
+      idWarna: idWarna,
+      namaWarna: namaWarna ?? this.namaWarna,
+      enableOffset: enableOffset,
+      offsetCurrent: offsetCurrent,
+      offsetNext: offsetNext,
+      idFurnitureMaterial: idFurnitureMaterial,
+      namaFurnitureMaterial: namaFurnitureMaterial ?? this.namaFurnitureMaterial,
+      idJenis: idJenis,
+      namaJenis: namaJenis ?? this.namaJenis,
+      beratProdukHasilTimbang: beratProdukHasilTimbang,
+      hourStart: hourStart ?? this.hourStart,
+      hourEnd: hourEnd ?? this.hourEnd,
+      lastClosedDate: lastClosedDate,
+      isLocked: isLocked,
+    );
+  }
+
   /// Optional helper for UI
   String get jamLabel => jam <= 0 ? '-' : '${jam.toString().padLeft(2, '0')}:00';
 
@@ -269,6 +332,19 @@ class InjectProduction {
 
 // ── Mesin-screen models (endpoint: GET /api/mst-mesin/inject) ──────────────
 
+class InjectOutputJenis {
+  final int idJenis;
+  final String namaJenis;
+
+  const InjectOutputJenis({required this.idJenis, required this.namaJenis});
+
+  factory InjectOutputJenis.fromJson(Map<String, dynamic> j) =>
+      InjectOutputJenis(
+        idJenis: (j['idJenis'] as num?)?.toInt() ?? 0,
+        namaJenis: j['namaJenis']?.toString() ?? '',
+      );
+}
+
 class InjectProduksiItem {
   final String noProduksi;
   final DateTime? tglProduksi;
@@ -278,11 +354,15 @@ class InjectProduksiItem {
   final String? namaCetakan;
   final int? idWarna;
   final String? warna;
+  final int? idFurnitureMaterial;
+  final String? namaFurnitureMaterial;
   final List<int> idOperators;
   final String? operators;
   final int? shift;
   final String? hourStart;
   final String? hourEnd;
+  final String? outputCategory;
+  final List<InjectOutputJenis> outputs;
 
   const InjectProduksiItem({
     required this.noProduksi,
@@ -293,11 +373,15 @@ class InjectProduksiItem {
     this.namaCetakan,
     this.idWarna,
     this.warna,
+    this.idFurnitureMaterial,
+    this.namaFurnitureMaterial,
     this.idOperators = const [],
     this.operators,
     this.shift,
     this.hourStart,
     this.hourEnd,
+    this.outputCategory,
+    this.outputs = const [],
   });
 
   int? get idOperator => idOperators.isNotEmpty ? idOperators.first : null;
@@ -337,11 +421,17 @@ class InjectProduksiItem {
       namaCetakan: s(j['NamaCetakan']),
       idWarna: i(j['IdWarna']),
       warna: s(j['Warna']),
+      idFurnitureMaterial: i(j['IdFurnitureMaterial']),
+      namaFurnitureMaterial: s(j['NamaFurnitureMaterial']),
       idOperators: parseIdOperators(j['IdOperators'] ?? j['IdOperator']),
       operators: s(j['Operators']) ?? s(j['Operator']),
       shift: i(j['Shift']),
       hourStart: timeHHmm(j['HourStart']),
       hourEnd: timeHHmm(j['HourEnd']),
+      outputCategory: s(j['OutputCategory']),
+      outputs: (j['Outputs'] as List<dynamic>? ?? [])
+          .map((e) => InjectOutputJenis.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
   }
 }
@@ -365,6 +455,10 @@ class InjectMesinInfo {
       produksiList.isNotEmpty ? produksiList.first.namaRegu : null;
   String? get namaCetakan =>
       produksiList.isNotEmpty ? produksiList.first.namaCetakan : null;
+  String? get outputCategory =>
+      produksiList.isNotEmpty ? produksiList.first.outputCategory : null;
+  List<InjectOutputJenis> get outputs =>
+      produksiList.isNotEmpty ? produksiList.first.outputs : const [];
 
   const InjectMesinInfo({
     required this.idMesin,

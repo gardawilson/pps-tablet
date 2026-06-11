@@ -10,11 +10,16 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
   final String? hourStart;
   final String? hourEnd;
   final String? namaJenis;
+  final String? namaCetakan;
+  final String? namaWarna;
+  final String? namaFurnitureMaterial;
   final Color primaryColor;
 
+  final bool showTimeInfo;
   final VoidCallback? onGanti;
   final VoidCallback? onRiwayat;
   final VoidCallback? onRefresh;
+  final List<Widget>? trailingActions;
 
   const ProductionWorkspaceToolbar({
     super.key,
@@ -27,9 +32,14 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
     this.hourStart,
     this.hourEnd,
     this.namaJenis,
+    this.namaCetakan,
+    this.namaWarna,
+    this.namaFurnitureMaterial,
+    this.showTimeInfo = true,
     this.onGanti,
     this.onRiwayat,
     this.onRefresh,
+    this.trailingActions,
   });
 
   bool _isWithinTimeRange() {
@@ -78,6 +88,10 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
     final isActive = !isLocked && _isWithinTimeRange();
     final hasJenis = (namaJenis ?? '').trim().isNotEmpty;
     final canGanti = idMesin != null && shift != null && tglProduksi != null;
+
+    final hasCetakanInfo = (namaCetakan ?? '').trim().isNotEmpty ||
+        (namaWarna ?? '').trim().isNotEmpty ||
+        (namaFurnitureMaterial ?? '').trim().isNotEmpty;
 
     final accentColor = isLocked
         ? lockedAccent
@@ -170,17 +184,54 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
                 ),
               ),
               vline(),
-              Flexible(
-                child: Text(
-                  hasJenis ? namaJenis!.trim() : 'Belum ada jenis',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: hasJenis ? accentColor : Colors.grey.shade400,
+              if (hasCetakanInfo)
+                Flexible(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if ((namaCetakan ?? '').trim().isNotEmpty) ...[
+                        Flexible(
+                          child: _InfoChip(
+                            icon: Icons.view_in_ar_rounded,
+                            label: namaCetakan!.trim(),
+                            color: accentColor,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      if ((namaWarna ?? '').trim().isNotEmpty) ...[
+                        Flexible(
+                          child: _InfoChip(
+                            icon: Icons.palette_outlined,
+                            label: namaWarna!.trim(),
+                            color: accentColor,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      if ((namaFurnitureMaterial ?? '').trim().isNotEmpty)
+                        Flexible(
+                          child: _InfoChip(
+                            icon: Icons.category_outlined,
+                            label: namaFurnitureMaterial!.trim(),
+                            color: accentColor,
+                          ),
+                        ),
+                    ],
                   ),
-                  overflow: TextOverflow.ellipsis,
+                )
+              else
+                Flexible(
+                  child: Text(
+                    hasJenis ? namaJenis!.trim() : 'Belum ada jenis',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: hasJenis ? accentColor : Colors.grey.shade400,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
               if (canGanti) ...[
                 const SizedBox(width: 4),
                 Material(
@@ -245,16 +296,18 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
                   ),
                 ),
               ),
-              vline(),
-              if (tglText != null) ...[
-                infoTag(Icons.calendar_today_outlined, tglText),
-                dot(),
+              if (showTimeInfo) ...[
+                vline(),
+                if (tglText != null) ...[
+                  infoTag(Icons.calendar_today_outlined, tglText),
+                  dot(),
+                ],
+                if (shift != null) ...[
+                  infoTag(Icons.group_outlined, 'Shift $shift'),
+                  dot(),
+                ],
+                infoTag(Icons.schedule_outlined, jamText),
               ],
-              if (shift != null) ...[
-                infoTag(Icons.group_outlined, 'Shift $shift'),
-                dot(),
-              ],
-              infoTag(Icons.schedule_outlined, jamText),
               const Spacer(),
               Text(
                 noProduksi,
@@ -280,9 +333,52 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
                   ),
                 ),
               ),
+              if (trailingActions != null) ...trailingActions!,
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  const _InfoChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: color),
+          const SizedBox(width: 3),
+          Flexible(
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

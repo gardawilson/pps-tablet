@@ -276,6 +276,117 @@ class InjectProductionInputRepository {
   void invalidateOutputs(String noProduksi) => _outputsCache.remove(noProduksi);
 
   /* =============================
+   * GET OUTPUTS (Barang Jadi)
+   * ============================= */
+
+  final Map<String, List<InjectBjOutputItem>> _bjOutputsCache = {};
+
+  static List<InjectBjOutputItem> _parseBjOutputs(Map<String, dynamic> body) {
+    final data = body['data'];
+    if (data == null || data is! List) return <InjectBjOutputItem>[];
+    return data
+        .whereType<Map>()
+        .map((e) => InjectBjOutputItem.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  /// GET /api/production/inject/:noProduksi/outputs/barang-jadi
+  Future<List<InjectBjOutputItem>> fetchBjOutputs(
+    String noProduksi, {
+    bool force = false,
+  }) async {
+    if (!force && _bjOutputsCache.containsKey(noProduksi)) {
+      return _bjOutputsCache[noProduksi]!;
+    }
+    final path = '/api/production/inject/$noProduksi/outputs/barang-jadi';
+    final body = await api.getJson(path);
+    final items = await compute(_parseBjOutputs, body);
+    _bjOutputsCache[noProduksi] = items;
+    return items;
+  }
+
+  void invalidateBjOutputs(String noProduksi) =>
+      _bjOutputsCache.remove(noProduksi);
+
+  /* =============================
+   * GET OUTPUTS (Reject)
+   * ============================= */
+
+  final Map<String, List<InjectRejectOutputItem>> _rejectOutputsCache = {};
+
+  static List<InjectRejectOutputItem> _parseRejectOutputs(
+    Map<String, dynamic> body,
+  ) {
+    final data = body['data'];
+    if (data == null || data is! List) return <InjectRejectOutputItem>[];
+    return data
+        .whereType<Map>()
+        .map(
+          (e) =>
+              InjectRejectOutputItem.fromJson(Map<String, dynamic>.from(e)),
+        )
+        .toList();
+  }
+
+  /// GET /api/production/inject/:noProduksi/outputs/reject
+  Future<List<InjectRejectOutputItem>> fetchRejectOutputs(
+    String noProduksi, {
+    bool force = false,
+  }) async {
+    if (!force && _rejectOutputsCache.containsKey(noProduksi)) {
+      return _rejectOutputsCache[noProduksi]!;
+    }
+    final path = '/api/production/inject/$noProduksi/outputs/reject';
+    final body = await api.getJson(path);
+    final items = await compute(_parseRejectOutputs, body);
+    _rejectOutputsCache[noProduksi] = items;
+    return items;
+  }
+
+  void invalidateRejectOutputs(String noProduksi) =>
+      _rejectOutputsCache.remove(noProduksi);
+
+  /* =============================
+   * GET OUTPUTS (Bonggolan)
+   * ============================= */
+
+  final Map<String, List<InjectBonggolanOutputItem>> _bonggolanOutputsCache =
+      {};
+
+  static List<InjectBonggolanOutputItem> _parseBonggolanOutputs(
+    Map<String, dynamic> body,
+  ) {
+    final data = body['data'];
+    if (data == null || data is! List) return <InjectBonggolanOutputItem>[];
+    return data
+        .whereType<Map>()
+        .map(
+          (e) => InjectBonggolanOutputItem.fromJson(
+            Map<String, dynamic>.from(e),
+          ),
+        )
+        .toList();
+  }
+
+  /// GET /api/production/inject/:noProduksi/outputs/bonggolan
+  Future<List<InjectBonggolanOutputItem>> fetchBonggolanOutputs(
+    String noProduksi, {
+    bool force = false,
+  }) async {
+    if (!force && _bonggolanOutputsCache.containsKey(noProduksi)) {
+      return _bonggolanOutputsCache[noProduksi]!;
+    }
+    final path = '/api/production/inject/$noProduksi/outputs/bonggolan';
+    final body = await api.getJson(path);
+    final items = await compute(_parseBonggolanOutputs, body);
+    _bonggolanOutputsCache[noProduksi] = items;
+    return items;
+  }
+
+  void invalidateBonggolanOutputs(String noProduksi) =>
+      _bonggolanOutputsCache.remove(noProduksi);
+
+  /* =============================
    * Helpers
    * ============================= */
 

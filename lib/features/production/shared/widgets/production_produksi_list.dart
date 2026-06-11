@@ -11,6 +11,11 @@ class ProduksiRowData {
   final String? namaRegu;
   final String? outputJenisNama;
 
+  // inject-specific fields (cetakan/warna/material)
+  final String? namaCetakan;
+  final String? namaWarna;
+  final String? namaFurnitureMaterial;
+
   const ProduksiRowData({
     required this.tglProduksi,
     required this.hourStart,
@@ -20,6 +25,9 @@ class ProduksiRowData {
     required this.namaMesin,
     this.namaRegu,
     this.outputJenisNama,
+    this.namaCetakan,
+    this.namaWarna,
+    this.namaFurnitureMaterial,
   });
 }
 
@@ -130,6 +138,10 @@ class _ProduksiRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasCetakanInfo = (data.namaCetakan ?? '').trim().isNotEmpty ||
+        (data.namaWarna ?? '').trim().isNotEmpty ||
+        (data.namaFurnitureMaterial ?? '').trim().isNotEmpty;
+
     final metaItems = <_MetaItem>[
       if (showMesin)
         _MetaItem(
@@ -138,18 +150,37 @@ class _ProduksiRow extends StatelessWidget {
               ? data.namaMesin.trim()
               : '-',
         ),
-      _MetaItem(
-        label: 'Regu',
-        value: (data.namaRegu ?? '').trim().isNotEmpty
-            ? data.namaRegu!.trim()
-            : '-',
-      ),
-      _MetaItem(
-        label: 'Output',
-        value: (data.outputJenisNama ?? '').trim().isNotEmpty
-            ? data.outputJenisNama!.trim()
-            : '-',
-      ),
+      if (hasCetakanInfo) ...[
+        if ((data.namaCetakan ?? '').trim().isNotEmpty)
+          _MetaItem(
+            label: 'Cetakan',
+            value: data.namaCetakan!.trim(),
+          ),
+        if ((data.namaWarna ?? '').trim().isNotEmpty)
+          _MetaItem(
+            label: 'Warna',
+            value: data.namaWarna!.trim(),
+          ),
+        _MetaItem(
+          label: 'Material',
+          value: (data.namaFurnitureMaterial ?? '').trim().isNotEmpty
+              ? data.namaFurnitureMaterial!.trim()
+              : '-',
+        ),
+      ] else ...[
+        _MetaItem(
+          label: 'Regu',
+          value: (data.namaRegu ?? '').trim().isNotEmpty
+              ? data.namaRegu!.trim()
+              : '-',
+        ),
+        _MetaItem(
+          label: 'Output',
+          value: (data.outputJenisNama ?? '').trim().isNotEmpty
+              ? data.outputJenisNama!.trim()
+              : '-',
+        ),
+      ],
     ];
 
     return Container(

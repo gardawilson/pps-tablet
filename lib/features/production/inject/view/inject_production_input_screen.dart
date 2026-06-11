@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:pps_tablet/core/view/app_shell.dart';
 import 'package:pps_tablet/features/production/shared/shared.dart';
 
+import '../model/inject_production_model.dart' show InjectOutputJenis;
+
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/scan_label_dialog.dart';
 import '../../../../core/view_model/permission_view_model.dart';
@@ -15,9 +17,10 @@ import '../../shared/widgets/unsaved_temp_warning_dialog.dart';
 import '../model/inject_output_model.dart';
 import '../model/inject_production_inputs_model.dart';
 import '../view_model/inject_production_input_view_model.dart';
+import '../widgets/inject_split_time_dialog.dart';
 
 // ── Colour palette ─────────────────────────────────────────────────────────────
-const _kInjectPrimary = Color(0xFF00897B); // teal — input
+const _kInjectPrimary = Color(0xFF0277BD); // biru — input
 const _kInjectOutput = Color(0xFF00695C); // darker teal — output
 const _kInjectSurface = Color(0xFFF8F9FB);
 const _kInjectBorder = Color(0xFFE2E6EA);
@@ -29,10 +32,17 @@ class InjectProductionInputScreen extends StatefulWidget {
 
   final int? idMesin;
   final String? namaJenis;
+  final String? namaCetakan;
+  final String? namaWarna;
+  final String? namaFurnitureMaterial;
   final DateTime? tglProduksi;
   final int? shift;
   final String? hourStart;
   final String? hourEnd;
+
+  /// 'furnitureWip' | 'barangjadi' | null (null = bebas)
+  final String? outputCategory;
+  final List<InjectOutputJenis> lockedOutputs;
 
   const InjectProductionInputScreen({
     super.key,
@@ -41,10 +51,15 @@ class InjectProductionInputScreen extends StatefulWidget {
     this.lastClosedDate,
     this.idMesin,
     this.namaJenis,
+    this.namaCetakan,
+    this.namaWarna,
+    this.namaFurnitureMaterial,
     this.tglProduksi,
     this.shift,
     this.hourStart,
     this.hourEnd,
+    this.outputCategory,
+    this.lockedOutputs = const [],
   });
 
   @override
@@ -55,6 +70,8 @@ class InjectProductionInputScreen extends StatefulWidget {
 class _InjectProductionInputScreenState
     extends State<InjectProductionInputScreen> {
   String _selectedInputTab = 'fwip';
+  late String _selectedOutputTab;
+  bool _outputOnLeft = false;
 
   List<BreadcrumbSegment> _prevBreadcrumb = [];
   String get _breadcrumbLabel => widget.noProduksi;
@@ -64,6 +81,7 @@ class _InjectProductionInputScreenState
   @override
   void initState() {
     super.initState();
+    _selectedOutputTab = widget.outputCategory == 'barangjadi' ? 'bj' : 'fwip';
     _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -88,6 +106,18 @@ class _InjectProductionInputScreenState
       if (vm.outputsOf(widget.noProduksi) == null &&
           !vm.isOutputsLoading(widget.noProduksi)) {
         vm.loadOutputs(widget.noProduksi);
+      }
+      if (vm.bjOutputsOf(widget.noProduksi) == null &&
+          !vm.isBjOutputsLoading(widget.noProduksi)) {
+        vm.loadBjOutputs(widget.noProduksi);
+      }
+      if (vm.rejectOutputsOf(widget.noProduksi) == null &&
+          !vm.isRejectOutputsLoading(widget.noProduksi)) {
+        vm.loadRejectOutputs(widget.noProduksi);
+      }
+      if (vm.bonggolanOutputsOf(widget.noProduksi) == null &&
+          !vm.isBonggolanOutputsLoading(widget.noProduksi)) {
+        vm.loadBonggolanOutputs(widget.noProduksi);
       }
     });
   }
@@ -207,6 +237,29 @@ class _InjectProductionInputScreenState
         ],
       ),
     );
+  }
+
+  // ── Split Time (Ganti) ────────────────────────────────────────────────────
+
+  Future<void> _openSplitTimeDialog() async {
+    if (widget.idMesin == null || widget.tglProduksi == null) return;
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => InjectSplitTimeDialog(
+        idMesin: widget.idMesin!,
+        tglProduksi: widget.tglProduksi!,
+        currentHourEnd: widget.hourEnd,
+        currentCetakan: widget.namaCetakan,
+        currentWarna: widget.namaWarna,
+        currentMaterial: widget.namaFurnitureMaterial,
+      ),
+    );
+    if (!mounted) return;
+    if (result == true) {
+      _showSnack('✅ Produksi berhasil diganti', backgroundColor: Colors.green);
+      if (mounted) Navigator.of(context).pop();
+    }
   }
 
   // ── Scan / Lookup ──────────────────────────────────────────────────────────
@@ -366,22 +419,86 @@ class _InjectProductionInputScreenState
     required List<CabinetMaterialItem> materialAll,
     required Set<int> tempMaterialIds,
   }) {
+    // ── per-tab metrics ────────────────────────────────────────────
+    double fwipBerat = 0;
     int fwipPcs = 0;
-    for (final e in fwipGroups.values) {
-      for (final i in e) {
+    for (final items in fwipGroups.values) {
+      for (final i in items) {
         fwipPcs += i.pcs ?? 0;
+        fwipBerat += i.berat ?? 0;
       }
     }
-    int brokerSak = brokerGroups.values.fold(0, (s, e) => s + e.length);
-    int mixerSak = mixerGroups.values.fold(0, (s, e) => s + e.length);
-    int gilinganCount = gilinganGroups.length;
+    int brokerSak = 0;
+    double brokerBerat = 0;
+    for (final items in brokerGroups.values) {
+      for (final i in items) {
+        brokerSak += 1;
+        brokerBerat += i.berat ?? 0;
+      }
+    }
+    int mixerSak = 0;
+    double mixerBerat = 0;
+    for (final items in mixerGroups.values) {
+      for (final i in items) {
+        mixerSak += 1;
+        mixerBerat += i.berat ?? 0;
+      }
+    }
+    double gilinganBerat = 0;
+    for (final items in gilinganGroups.values) {
+      for (final i in items) {
+        gilinganBerat += i.berat ?? 0;
+      }
+    }
     final materialCount = materialAll.length;
-    final totalInputLabel =
+
+    // ── grand total ────────────────────────────────────────────────
+    final grandLabel =
         fwipGroups.length +
         brokerGroups.length +
         mixerGroups.length +
         gilinganGroups.length +
         materialCount;
+    final grandSak = brokerSak + mixerSak;
+    final grandBerat = fwipBerat + brokerBerat + mixerBerat + gilinganBerat;
+
+    // ── active-tab summary ─────────────────────────────────────────
+    SectionSummary activeTabSummary() {
+      switch (_selectedInputTab) {
+        case 'fwip':
+          return SectionSummary(
+            totalData: fwipGroups.length,
+            totalSak: fwipPcs,
+            totalBerat: 0,
+          );
+        case 'broker':
+          return SectionSummary(
+            totalData: brokerGroups.length,
+            totalSak: brokerSak,
+            totalBerat: brokerBerat,
+          );
+        case 'mixer':
+          return SectionSummary(
+            totalData: mixerGroups.length,
+            totalSak: mixerSak,
+            totalBerat: mixerBerat,
+          );
+        case 'gilingan':
+          return SectionSummary(
+            totalData: gilinganGroups.length,
+            totalSak: 0,
+            totalBerat: gilinganBerat,
+          );
+        case 'material':
+          return SectionSummary(
+            totalData: materialCount,
+            totalSak: materialCount,
+            totalBerat: 0,
+          );
+        default:
+          return SectionSummary(totalData: 0, totalSak: 0, totalBerat: 0);
+      }
+    }
 
     final tabCounts = {
       'fwip': fwipGroups.length,
@@ -497,20 +614,37 @@ class _InjectProductionInputScreenState
                               ),
                             ),
                           ),
-                          const SizedBox(height: 10),
-                          // Footer: summary + FAB
+                          const SizedBox(height: 6),
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Expanded(
-                                child: _InjectInputSummaryBar(
-                                  totalLabel: totalInputLabel,
-                                  totalFwipPcs: fwipPcs,
-                                  totalBrokerSak: brokerSak,
-                                  totalMixerSak: mixerSak,
-                                  totalGilingan: gilinganCount,
-                                  totalMaterial: materialCount,
-                                  color: _kInjectPrimary,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    ProductionCategorySummaryTile(
+                                      summary: activeTabSummary(),
+                                      accentColor: _kInjectPrimary,
+                                      sakLabel:
+                                          (_selectedInputTab == 'fwip' ||
+                                              _selectedInputTab == 'material')
+                                          ? 'Qty'
+                                          : 'Sak',
+                                      showBerat:
+                                          _selectedInputTab != 'fwip' &&
+                                          _selectedInputTab != 'material',
+                                      showLabel:
+                                          _selectedInputTab != 'material',
+                                    ),
+                                    const SizedBox(height: 6),
+                                    ProductionInputGrandTotalBar(
+                                      totalLabel: grandLabel,
+                                      totalSak: grandSak,
+                                      totalBerat: grandBerat,
+                                      color: _kInjectPrimary,
+                                      sakLabel: 'Qty',
+                                    ),
+                                  ],
                                 ),
                               ),
                               const SizedBox(width: 10),
@@ -849,16 +983,264 @@ class _InjectProductionInputScreenState
     );
   }
 
+  // ── Output FAB visibility ────────────────────────────────────────────────
+
+  bool _isFabVisible({
+    required bool isBj,
+    required bool isReject,
+    required bool isBonggolan,
+  }) {
+    // Reject dan Bonggolan selalu tampil
+    if (isReject || isBonggolan) return true;
+    final cat = widget.outputCategory;
+    if (cat == null) return true; // tidak ada kunci, semua tampil
+    if (isBj) return cat == 'barangjadi';
+    return cat == 'furnitureWip'; // tab fwip
+  }
+
+  // ── Output FAB actions ────────────────────────────────────────────────────
+
+  Future<InjectOutputJenis?> _pickOutputJenis(
+    List<InjectOutputJenis> options,
+  ) async {
+    if (options.length == 1) return options.first;
+    return showDialog<InjectOutputJenis>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 13, 12, 13),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: _kInjectOutput.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.list_alt_outlined,
+                        color: _kInjectOutput,
+                        size: 17,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'Pilih Jenis Output',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1F2937),
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      icon: const Icon(
+                        Icons.close,
+                        size: 18,
+                        color: Color(0xFF9CA3AF),
+                      ),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: _kInjectBorder),
+              // Options list
+              ...options.asMap().entries.map((entry) {
+                final i = entry.key;
+                final o = entry.value;
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    InkWell(
+                      onTap: () => Navigator.of(ctx).pop(o),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 14,
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 26,
+                              height: 26,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: _kInjectOutput.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '${i + 1}',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: _kInjectOutput,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                o.namaJenis,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF1F2937),
+                                ),
+                              ),
+                            ),
+                            const Icon(
+                              Icons.chevron_right,
+                              size: 18,
+                              color: Color(0xFF9CA3AF),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (i < options.length - 1)
+                      const Divider(
+                        height: 1,
+                        color: _kInjectBorder,
+                        indent: 18,
+                        endIndent: 18,
+                      ),
+                  ],
+                );
+              }),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openAddFwipOutputDialog(VoidCallback onRefresh) async {
+    int? lockedId;
+    String? lockedNama;
+    if (widget.lockedOutputs.isNotEmpty) {
+      final picked = await _pickOutputJenis(widget.lockedOutputs);
+      if (picked == null || !mounted) return;
+      lockedId = picked.idJenis;
+      lockedNama = picked.namaJenis;
+    }
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => ProductionFwipOutputFormDialog(
+        noProduksi: widget.noProduksi,
+        tglProduksi: widget.tglProduksi,
+        accentColor: _kInjectOutput,
+        lockedIdJenis: lockedId,
+        lockedNamaJenis: lockedNama,
+      ),
+    );
+    if (result == true) onRefresh();
+  }
+
+  Future<void> _openAddBjOutputDialog(VoidCallback onRefresh) async {
+    int? lockedId;
+    String? lockedNama;
+    if (widget.lockedOutputs.isNotEmpty) {
+      final picked = await _pickOutputJenis(widget.lockedOutputs);
+      if (picked == null || !mounted) return;
+      lockedId = picked.idJenis;
+      lockedNama = picked.namaJenis;
+    }
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => ProductionBjOutputFormDialog(
+        noProduksi: widget.noProduksi,
+        tglProduksi: widget.tglProduksi,
+        accentColor: _kInjectOutput,
+        lockedIdJenis: lockedId,
+        lockedNamaJenis: lockedNama,
+      ),
+    );
+    if (result == true) onRefresh();
+  }
+
+  Future<void> _openAddRejectOutputDialog(VoidCallback onRefresh) async {
+    final result = await showDialog<dynamic>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => ProductionRejectOutputFormDialog(
+        noProduksi: widget.noProduksi,
+        tglProduksi: widget.tglProduksi,
+        accentColor: _kInjectOutput,
+      ),
+    );
+    if (result != null && result != false) onRefresh();
+  }
+
+  Future<void> _openAddBonggolanOutputDialog(VoidCallback onRefresh) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => ProductionBonggolanOutputFormDialog(
+        noProduksi: widget.noProduksi,
+        tglProduksi: widget.tglProduksi,
+        accentColor: _kInjectOutput,
+      ),
+    );
+    if (result == true) onRefresh();
+  }
+
   // ── Output panel ───────────────────────────────────────────────────────────
 
   Widget _buildOutputPanel({
-    required List<InjectOutputItem> outputs,
-    required bool isLoading,
-    required String? error,
+    required List<InjectOutputItem> fwipOutputs,
+    required bool fwipLoading,
+    required String? fwipError,
+    required List<InjectBjOutputItem> bjOutputs,
+    required bool bjLoading,
+    required String? bjError,
+    required List<InjectRejectOutputItem> rejectOutputs,
+    required bool rejectLoading,
+    required String? rejectError,
+    required List<InjectBonggolanOutputItem> bonggolanOutputs,
+    required bool bonggolanLoading,
+    required String? bonggolanError,
     required VoidCallback onRefresh,
   }) {
-    final totalPcs = outputs.fold<int>(0, (s, o) => s + o.pcs);
-    final totalBerat = outputs.fold<double>(0, (s, o) => s + o.berat);
+    final isReject = _selectedOutputTab == 'reject';
+    final isBj = _selectedOutputTab == 'bj';
+    final isBonggolan = _selectedOutputTab == 'bonggolan';
+    final isLoading = isBonggolan
+        ? bonggolanLoading
+        : isReject
+        ? rejectLoading
+        : isBj
+        ? bjLoading
+        : fwipLoading;
+    final error = isBonggolan
+        ? bonggolanError
+        : isReject
+        ? rejectError
+        : isBj
+        ? bjError
+        : fwipError;
+    final fwipPcs = fwipOutputs.fold<int>(0, (s, o) => s + o.pcs);
+    final fwipBerat = fwipOutputs.fold<double>(0, (s, o) => s + o.berat);
+    final bjPcs = bjOutputs.fold<int>(0, (s, o) => s + o.pcs);
+    final rejectBerat = rejectOutputs.fold<double>(0, (s, o) => s + o.berat);
+    final bonggolanBerat = bonggolanOutputs.fold<double>(
+      0,
+      (s, o) => s + o.berat,
+    );
 
     return Container(
       decoration: productionPanelDecoration(
@@ -869,7 +1251,7 @@ class _InjectProductionInputScreenState
         children: [
           // Header
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+            padding: const EdgeInsets.fromLTRB(12, 1, 1, 1),
             child: Row(
               children: [
                 productionSectionHeader(
@@ -879,10 +1261,12 @@ class _InjectProductionInputScreenState
                   primaryColor: _kInjectPrimary,
                 ),
                 const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.refresh, size: 18),
-                  tooltip: 'Refresh output',
-                  onPressed: onRefresh,
+                Opacity(
+                  opacity: 0,
+                  child: IconButton(
+                    icon: const Icon(Icons.refresh, size: 18),
+                    onPressed: null,
+                  ),
                 ),
               ],
             ),
@@ -890,81 +1274,309 @@ class _InjectProductionInputScreenState
           const Divider(height: 1, color: _kInjectBorder),
           // Body
           Expanded(
-            child: isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (error != null) ...[
-                          ProductionOutputErrorBanner(message: error),
-                          const SizedBox(height: 10),
-                        ],
-                        Expanded(
-                          child: ProductionInputCategoryBlock(
-                            color: _kInjectOutput,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Expanded(
-                                  child: LayoutBuilder(
-                                    builder: (ctx, c) =>
-                                        ProductionOutputCategoryContent(
-                                          footer: const SizedBox.shrink(),
-                                          child: outputs.isEmpty
-                                              ? const Center(
-                                                  child: Text(
-                                                    'Belum ada label output furniture WIP',
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: Color(0xFF9CA3AF),
-                                                    ),
-                                                  ),
-                                                )
-                                              : GridView(
-                                                  padding: const EdgeInsets.all(
-                                                    6,
-                                                  ),
-                                                  gridDelegate:
-                                                      SliverGridDelegateWithFixedCrossAxisCount(
-                                                        crossAxisCount:
-                                                            c.maxWidth < 380
-                                                            ? 2
-                                                            : 3,
-                                                        crossAxisSpacing: 6,
-                                                        mainAxisSpacing: 6,
-                                                        mainAxisExtent: 78,
-                                                      ),
-                                                  children: outputs
-                                                      .map(
-                                                        (o) =>
-                                                            _InjectOutputTile(
-                                                              output: o,
-                                                            ),
-                                                      )
-                                                      .toList(),
-                                                ),
-                                        ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (error != null) ...[
+                    ProductionOutputErrorBanner(message: error),
+                    const SizedBox(height: 10),
+                  ],
+                  ProductionFolderTabBar(
+                    selectedValue: _selectedOutputTab,
+                    accentColor: _kInjectOutput,
+                    tabs: [
+                      if (widget.outputCategory != 'barangjadi')
+                        ProductionTabItem(
+                          value: 'fwip',
+                          label: 'Furniture WIP',
+                          count: fwipOutputs.length,
+                        ),
+                      if (widget.outputCategory != 'furnitureWip')
+                        ProductionTabItem(
+                          value: 'bj',
+                          label: 'Barang Jadi',
+                          count: bjOutputs.length,
+                        ),
+                      ProductionTabItem(
+                        value: 'reject',
+                        label: 'Reject',
+                        count: rejectOutputs.length,
+                      ),
+                      ProductionTabItem(
+                        value: 'bonggolan',
+                        label: 'Bonggolan',
+                        count: bonggolanOutputs.length,
+                      ),
+                    ],
+                    onChanged: (v) {
+                      if (_selectedOutputTab == v) return;
+                      setState(() => _selectedOutputTab = v);
+                    },
+                  ),
+                  Expanded(
+                    child: ProductionInputCategoryBlock(
+                      color: _kInjectOutput,
+                      isLoading: isLoading,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: LayoutBuilder(
+                              builder: (ctx, c) =>
+                                  ProductionOutputCategoryContent(
+                                    footer: const SizedBox.shrink(),
+                                    child: isBonggolan
+                                        ? _buildBonggolanOutputGrid(
+                                            bonggolanOutputs,
+                                            c,
+                                          )
+                                        : isReject
+                                        ? _buildRejectOutputGrid(
+                                            rejectOutputs,
+                                            c,
+                                          )
+                                        : isBj
+                                        ? _buildBjOutputGrid(bjOutputs, c)
+                                        : _buildFwipOutputGrid(fwipOutputs, c),
                                   ),
-                                ),
-                                const SizedBox(height: 10),
-                                _InjectOutputSummaryBar(
-                                  totalLabel: outputs.length,
-                                  totalPcs: totalPcs,
-                                  totalBerat: totalBerat,
-                                  color: _kInjectOutput,
-                                ),
-                              ],
                             ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 6),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    ProductionCategorySummaryTile(
+                                      summary: SectionSummary(
+                                        totalData: isBonggolan
+                                            ? bonggolanOutputs.length
+                                            : isReject
+                                            ? rejectOutputs.length
+                                            : isBj
+                                            ? bjOutputs.length
+                                            : fwipOutputs.length,
+                                        totalSak: isBj
+                                            ? bjPcs
+                                            : (!isBonggolan && !isReject)
+                                            ? fwipPcs
+                                            : 0,
+                                        totalBerat: isBonggolan
+                                            ? bonggolanBerat
+                                            : isReject
+                                            ? rejectBerat
+                                            : fwipBerat,
+                                      ),
+                                      accentColor: _kInjectOutput,
+                                      sakLabel: 'Qty',
+                                    ),
+                                    const SizedBox(height: 6),
+                                    ProductionInputGrandTotalBar(
+                                      totalLabel:
+                                          fwipOutputs.length +
+                                          bjOutputs.length +
+                                          rejectOutputs.length +
+                                          bonggolanOutputs.length,
+                                      totalSak: fwipPcs + bjPcs,
+                                      totalBerat:
+                                          fwipBerat +
+                                          rejectBerat +
+                                          bonggolanBerat,
+                                      color: _kInjectOutput,
+                                      sakLabel: 'Qty',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              if (_isFabVisible(
+                                isBj: isBj,
+                                isReject: isReject,
+                                isBonggolan: isBonggolan,
+                              ))
+                                FloatingActionButton(
+                                  heroTag:
+                                      'fab_add_inject_output_$_selectedOutputTab',
+                                  mini: true,
+                                  backgroundColor: widget.isLocked == true
+                                      ? Colors.grey.shade300
+                                      : _kInjectOutput,
+                                  foregroundColor: Colors.white,
+                                  onPressed: widget.isLocked == true
+                                      ? null
+                                      : () {
+                                          if (isBonggolan) {
+                                            _openAddBonggolanOutputDialog(
+                                              onRefresh,
+                                            );
+                                          } else if (isReject) {
+                                            _openAddRejectOutputDialog(
+                                              onRefresh,
+                                            );
+                                          } else if (isBj) {
+                                            _openAddBjOutputDialog(onRefresh);
+                                          } else {
+                                            _openAddFwipOutputDialog(onRefresh);
+                                          }
+                                        },
+                                  child: const Icon(Icons.add),
+                                )
+                              else
+                                const SizedBox(width: 40),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildFwipOutputGrid(
+    List<InjectOutputItem> outputs,
+    BoxConstraints c,
+  ) {
+    if (outputs.isEmpty) {
+      return const Center(
+        child: Text(
+          'Belum ada label output furniture WIP',
+          style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+        ),
+      );
+    }
+    return GridView(
+      padding: const EdgeInsets.all(6),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+        crossAxisSpacing: 6,
+        mainAxisSpacing: 6,
+        mainAxisExtent: 78,
+      ),
+      children: outputs
+          .map(
+            (o) => ProductionFwipOutputTile(
+              labelCode: o.noFurnitureWip,
+              namaJenis: o.namaJenis,
+              pcs: o.pcs,
+              berat: o.berat,
+              isPrinted: o.hasBeenPrinted,
+              accentColor: _kInjectOutput,
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  Widget _buildBonggolanOutputGrid(
+    List<InjectBonggolanOutputItem> outputs,
+    BoxConstraints c,
+  ) {
+    if (outputs.isEmpty) {
+      return const Center(
+        child: Text(
+          'Belum ada label output bonggolan',
+          style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+        ),
+      );
+    }
+    return GridView(
+      padding: const EdgeInsets.all(6),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+        crossAxisSpacing: 6,
+        mainAxisSpacing: 6,
+        mainAxisExtent: 78,
+      ),
+      children: outputs
+          .map(
+            (o) => ProductionBonggolanOutputTile(
+              labelCode: o.noBonggolan,
+              namaJenis: o.namaBonggolan,
+              berat: o.berat,
+              isPrinted: o.isPrinted,
+              accentColor: _kInjectOutput,
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  Widget _buildRejectOutputGrid(
+    List<InjectRejectOutputItem> outputs,
+    BoxConstraints c,
+  ) {
+    if (outputs.isEmpty) {
+      return const Center(
+        child: Text(
+          'Belum ada label output reject',
+          style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+        ),
+      );
+    }
+    return GridView(
+      padding: const EdgeInsets.all(6),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+        crossAxisSpacing: 6,
+        mainAxisSpacing: 6,
+        mainAxisExtent: 78,
+      ),
+      children: outputs
+          .map(
+            (o) => ProductionRejectOutputTile(
+              labelCode: o.noReject,
+              namaJenis: o.namaJenis,
+              berat: o.berat,
+              isPrinted: o.isPrinted,
+              pcs: o.pcs,
+              accentColor: _kInjectOutput,
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  Widget _buildBjOutputGrid(
+    List<InjectBjOutputItem> outputs,
+    BoxConstraints c,
+  ) {
+    if (outputs.isEmpty) {
+      return const Center(
+        child: Text(
+          'Belum ada label output barang jadi',
+          style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+        ),
+      );
+    }
+    return GridView(
+      padding: const EdgeInsets.all(6),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+        crossAxisSpacing: 6,
+        mainAxisSpacing: 6,
+        mainAxisExtent: 78,
+      ),
+      children: outputs
+          .map(
+            (o) => ProductionBjOutputTile(
+              labelCode: o.noBj,
+              namaJenis: o.namaJenis,
+              pcs: o.pcs,
+              isPrinted: o.isPrinted,
+              accentColor: _kInjectOutput,
+            ),
+          )
+          .toList(),
     );
   }
 
@@ -1000,16 +1612,42 @@ class _InjectProductionInputScreenState
                   isLocked: locked,
                   idMesin: widget.idMesin,
                   namaJenis: widget.namaJenis,
+                  namaCetakan: widget.namaCetakan,
+                  namaWarna: widget.namaWarna,
+                  namaFurnitureMaterial: widget.namaFurnitureMaterial,
                   tglProduksi: widget.tglProduksi,
                   shift: widget.shift,
                   hourStart: widget.hourStart,
                   hourEnd: widget.hourEnd,
+                  showTimeInfo: false,
                   primaryColor: _kInjectPrimary,
+                  onGanti: _openSplitTimeDialog,
                   onRefresh: () {
                     vm.loadInputs(widget.noProduksi, force: true);
                     vm.loadOutputs(widget.noProduksi, force: true);
+                    vm.loadBjOutputs(widget.noProduksi, force: true);
+                    vm.loadRejectOutputs(widget.noProduksi, force: true);
+                    vm.loadBonggolanOutputs(widget.noProduksi, force: true);
                     _showSnack('Data di-refresh');
                   },
+                  trailingActions: [
+                    const SizedBox(width: 4),
+                    SizedBox(
+                      width: 26,
+                      height: 26,
+                      child: IconButton(
+                        tooltip: 'Tukar posisi panel',
+                        padding: EdgeInsets.zero,
+                        onPressed: () =>
+                            setState(() => _outputOnLeft = !_outputOnLeft),
+                        icon: Icon(
+                          Icons.swap_horiz,
+                          size: 15,
+                          color: Colors.grey.shade400,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 Expanded(
                   child: Builder(
@@ -1069,40 +1707,71 @@ class _InjectProductionInputScreenState
                         _gilinganTitleKey,
                       );
 
+                      final outputPanel = Expanded(
+                        child: _buildOutputPanel(
+                          fwipOutputs: vm.outputsOf(widget.noProduksi) ?? [],
+                          fwipLoading: vm.isOutputsLoading(widget.noProduksi),
+                          fwipError: vm.outputsError(widget.noProduksi),
+                          bjOutputs: vm.bjOutputsOf(widget.noProduksi) ?? [],
+                          bjLoading: vm.isBjOutputsLoading(widget.noProduksi),
+                          bjError: vm.bjOutputsError(widget.noProduksi),
+                          rejectOutputs:
+                              vm.rejectOutputsOf(widget.noProduksi) ?? [],
+                          rejectLoading: vm.isRejectOutputsLoading(
+                            widget.noProduksi,
+                          ),
+                          rejectError: vm.rejectOutputsError(widget.noProduksi),
+                          bonggolanOutputs:
+                              vm.bonggolanOutputsOf(widget.noProduksi) ?? [],
+                          bonggolanLoading: vm.isBonggolanOutputsLoading(
+                            widget.noProduksi,
+                          ),
+                          bonggolanError: vm.bonggolanOutputsError(
+                            widget.noProduksi,
+                          ),
+                          onRefresh: () {
+                            vm.loadOutputs(widget.noProduksi, force: true);
+                            vm.loadBjOutputs(widget.noProduksi, force: true);
+                            vm.loadRejectOutputs(
+                              widget.noProduksi,
+                              force: true,
+                            );
+                            vm.loadBonggolanOutputs(
+                              widget.noProduksi,
+                              force: true,
+                            );
+                          },
+                        ),
+                      );
+                      final inputPanel = Expanded(
+                        child: _buildInputPanel(
+                          vm: vm,
+                          locked: locked,
+                          loading: loading,
+                          canDelete: canDelete,
+                          fwipGroups: fwipGroups,
+                          brokerGroups: brokerGroups,
+                          mixerGroups: mixerGroups,
+                          gilinganGroups: gilinganGroups,
+                          materialAll: materialAll,
+                          tempMaterialIds: tempMaterialIds,
+                        ),
+                      );
                       return Padding(
                         padding: const EdgeInsets.all(16),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Expanded(
-                              child: _buildInputPanel(
-                                vm: vm,
-                                locked: locked,
-                                loading: loading,
-                                canDelete: canDelete,
-                                fwipGroups: fwipGroups,
-                                brokerGroups: brokerGroups,
-                                mixerGroups: mixerGroups,
-                                gilinganGroups: gilinganGroups,
-                                materialAll: materialAll,
-                                tempMaterialIds: tempMaterialIds,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: _buildOutputPanel(
-                                outputs: vm.outputsOf(widget.noProduksi) ?? [],
-                                isLoading: vm.isOutputsLoading(
-                                  widget.noProduksi,
-                                ),
-                                error: vm.outputsError(widget.noProduksi),
-                                onRefresh: () => vm.loadOutputs(
-                                  widget.noProduksi,
-                                  force: true,
-                                ),
-                              ),
-                            ),
-                          ],
+                          children: _outputOnLeft
+                              ? [
+                                  outputPanel,
+                                  const SizedBox(width: 16),
+                                  inputPanel,
+                                ]
+                              : [
+                                  inputPanel,
+                                  const SizedBox(width: 16),
+                                  outputPanel,
+                                ],
                         ),
                       );
                     },
@@ -1125,197 +1794,6 @@ Map<K, List<T>> _groupBy<K, T>(Iterable<T> items, K Function(T) keyFn) {
     (map[keyFn(item)] ??= []).add(item);
   }
   return map;
-}
-
-// ── Summary bar ────────────────────────────────────────────────────────────────
-
-class _InjectInputSummaryBar extends StatelessWidget {
-  const _InjectInputSummaryBar({
-    required this.totalLabel,
-    required this.totalFwipPcs,
-    required this.totalBrokerSak,
-    required this.totalMixerSak,
-    required this.totalGilingan,
-    required this.totalMaterial,
-    required this.color,
-  });
-
-  final int totalLabel;
-  final int totalFwipPcs;
-  final int totalBrokerSak;
-  final int totalMixerSak;
-  final int totalGilingan;
-  final int totalMaterial;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Wrap(
-        spacing: 16,
-        runSpacing: 4,
-        children: [
-          _SummaryChip(label: 'Total Label', value: '$totalLabel'),
-          _SummaryChip(label: 'FWIP', value: '$totalFwipPcs pcs'),
-          _SummaryChip(label: 'Broker', value: '$totalBrokerSak sak'),
-          _SummaryChip(label: 'Mixer', value: '$totalMixerSak sak'),
-          _SummaryChip(label: 'Gilingan', value: '$totalGilingan'),
-          _SummaryChip(label: 'Material', value: '$totalMaterial'),
-        ],
-      ),
-    );
-  }
-}
-
-class _InjectOutputSummaryBar extends StatelessWidget {
-  const _InjectOutputSummaryBar({
-    required this.totalLabel,
-    required this.totalPcs,
-    required this.totalBerat,
-    required this.color,
-  });
-
-  final int totalLabel;
-  final int totalPcs;
-  final double totalBerat;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        children: [
-          _SummaryChip(label: 'Total Label', value: '$totalLabel'),
-          const SizedBox(width: 16),
-          _SummaryChip(label: 'Total Pcs', value: '$totalPcs pcs'),
-          const SizedBox(width: 16),
-          _SummaryChip(
-            label: 'Total Berat',
-            value: '${totalBerat.toStringAsFixed(2)} kg',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SummaryChip extends StatelessWidget {
-  const _SummaryChip({required this.label, required this.value});
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 10, color: Color(0xFF6B7280)),
-        ),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF1F2937),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ── Output tile ────────────────────────────────────────────────────────────────
-
-class _InjectOutputTile extends StatelessWidget {
-  const _InjectOutputTile({required this.output});
-  final InjectOutputItem output;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE2E6EA)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x08000000),
-            blurRadius: 4,
-            offset: Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  output.noFurnitureWip,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1F2937),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (output.hasBeenPrinted)
-                const Icon(
-                  Icons.print_outlined,
-                  size: 12,
-                  color: Color(0xFF6B7280),
-                ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Text(
-            output.namaJenis,
-            style: const TextStyle(fontSize: 10, color: Color(0xFF6B7280)),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const Spacer(),
-          Row(
-            children: [
-              Text(
-                '${output.pcs} pcs',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF00695C),
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '${output.berat.toStringAsFixed(1)} kg',
-                style: const TextStyle(fontSize: 10, color: Color(0xFF6B7280)),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 // ── Material list tile ─────────────────────────────────────────────────────────

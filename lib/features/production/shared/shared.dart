@@ -32,3 +32,15 @@ export 'widgets/production_timeline_factories.dart';
 export 'widgets/production_workspace_toolbar.dart';
 export 'widgets/production_flow_helpers.dart';
 export 'widgets/production_pcs_input_dialog.dart';
+
+// ── Output tiles per kategori ─────────────────────────────────────────────────
+export 'widgets/production_fwip_output_tile.dart';
+export 'widgets/production_bj_output_tile.dart';
+export 'widgets/production_reject_output_tile.dart';
+export 'widgets/production_bonggolan_output_tile.dart';
+
+// ── Output form dialogs per kategori ─────────────────────────────────────────
+export 'widgets/production_fwip_output_form_dialog.dart';
+export 'widgets/production_bj_output_form_dialog.dart';
+export 'widgets/production_reject_output_form_dialog.dart';
+export 'widgets/production_bonggolan_output_form_dialog.dart';

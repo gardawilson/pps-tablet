@@ -127,7 +127,10 @@ class _InjectProductionMesinScreenState
     _loadProduksiPage();
   }
 
-  Future<void> _openCreateDialog({required InjectMesinInfo mesin}) async {
+  Future<void> _openCreateDialog({
+    required InjectMesinInfo mesin,
+    bool isBackdate = false,
+  }) async {
     if (!mounted) return;
     final defaultShift = await ShiftRepository.fetchCurrentShift();
     if (!mounted) return;
@@ -150,6 +153,7 @@ class _InjectProductionMesinScreenState
             initialShift: defaultShift?.shift,
             initialHourStart: defaultShift?.hourStart,
             initialHourEnd: defaultShift?.hourEnd,
+            isBackdateInput: isBackdate,
           ),
         ),
       );
@@ -163,6 +167,9 @@ class _InjectProductionMesinScreenState
               lastClosedDate: created.lastClosedDate,
               idMesin: created.idMesin,
               namaJenis: created.namaJenis,
+              namaCetakan: created.namaCetakan,
+              namaWarna: created.namaWarna,
+              namaFurnitureMaterial: created.namaFurnitureMaterial,
               tglProduksi: created.tglProduksi,
               shift: created.shift,
               hourStart: created.hourStart,
@@ -192,10 +199,15 @@ class _InjectProductionMesinScreenState
           isLocked: false,
           lastClosedDate: null,
           idMesin: mesin.idMesin,
+          namaCetakan: item.namaCetakan,
+          namaWarna: item.warna,
+          namaFurnitureMaterial: item.namaFurnitureMaterial,
           shift: item.shift,
           tglProduksi: item.tglProduksi,
           hourStart: item.hourStart,
           hourEnd: item.hourEnd,
+          outputCategory: mesin.outputCategory,
+          lockedOutputs: mesin.outputs,
         ),
       ),
     );
@@ -247,8 +259,9 @@ class _InjectProductionMesinScreenState
       namaMesin: mesin.namaMesin,
       isActive: mesin.isActive,
       shiftTimeText: shiftTimeText,
-      namaRegu: current?.namaRegu,
-      outputJenisNama: current?.namaCetakan,
+      namaCetakan: current?.namaCetakan,
+      namaWarna: current?.warna,
+      namaFurnitureMaterial: current?.namaFurnitureMaterial,
     );
   }
 
@@ -260,8 +273,9 @@ class _InjectProductionMesinScreenState
       shift: row.shift,
       isLocked: row.isLocked,
       namaMesin: row.namaMesin,
-      namaRegu: null,
-      outputJenisNama: row.namaJenis,
+      namaCetakan: row.namaCetakan,
+      namaWarna: row.namaWarna,
+      namaFurnitureMaterial: row.namaFurnitureMaterial,
     );
   }
 
@@ -414,10 +428,16 @@ class _InjectProductionMesinScreenState
                                     lastClosedDate: row.lastClosedDate,
                                     idMesin: row.idMesin,
                                     namaJenis: row.namaJenis,
+                                    namaCetakan: row.namaCetakan,
+                                    namaWarna: row.namaWarna,
+                                    namaFurnitureMaterial:
+                                        row.namaFurnitureMaterial,
                                     tglProduksi: row.tglProduksi,
                                     shift: row.shift,
                                     hourStart: row.hourStart,
                                     hourEnd: row.hourEnd,
+                                    outputCategory: row.outputCategory,
+                                    lockedOutputs: row.outputs,
                                   ),
                                 ),
                               );
@@ -498,10 +518,16 @@ class _InjectProductionMesinScreenState
                                     lastClosedDate: row.lastClosedDate,
                                     idMesin: row.idMesin,
                                     namaJenis: row.namaJenis,
+                                    namaCetakan: row.namaCetakan,
+                                    namaWarna: row.namaWarna,
+                                    namaFurnitureMaterial:
+                                        row.namaFurnitureMaterial,
                                     tglProduksi: row.tglProduksi,
                                     shift: row.shift,
                                     hourStart: row.hourStart,
                                     hourEnd: row.hourEnd,
+                                    outputCategory: row.outputCategory,
+                                    lockedOutputs: row.outputs,
                                   ),
                                 ),
                               );
@@ -515,8 +541,10 @@ class _InjectProductionMesinScreenState
                             bottom: 16,
                             child: FloatingActionButton.small(
                               heroTag: 'fab_backdate_inject',
-                              onPressed: () =>
-                                  _openCreateDialog(mesin: _selectedMesinInfo!),
+                              onPressed: () => _openCreateDialog(
+                                mesin: _selectedMesinInfo!,
+                                isBackdate: true,
+                              ),
                               backgroundColor: const Color(0xFF1D4ED8),
                               foregroundColor: Colors.white,
                               tooltip: 'Tambah Backdate',

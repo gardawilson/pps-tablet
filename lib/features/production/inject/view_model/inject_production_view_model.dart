@@ -213,11 +213,13 @@ class InjectProductionViewModel extends ChangeNotifier {
   Future<InjectProduction?> createProduksi({
     required DateTime tglProduksi,
     required int idMesin,
-    required int idOperator,
+    /// Gunakan idOperators (list) — idOperator (single) dipertahankan untuk
+    /// backward compat dari layar lama.
+    List<int>? idOperators,
+    int? idOperator,
+    int? idRegu,
     required int shift,
 
-    /// Inject: "Jam" is INT in DB.
-    /// UI boleh kirim "09:00" atau 9 -> backend controller kamu sudah toJamInt.
     dynamic jam,
 
     int? jmlhAnggota,
@@ -230,14 +232,18 @@ class InjectProductionViewModel extends ChangeNotifier {
     int? idFurnitureMaterial,
     double? hourMeter,
     double? beratProdukHasilTimbang,
-    String? hourStart, // "HH:mm"
-    String? hourEnd, // "HH:mm"
+    String? hourStart,
+    String? hourEnd,
     String? checkBy1,
     String? checkBy2,
     String? approveBy,
   }) async {
+    final opsList = idOperators ?? (idOperator != null ? [idOperator] : <int>[]);
+    final jmlh = jmlhAnggota ?? opsList.length;
+    final hdrs = hadir ?? opsList.length;
+
     debugPrint(
-      '🆕 [INJECT_VM] createProduksi(tgl=$tglProduksi, idMesin=$idMesin, idOperator=$idOperator, shift=$shift, jam=$jam) VM hash=$hashCode',
+      '🆕 [INJECT_VM] createProduksi(tgl=$tglProduksi, idMesin=$idMesin, operators=$opsList, shift=$shift, jam=$jam) VM hash=$hashCode',
     );
 
     isSaving = true;
@@ -248,13 +254,14 @@ class InjectProductionViewModel extends ChangeNotifier {
       final payload = <String, dynamic>{
         'tglProduksi': toDbDateString(tglProduksi),
         'idMesin': idMesin,
-        'idOperator': idOperator,
+        'idOperators': opsList,
+        if (idRegu != null) 'idRegu': idRegu,
         'shift': shift,
 
         if (jam != null) 'jam': jam,
 
-        if (jmlhAnggota != null) 'jmlhAnggota': jmlhAnggota,
-        if (hadir != null) 'hadir': hadir,
+        'jmlhAnggota': jmlh,
+        'hadir': hdrs,
         if (idCetakan != null) 'idCetakan': idCetakan,
         if (idWarna != null) 'idWarna': idWarna,
         if (enableOffset != null) 'enableOffset': enableOffset ? 1 : 0,
@@ -306,7 +313,9 @@ class InjectProductionViewModel extends ChangeNotifier {
 
     DateTime? tglProduksi,
     int? idMesin,
+    List<int>? idOperators,
     int? idOperator,
+    int? idRegu,
     int? shift,
     dynamic jam,
 
@@ -326,8 +335,10 @@ class InjectProductionViewModel extends ChangeNotifier {
     String? checkBy2,
     String? approveBy,
   }) async {
+    final opsList = idOperators ?? (idOperator != null ? [idOperator] : null);
+
     debugPrint(
-      '✏️ [INJECT_VM] updateProduksi(no=$noProduksi, tgl=$tglProduksi, jam=$jam) VM hash=$hashCode',
+      '✏️ [INJECT_VM] updateProduksi(no=$noProduksi, tgl=$tglProduksi, operators=$opsList, jam=$jam) VM hash=$hashCode',
     );
 
     isSaving = true;
@@ -338,13 +349,15 @@ class InjectProductionViewModel extends ChangeNotifier {
       final payload = <String, dynamic>{
         if (tglProduksi != null) 'tglProduksi': toDbDateString(tglProduksi),
         if (idMesin != null) 'idMesin': idMesin,
-        if (idOperator != null) 'idOperator': idOperator,
+        if (opsList != null) 'idOperators': opsList,
+        if (idRegu != null) 'idRegu': idRegu,
         if (shift != null) 'shift': shift,
 
         if (jam != null) 'jam': jam,
 
-        if (jmlhAnggota != null) 'jmlhAnggota': jmlhAnggota,
-        if (hadir != null) 'hadir': hadir,
+        if (jmlhAnggota != null || opsList != null)
+          'jmlhAnggota': jmlhAnggota ?? opsList!.length,
+        if (hadir != null || opsList != null) 'hadir': hadir ?? opsList!.length,
         if (idCetakan != null) 'idCetakan': idCetakan,
         if (idWarna != null) 'idWarna': idWarna,
         if (enableOffset != null) 'enableOffset': enableOffset ? 1 : 0,

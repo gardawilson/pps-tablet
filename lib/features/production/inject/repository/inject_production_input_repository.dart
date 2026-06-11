@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import '../../../../core/network/api_client.dart';
 import '../../shared/models/production_label_lookup_result.dart';
 import '../../shared/models/cabinet_material_item.dart';
+import '../model/inject_output_model.dart';
 import '../model/inject_production_inputs_model.dart';
 
 class InjectProductionInputRepository {
@@ -240,6 +241,39 @@ class InjectProductionInputRepository {
       throw Exception(msg);
     }
   }
+
+  /* =============================
+   * GET OUTPUTS (Furniture WIP)
+   * ============================= */
+
+  final Map<String, List<InjectOutputItem>> _outputsCache = {};
+
+  static List<InjectOutputItem> _parseOutputs(Map<String, dynamic> body) {
+    final data = body['data'];
+    if (data == null) return <InjectOutputItem>[];
+    if (data is! List) return <InjectOutputItem>[];
+    return data
+        .whereType<Map>()
+        .map((e) => InjectOutputItem.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  /// GET /api/production/inject/:noProduksi/outputs/furniture-wip
+  Future<List<InjectOutputItem>> fetchOutputs(
+    String noProduksi, {
+    bool force = false,
+  }) async {
+    if (!force && _outputsCache.containsKey(noProduksi)) {
+      return _outputsCache[noProduksi]!;
+    }
+    final path = '/api/production/inject/$noProduksi/outputs/furniture-wip';
+    final body = await api.getJson(path);
+    final items = await compute(_parseOutputs, body);
+    _outputsCache[noProduksi] = items;
+    return items;
+  }
+
+  void invalidateOutputs(String noProduksi) => _outputsCache.remove(noProduksi);
 
   /* =============================
    * Helpers

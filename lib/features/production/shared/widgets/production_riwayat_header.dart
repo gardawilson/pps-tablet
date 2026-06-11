@@ -15,11 +15,15 @@ class ProductionRiwayatHeader extends StatelessWidget {
     required this.mesinList,
     required this.selectedIdMesin,
     required this.onFilterChanged,
+    this.onToggle,
+    this.isExpanded = true,
   });
 
   final List<MesinFilterItem> mesinList;
   final int? selectedIdMesin;
   final ValueChanged<int?> onFilterChanged;
+  final VoidCallback? onToggle;
+  final bool isExpanded;
 
   @override
   Widget build(BuildContext context) {
@@ -38,6 +42,26 @@ class ProductionRiwayatHeader extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14),
               child: Row(
                 children: [
+                  if (onToggle != null) ...[
+                    Tooltip(
+                      message: 'Sembunyikan Riwayat',
+                      waitDuration: const Duration(milliseconds: 400),
+                      child: IconButton(
+                        onPressed: onToggle,
+                        icon: const Icon(
+                          Icons.keyboard_double_arrow_right_rounded,
+                          size: 16,
+                        ),
+                        color: const Color(0xFF9CA3AF),
+                        hoverColor: const Color(0xFFEFF6FF),
+                        highlightColor: const Color(0xFFDBEAFE),
+                        padding: EdgeInsets.zero,
+                        constraints:
+                            const BoxConstraints(minWidth: 28, minHeight: 28),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                  ],
                   const Text(
                     'Riwayat Produksi',
                     style: TextStyle(

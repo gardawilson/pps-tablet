@@ -266,3 +266,132 @@ class InjectProduction {
       (hourStart != null && hourStart!.trim().isNotEmpty) &&
           (hourEnd != null && hourEnd!.trim().isNotEmpty);
 }
+
+// ── Mesin-screen models (endpoint: GET /api/mst-mesin/inject) ──────────────
+
+class InjectProduksiItem {
+  final String noProduksi;
+  final DateTime? tglProduksi;
+  final int? idRegu;
+  final String? namaRegu;
+  final int? idCetakan;
+  final String? namaCetakan;
+  final int? idWarna;
+  final String? warna;
+  final List<int> idOperators;
+  final String? operators;
+  final int? shift;
+  final String? hourStart;
+  final String? hourEnd;
+
+  const InjectProduksiItem({
+    required this.noProduksi,
+    this.tglProduksi,
+    this.idRegu,
+    this.namaRegu,
+    this.idCetakan,
+    this.namaCetakan,
+    this.idWarna,
+    this.warna,
+    this.idOperators = const [],
+    this.operators,
+    this.shift,
+    this.hourStart,
+    this.hourEnd,
+  });
+
+  int? get idOperator => idOperators.isNotEmpty ? idOperators.first : null;
+
+  factory InjectProduksiItem.fromJson(Map<String, dynamic> j) {
+    String? s(dynamic v) =>
+        v == null ? null : v.toString().trim().isEmpty ? null : v.toString().trim();
+    int? i(dynamic v) {
+      if (v == null) return null;
+      if (v is num) return v.toInt();
+      return int.tryParse(v.toString());
+    }
+    String? timeHHmm(dynamic v) {
+      final raw = s(v);
+      if (raw == null) return null;
+      final isoTime = RegExp(r'T(\d{2}):(\d{2})').firstMatch(raw);
+      if (isoTime != null) return '${isoTime.group(1)}:${isoTime.group(2)}';
+      final parts = raw.split(':');
+      if (parts.length < 2) return raw;
+      return '${parts[0].padLeft(2, '0')}:${parts[1].padLeft(2, '0')}';
+    }
+
+    List<int> parseIdOperators(dynamic v) {
+      if (v is List) return v.map((e) => i(e) ?? 0).where((e) => e != 0).toList();
+      final single = i(v);
+      return single != null ? [single] : [];
+    }
+
+    return InjectProduksiItem(
+      noProduksi: s(j['NoProduksi']) ?? '',
+      tglProduksi: j['TglProduksi'] != null
+          ? DateTime.tryParse(j['TglProduksi'].toString())
+          : null,
+      idRegu: i(j['IdRegu']),
+      namaRegu: s(j['NamaRegu']),
+      idCetakan: i(j['IdCetakan']),
+      namaCetakan: s(j['NamaCetakan']),
+      idWarna: i(j['IdWarna']),
+      warna: s(j['Warna']),
+      idOperators: parseIdOperators(j['IdOperators'] ?? j['IdOperator']),
+      operators: s(j['Operators']) ?? s(j['Operator']),
+      shift: i(j['Shift']),
+      hourStart: timeHHmm(j['HourStart']),
+      hourEnd: timeHHmm(j['HourEnd']),
+    );
+  }
+}
+
+class InjectMesinInfo {
+  final int idMesin;
+  final String namaMesin;
+  final String bagian;
+  final List<InjectProduksiItem> produksiList;
+
+  bool get isActive => produksiList.isNotEmpty;
+
+  String? get noProduksi =>
+      produksiList.isNotEmpty ? produksiList.first.noProduksi : null;
+  int? get shift => produksiList.isNotEmpty ? produksiList.first.shift : null;
+  String? get hourStart =>
+      produksiList.isNotEmpty ? produksiList.first.hourStart : null;
+  String? get hourEnd =>
+      produksiList.isNotEmpty ? produksiList.first.hourEnd : null;
+  String? get namaRegu =>
+      produksiList.isNotEmpty ? produksiList.first.namaRegu : null;
+  String? get namaCetakan =>
+      produksiList.isNotEmpty ? produksiList.first.namaCetakan : null;
+
+  const InjectMesinInfo({
+    required this.idMesin,
+    required this.namaMesin,
+    required this.bagian,
+    this.produksiList = const [],
+  });
+
+  factory InjectMesinInfo.fromJson(Map<String, dynamic> j) {
+    String? s(dynamic v) =>
+        v == null ? null : v.toString().trim().isEmpty ? null : v.toString().trim();
+    int? i(dynamic v) {
+      if (v == null) return null;
+      if (v is num) return v.toInt();
+      return int.tryParse(v.toString());
+    }
+
+    final List<InjectProduksiItem> items = [];
+    if (s(j['NoProduksi']) != null) {
+      items.add(InjectProduksiItem.fromJson(j));
+    }
+
+    return InjectMesinInfo(
+      idMesin: i(j['IdMesin']) ?? 0,
+      namaMesin: s(j['NamaMesin']) ?? '',
+      bagian: s(j['Bagian']) ?? '',
+      produksiList: items,
+    );
+  }
+}

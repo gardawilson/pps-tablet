@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'production_stat_badge.dart';
 
 /// Header section panel kiri (daftar mesin).
-/// Menampilkan judul, badge aktif/nonaktif, dan tombol refresh.
+/// Menampilkan judul dan badge aktif/nonaktif.
 /// Generic — bisa dipakai di semua modul production.
 class MesinSectionHeader extends StatelessWidget {
   const MesinSectionHeader({
@@ -12,16 +12,12 @@ class MesinSectionHeader extends StatelessWidget {
     required this.activeCount,
     required this.inactiveCount,
     required this.isLoading,
-    this.onToggleRiwayat,
-    this.isRiwayatVisible = true,
   });
 
   final String title;
   final int activeCount;
   final int inactiveCount;
   final bool isLoading;
-  final VoidCallback? onToggleRiwayat;
-  final bool isRiwayatVisible;
 
   @override
   Widget build(BuildContext context) {
@@ -58,25 +54,6 @@ class MesinSectionHeader extends StatelessWidget {
               bg: const Color(0xFFFEE2E2),
             ),
           ],
-          const Spacer(),
-          if (onToggleRiwayat != null)
-            IconButton(
-              onPressed: onToggleRiwayat,
-              icon: Icon(
-                isRiwayatVisible
-                    ? Icons.view_list_rounded
-                    : Icons.view_list_outlined,
-                size: 16,
-                color: isRiwayatVisible
-                    ? const Color(0xFF2563EB)
-                    : const Color(0xFF6B7280),
-              ),
-              tooltip: isRiwayatVisible
-                  ? 'Sembunyikan Riwayat'
-                  : 'Tampilkan Riwayat',
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-            ),
         ],
       ),
     );

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
@@ -7,6 +7,7 @@ import '../../shared/widgets/mesin_section_header.dart';
 import '../../shared/widgets/production_mesin_card.dart';
 import '../../shared/widgets/production_produksi_list.dart';
 import '../../shared/widgets/production_riwayat_header.dart';
+import '../../shared/widgets/riwayat_animated_panel.dart';
 import '../../../mesin/model/mesin_model.dart';
 import '../../../shift/repository/shift_repository.dart';
 import '../model/packing_production_model.dart';
@@ -261,7 +262,8 @@ class _PackingProductionMesinScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Row(
+      body: LayoutBuilder(
+        builder: (_, c) => Row(
         children: [
           // ── LEFT: mesin grid (3/5) ──────────────────────────────
           Expanded(
@@ -279,9 +281,6 @@ class _PackingProductionMesinScreenState
                     final inactiveCount = allMesin.length - activeCount;
                     return MesinSectionHeader(
                       title: 'Status Mesin Packing',
-                      onToggleRiwayat: () =>
-                          setState(() => _isRiwayatExpanded = !_isRiwayatExpanded),
-                      isRiwayatVisible: _isRiwayatExpanded,
                       activeCount: activeCount,
                       inactiveCount: inactiveCount,
                       isLoading:
@@ -343,13 +342,11 @@ class _PackingProductionMesinScreenState
             ),
           ),
 
-          // ── DIVIDER ─────────────────────────────────────────────
-          const VerticalDivider(width: 1, color: Color(0xFFE5E7EB)),
-
-          // ── RIGHT: riwayat produksi (2/5) ───────────────────────
-          if (_isRiwayatExpanded)
-          Expanded(
-            flex: 2,
+          // ── RIGHT: riwayat produksi ──────────────────────────
+          RiwayatAnimatedPanel(
+            expandedWidth: c.maxWidth * 0.4,
+            isExpanded: _isRiwayatExpanded,
+            onToggle: () => setState(() => _isRiwayatExpanded = !_isRiwayatExpanded),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -378,6 +375,8 @@ class _PackingProductionMesinScreenState
                         });
                         _loadProduksiPage();
                       },
+                      onToggle: () => setState(() => _isRiwayatExpanded = !_isRiwayatExpanded),
+                      isExpanded: _isRiwayatExpanded,
                     );
                   },
                 ),
@@ -505,6 +504,7 @@ class _PackingProductionMesinScreenState
           ),
         ],
       ),
+    ),
     );
   }
 }

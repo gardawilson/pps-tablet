@@ -1,44 +1,29 @@
-// lib/features/production/inject/widgets/inject_production_form_dialog.dart
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../common/widgets/app_date_field.dart';
 import '../../../../common/widgets/app_number_field.dart';
-import '../../../../common/widgets/app_text_field.dart';
-import '../../../../common/widgets/error_status_dialog.dart';
+import '../../../../core/network/endpoints.dart';
+import '../../../../core/services/token_storage.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/utils/time_formatter.dart';
 
 import '../../../cetakan/model/mst_cetakan_model.dart';
-import '../../../cetakan/repository/cetakan_repository.dart';
-import '../../../cetakan/view_model/cetakan_view_model.dart';
-import '../../../cetakan/widgets/cetakan_dropdown.dart';
-
 import '../../../furniture_material/model/furniture_material_lookup_model.dart';
-import '../../../furniture_material/widgets/furniture_material_dropdown.dart';
-
-import '../../../warna/model/warna_model.dart';
-import '../../../warna/repository/warna_repository.dart';
-import '../../../warna/view_model/warna_view_model.dart';
-import '../../../warna/widgets/warna_dropdown.dart';
-
-import '../../../furniture_material/repository/furniture_material_lookup_repository.dart';
-import '../../../furniture_material/view_model/furniture_material_lookup_view_model.dart';
-
-import '../../../mesin/widgets/mesin_dropdown.dart';
 import '../../../mesin/model/mesin_model.dart';
-
-import '../../../operator/widgets/operator_dropdown.dart';
 import '../../../operator/model/operator_model.dart';
-
-import '../../../shared/shift/widgets/shift_dropdown.dart';
-import '../../../production/shared/widgets/total_hours_pill.dart';
-import '../../../production/shared/widgets/time_form_field.dart';
-
+import '../../../regu/model/regu_model.dart';
 import '../../../shared/overlap/repository/overlap_repository.dart';
 import '../../../shared/overlap/view_model/overlap_view_model.dart';
+import '../../../shared/shift/widgets/shift_dropdown.dart';
+import '../../../warna/model/warna_model.dart';
+import '../../shared/widgets/regu_operator_picker.dart';
+import '../../shared/widgets/time_form_field.dart';
+import '../../shared/widgets/total_hours_pill.dart';
+import 'cetakan_warna_material_picker.dart';
 
 import '../model/inject_production_model.dart';
 import '../view_model/inject_production_view_model.dart';
@@ -47,7 +32,25 @@ class InjectProductionFormDialog extends StatefulWidget {
   final InjectProduction? header;
   final Function(InjectProduction)? onSave;
 
-  const InjectProductionFormDialog({super.key, this.header, this.onSave});
+  /// Params untuk create dari mesin screen (pre-fill)
+  final MstMesin? initialMesin;
+  final DateTime? initialDate;
+  final int? initialShift;
+  final String? initialHourStart;
+  final String? initialHourEnd;
+  final bool isBackdateInput;
+
+  const InjectProductionFormDialog({
+    super.key,
+    this.header,
+    this.onSave,
+    this.initialMesin,
+    this.initialDate,
+    this.initialShift,
+    this.initialHourStart,
+    this.initialHourEnd,
+    this.isBackdateInput = false,
+  });
 
   @override
   State<InjectProductionFormDialog> createState() =>
@@ -58,47 +61,25 @@ class _InjectProductionFormDialogState
     extends State<InjectProductionFormDialog> {
   final _formKey = GlobalKey<FormState>();
 
-  // Controllers
-  late final TextEditingController noProduction;
   late final TextEditingController dateCreatedCtrl;
-  late final TextEditingController mesinCtrl;
-  late final TextEditingController operatorCtrl;
-  late final TextEditingController jamCtrl; // ✅ Jam field
-  late final TextEditingController hourMeterCtrl;
-  late final TextEditingController beratProdukHasilTimbangCtrl;
-
-  // keep only for payload
-  late final TextEditingController idFurnitureMaterialCtrl;
-
-  // State
-  MstMesin? _selectedMesin;
-  MstOperator? _selectedOperator;
-  int? _selectedShift;
-
-  int? _operatorPreselectId;
-
-  DateTime _selectedDate = DateTime.now();
-
-  // --- time controllers ---
   late final TextEditingController hourStartCtrl;
   late final TextEditingController hourEndCtrl;
+  late final TextEditingController hourMeterCtrl;
+  late final TextEditingController beratProdukCtrl;
 
-  // --- time state ---
-  TimeOfDay? _startTime;
-  TimeOfDay? _endTime;
+  MstMesin? _selectedMesin;
+  MstRegu? _selectedRegu;
+  List<MstOperator> _selectedOperators = [];
+  bool _loadingReguOperator = false;
+  bool _loadingCetakanWarna = false;
+  int? _selectedShift;
 
-  bool get isEdit => widget.header != null;
-
-  // kind untuk endpoint overlap (dialog ini INJECT)
-  static const String _kind = 'inject';
-
-  // dropdown selections
   MstCetakan? _selectedCetakan;
   MstWarna? _selectedWarna;
-
   FurnitureMaterialLookupResult? _selectedFurnitureMaterial;
 
-  // ✅ placeholder karena model tidak support null id
+  static const int _idBagianInject = 4;
+  static const String _kind = 'inject';
   static const int _noneFurnitureId = 0;
   static const FurnitureMaterialLookupResult _noneFurnitureMaterial =
       FurnitureMaterialLookupResult(
@@ -108,67 +89,179 @@ class _InjectProductionFormDialogState
         enable: false,
       );
 
+  DateTime _selectedDate = DateTime.now();
+  TimeOfDay? _startTime;
+  TimeOfDay? _endTime;
+
+  bool get isEdit => widget.header != null;
+
   @override
   void initState() {
     super.initState();
-    noProduction = TextEditingController(text: widget.header?.noProduksi ?? '');
 
-    final DateTime seededDate = widget.header != null
+    final seededDate = widget.header != null
         ? (parseAnyToDateTime(widget.header!.tglProduksi) ?? DateTime.now())
-        : DateTime.now();
-
+        : (widget.initialDate ?? DateTime.now());
     _selectedDate = seededDate;
     dateCreatedCtrl = TextEditingController(
       text: DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(seededDate),
     );
 
-    mesinCtrl = TextEditingController(text: widget.header?.namaMesin ?? '');
-    operatorCtrl = TextEditingController(
-      text: widget.header?.namaOperator ?? '',
-    );
+    _selectedMesin = widget.initialMesin;
+    _selectedShift = widget.header?.shift ?? widget.initialShift;
 
-    // ✅ Initialize jam field
-    jamCtrl = TextEditingController(text: widget.header?.jam?.toString() ?? '');
+    final initStart = widget.header?.hourStart ?? widget.initialHourStart;
+    final initEnd = widget.header?.hourEnd ?? widget.initialHourEnd;
+    hourStartCtrl = TextEditingController(text: initStart ?? '');
+    hourEndCtrl = TextEditingController(text: initEnd ?? '');
 
     hourMeterCtrl = TextEditingController(
       text: widget.header?.hourMeter?.toString() ?? '',
     );
-    beratProdukHasilTimbangCtrl = TextEditingController(
+    beratProdukCtrl = TextEditingController(
       text: widget.header?.beratProdukHasilTimbang?.toString() ?? '',
     );
 
-    hourStartCtrl = TextEditingController(text: widget.header?.hourStart ?? '');
-    hourEndCtrl = TextEditingController(text: widget.header?.hourEnd ?? '');
-
-    idFurnitureMaterialCtrl = TextEditingController(
-      text: widget.header?.idFurnitureMaterial?.toString() ?? '',
-    );
-
-    // default placeholder (akan diganti kalau resolve menemukan data)
     _selectedFurnitureMaterial = _noneFurnitureMaterial;
 
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await _resolveFurnitureMaterialIfReady();
-    });
+    final h = widget.header;
+    if (h != null) {
+      // Pre-fill operator dari header (edit mode)
+      if (h.idOperator != 0) {
+        _selectedOperators = [
+          MstOperator(
+            idOperator: h.idOperator,
+            namaOperator: h.namaOperator,
+            enable: true,
+          ),
+        ];
+      }
+      // Cetakan/warna/material: model hanya punya ID, nama tidak tersedia.
+      // User perlu re-pick lewat dialog saat edit.
+    }
   }
 
   @override
   void dispose() {
-    noProduction.dispose();
     dateCreatedCtrl.dispose();
-    mesinCtrl.dispose();
-    operatorCtrl.dispose();
-    jamCtrl.dispose(); // ✅ Dispose jam controller
-    hourMeterCtrl.dispose();
-    beratProdukHasilTimbangCtrl.dispose();
     hourStartCtrl.dispose();
     hourEndCtrl.dispose();
-    idFurnitureMaterialCtrl.dispose();
+    hourMeterCtrl.dispose();
+    beratProdukCtrl.dispose();
     super.dispose();
   }
 
+  Future<void> _pickTanggal() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+      locale: const Locale('id', 'ID'),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _selectedDate = picked;
+      dateCreatedCtrl.text =
+          DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(picked);
+    });
+    if (_selectedShift != null) await _fetchShiftHour(_selectedShift!);
+    await _checkOverlap();
+  }
+
+  Future<void> _fetchShiftHour(int shift) async {
+    final tanggal = DateFormat('yyyy-MM-dd').format(_selectedDate);
+    final base = ApiConstants.baseUrl.replaceFirst(RegExp(r'/*$'), '');
+    final url =
+        Uri.parse('$base/api/mst/shift/hour?tanggal=$tanggal&shift=$shift');
+    try {
+      final token = await TokenStorage.getToken();
+      final res = await http
+          .get(url, headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          })
+          .timeout(const Duration(seconds: 10));
+      if (res.statusCode != 200 || !mounted) return;
+      final body =
+          jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      final data = body['data'] as Map<String, dynamic>?;
+      if (data == null) return;
+      String trim5(String? v) =>
+          (v != null && v.length >= 5) ? v.substring(0, 5) : (v ?? '');
+      final start = trim5(data['hourStart'] as String?);
+      final end = trim5(data['hourEnd'] as String?);
+      if (!mounted) return;
+      setState(() {
+        if (start.isNotEmpty) hourStartCtrl.text = start;
+        if (end.isNotEmpty) hourEndCtrl.text = end;
+      });
+      await _checkOverlap();
+    } catch (_) {}
+  }
+
+  Future<void> _checkOverlap() async {
+    final vm = context.read<OverlapViewModel>();
+    final start = hourStartCtrl.text.trim();
+    final end = hourEndCtrl.text.trim();
+    final idMesin = _selectedMesin?.idMesin ?? widget.header?.idMesin;
+    if (start.isEmpty || end.isEmpty || idMesin == null) {
+      vm.clear();
+      return;
+    }
+    await vm.check(
+      kind: _kind,
+      date: _selectedDate,
+      idMesin: idMesin,
+      hourStart: start,
+      hourEnd: end,
+      excludeNo: isEdit ? widget.header!.noProduksi : null,
+    );
+  }
+
+  Future<void> _openReguOperatorPicker() async {
+    if (!mounted) return;
+    setState(() => _loadingReguOperator = true);
+    final result = await showReguOperatorPicker(
+      context,
+      initialRegu: _selectedRegu,
+      initialSelected: _selectedOperators,
+      idBagian: _idBagianInject,
+    );
+    if (mounted) setState(() => _loadingReguOperator = false);
+    if (result != null && mounted) {
+      setState(() {
+        _selectedRegu = result.regu;
+        _selectedOperators
+          ..clear()
+          ..addAll(result.operators);
+      });
+    }
+  }
+
+  Future<void> _openCetakanWarnaPicker() async {
+    if (!mounted) return;
+    setState(() => _loadingCetakanWarna = true);
+    final result = await showCetakanWarnaMaterialPicker(
+      context,
+      initialCetakan: _selectedCetakan,
+      initialWarna: _selectedWarna,
+      initialMaterial:
+          _selectedFurnitureMaterial?.idFurnitureMaterial == _noneFurnitureId
+              ? null
+              : _selectedFurnitureMaterial,
+    );
+    if (mounted) setState(() => _loadingCetakanWarna = false);
+    if (result != null && mounted) {
+      setState(() {
+        _selectedCetakan = result.cetakan;
+        _selectedWarna = result.warna;
+        _selectedFurnitureMaterial = result.material ?? _noneFurnitureMaterial;
+      });
+    }
+  }
+
   Future<void> _submit() async {
-    // cek overlap dulu
     final ovm = context.read<OverlapViewModel>();
     if (ovm.hasOverlap) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -181,104 +274,75 @@ class _InjectProductionFormDialogState
 
     if (!_formKey.currentState!.validate()) return;
 
-    // pastikan ada mesin & operator & shift
     final mesinId = _selectedMesin?.idMesin ?? widget.header?.idMesin;
     if (mesinId == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Mesin wajib dipilih')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mesin wajib dipilih')),
+      );
       return;
     }
 
-    final operatorId =
-        _selectedOperator?.idOperator ??
-        _operatorPreselectId ??
-        widget.header?.idOperator;
-    if (operatorId == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Operator wajib dipilih')));
+    final idOperatorList =
+        _selectedOperators.map((o) => o.idOperator).toList();
+    if (idOperatorList.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Minimal 1 operator wajib dipilih')),
+      );
       return;
     }
 
     if (_selectedShift == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Shift wajib dipilih')));
-      return;
-    }
-
-    // ✅ Parse jam field (can be int or computed from time range)
-    int? jamKerja;
-
-    // Try to get jam from direct input first
-    if (jamCtrl.text.trim().isNotEmpty) {
-      jamKerja = int.tryParse(jamCtrl.text.trim());
-    }
-
-    // If not set, calculate from hourStart and hourEnd
-    if (jamKerja == null &&
-        hourStartCtrl.text.trim().isNotEmpty &&
-        hourEndCtrl.text.trim().isNotEmpty) {
-      final duration = durationBetweenHHmmWrap(
-        hourStartCtrl.text,
-        hourEndCtrl.text,
-      );
-      if (duration != null) {
-        jamKerja = duration.inHours;
-      }
-    }
-
-    // Pastikan jam mulai & selesai terisi
-    if (hourStartCtrl.text.trim().isEmpty || hourEndCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Jam mulai & selesai wajib diisi (HH:mm)'),
-        ),
+        const SnackBar(content: Text('Shift wajib dipilih')),
       );
       return;
     }
 
-    // helper HH:mm -> HH:mm:00
-    String _toSqlTime(String raw) {
+    final start = hourStartCtrl.text.trim();
+    final end = hourEndCtrl.text.trim();
+    if (start.isEmpty || end.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Jam mulai & selesai wajib diisi')),
+      );
+      return;
+    }
+
+    if (_selectedCetakan == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cetakan wajib dipilih')),
+      );
+      return;
+    }
+    if (_selectedWarna == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Warna wajib dipilih')),
+      );
+      return;
+    }
+
+    String toSqlTime(String raw) {
       final t = raw.trim();
-      if (t.isEmpty) return t;
-      return t.length == 5 ? '$t:00' : t;
+      return (t.isNotEmpty && t.length == 5) ? '$t:00' : t;
     }
 
-    final hourStartSql = _toSqlTime(hourStartCtrl.text);
-    final hourEndSql = _toSqlTime(hourEndCtrl.text);
+    final hourStartSql = toSqlTime(start);
+    final hourEndSql = toSqlTime(end);
 
-    // parse angka
+    final dur = durationBetweenHHmmWrap(start, end);
+    final jamKerja = dur?.inHours;
+
+    final pickedFm = _selectedFurnitureMaterial;
+    final int? idFurnitureMaterial =
+        (pickedFm == null ||
+                pickedFm.idFurnitureMaterial == _noneFurnitureId)
+            ? null
+            : pickedFm.idFurnitureMaterial;
+
     final hourMeter = double.tryParse(hourMeterCtrl.text.trim());
-    final beratProduk = double.tryParse(
-      beratProdukHasilTimbangCtrl.text.trim(),
-    );
-
-    final idCetakan = _selectedCetakan?.idCetakan ?? widget.header?.idCetakan;
-    final idWarna = _selectedWarna?.idWarna ?? widget.header?.idWarna;
-
-    if (idCetakan == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Cetakan wajib dipilih')));
-      return;
-    }
-    if (idWarna == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Warna wajib dipilih')));
-      return;
-    }
-
-    // ✅ convert placeholder -> null for payload
-    final pickedId = int.tryParse(idFurnitureMaterialCtrl.text.trim());
-    final int? idFurnitureMaterialPayload =
-        (pickedId == null || pickedId == _noneFurnitureId) ? null : pickedId;
+    final beratProduk = double.tryParse(beratProdukCtrl.text.trim());
 
     final prodVm = context.read<InjectProductionViewModel>();
 
-    // show loading
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -293,31 +357,33 @@ class _InjectProductionFormDialogState
           noProduksi: widget.header!.noProduksi,
           tglProduksi: _selectedDate,
           idMesin: mesinId,
-          idOperator: operatorId,
-          jam: jamKerja,
+          idOperators: idOperatorList,
+          idRegu: _selectedRegu?.idRegu,
           shift: _selectedShift!,
-          hourStart: hourStartSql,
-          hourEnd: hourEndSql,
+          jam: jamKerja,
+          idCetakan: _selectedCetakan!.idCetakan,
+          idWarna: _selectedWarna!.idWarna,
+          idFurnitureMaterial: idFurnitureMaterial,
           hourMeter: hourMeter,
           beratProdukHasilTimbang: beratProduk,
-          idCetakan: idCetakan,
-          idWarna: idWarna,
-          idFurnitureMaterial: idFurnitureMaterialPayload,
+          hourStart: hourStartSql,
+          hourEnd: hourEndSql,
         );
       } else {
         result = await prodVm.createProduksi(
           tglProduksi: _selectedDate,
           idMesin: mesinId,
-          idOperator: operatorId,
-          jam: jamKerja,
+          idOperators: idOperatorList,
+          idRegu: _selectedRegu?.idRegu,
           shift: _selectedShift!,
-          hourStart: hourStartSql,
-          hourEnd: hourEndSql,
+          jam: jamKerja,
+          idCetakan: _selectedCetakan!.idCetakan,
+          idWarna: _selectedWarna!.idWarna,
+          idFurnitureMaterial: idFurnitureMaterial,
           hourMeter: hourMeter,
           beratProdukHasilTimbang: beratProduk,
-          idCetakan: idCetakan,
-          idWarna: idWarna,
-          idFurnitureMaterial: idFurnitureMaterialPayload,
+          hourStart: hourStartSql,
+          hourEnd: hourEndSql,
         );
       }
     } finally {
@@ -330,559 +396,319 @@ class _InjectProductionFormDialogState
       widget.onSave?.call(result);
       Navigator.of(context).pop(result);
     } else {
-      showDialog(
-        context: context,
-        builder: (_) => ErrorStatusDialog(
-          title: 'Gagal Menyimpan',
-          message: prodVm.saveError ?? 'Gagal menyimpan data',
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(prodVm.saveError ?? 'Gagal menyimpan data'),
+          backgroundColor: Colors.red,
         ),
       );
-    }
-  }
-
-  /// Panggil cek-overlap via ViewModel hanya jika input sudah lengkap
-  Future<void> _checkOverlapIfReadyVM() async {
-    final vm = context.read<OverlapViewModel>();
-
-    final start = hourStartCtrl.text.trim();
-    final end = hourEndCtrl.text.trim();
-    final idMesin = _selectedMesin?.idMesin ?? widget.header?.idMesin;
-
-    if (start.isEmpty || end.isEmpty || idMesin == null) {
-      vm.clear();
-      return;
-    }
-
-    await vm.check(
-      kind: _kind,
-      date: _selectedDate,
-      idMesin: idMesin,
-      hourStart: start,
-      hourEnd: end,
-      excludeNo: isEdit ? widget.header!.noProduksi : null,
-    );
-  }
-
-  /// ✅ Auto-calculate jam from time range
-  void _updateJamFromTimeRange() {
-    final start = hourStartCtrl.text.trim();
-    final end = hourEndCtrl.text.trim();
-
-    if (start.isEmpty || end.isEmpty) return;
-
-    final duration = durationBetweenHHmmWrap(start, end);
-    if (duration != null) {
-      final hours = duration.inHours;
-      setState(() {
-        jamCtrl.text = hours.toString();
-      });
-    }
-  }
-
-  /// ✅ resolve from cetakan+warna
-  /// rules:
-  /// - if not ready => placeholder & disable later
-  /// - if found null => placeholder (not error)
-  Future<void> _resolveFurnitureMaterialIfReady() async {
-    final idCetakan = _selectedCetakan?.idCetakan ?? widget.header?.idCetakan;
-    final idWarna = _selectedWarna?.idWarna ?? widget.header?.idWarna;
-
-    final lvm = context.read<FurnitureMaterialLookupViewModel>();
-
-    if (idCetakan == null || idWarna == null) {
-      lvm.clear();
-      if (!mounted) return;
-      setState(() => _selectedFurnitureMaterial = _noneFurnitureMaterial);
-      idFurnitureMaterialCtrl.text = '';
-      return;
-    }
-
-    await lvm.resolve(idCetakan: idCetakan, idWarna: idWarna);
-    if (!mounted) return;
-
-    // ✅ kalau error, jangan auto set apa-apa (biarkan UI handle error)
-    if (lvm.error.isNotEmpty) {
-      setState(() => _selectedFurnitureMaterial = _noneFurnitureMaterial);
-      idFurnitureMaterialCtrl.text = '';
-      return;
-    }
-
-    final list = lvm.items; // ✅ LIST
-
-    // ✅ tidak ada mapping => pilih "Tidak ada"
-    if (list.isEmpty) {
-      setState(() => _selectedFurnitureMaterial = _noneFurnitureMaterial);
-      idFurnitureMaterialCtrl.text = '';
-      return;
-    }
-
-    // =========================================================
-    // ✅ strategi pilih (pick)
-    // prioritas:
-    // 1) kalau sedang edit: header sudah punya idFurnitureMaterial -> cari itu
-    // 2) kalau user sudah sempat pilih -> pertahankan kalau masih ada
-    // 3) kalau list cuma 1 -> auto pilih
-    // 4) fallback -> "Tidak ada"
-    // =========================================================
-    final headerId =
-        widget.header?.idFurnitureMaterial; // <-- pastikan field ini ada
-    final currentId = _selectedFurnitureMaterial?.idFurnitureMaterial;
-
-    FurnitureMaterialLookupResult pick;
-
-    if (headerId != null) {
-      pick = list.firstWhere(
-        (e) => e.idFurnitureMaterial == headerId,
-        orElse: () => list.length == 1 ? list.first : _noneFurnitureMaterial,
-      );
-    } else if (currentId != null &&
-        currentId != _noneFurnitureMaterial.idFurnitureMaterial) {
-      pick = list.firstWhere(
-        (e) => e.idFurnitureMaterial == currentId,
-        orElse: () => list.length == 1 ? list.first : _noneFurnitureMaterial,
-      );
-    } else if (list.length == 1) {
-      pick = list.first;
-    } else {
-      pick = _noneFurnitureMaterial;
-    }
-
-    setState(() => _selectedFurnitureMaterial = pick);
-
-    // ✅ kalau "Tidak ada" => kosongkan controller
-    if (pick.idFurnitureMaterial ==
-        _noneFurnitureMaterial.idFurnitureMaterial) {
-      idFurnitureMaterialCtrl.text = '';
-    } else {
-      idFurnitureMaterialCtrl.text = pick.idFurnitureMaterial.toString();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    final isLandscape = mq.orientation == Orientation.landscape;
+
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
           create: (_) => OverlapViewModel(repository: OverlapRepository()),
         ),
-        ChangeNotifierProvider(
-          create: (_) => CetakanViewModel(repository: CetakanRepository()),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => WarnaViewModel(repository: WarnaRepository()),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => FurnitureMaterialLookupViewModel(
-            repository: FurnitureMaterialLookupRepository(),
-          ),
-        ),
       ],
       child: Dialog(
+        backgroundColor: Colors.white,
+        insetPadding: isLandscape
+            ? const EdgeInsets.symmetric(horizontal: 72, vertical: 12)
+            : const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 720, maxHeight: 820),
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildHeader(),
-              const SizedBox(height: 12),
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [Expanded(flex: 4, child: _buildLeftColumn())],
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: isLandscape ? 700 : 640,
+            maxHeight: (mq.size.height - 24).clamp(
+              300,
+              isLandscape ? 620 : 740,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  fit: FlexFit.loose,
+                  child: SingleChildScrollView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    child: _buildForm(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              _buildActions(),
-            ],
+                const SizedBox(height: 16),
+                _buildActions(),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: isEdit ? Colors.orange.shade100 : Colors.green.shade100,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            isEdit ? Icons.edit : Icons.add,
-            color: isEdit ? Colors.orange.shade700 : Colors.green.shade700,
-            size: 24,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Text(
-          isEdit ? 'Edit Produksi Inject' : 'Tambah Produksi Inject',
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLeftColumn() {
-    final vm = context.watch<OverlapViewModel>();
-
-    // durasi lokal
+  Widget _buildForm() {
+    final ovm = context.watch<OverlapViewModel>();
     final dur = durationBetweenHHmmWrap(hourStartCtrl.text, hourEndCtrl.text);
     final startFilled = hourStartCtrl.text.trim().isNotEmpty;
     final endFilled = hourEndCtrl.text.trim().isNotEmpty;
     final hasDurationError = startFilled && endFilled && dur == null;
-
-    // overlap dari server
-    final hasOverlap = vm.hasOverlap;
+    final hasOverlap = ovm.hasOverlap;
     final overlapMsg =
-        vm.overlapMessage ?? 'Jam ini bentrok dengan dokumen lain';
+        ovm.overlapMessage ?? 'Jam ini bentrok dengan dokumen lain';
 
-    final idCetakan = _selectedCetakan?.idCetakan ?? widget.header?.idCetakan;
-    final idWarna = _selectedWarna?.idWarna ?? widget.header?.idWarna;
+    final mesinName =
+        _selectedMesin?.namaMesin ??
+        widget.header?.namaMesin ??
+        widget.initialMesin?.namaMesin ??
+        (isEdit ? 'Edit Produksi Inject' : 'Tambah Produksi Inject');
 
-    final fmVm = context.watch<FurnitureMaterialLookupViewModel>();
+    return Form(
+      key: _formKey,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Judul ────────────────────────────────────────────────
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isEdit ? Colors.orange.shade50 : Colors.teal.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  isEdit ? Icons.edit : Icons.add,
+                  color:
+                      isEdit ? Colors.orange.shade700 : Colors.teal.shade700,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 3,
+                child: Text(
+                  mesinName,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1F2937),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (!widget.isBackdateInput)
+                Text(
+                  DateFormat('dd MMM yyyy', 'id_ID').format(_selectedDate),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
+              if (widget.isBackdateInput) ...[
+                const SizedBox(width: 16),
+                Expanded(
+                  flex: 2,
+                  child: TextFormField(
+                    controller: dateCreatedCtrl,
+                    readOnly: true,
+                    onTap: _pickTanggal,
+                    decoration: InputDecoration(
+                      labelText: 'Tanggal',
+                      hintText: 'Pilih tanggal',
+                      prefixIcon: const Icon(
+                        Icons.calendar_today_outlined,
+                        size: 20,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                    ),
+                    validator: (v) =>
+                        (v == null || v.isEmpty) ? 'Wajib pilih tanggal' : null,
+                  ),
+                ),
+              ],
+            ],
+          ),
 
-    final furnitureDropdownEnabled =
-        idCetakan != null &&
-        idWarna != null &&
-        fmVm.items.isNotEmpty &&
-        !fmVm.isLoading &&
-        fmVm.error.isEmpty;
+          const SizedBox(height: 20),
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
+          // ── Baris 1: Shift + Jam Mulai + Jam Selesai + Total ─────
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.description,
-                    color: Colors.blue.shade700,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Header',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // No Produksi (readonly, auto dari backend)
-              AppTextField(
-                controller: noProduction,
-                label: 'No. Inject',
-                icon: Icons.label,
-                readOnly: true,
-                hintText: 'S.XXXXXXXXXX',
-              ),
-
-              const SizedBox(height: 16),
-
-              AppDateField(
-                controller: dateCreatedCtrl,
-                label: 'Tanggal',
-                format: DateFormat('EEEE, dd MMM yyyy', 'id_ID'),
-                initialDate: _selectedDate,
-                onChanged: (d) async {
-                  if (d != null) {
-                    setState(() {
-                      _selectedDate = d;
-                      dateCreatedCtrl.text = DateFormat(
-                        'EEEE, dd MMM yyyy',
-                        'id_ID',
-                      ).format(d);
-                    });
-                    await _checkOverlapIfReadyVM();
-                  }
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              // Jenis Mesin
-              MesinDropdown(
-                idBagianMesin: 4, // ✅ ID bagian untuk INJECT
-                preselectId: widget.header?.idMesin,
-                label: 'Mesin Inject',
-                hint: 'Pilih mesin',
-                autovalidateMode: AutovalidateMode.onUserInteraction,
-                validator: (v) => v == null ? 'Wajib pilih mesin inject' : null,
-                onChanged: (m) async {
-                  _selectedMesin = m;
-                  _operatorPreselectId = m?.defaultOperatorId;
-
-                  setState(() {});
-                  await _checkOverlapIfReadyVM();
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              // Operator
-              OperatorDropdown(
-                key: ValueKey(
-                  _operatorPreselectId ?? widget.header?.idOperator,
+              SizedBox(
+                width: 190,
+                child: ShiftDropdown(
+                  preselectId: widget.header?.shift ?? widget.initialShift,
+                  onChangedId: (id) {
+                    setState(() => _selectedShift = id);
+                    if (id != null && widget.isBackdateInput) {
+                      _fetchShiftHour(id);
+                    }
+                  },
+                  validator: (v) => v == null ? 'Wajib pilih shift' : null,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
                 ),
-                preselectId: isEdit
-                    ? widget.header?.idOperator
-                    : _operatorPreselectId,
-                label: 'Operator',
-                hint: 'Pilih operator',
-                autovalidateMode: AutovalidateMode.onUserInteraction,
-                validator: (v) => v == null ? 'Wajib pilih operator' : null,
-                onChanged: (op) {
-                  _selectedOperator = op;
-                  setState(() {});
-                },
               ),
-
-              const SizedBox(height: 16),
-
-              // Jam Mulai & Jam Selesai
-              Row(
-                children: [
-                  Expanded(
-                    child: TimeFormField(
-                      controller: hourStartCtrl,
-                      label: 'Jam Mulai',
-                      hintText: 'HH:mm',
-                      onPick: () async {
-                        final picked = await pickTime24h(
-                          context,
-                          initial: _startTime,
-                        );
-                        if (picked != null) {
-                          setState(() {
-                            _startTime = picked;
-                            hourStartCtrl.text = formatHHmm(picked);
-                          });
-                          _updateJamFromTimeRange(); // ✅ Auto-update jam
-                          await _checkOverlapIfReadyVM();
-                        }
-                      },
-                      validator: (_) {
-                        final s = parseHHmm(hourStartCtrl.text);
-                        if (s == null) {
-                          return 'Wajib isi jam mulai (HH:mm)';
-                        }
-                        final diff = durationBetweenHHmmWrap(
-                          hourStartCtrl.text,
-                          hourEndCtrl.text,
-                        );
-                        if (diff == null &&
-                            parseHHmm(hourEndCtrl.text) != null) {
-                          return 'Durasi tidak boleh 0 menit';
-                        }
-                        return null;
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TimeFormField(
-                      controller: hourEndCtrl,
-                      label: 'Jam Selesai',
-                      hintText: 'HH:mm',
-                      onPick: () async {
-                        final picked = await pickTime24h(
-                          context,
-                          initial: _endTime ?? _startTime,
-                        );
-                        if (picked != null) {
-                          setState(() {
-                            _endTime = picked;
-                            hourEndCtrl.text = formatHHmm(picked);
-                          });
-                          _updateJamFromTimeRange(); // ✅ Auto-update jam
-                          await _checkOverlapIfReadyVM();
-                        }
-                      },
-                      validator: (_) {
-                        final e = parseHHmm(hourEndCtrl.text);
-                        if (e == null) {
-                          return 'Wajib isi jam selesai (HH:mm)';
-                        }
-                        final s = parseHHmm(hourStartCtrl.text);
-                        if (s != null) {
-                          final diff = durationBetweenHHmmWrap(
-                            hourStartCtrl.text,
-                            hourEndCtrl.text,
-                          );
-                          if (diff == null) {
-                            return 'Durasi tidak boleh 0 menit';
-                          }
-                        }
-                        return null;
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  TotalHoursPill(
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: TimeFormField(
+                  controller: hourStartCtrl,
+                  label: 'Jam Mulai',
+                  hintText: 'HH:mm',
+                  onPick: () async {
+                    final picked = await pickTime24h(
+                      context,
+                      initial: _startTime,
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        _startTime = picked;
+                        hourStartCtrl.text = formatHHmm(picked);
+                      });
+                      await _checkOverlap();
+                    }
+                  },
+                  validator: (_) {
+                    final s = parseHHmm(hourStartCtrl.text);
+                    if (s == null) return 'Wajib isi (HH:mm)';
+                    final diff = durationBetweenHHmmWrap(
+                      hourStartCtrl.text,
+                      hourEndCtrl.text,
+                    );
+                    if (diff == null && parseHHmm(hourEndCtrl.text) != null) {
+                      return 'Durasi 0';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: TimeFormField(
+                  controller: hourEndCtrl,
+                  label: 'Jam Selesai',
+                  hintText: 'HH:mm',
+                  onPick: () async {
+                    final picked = await pickTime24h(
+                      context,
+                      initial: _endTime ?? _startTime,
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        _endTime = picked;
+                        hourEndCtrl.text = formatHHmm(picked);
+                      });
+                      await _checkOverlap();
+                    }
+                  },
+                  validator: (_) {
+                    final e = parseHHmm(hourEndCtrl.text);
+                    if (e == null) return 'Wajib isi (HH:mm)';
+                    final s = parseHHmm(hourStartCtrl.text);
+                    if (s != null) {
+                      final diff = durationBetweenHHmmWrap(
+                        hourStartCtrl.text,
+                        hourEndCtrl.text,
+                      );
+                      if (diff == null) return 'Durasi 0';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              Align(
+                alignment: Alignment.center,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: TotalHoursPill(
                     duration: dur,
                     isError: hasOverlap || hasDurationError,
                     errorText: hasOverlap
                         ? overlapMsg
                         : 'Durasi tidak boleh 0 menit',
                   ),
-                ],
+                ),
               ),
-
-              const SizedBox(height: 16),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: ShiftDropdown(
-                      preselectId: widget.header?.shift,
-                      onChangedId: (id) {
-                        setState(() {
-                          _selectedShift = id;
-                        });
-                      },
-                      validator: (v) => v == null ? 'Wajib pilih shift' : null,
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: AppTextField(
-                      controller: jamCtrl,
-                      label: 'Jam (INT)',
-                      icon: Icons.access_time,
-                      hintText: 'contoh: 9',
-                      validator: (_) {
-                        final t = jamCtrl.text.trim();
-                        if (t.isEmpty) return null;
-                        if (int.tryParse(t) != null) return null;
-                        return 'Harus berupa angka';
-                      },
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: AppNumberField(
-                      controller: hourMeterCtrl,
-                      label: 'Hour Meter',
-                      icon: Icons.timer_sharp,
-                      allowDecimal: true,
-                      allowNegative: false,
-                      hintText: 'contoh: 3.5',
-                      validator: (_) => null,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: AppNumberField(
-                      controller: beratProdukHasilTimbangCtrl,
-                      label: 'Berat Produk (kg)',
-                      icon: Icons.scale,
-                      allowDecimal: true,
-                      allowNegative: false,
-                      hintText: 'contoh: 12.5',
-                      validator: (_) => null,
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: CetakanDropdown(
-                      key: ValueKey(widget.header?.idCetakan),
-                      preselectId: widget.header?.idCetakan,
-                      label: 'Cetakan',
-                      hint: 'Pilih cetakan',
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                      validator: (v) =>
-                          v == null ? 'Wajib pilih cetakan' : null,
-                      onChanged: (c) async {
-                        _selectedCetakan = c;
-                        setState(() {});
-                        await _resolveFurnitureMaterialIfReady();
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: WarnaDropdown(
-                      preselectId: widget.header?.idWarna,
-                      label: 'Warna',
-                      hint: 'Pilih warna',
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                      validator: (v) => v == null ? 'Wajib pilih warna' : null,
-                      onChanged: (w) async {
-                        _selectedWarna = w;
-                        setState(() {});
-                        await _resolveFurnitureMaterialIfReady();
-                      },
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: FurnitureMaterialDropdown(
-                      idCetakan: idCetakan,
-                      idWarna: idWarna,
-                      preselectId: widget.header?.idFurnitureMaterial,
-                      label: 'Furniture Material',
-                      hint: 'Pilih furniture material',
-                      enabled: furnitureDropdownEnabled,
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-
-                      // ✅ tidak wajib (boleh kosong)
-                      validator: (_) => null,
-
-                      onChanged: (val) {
-                        if (val == null) {
-                          setState(
-                            () => _selectedFurnitureMaterial =
-                                _noneFurnitureMaterial,
-                          );
-                          idFurnitureMaterialCtrl.text = '';
-                          return;
-                        }
-                        setState(() => _selectedFurnitureMaterial = val);
-                        idFurnitureMaterialCtrl.text =
-                            (val.idFurnitureMaterial == _noneFurnitureId)
-                            ? ''
-                            : val.idFurnitureMaterial.toString();
-                      },
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 16),
             ],
           ),
-        ),
+
+          const SizedBox(height: 16),
+
+          // ── Baris 2: Regu & Operator ─────────────────────────────
+          ReguOperatorPickerField(
+            selectedRegu: _selectedRegu,
+            selectedOperators: _selectedOperators,
+            isLoading: _loadingReguOperator,
+            onTap: _openReguOperatorPicker,
+          ),
+
+          const SizedBox(height: 16),
+
+          // ── Baris 3: Cetakan + Warna + Furniture Material ────────
+          CetakanWarnaMaterialPickerField(
+            selectedCetakan: _selectedCetakan,
+            selectedWarna: _selectedWarna,
+            selectedMaterial:
+                _selectedFurnitureMaterial?.idFurnitureMaterial ==
+                        _noneFurnitureId
+                    ? null
+                    : _selectedFurnitureMaterial,
+            isLoading: _loadingCetakanWarna,
+            onTap: _openCetakanWarnaPicker,
+          ),
+
+          const SizedBox(height: 16),
+
+          // ── Baris 4: Hour Meter + Berat Produk (opsional) ────────
+          Row(
+            children: [
+              Expanded(
+                child: AppNumberField(
+                  controller: hourMeterCtrl,
+                  label: 'Hour Meter',
+                  icon: Icons.timer_sharp,
+                  allowDecimal: true,
+                  allowNegative: false,
+                  hintText: 'contoh: 3.5',
+                  validator: (_) => null,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: AppNumberField(
+                  controller: beratProdukCtrl,
+                  label: 'Berat Produk (kg)',
+                  icon: Icons.scale,
+                  allowDecimal: true,
+                  allowNegative: false,
+                  hintText: 'contoh: 12.5',
+                  validator: (_) => null,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 8),
+        ],
       ),
     );
   }
@@ -890,8 +716,6 @@ class _InjectProductionFormDialogState
   Widget _buildActions() {
     final ovm = context.watch<OverlapViewModel>();
     final hasOverlap = ovm.hasOverlap;
-
-    // ✅ Watch VM from PARENT Screen context for isSaving state
     final prodVm = context.watch<InjectProductionViewModel>();
     final isSaving = prodVm.isSaving;
 
@@ -906,9 +730,8 @@ class _InjectProductionFormDialogState
         ElevatedButton(
           onPressed: (hasOverlap || isSaving) ? null : _submit,
           style: ElevatedButton.styleFrom(
-            backgroundColor: isEdit
-                ? const Color(0xFFF57C00)
-                : const Color(0xFF00897B),
+            backgroundColor:
+                isEdit ? const Color(0xFFF57C00) : const Color(0xFF00897B),
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
           ),

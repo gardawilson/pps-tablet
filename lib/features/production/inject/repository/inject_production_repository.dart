@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import 'package:pps_tablet/core/network/api_client.dart';
+import 'package:pps_tablet/core/network/endpoints.dart';
+import 'package:pps_tablet/core/services/token_storage.dart';
 import 'package:pps_tablet/core/utils/date_formatter.dart';
 
 import '../model/inject_production_model.dart';
@@ -14,6 +17,87 @@ class InjectProductionRepository {
 
   InjectProductionRepository({ApiClient? apiClient})
     : api = apiClient ?? ApiClient();
+
+  static const _timeout = Duration(seconds: 25);
+
+  /* =============================
+   * MESIN LIST
+   * GET :7500/api/mst-mesin/inject
+   * ============================= */
+
+  Future<List<InjectMesinInfo>> fetchInjectMesin() async {
+    final token = await TokenStorage.getToken();
+    final apiBaseUri = Uri.parse(ApiConstants.baseUrl);
+    final url = Uri(
+      scheme: apiBaseUri.scheme.isEmpty ? 'http' : apiBaseUri.scheme,
+      host: apiBaseUri.host,
+      port: 7500,
+      path: '/api/mst-mesin/inject',
+    );
+
+    late http.Response res;
+    try {
+      res = await http
+          .get(url, headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          })
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout mengambil data mesin inject');
+    } catch (e) {
+      throw Exception('Gagal terhubung ke server: $e');
+    }
+
+    if (res.statusCode != 200) {
+      throw Exception('Gagal memuat mesin inject (${res.statusCode})');
+    }
+
+    final body = json.decode(utf8.decode(res.bodyBytes));
+    final data = body['data'] as List<dynamic>? ?? [];
+    return data
+        .map((e) => InjectMesinInfo.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /* =============================
+   * GET ALL (PAGED WITH MAP RESULT)
+   * GET /api/production/inject
+   * ============================= */
+
+  Future<Map<String, dynamic>> fetchAll({
+    required int page,
+    int pageSize = 20,
+    String? search,
+    int? idMesin,
+  }) async {
+    final body = await api.getJson(
+      '/api/production/inject',
+      query: {
+        'page': page.toString(),
+        'pageSize': pageSize.toString(),
+        if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+        if (idMesin != null) 'idMesin': idMesin.toString(),
+      },
+    );
+
+    final List dataList = (body['data'] ?? []) as List;
+    final items = dataList
+        .map((e) => InjectProduction.fromJson(e as Map<String, dynamic>))
+        .toList();
+
+    final meta = (body['meta'] ?? {}) as Map<String, dynamic>;
+    final currentPage = (meta['page'] ?? page) as int;
+    final totalPages = (meta['totalPages'] ?? 1) as int;
+    final totalData = (body['totalData'] ?? meta['total'] ?? 0) as int;
+
+    return {
+      'items': items,
+      'page': currentPage,
+      'totalPages': totalPages,
+      'total': totalData,
+    };
+  }
 
   /* =============================
    * GET (BY DATE) - existing

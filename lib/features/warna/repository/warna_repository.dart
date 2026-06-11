@@ -32,6 +32,18 @@ class WarnaRepository {
     }
   }
 
+  /// Ambil warna berdasarkan cetakan dari /api/mst-warna/cetakan/:idCetakan
+  Future<List<MstWarna>> fetchByCetakan(int idCetakan) async {
+    final uri = Uri.parse('$_base/api/mst-warna/cetakan/$idCetakan');
+    final res = await _get(uri);
+    if (res.statusCode != 200) {
+      throw Exception('Gagal mengambil warna (${res.statusCode})');
+    }
+    final body = json.decode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    final List list = (body['data'] ?? []) as List;
+    return list.map((e) => MstWarna.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
   /// Ambil semua warna (active only) dari /api/master-warna
   Future<List<MstWarna>> fetchAll() async {
     final uri = Uri.parse('$_base/api/mst-warna');

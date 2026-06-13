@@ -2,13 +2,14 @@
 
 import '../../shared/models/broker_item.dart';
 import '../../shared/models/bb_item.dart';
+import '../../shared/models/washing_item.dart';
 import '../../shared/models/gilingan_item.dart';
 import '../../shared/models/mixer_item.dart';
 import '../../../../core/utils/model_helpers.dart';
 
-// ✅ Export item models agar bisa diakses lewat satu import
 export '../../shared/models/broker_item.dart';
 export '../../shared/models/bb_item.dart';
+export '../../shared/models/washing_item.dart';
 export '../../shared/models/gilingan_item.dart';
 export '../../shared/models/mixer_item.dart';
 
@@ -17,6 +18,7 @@ export '../../shared/models/mixer_item.dart';
 class MixerInputs {
   final List<BrokerItem> broker;
   final List<BbItem> bb;
+  final List<WashingItem> washing;
   final List<GilinganItem> gilingan;
   final List<MixerItem> mixer;
 
@@ -25,6 +27,7 @@ class MixerInputs {
   MixerInputs({
     required this.broker,
     required this.bb,
+    required this.washing,
     required this.gilingan,
     required this.mixer,
     required this.summary,
@@ -44,45 +47,42 @@ class MixerInputs {
     return MixerInputs(
       broker: _listOf(j['broker'], (m) => BrokerItem.fromJson(m)),
       bb: _listOf(j['bb'], (m) => BbItem.fromJson(m)),
+      washing: _listOf(j['washing'], (m) => WashingItem.fromJson(m)),
       gilingan: _listOf(j['gilingan'], (m) => GilinganItem.fromJson(m)),
       mixer: _listOf(j['mixer'], (m) => MixerItem.fromJson(m)),
       summary: _toSummary(j['summary']),
     );
   }
 
-  // Quick totals
   double totalBeratBroker() => broker.fold(0.0, (s, it) => s + (it.berat ?? 0));
   double totalBeratBb() => bb.fold(0.0, (s, it) => s + (it.berat ?? 0));
+  double totalBeratWashing() => washing.fold(0.0, (s, it) => s + (it.berat ?? 0));
   double totalBeratGilingan() => gilingan.fold(0.0, (s, it) => s + (it.berat ?? 0));
   double totalBeratMixer() => mixer.fold(0.0, (s, it) => s + (it.berat ?? 0));
 
-  // Total semua input
   double totalBerat() =>
       totalBeratBroker() +
-          totalBeratBb() +
-          totalBeratGilingan() +
-          totalBeratMixer();
+      totalBeratBb() +
+      totalBeratWashing() +
+      totalBeratGilingan() +
+      totalBeratMixer();
 
-  // Total items count
   int totalItems() =>
-      broker.length +
-          bb.length +
-          gilingan.length +
-          mixer.length;
+      broker.length + bb.length + washing.length + gilingan.length + mixer.length;
 
-  // Check if has any inputs
   bool get isEmpty =>
       broker.isEmpty &&
-          bb.isEmpty &&
-          gilingan.isEmpty &&
-          mixer.isEmpty;
+      bb.isEmpty &&
+      washing.isEmpty &&
+      gilingan.isEmpty &&
+      mixer.isEmpty;
 
   bool get isNotEmpty => !isEmpty;
 
-  // Copy with method untuk state management
   MixerInputs copyWith({
     List<BrokerItem>? broker,
     List<BbItem>? bb,
+    List<WashingItem>? washing,
     List<GilinganItem>? gilingan,
     List<MixerItem>? mixer,
     Map<String, int>? summary,
@@ -90,26 +90,27 @@ class MixerInputs {
     return MixerInputs(
       broker: broker ?? this.broker,
       bb: bb ?? this.bb,
+      washing: washing ?? this.washing,
       gilingan: gilingan ?? this.gilingan,
       mixer: mixer ?? this.mixer,
       summary: summary ?? this.summary,
     );
   }
 
-  // Empty factory
   factory MixerInputs.empty() {
     return MixerInputs(
       broker: [],
       bb: [],
+      washing: [],
       gilingan: [],
       mixer: [],
       summary: {},
     );
   }
 
-  // Get summary by category
   int countBroker() => summary['broker'] ?? broker.length;
   int countBb() => summary['bb'] ?? bb.length;
+  int countWashing() => summary['washing'] ?? washing.length;
   int countGilingan() => summary['gilingan'] ?? gilingan.length;
   int countMixer() => summary['mixer'] ?? mixer.length;
 }

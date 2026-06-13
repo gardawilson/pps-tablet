@@ -14,6 +14,7 @@ import '../../shared/widgets/save_button_with_badge.dart';
 import '../../shared/widgets/unsaved_temp_warning_dialog.dart';
 import '../../shared/models/bb_item.dart';
 import '../../shared/models/broker_item.dart';
+import '../../shared/models/washing_item.dart';
 import '../../shared/models/gilingan_item.dart';
 import '../../shared/models/mixer_item.dart';
 import '../model/mixer_output_model.dart';
@@ -25,9 +26,9 @@ import 'package:pps_tablet/features/mixer_type/repository/mixer_type_repository.
 import 'package:pps_tablet/features/mixer_type/view_model/mixer_type_view_model.dart';
 import 'package:pps_tablet/features/mixer_type/widgets/mixer_type_dropdown.dart';
 import '../widgets/mixer_input_group_popover.dart';
-import '../widgets/mixer_lookup_label_dialog.dart';
-import '../widgets/mixer_lookup_label_partial_dialog.dart';
 import '../widgets/mixer_output_tile.dart';
+import '../widgets/mixer_sak_picker_dialog.dart';
+import '../widgets/mixer_gilingan_weight_dialog.dart';
 import '../widgets/mixer_production_output_form_dialog.dart';
 import 'package:pps_tablet/features/production/shared/shared.dart';
 
@@ -150,6 +151,8 @@ class _MixerProductionInputScreenState
     final np = item.noPallet ?? 0;
     return np > 0 ? '$nb-$np' : nb;
   }
+
+  String _washingTitleKey(WashingItem item) => item.noWashing ?? '-';
 
   String _brokerTitleKey(BrokerItem item) {
     final p = (item.noBrokerPartial ?? '').trim();
@@ -297,7 +300,8 @@ class _MixerProductionInputScreenState
         headerSubtitle: _modeLabel(_selectedMode),
         acceptedLabels: const [
           (prefix: 'A', label: 'Bahan Baku'),
-          (prefix: 'B', label: 'Broker'),
+          (prefix: 'B', label: 'Washing'),
+          (prefix: 'D', label: 'Broker'),
           (prefix: 'V', label: 'Gilingan'),
           (prefix: 'I', label: 'Mixer'),
         ],
@@ -313,7 +317,7 @@ class _MixerProductionInputScreenState
       final normalized = code.trim().toUpperCase();
       final prefix = normalized.length >= 2 ? normalized.substring(0, 2) : '';
       if (prefix == 'B.' || prefix == 'F.') {
-        final labelType = prefix == 'B.' ? 'Broker' : 'Crusher';
+        final labelType = prefix == 'B.' ? 'Washing' : 'Crusher';
         await PartialModeNotSupportedDialog.show(
           context: context,
           labelType: labelType,
@@ -350,93 +354,80 @@ class _MixerProductionInputScreenState
     final item = res.typedItems.first;
     if (item is BbItem) return 'bb';
     if (item is BrokerItem) return 'broker';
+    if (item is WashingItem) return 'washing';
     if (item is GilinganItem) return 'gilingan';
     if (item is MixerItem) return 'mixer';
     return null;
+  }
+
+  bool _usesChipPicker(ProductionLabelLookupResult res) {
+    return res.prefixType == PrefixType.bb ||
+        res.prefixType == PrefixType.washing ||
+        res.prefixType == PrefixType.broker ||
+        res.prefixType == PrefixType.mixer;
   }
 
   Future<void> _handleFullMode(
     MixerProductionInputViewModel vm,
     ProductionLabelLookupResult res,
   ) async {
-    final freshCount = vm.countNewRowsInLastLookup(widget.noProduksi);
-    if (freshCount == 0) {
-      final code = _labelCodeOfFirst(res);
-      final hasTemp = code != null && vm.hasTemporaryDataForLabel(code);
-      final suffix = hasTemp ? ' • ${vm.getTemporaryDataSummary(code)}' : '';
-      _showSnack('Semua item untuk ${code ?? "label ini"} sudah ada.$suffix');
-      return;
+    if (res.prefixType == PrefixType.gilingan) {
+      await showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) =>
+            MixerGilinganWeightDialog(noProduksi: widget.noProduksi),
+      );
+    } else if (_usesChipPicker(res)) {
+      await showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => MixerSakPickerDialog(noProduksi: widget.noProduksi),
+      );
     }
-    vm.clearPicks();
-    vm.pickAllNew(widget.noProduksi);
-    final result = vm.commitPickedToTemp(noProduksi: widget.noProduksi);
-    final msg = result.added > 0
-        ? '✅ Auto-added ${result.added} item${result.skipped > 0 ? ' • Duplikat terlewati ${result.skipped}' : ''}'
-        : 'Tidak ada item baru ditambahkan';
-    _showSnack(
-      msg,
-      backgroundColor: result.added > 0 ? Colors.green : Colors.orange,
-    );
   }
 
   Future<void> _handlePartialMode(
     MixerProductionInputViewModel vm,
     ProductionLabelLookupResult res,
   ) async {
-    await showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (_) => LookupLabelPartialDialog(
-        noProduksi: widget.noProduksi,
-        selectedMode: _selectedMode,
-      ),
-    );
+    if (res.prefixType == PrefixType.gilingan) {
+      await showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) =>
+            MixerGilinganWeightDialog(noProduksi: widget.noProduksi),
+      );
+    } else if (_usesChipPicker(res)) {
+      await showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => MixerSakPickerDialog(
+          noProduksi: widget.noProduksi,
+          isPartialMode: true,
+        ),
+      );
+    }
   }
 
   Future<void> _handleSelectMode(
     MixerProductionInputViewModel vm,
     ProductionLabelLookupResult res,
   ) async {
-    final freshCount = vm.countNewRowsInLastLookup(widget.noProduksi);
-    if (freshCount == 0) {
-      final code = _labelCodeOfFirst(res);
-      final hasTemp = code != null && vm.hasTemporaryDataForLabel(code);
-      final suffix = hasTemp ? ' • ${vm.getTemporaryDataSummary(code)}' : '';
-      _showSnack('Semua item untuk ${code ?? "label ini"} sudah ada.$suffix');
-      return;
+    if (res.prefixType == PrefixType.gilingan) {
+      await showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) =>
+            MixerGilinganWeightDialog(noProduksi: widget.noProduksi),
+      );
+    } else if (_usesChipPicker(res)) {
+      await showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => MixerSakPickerDialog(noProduksi: widget.noProduksi),
+      );
     }
-    await showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (_) => MixerLookupLabelDialog(
-        noProduksi: widget.noProduksi,
-        selectedMode: _selectedMode,
-      ),
-    );
-  }
-
-  String? _labelCodeOfFirst(ProductionLabelLookupResult res) {
-    if (res.typedItems.isEmpty) return null;
-    final item = res.typedItems.first;
-    if (item is BbItem) {
-      final n = (item.noBBPartial ?? '').trim();
-      return n.isNotEmpty ? n : item.noBahanBaku;
-    }
-    if (item is BrokerItem) {
-      final n = (item.noBrokerPartial ?? '').trim();
-      return n.isNotEmpty ? n : item.noBroker;
-    }
-    if (item is GilinganItem) {
-      return (item.noGilinganPartial ?? '').trim().isNotEmpty
-          ? item.noGilinganPartial
-          : item.noGilingan;
-    }
-    if (item is MixerItem) {
-      return (item.noMixerPartial ?? '').trim().isNotEmpty
-          ? item.noMixerPartial
-          : item.noMixer;
-    }
-    return null;
   }
 
   // ── Output helpers ─────────────────────────────────────────────────────────
@@ -778,6 +769,7 @@ class _MixerProductionInputScreenState
     required bool canDelete,
     required Map<String, List<BbItem>> bbGroups,
     required Map<String, List<BrokerItem>> brokerGroups,
+    required Map<String, List<WashingItem>> washingGroups,
     required Map<String, List<GilinganItem>> gilinganGroups,
     required Map<String, List<MixerItem>> mixerGroups,
   }) {
@@ -790,6 +782,12 @@ class _MixerProductionInputScreenState
       }
     }
     for (final e in brokerGroups.values) {
+      for (final i in e) {
+        grandSak++;
+        grandBerat += i.berat ?? 0;
+      }
+    }
+    for (final e in washingGroups.values) {
       for (final i in e) {
         grandSak++;
         grandBerat += i.berat ?? 0;
@@ -810,11 +808,13 @@ class _MixerProductionInputScreenState
     final totalLabel =
         bbGroups.length +
         brokerGroups.length +
+        washingGroups.length +
         gilinganGroups.length +
         mixerGroups.length;
     final selSummary = _selectedTabSummary(
       bbGroups: bbGroups,
       brokerGroups: brokerGroups,
+      washingGroups: washingGroups,
       gilinganGroups: gilinganGroups,
       mixerGroups: mixerGroups,
     );
@@ -876,6 +876,11 @@ class _MixerProductionInputScreenState
                         count: brokerGroups.length,
                       ),
                       ProductionTabItem(
+                        value: 'washing',
+                        label: 'Washing',
+                        count: washingGroups.length,
+                      ),
+                      ProductionTabItem(
                         value: 'gilingan',
                         label: 'Gilingan',
                         count: gilinganGroups.length,
@@ -906,6 +911,7 @@ class _MixerProductionInputScreenState
                                   canDelete: canDelete,
                                   bbGroups: bbGroups,
                                   brokerGroups: brokerGroups,
+                                  washingGroups: washingGroups,
                                   gilinganGroups: gilinganGroups,
                                   mixerGroups: mixerGroups,
                                 ),
@@ -978,6 +984,7 @@ class _MixerProductionInputScreenState
     required bool canDelete,
     required Map<String, List<BbItem>> bbGroups,
     required Map<String, List<BrokerItem>> brokerGroups,
+    required Map<String, List<WashingItem>> washingGroups,
     required Map<String, List<GilinganItem>> gilinganGroups,
     required Map<String, List<MixerItem>> mixerGroups,
   }) {
@@ -989,6 +996,12 @@ class _MixerProductionInputScreenState
           vm: vm,
           canDelete: canDelete,
           brokerGroups: brokerGroups,
+        );
+      case 'washing':
+        return _buildWashingTab(
+          vm: vm,
+          canDelete: canDelete,
+          washingGroups: washingGroups,
         );
       case 'gilingan':
         return _buildGilinganTab(
@@ -1166,6 +1179,79 @@ class _MixerProductionInputScreenState
                           isPartial: item.isPartialRow,
                           onDelete: isTemp
                               ? () => vm.deleteTempBrokerItem(item)
+                              : null,
+                        );
+                      }).toList();
+                    },
+                  );
+                }).toList(),
+              ),
+            ),
+    );
+  }
+
+  // ── Washing Tab ────────────────────────────────────────────────────────────
+
+  Widget _buildWashingTab({
+    required MixerProductionInputViewModel vm,
+    required bool canDelete,
+    required Map<String, List<WashingItem>> washingGroups,
+  }) {
+    return ProductionOutputCategoryContent(
+      footer: const SizedBox.shrink(),
+      child: washingGroups.isEmpty
+          ? const Center(
+              child: Text('Tidak ada data', style: TextStyle(fontSize: 11)),
+            )
+          : LayoutBuilder(
+              builder: (_, c) => GridView(
+                padding: const EdgeInsets.all(6),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+                  crossAxisSpacing: 6,
+                  mainAxisSpacing: 6,
+                  mainAxisExtent: 72,
+                ),
+                children: washingGroups.entries.map((entry) {
+                  return ProductionInputGroupTile(
+                    title: entry.key,
+                    headerSubtitle:
+                        (entry.value.isNotEmpty
+                            ? entry.value.first.namaJenis
+                            : '-') ??
+                        '-',
+                    tileMetrics: [
+                      (Icons.inventory_2_outlined, '${entry.value.length} sak'),
+                      (
+                        Icons.scale_outlined,
+                        '${num2(entry.value.fold<double>(0, (s, i) => s + (i.berat ?? 0)))} kg',
+                      ),
+                    ],
+                    color: _kMixerPrimary,
+                    isTemp: vm.tempWashing.any(
+                      (x) => _washingTitleKey(x) == entry.key,
+                    ),
+                    chipItemsBuilder: () {
+                      final dbItems =
+                          vm
+                              .inputsOf(widget.noProduksi)
+                              ?.washing
+                              .where((x) => _washingTitleKey(x) == entry.key) ??
+                          const [];
+                      final items = [
+                        ...dbItems,
+                        ...vm.tempWashing.where(
+                          (x) => _washingTitleKey(x) == entry.key,
+                        ),
+                      ];
+                      return items.map((item) {
+                        final isTemp = vm.tempWashing.contains(item);
+                        return ProductionSakChip(
+                          label: 'Sak ${item.noSak ?? '-'}',
+                          berat: item.berat,
+                          isTemp: isTemp,
+                          onDelete: isTemp
+                              ? () => vm.deleteTempWashingItem(item)
                               : null,
                         );
                       }).toList();
@@ -1366,6 +1452,7 @@ class _MixerProductionInputScreenState
   SectionSummary _selectedTabSummary({
     required Map<String, List<BbItem>> bbGroups,
     required Map<String, List<BrokerItem>> brokerGroups,
+    required Map<String, List<WashingItem>> washingGroups,
     required Map<String, List<GilinganItem>> gilinganGroups,
     required Map<String, List<MixerItem>> mixerGroups,
   }) {
@@ -1393,6 +1480,18 @@ class _MixerProductionInputScreenState
         }
         return SectionSummary(
           totalData: brokerGroups.length,
+          totalSak: sak,
+          totalBerat: berat,
+        );
+      case 'washing':
+        for (final e in washingGroups.values) {
+          for (final i in e) {
+            sak++;
+            berat += i.berat ?? 0;
+          }
+        }
+        return SectionSummary(
+          totalData: washingGroups.length,
           totalSak: sak,
           totalBerat: berat,
         );
@@ -1490,6 +1589,9 @@ class _MixerProductionInputScreenState
                               ...vm.tempBrokerPartial.reversed,
                               ...?inputs?.broker,
                             ];
+                      final washingAll = loading
+                          ? <WashingItem>[]
+                          : [...vm.tempWashing.reversed, ...?inputs?.washing];
                       final gilinganAll = loading
                           ? <GilinganItem>[]
                           : [
@@ -1507,6 +1609,10 @@ class _MixerProductionInputScreenState
 
                       final bbGroups = groupBy(bbAll, _bbTitleKey);
                       final brokerGroups = groupBy(brokerAll, _brokerTitleKey);
+                      final washingGroups = groupBy(
+                        washingAll,
+                        _washingTitleKey,
+                      );
                       final gilinganGroups = groupBy(
                         gilinganAll,
                         _gilinganTitleKey,
@@ -1524,6 +1630,9 @@ class _MixerProductionInputScreenState
                         grandInputBerat += i.berat ?? 0.0;
                       }
                       for (final i in brokerAll) {
+                        grandInputBerat += i.berat ?? 0.0;
+                      }
+                      for (final i in washingAll) {
                         grandInputBerat += i.berat ?? 0.0;
                       }
                       for (final i in gilinganAll) {
@@ -1546,6 +1655,7 @@ class _MixerProductionInputScreenState
                                 canDelete: canDelete,
                                 bbGroups: bbGroups,
                                 brokerGroups: brokerGroups,
+                                washingGroups: washingGroups,
                                 gilinganGroups: gilinganGroups,
                                 mixerGroups: mixerGroups,
                               ),

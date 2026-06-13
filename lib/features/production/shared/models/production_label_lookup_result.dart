@@ -728,6 +728,21 @@ extension TempPartialFormat on PrefixType {
   }
 }
 
+// ====== PREFIX TYPE INPUT CONFIG ======
+
+extension PrefixTypeInputConfig on PrefixType {
+  /// True untuk prefix yang tidak mendukung input dialog (langsung auto-commit
+  /// dengan berat asli). Berlaku di semua proses produksi.
+  bool get isFullOnlyInput =>
+      this == PrefixType.bonggolan || this == PrefixType.crusher;
+
+  /// True untuk prefix yang tidak mendukung mode partial.
+  bool get isPartialNotSupported =>
+      this == PrefixType.bonggolan ||
+      this == PrefixType.crusher ||
+      this == PrefixType.washing;
+}
+
 /// Util sederhana jika kamu mau pakai tanpa instance enum
 String generateTempPartialCode(PrefixType t, int seq) =>
     t.formatTempPartial(seq);

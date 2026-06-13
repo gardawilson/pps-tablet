@@ -16,8 +16,8 @@ import '../model/gilingan_output_model.dart';
 import '../model/gilingan_production_model.dart';
 import '../repository/gilingan_production_input_repository.dart';
 import '../repository/gilingan_production_repository.dart';
-import '../widgets/gilingan_lookup_label_dialog.dart';
-import '../widgets/gilingan_lookup_label_partial_dialog.dart';
+import '../widgets/gilingan_sak_picker_dialog.dart';
+import '../widgets/gilingan_berat_input_dialog.dart';
 import '../widgets/gilingan_output_tile.dart';
 import '../widgets/gilingan_production_output_form_dialog.dart';
 import '../../../gilingan_type/model/gilingan_type_model.dart';
@@ -290,6 +290,27 @@ class _GilinganProductionInputScreenState
       return 'Label "$code" tidak memiliki data yang tersedia.';
     }
 
+    const allowedPrefixes = {
+      PrefixType.broker,
+      PrefixType.bonggolan,
+      PrefixType.crusher,
+      PrefixType.reject,
+    };
+    if (!allowedPrefixes.contains(res.prefixType)) {
+      if (mounted) {
+        await showDialog(
+          context: context,
+          builder: (_) => ErrorStatusDialog(
+            title: 'Label Tidak Diizinkan',
+            message:
+                'Label "${res.prefix}" tidak dapat digunakan di proses Gilingan.\n\n'
+                'Prefix yang diperbolehkan: D (Broker), M (Bonggolan), F (Crusher), BF (Reject).',
+          ),
+        );
+      }
+      return 'Prefix ${res.prefix} tidak diperbolehkan untuk proses Gilingan';
+    }
+
     final tab = _tabForLookupResult(res);
     if (tab != null && tab != _selectedInputTab) {
       setState(() => _selectedInputTab = tab);
@@ -316,92 +337,94 @@ class _GilinganProductionInputScreenState
     return null;
   }
 
+  void _autoCommit(
+    GilinganProductionInputViewModel vm,
+    ProductionLabelLookupResult res,
+    String categoryLabel,
+  ) {
+    if (res.data.isEmpty) return;
+    final row = res.data.first;
+    vm.clearPicks();
+    vm.togglePick(row);
+    final r = vm.commitPickedToTemp(noProduksi: widget.noProduksi);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          r.added > 0
+              ? '✅ $categoryLabel ditambahkan'
+              : 'Gagal menambahkan atau sudah ada',
+        ),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: r.added > 0 ? Colors.green : Colors.orange,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
   Future<void> _handleFullMode(
     GilinganProductionInputViewModel vm,
     ProductionLabelLookupResult res,
   ) async {
-    final freshCount = vm.countNewRowsInLastLookup(widget.noProduksi);
-    if (freshCount == 0) {
-      final labelCode = _labelCodeOfFirst(res);
-      final hasTemp =
-          labelCode != null && vm.hasTemporaryDataForLabel(labelCode);
-      final suffix = hasTemp
-          ? ' • ${vm.getTemporaryDataSummary(labelCode)}'
-          : '';
-      _showSnack(
-        'Semua item untuk ${labelCode ?? "label ini"} sudah ada.$suffix',
+    if (res.prefixType == PrefixType.broker) {
+      await showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => GilinganSakPickerDialog(noProduksi: widget.noProduksi),
       );
-      return;
+    } else if (res.prefixType.isFullOnlyInput) {
+      _autoCommit(vm, res, res.prefixType.displayName);
+    } else {
+      await showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => GilinganBeratInputDialog(noProduksi: widget.noProduksi),
+      );
     }
-    vm.clearPicks();
-    vm.pickAllNew(widget.noProduksi);
-    final result = vm.commitPickedToTemp(noProduksi: widget.noProduksi);
-    final msg = result.added > 0
-        ? '✅ Auto-added ${result.added} item${result.skipped > 0 ? ' • Duplikat terlewati ${result.skipped}' : ''}'
-        : 'Tidak ada item baru ditambahkan';
-    _showSnack(
-      msg,
-      backgroundColor: result.added > 0 ? Colors.green : Colors.orange,
-    );
   }
 
   Future<void> _handlePartialMode(
     GilinganProductionInputViewModel vm,
     ProductionLabelLookupResult res,
   ) async {
-    await showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (_) => GilinganLookupLabelPartialDialog(
-        noProduksi: widget.noProduksi,
-        selectedMode: _selectedMode,
-      ),
-    );
+    if (res.prefixType == PrefixType.broker) {
+      await showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => GilinganSakPickerDialog(
+          noProduksi: widget.noProduksi,
+          isPartialMode: true,
+        ),
+      );
+    } else {
+      // bonggolan/crusher sudah diblok di _onCodeReady; reject pakai dialog berat
+      await showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => GilinganBeratInputDialog(noProduksi: widget.noProduksi),
+      );
+    }
   }
 
   Future<void> _handleSelectMode(
     GilinganProductionInputViewModel vm,
     ProductionLabelLookupResult res,
   ) async {
-    final freshCount = vm.countNewRowsInLastLookup(widget.noProduksi);
-    if (freshCount == 0) {
-      final labelCode = _labelCodeOfFirst(res);
-      final hasTemp =
-          labelCode != null && vm.hasTemporaryDataForLabel(labelCode);
-      final suffix = hasTemp
-          ? ' • ${vm.getTemporaryDataSummary(labelCode)}'
-          : '';
-      _showSnack(
-        'Semua item untuk ${labelCode ?? "label ini"} sudah ada.$suffix',
+    if (res.prefixType == PrefixType.broker) {
+      await showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => GilinganSakPickerDialog(noProduksi: widget.noProduksi),
       );
-      return;
+    } else if (res.prefixType.isFullOnlyInput) {
+      _autoCommit(vm, res, res.prefixType.displayName);
+    } else {
+      await showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => GilinganBeratInputDialog(noProduksi: widget.noProduksi),
+      );
     }
-    await showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (_) => GilinganLookupLabelDialog(
-        noProduksi: widget.noProduksi,
-        selectedMode: _selectedMode,
-      ),
-    );
-  }
-
-  String? _labelCodeOfFirst(ProductionLabelLookupResult res) {
-    if (res.typedItems.isEmpty) return null;
-    final item = res.typedItems.first;
-    if (item is BrokerItem) {
-      return (item.noBrokerPartial ?? '').trim().isNotEmpty
-          ? item.noBrokerPartial
-          : item.noBroker;
-    }
-    if (item is BonggolanItem) return item.noBonggolan;
-    if (item is CrusherItem) return item.noCrusher;
-    if (item is RejectItem) {
-      return (item.noRejectPartial ?? '').trim().isNotEmpty
-          ? item.noRejectPartial
-          : item.noReject;
-    }
-    return null;
   }
 
   // ── Summary helper ─────────────────────────────────────────────────────────

@@ -20,6 +20,12 @@ import '../view_model/inject_production_input_view_model.dart';
 
 import '../view_model/inject_formula_view_model.dart';
 import '../widgets/inject_formula_dialog.dart';
+import '../../shared/widgets/production_output_detail_dialog.dart';
+import '../../../label/bonggolan/repository/bonggolan_repository.dart';
+import '../../../label/furniture_wip/repository/furniture_wip_repository.dart';
+import '../../../label/reject/repository/reject_repository.dart';
+import '../../../../core/network/endpoints.dart';
+import '../../../../core/network/api_client.dart';
 import '../widgets/inject_sak_picker_dialog.dart';
 import '../widgets/inject_split_time_dialog.dart';
 
@@ -297,26 +303,27 @@ class _InjectProductionInputScreenState
       return 'Label "$code" tidak memiliki data yang tersedia.';
     }
 
-    const allowedPrefixes = {
-      PrefixType.furnitureWip,
-      PrefixType.broker,
-      PrefixType.mixer,
-      PrefixType.gilingan,
-    };
-    if (!allowedPrefixes.contains(res.prefixType)) {
-      if (mounted) {
-        await showDialog<void>(
-          context: context,
-          builder: (_) => ErrorStatusDialog(
-            title: 'Label Tidak Diizinkan',
-            message:
-                'Label "${res.prefix}" tidak dapat digunakan di proses Inject.\n\n'
-                'Prefix yang diperbolehkan: BB (Furniture WIP), D (Broker), H (Mixer), V (Gilingan).',
-          ),
-        );
-      }
-      return 'Prefix ${res.prefix} tidak diperbolehkan untuk proses Inject';
-    }
+    // TODO: re-enable prefix validation setelah formula siap
+    // const allowedPrefixes = {
+    //   PrefixType.furnitureWip,
+    //   PrefixType.broker,
+    //   PrefixType.mixer,
+    //   PrefixType.gilingan,
+    // };
+    // if (!allowedPrefixes.contains(res.prefixType)) {
+    //   if (mounted) {
+    //     await showDialog<void>(
+    //       context: context,
+    //       builder: (_) => ErrorStatusDialog(
+    //         title: 'Label Tidak Diizinkan',
+    //         message:
+    //             'Label "${res.prefix}" tidak dapat digunakan di proses Inject.\n\n'
+    //             'Prefix yang diperbolehkan: BB (Furniture WIP), D (Broker), H (Mixer), V (Gilingan).',
+    //       ),
+    //     );
+    //   }
+    //   return 'Prefix ${res.prefix} tidak diperbolehkan untuk proses Inject';
+    // }
 
     if (res.prefixType == PrefixType.furnitureWip) {
       await _handleFwipPcsFlow(vm, res);
@@ -1520,8 +1527,26 @@ class _InjectProductionInputScreenState
               namaJenis: o.namaJenis,
               pcs: o.pcs,
               berat: o.berat,
-              isPrinted: o.hasBeenPrinted,
+              printCount: o.hasBeenPrinted,
               accentColor: _kInjectOutput,
+              onTap: () => showDialog<void>(
+                context: context,
+                builder: (_) => ProductionOutputDetailDialog(
+                  labelCode: o.noFurnitureWip,
+                  namaJenis: o.namaJenis,
+                  printCount: o.hasBeenPrinted,
+                  accentColor: _kInjectOutput,
+                  pdfUrl: ApiConstants.furnitureWipLabelPdf(o.noFurnitureWip),
+                  feature: 'furniture_wip',
+                  markAsPrinted: () =>
+                      FurnitureWipRepository().markAsPrinted(o.noFurnitureWip),
+                  metrics: [
+                    (icon: Icons.inventory_2_outlined, text: '${o.pcs} pcs'),
+                    if (o.berat > 0)
+                      (icon: Icons.scale_outlined, text: '${o.berat} kg'),
+                  ],
+                ),
+              ),
             ),
           )
           .toList(),
@@ -1554,8 +1579,24 @@ class _InjectProductionInputScreenState
               labelCode: o.noBonggolan,
               namaJenis: o.namaBonggolan,
               berat: o.berat,
-              isPrinted: o.isPrinted,
+              printCount: o.hasBeenPrinted,
               accentColor: _kInjectOutput,
+              onTap: () => showDialog<void>(
+                context: context,
+                builder: (_) => ProductionOutputDetailDialog(
+                  labelCode: o.noBonggolan,
+                  namaJenis: o.namaBonggolan,
+                  printCount: o.hasBeenPrinted,
+                  accentColor: _kInjectOutput,
+                  pdfUrl: ApiConstants.bonggolanLabelPdf(o.noBonggolan),
+                  feature: 'bonggolan',
+                  markAsPrinted: () =>
+                      BonggolanRepository().markAsPrinted(o.noBonggolan),
+                  metrics: [
+                    (icon: Icons.scale_outlined, text: '${o.berat} kg'),
+                  ],
+                ),
+              ),
             ),
           )
           .toList(),
@@ -1588,9 +1629,28 @@ class _InjectProductionInputScreenState
               labelCode: o.noReject,
               namaJenis: o.namaJenis,
               berat: o.berat,
-              isPrinted: o.isPrinted,
+              printCount: o.hasBeenPrinted,
               pcs: o.pcs,
               accentColor: _kInjectOutput,
+              onTap: () => showDialog<void>(
+                context: context,
+                builder: (_) => ProductionOutputDetailDialog(
+                  labelCode: o.noReject,
+                  namaJenis: o.namaJenis,
+                  printCount: o.hasBeenPrinted,
+                  accentColor: _kInjectOutput,
+                  pdfUrl: ApiConstants.rejectLabelPdf(o.noReject),
+                  feature: 'reject',
+                  markAsPrinted: () => RejectRepository(
+                    api: ApiClient(),
+                  ).markAsPrinted(o.noReject),
+                  metrics: [
+                    (icon: Icons.scale_outlined, text: '${o.berat} kg'),
+                    if (o.pcs != null)
+                      (icon: Icons.inventory_2_outlined, text: '${o.pcs} pcs'),
+                  ],
+                ),
+              ),
             ),
           )
           .toList(),
@@ -1682,6 +1742,32 @@ class _InjectProductionInputScreenState
                     _showSnack('Data di-refresh');
                   },
                   trailingActions: [
+                    const SizedBox(width: 4),
+                    SizedBox(
+                      height: 26,
+                      child: TextButton.icon(
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 0,
+                          ),
+                          foregroundColor: _kInjectPrimary,
+                          backgroundColor: _kInjectPrimary.withValues(
+                            alpha: 0.07,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        onPressed: null,
+                        icon: const Icon(Icons.timer_outlined, size: 13),
+                        label: const Text(
+                          'Cycle Time',
+                          style: TextStyle(fontSize: 11),
+                        ),
+                      ),
+                    ),
                     const SizedBox(width: 4),
                     Consumer<InjectFormulaViewModel>(
                       builder: (_, fvm, __) => SizedBox(

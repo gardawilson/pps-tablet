@@ -9,7 +9,7 @@ class ProductionBonggolanOutputTile extends StatelessWidget {
     required this.labelCode,
     required this.namaJenis,
     required this.berat,
-    required this.isPrinted,
+    required this.printCount,
     this.accentColor = const Color(0xFF00695C),
     this.onTap,
   });
@@ -17,9 +17,11 @@ class ProductionBonggolanOutputTile extends StatelessWidget {
   final String labelCode;
   final String namaJenis;
   final double berat;
-  final bool isPrinted;
+  final int printCount;
   final Color accentColor;
   final VoidCallback? onTap;
+
+  bool get _isPrinted => printCount > 0;
 
   @override
   Widget build(BuildContext context) {
@@ -51,10 +53,19 @@ class ProductionBonggolanOutputTile extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 4),
+                  Text(
+                    '×$printCount',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: _isPrinted ? accentColor : Colors.grey.shade400,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
                   Icon(
                     Icons.print_outlined,
                     size: 11,
-                    color: isPrinted ? accentColor : Colors.grey.shade400,
+                    color: _isPrinted ? accentColor : Colors.grey.shade400,
                   ),
                 ],
               ),

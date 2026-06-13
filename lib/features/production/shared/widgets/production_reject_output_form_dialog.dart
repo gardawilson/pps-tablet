@@ -108,13 +108,15 @@ class _ProductionRejectOutputFormDialogState
     final tglText = DateFormat('dd MMM yyyy', 'id_ID')
         .format((widget.tglProduksi ?? DateTime.now()).toLocal());
 
+    final mq = MediaQuery.of(context);
+    final maxHeight = mq.size.height - mq.viewInsets.bottom - 48;
     return Dialog(
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: EdgeInsets.only(
-            bottom: MediaQuery.viewInsetsOf(context).bottom),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: 460, maxHeight: maxHeight),
         child: SingleChildScrollView(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 460),

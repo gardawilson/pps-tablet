@@ -141,7 +141,7 @@ class InjectOutputItem {
   final String noFurnitureWip;
   final int idJenis;
   final String namaJenis;
-  final bool hasBeenPrinted;
+  final int hasBeenPrinted;
   final double berat;
   final int pcs;
 
@@ -154,6 +154,8 @@ class InjectOutputItem {
     required this.berat,
     required this.pcs,
   });
+
+  bool get isPrinted => hasBeenPrinted > 0;
 
   factory InjectOutputItem.fromJson(Map<String, dynamic> j) {
     int asInt(dynamic v) {
@@ -170,19 +172,12 @@ class InjectOutputItem {
       return double.tryParse(v.toString()) ?? 0.0;
     }
 
-    bool asBool(dynamic v) {
-      if (v == null) return false;
-      if (v is bool) return v;
-      if (v is int) return v != 0;
-      return false;
-    }
-
     return InjectOutputItem(
       noProduksi: j['NoProduksi']?.toString() ?? '',
       noFurnitureWip: j['NoFurnitureWIP']?.toString() ?? '',
       idJenis: asInt(j['IdJenis']),
       namaJenis: j['NamaJenis']?.toString() ?? '',
-      hasBeenPrinted: asBool(j['HasBeenPrinted']),
+      hasBeenPrinted: asInt(j['HasBeenPrinted']),
       berat: asDouble(j['Berat']),
       pcs: asInt(j['Pcs']),
     );

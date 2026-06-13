@@ -17,11 +17,10 @@ import '../../shared/widgets/unsaved_temp_warning_dialog.dart';
 import '../model/inject_output_model.dart';
 import '../model/inject_production_inputs_model.dart';
 import '../view_model/inject_production_input_view_model.dart';
-import '../model/inject_formula_model.dart';
-import '../model/inject_validate_label_model.dart';
-import '../repository/inject_validate_label_repository.dart';
+
 import '../view_model/inject_formula_view_model.dart';
 import '../widgets/inject_formula_dialog.dart';
+import '../widgets/inject_sak_picker_dialog.dart';
 import '../widgets/inject_split_time_dialog.dart';
 
 // ── Colour palette ─────────────────────────────────────────────────────────────
@@ -79,38 +78,6 @@ class _InjectProductionInputScreenState
   bool _outputOnLeft = false;
 
   // ── Formula-driven tab filtering ──────────────────────────────────────────
-
-  /// Kode kategori formula → tab value pada input panel
-  static const _kKodeToTab = {
-    'furniturewip': 'fwip',
-    'mixer': 'mixer',
-    'broker': 'broker',
-    'gilingan': 'gilingan',
-  };
-
-  /// Hitung tab yang boleh tampil berdasarkan formula.
-  /// - null (belum load)  → semua tab tampil
-  /// - ada tapi kode kosong → tidak ada tab yang tampil
-  /// - ada dengan kode     → hanya tab sesuai kode + material
-  Set<String> _visibleInputTabs(InjectFormulaData? formula) {
-    if (formula == null) return _kKodeToTab.values.toSet()..add('material');
-
-    final kodes = <String>{};
-    for (final out in formula.outputs) {
-      for (final f in out.formulas) {
-        kodes.add(f.inputKategoriKode.toLowerCase());
-      }
-    }
-
-    if (kodes.isEmpty) return const {};
-
-    final allowed = <String>{};
-    for (final entry in _kKodeToTab.entries) {
-      if (kodes.contains(entry.key)) allowed.add(entry.value);
-    }
-    allowed.add('material');
-    return allowed;
-  }
 
   List<BreadcrumbSegment> _prevBreadcrumb = [];
   String get _breadcrumbLabel => widget.noProduksi;
@@ -322,26 +289,6 @@ class _InjectProductionInputScreenState
   }
 
   Future<String?> _onCodeReady(String code) async {
-    // ── Validasi formula terlebih dahulu ──────────────────────────────────────
-    try {
-      final validateResult =
-          await InjectValidateLabelRepository().validate(widget.noProduksi, code);
-      if (!mounted) return 'Halaman sudah tidak aktif';
-      if (!validateResult.valid) {
-        await showDialog<void>(
-          context: context,
-          builder: (_) => ErrorStatusDialog(
-            title: 'Label Tidak Valid',
-            message: validateResult.reason ?? 'Label tidak valid untuk produksi ini',
-          ),
-        );
-        return null;
-      }
-    } catch (_) {
-      // Jika endpoint tidak tersedia / error jaringan, lanjut ke alur normal
-    }
-
-    // ── Lookup & tambah ke temp ───────────────────────────────────────────────
     final vm = context.read<InjectProductionInputViewModel>();
     final res = await vm.lookupLabel(code, force: true);
     if (!mounted) return 'Halaman sudah tidak aktif';
@@ -350,47 +297,90 @@ class _InjectProductionInputScreenState
       return 'Label "$code" tidak memiliki data yang tersedia.';
     }
 
-    await _handleFullMode(vm, res);
+    const allowedPrefixes = {
+      PrefixType.furnitureWip,
+      PrefixType.broker,
+      PrefixType.mixer,
+      PrefixType.gilingan,
+    };
+    if (!allowedPrefixes.contains(res.prefixType)) {
+      if (mounted) {
+        await showDialog<void>(
+          context: context,
+          builder: (_) => ErrorStatusDialog(
+            title: 'Label Tidak Diizinkan',
+            message:
+                'Label "${res.prefix}" tidak dapat digunakan di proses Inject.\n\n'
+                'Prefix yang diperbolehkan: BB (Furniture WIP), D (Broker), H (Mixer), V (Gilingan).',
+          ),
+        );
+      }
+      return 'Prefix ${res.prefix} tidak diperbolehkan untuk proses Inject';
+    }
+
+    if (res.prefixType == PrefixType.furnitureWip) {
+      await _handleFwipPcsFlow(vm, res);
+    } else {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => InjectSakPickerDialog(noProduksi: widget.noProduksi),
+      );
+    }
     return null;
   }
 
-  Future<void> _handleFullMode(
+  Future<void> _handleFwipPcsFlow(
     InjectProductionInputViewModel vm,
     ProductionLabelLookupResult res,
   ) async {
-    final freshCount = vm.countNewRowsInLastLookup(widget.noProduksi);
-
-    if (freshCount == 0) {
-      final labelCode = _labelCodeOfFirst(res);
-      _showSnack('Semua item untuk ${labelCode ?? "label ini"} sudah ada.');
-      return;
+    int totalAdded = 0, totalSkipped = 0;
+    for (int i = 0; i < res.typedItems.length; i++) {
+      final item = res.typedItems[i];
+      if (item is! FurnitureWipItem) continue;
+      final rawRow = res.data[i];
+      final simpleKey = res.simpleKey(rawRow);
+      if (vm.isInTempKeys(simpleKey)) {
+        totalSkipped++;
+        continue;
+      }
+      if (!mounted) break;
+      final result = await showDialog<ProductionPcsInputResult>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => ProductionPcsInputDialog(
+          item: item,
+          itemIndex: i,
+          totalItems: res.typedItems.length,
+          primaryColor: _kInjectPrimary,
+        ),
+      );
+      if (result == null) continue;
+      final originalPcs = rawRow['pcs'] ?? rawRow['Pcs'];
+      final originalIsPartial = rawRow['isPartial'];
+      if (result.isPartial) {
+        rawRow['pcs'] = result.pcs;
+        rawRow['Pcs'] = result.pcs;
+        rawRow['isPartial'] = true;
+        rawRow['IsPartial'] = true;
+      }
+      vm.clearPicks();
+      vm.togglePick(rawRow);
+      final r = vm.commitPickedToTemp(noProduksi: widget.noProduksi);
+      rawRow['pcs'] = originalPcs;
+      rawRow['Pcs'] = originalPcs;
+      rawRow['isPartial'] = originalIsPartial;
+      rawRow['IsPartial'] = originalIsPartial;
+      totalAdded += r.added;
+      totalSkipped += r.skipped;
     }
-
-    vm.clearPicks();
-    vm.pickAllNew(widget.noProduksi);
-
-    final result = vm.commitPickedToTemp(noProduksi: widget.noProduksi);
-
+    if (!mounted) return;
     _showSnack(
-      result.added > 0
-          ? '✅ Auto-added ${result.added} item${result.skipped > 0 ? ' • Duplikat terlewati ${result.skipped}' : ''}'
-          : 'Tidak ada item baru ditambahkan',
-      backgroundColor: result.added > 0 ? Colors.green : Colors.orange,
+      totalAdded > 0
+          ? '✅ Ditambahkan $totalAdded item${totalSkipped > 0 ? ' • $totalSkipped terlewati' : ''}'
+          : 'Tidak ada item yang ditambahkan',
+      backgroundColor: totalAdded > 0 ? Colors.green : Colors.orange,
     );
-  }
-
-  String? _labelCodeOfFirst(ProductionLabelLookupResult res) {
-    if (res.typedItems.isEmpty) return null;
-    final item = res.typedItems.first;
-    if (item is BrokerItem) return item.noBroker;
-    if (item is MixerItem) return item.noMixer;
-    if (item is GilinganItem) return item.noGilingan;
-    if (item is FurnitureWipItem) {
-      return (item.noFurnitureWIPPartial ?? '').trim().isNotEmpty
-          ? item.noFurnitureWIPPartial
-          : item.noFurnitureWIP;
-    }
-    return null;
   }
 
   // ── Cabinet Material ───────────────────────────────────────────────────────
@@ -613,96 +603,40 @@ class _InjectProductionInputScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Builder(
-                    builder: (ctx) {
-                      final formulaVm = ctx.watch<InjectFormulaViewModel>();
-                      final visible = _visibleInputTabs(formulaVm.data);
-
-                      // Formula sudah load & tidak ada kategori → tampilkan notice
-                      if (formulaVm.data != null && visible.isEmpty) {
-                        return Expanded(
-                          child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(14),
-                                  decoration: BoxDecoration(
-                                    color: _kInjectPrimary.withValues(
-                                      alpha: 0.06,
-                                    ),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.science_outlined,
-                                    size: 28,
-                                    color: _kInjectPrimary,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                const Text(
-                                  'Silahkan isi formula terlebih dahulu',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF374151),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Gunakan tombol Formula di toolbar\nuntuk mengatur kategori input',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.grey.shade500,
-                                    height: 1.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
+                  ProductionFolderTabBar(
+                    selectedValue: _selectedInputTab,
+                    accentColor: _kInjectPrimary,
+                    tabs: [
+                      ProductionTabItem(
+                        value: 'fwip',
+                        label: 'Furniture WIP',
+                        count: tabCounts['fwip'] ?? 0,
+                      ),
+                      ProductionTabItem(
+                        value: 'broker',
+                        label: 'Broker',
+                        count: tabCounts['broker'] ?? 0,
+                      ),
+                      ProductionTabItem(
+                        value: 'mixer',
+                        label: 'Mixer',
+                        count: tabCounts['mixer'] ?? 0,
+                      ),
+                      ProductionTabItem(
+                        value: 'gilingan',
+                        label: 'Gilingan',
+                        count: tabCounts['gilingan'] ?? 0,
+                      ),
+                      ProductionTabItem(
+                        value: 'material',
+                        label: 'Material',
+                        count: tabCounts['material'] ?? 0,
+                      ),
+                    ],
+                    onChanged: (v) {
+                      if (_selectedInputTab != v) {
+                        setState(() => _selectedInputTab = v);
                       }
-
-                      // Jika tab aktif tidak lagi visible, pindah ke tab pertama
-                      if (visible.isNotEmpty &&
-                          !visible.contains(_selectedInputTab)) {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (mounted) {
-                            setState(() {
-                              _selectedInputTab = visible.first;
-                            });
-                          }
-                        });
-                      }
-
-                      const allTabs = [
-                        (value: 'fwip', label: 'Furniture WIP'),
-                        (value: 'broker', label: 'Broker'),
-                        (value: 'mixer', label: 'Mixer'),
-                        (value: 'gilingan', label: 'Gilingan'),
-                        (value: 'material', label: 'Material'),
-                      ];
-
-                      return ProductionFolderTabBar(
-                        selectedValue: _selectedInputTab,
-                        accentColor: _kInjectPrimary,
-                        tabs: [
-                          for (final t in allTabs)
-                            if (visible.contains(t.value))
-                              ProductionTabItem(
-                                value: t.value,
-                                label: t.label,
-                                count: tabCounts[t.value] ?? 0,
-                              ),
-                        ],
-                        onChanged: (v) {
-                          if (_selectedInputTab != v) {
-                            setState(() => _selectedInputTab = v);
-                          }
-                        },
-                      );
                     },
                   ),
                   Expanded(

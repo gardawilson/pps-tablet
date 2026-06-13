@@ -1,6 +1,7 @@
 import 'package:pps_tablet/core/network/api_client.dart';
 
 import '../model/mapping_blok_model.dart';
+import '../model/mapping_label_model.dart';
 import '../model/mapping_lokasi_model.dart';
 
 class MappingRepository {
@@ -32,5 +33,27 @@ class MappingRepository {
     return data
         .map((e) => MappingLokasi.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  Future<MappingLabelResult> fetchLabelByLokasi({
+    required String blok,
+    required int idLokasi,
+  }) async {
+    final body = await api.getJson(
+      '/api/label/all',
+      query: {'blok': blok, 'idlokasi': idLokasi.toString()},
+    );
+
+    final data = body['data'];
+    if (data is! List) throw Exception('Format data label tidak sesuai');
+
+    return MappingLabelResult(
+      data: data
+          .map((e) => MappingLabelItem.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      totalData: (body['totalData'] as num?)?.toInt() ?? 0,
+      totalQty: (body['totalQty'] as num?)?.toInt() ?? 0,
+      totalBerat: (body['totalBerat'] as num?)?.toDouble() ?? 0,
+    );
   }
 }

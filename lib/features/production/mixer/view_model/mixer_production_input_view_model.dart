@@ -176,6 +176,7 @@ class MixerProductionInputViewModel extends ChangeNotifier {
     _dumpList('tempBrokerPartial', tempBrokerPartial, _keyFromBrokerItem);
     _dumpList('tempBb', tempBb, _keyFromBbItem);
     _dumpList('tempBbPartial', tempBbPartial, _keyFromBbItem);
+    _dumpList('tempWashing', tempWashing, _keyFromWashingItem);
     _dumpList('tempGilingan', tempGilingan, _keyFromGilinganItem);
     _dumpList('tempGilinganPartial', tempGilinganPartial, _keyFromGilinganItem);
     _dumpList('tempMixer', tempMixer, _keyFromMixerItem);
@@ -513,6 +514,8 @@ class MixerProductionInputViewModel extends ChangeNotifier {
       return '$noBb-$noPallet';
     }
 
+    if (item is WashingItem) return item.noWashing;
+
     if (item is GilinganItem) {
       final part = (item.noGilinganPartial ?? '').trim();
       if (part.isNotEmpty) return part;
@@ -537,6 +540,8 @@ class MixerProductionInputViewModel extends ChangeNotifier {
   final List<BbItem> tempBb = [];
   final List<BbItem> tempBbPartial = [];
 
+  final List<WashingItem> tempWashing = [];
+
   final List<GilinganItem> tempGilingan = [];
   final List<GilinganItem> tempGilinganPartial = [];
 
@@ -551,6 +556,8 @@ class MixerProductionInputViewModel extends ChangeNotifier {
   final Set<String> _tempKeys = <String>{};
 
   // ====== key builders ======
+  String _keyFromWashingItem(WashingItem i) =>
+      'B.|Washing_d|${i.noWashing ?? '-'}|${(i.noSak ?? '').toString().trim()}';
   String _keyFromBrokerItem(BrokerItem i) =>
       'D.|Broker_d|${i.noBroker ?? '-'}|${(i.noSak ?? '').toString().trim()}';
   String _keyFromBbItem(BbItem i) {
@@ -572,6 +579,7 @@ class MixerProductionInputViewModel extends ChangeNotifier {
     if (db != null) {
       for (final x in db.broker) keys.add(_keyFromBrokerItem(x));
       for (final x in db.bb) keys.add(_keyFromBbItem(x));
+      for (final x in db.washing) keys.add(_keyFromWashingItem(x));
       for (final x in db.gilingan) keys.add(_keyFromGilinganItem(x));
       for (final x in db.mixer) keys.add(_keyFromMixerItem(x));
     }
@@ -769,6 +777,8 @@ class MixerProductionInputViewModel extends ChangeNotifier {
           ? _keyFromBrokerItem(item)
           : item is BbItem
           ? _keyFromBbItem(item)
+          : item is WashingItem
+          ? _keyFromWashingItem(item)
           : item is GilinganItem
           ? _keyFromGilinganItem(item)
           : item is MixerItem
@@ -797,6 +807,9 @@ class MixerProductionInputViewModel extends ChangeNotifier {
         } else {
           tempBb.add(newItem);
         }
+        itemAdded = true;
+      } else if (newItem is WashingItem) {
+        tempWashing.add(newItem);
         itemAdded = true;
       } else if (newItem is GilinganItem) {
         if (newItem.isPartialRow) {
@@ -925,6 +938,15 @@ class MixerProductionInputViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void deleteTempWashingItem(WashingItem item) {
+    tempWashing.remove(item);
+    _tempKeys.remove(_keyFromWashingItem(item));
+    final code = _getItemLabelCode(item);
+    if (code != null) _updateTempItemsByLabel(code);
+    debugDumpTempLists(tag: 'after deleteTempWashingItem');
+    notifyListeners();
+  }
+
   void deleteTempGilinganItem(GilinganItem item) {
     tempGilingan.remove(item);
     tempGilinganPartial.remove(item);
@@ -953,6 +975,7 @@ class MixerProductionInputViewModel extends ChangeNotifier {
     tempBrokerPartial.clear();
     tempBb.clear();
     tempBbPartial.clear();
+    tempWashing.clear();
     tempGilingan.clear();
     tempGilinganPartial.clear();
     tempMixer.clear();
@@ -979,6 +1002,9 @@ class MixerProductionInputViewModel extends ChangeNotifier {
     } else if (item is BbItem) {
       ok = tempBb.remove(item) || tempBbPartial.remove(item);
       if (ok) _tempKeys.remove(_keyFromBbItem(item));
+    } else if (item is WashingItem) {
+      ok = tempWashing.remove(item);
+      if (ok) _tempKeys.remove(_keyFromWashingItem(item));
     } else if (item is GilinganItem) {
       ok = tempGilingan.remove(item) || tempGilinganPartial.remove(item);
       if (ok) _tempKeys.remove(_keyFromGilinganItem(item));
@@ -1090,6 +1116,7 @@ class MixerProductionInputViewModel extends ChangeNotifier {
       tempBrokerPartial.length +
       tempBb.length +
       tempBbPartial.length +
+      tempWashing.length +
       tempGilingan.length +
       tempGilinganPartial.length +
       tempMixer.length +
@@ -1120,6 +1147,12 @@ class MixerProductionInputViewModel extends ChangeNotifier {
               'noSak': e.noSak,
             },
           )
+          .toList();
+    }
+
+    if (tempWashing.isNotEmpty) {
+      payload['washing'] = tempWashing
+          .map((e) => {'noWashing': e.noWashing, 'noSak': e.noSak})
           .toList();
     }
 
@@ -1257,6 +1290,9 @@ class MixerProductionInputViewModel extends ChangeNotifier {
     }
     if (tempBbPartial.isNotEmpty) {
       parts.add('${tempBbPartial.length} BB Partial');
+    }
+    if (tempWashing.isNotEmpty) {
+      parts.add('${tempWashing.length} Washing');
     }
     if (tempGilingan.isNotEmpty) {
       parts.add('${tempGilingan.length} Gilingan');

@@ -86,8 +86,6 @@ class _InjectProductionScreenState extends State<InjectProductionScreen> {
                       MaterialPageRoute(
                         builder: (_) => InjectProductionInputScreen(
                           noProduksi: row.noProduksi,
-                          isLocked: row.isLocked,
-                          lastClosedDate: row.lastClosedDate,
                         ),
                       ),
                     );

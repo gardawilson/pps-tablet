@@ -202,6 +202,17 @@ class CrusherProductionRepository {
     };
   }
 
+  Future<CrusherProduction> fetchOne(String noCrusherProduksi) async {
+    final result = await fetchAll(
+      page: 1,
+      pageSize: 1,
+      noCrusherProduksi: noCrusherProduksi.trim(),
+    );
+    final items = result['items'] as List<CrusherProduction>;
+    if (items.isEmpty) throw Exception('Data tidak ditemukan untuk $noCrusherProduksi');
+    return items.first;
+  }
+
   /// Convenience jika hanya butuh list halaman tertentu
   Future<List<CrusherProduction>> fetchAllList({
     required int page,

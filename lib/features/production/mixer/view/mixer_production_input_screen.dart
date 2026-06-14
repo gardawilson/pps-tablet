@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shimmer/shimmer.dart';
 
 import 'package:pps_tablet/core/view/app_shell.dart';
 import 'package:pps_tablet/features/production/mixer/view_model/mixer_production_input_view_model.dart';
@@ -41,32 +42,10 @@ const _kMixerBorder = Color(0xFFE2E6EA);
 
 class MixerProductionInputScreen extends StatefulWidget {
   final String noProduksi;
-  final bool? isLocked;
-  final DateTime? lastClosedDate;
-
-  // Header info
-  final int? idMesin;
-  final String? namaMesin;
-  final String? namaJenis;
-  final int? outputJenisId;
-  final DateTime? tglProduksi;
-  final int? shift;
-  final String? hourStart;
-  final String? hourEnd;
 
   const MixerProductionInputScreen({
     super.key,
     required this.noProduksi,
-    this.isLocked,
-    this.lastClosedDate,
-    this.idMesin,
-    this.namaMesin,
-    this.namaJenis,
-    this.outputJenisId,
-    this.tglProduksi,
-    this.shift,
-    this.hourStart,
-    this.hourEnd,
   });
 
   @override
@@ -85,8 +64,11 @@ class _MixerProductionInputScreenState
   List<BreadcrumbSegment> _prevBreadcrumb = [];
   bool _isReplacing = false;
 
+  MixerProduction? _header;
+  late String _cachedBreadcrumbLabel;
+
   String get _breadcrumbLabel {
-    final m = (widget.namaMesin ?? '').trim();
+    final m = (_header?.namaMesin ?? '').trim();
     return m.isNotEmpty ? m : widget.noProduksi;
   }
 
@@ -95,21 +77,12 @@ class _MixerProductionInputScreenState
   @override
   void initState() {
     super.initState();
-    _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
+    _cachedBreadcrumbLabel = widget.noProduksi;
+    _loadHeader();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      AppShell.breadcrumb.value = [
-        ..._prevBreadcrumb.map(
-          (s) => BreadcrumbSegment(
-            s.label,
-            onTap: () {
-              AppShell.breadcrumb.value = _prevBreadcrumb;
-              AppShell.shellNavigatorKey.currentState?.pop();
-            },
-          ),
-        ),
-        BreadcrumbSegment(_breadcrumbLabel),
-      ];
+      _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
+      _updateBreadcrumb();
 
       final vm = context.read<MixerProductionInputViewModel>();
       if (vm.inputsOf(widget.noProduksi) == null &&
@@ -123,13 +96,45 @@ class _MixerProductionInputScreenState
     });
   }
 
+  void _updateBreadcrumb() {
+    if (!mounted) return;
+    AppShell.breadcrumb.value = [
+      ..._prevBreadcrumb.map(
+        (s) => BreadcrumbSegment(
+          s.label,
+          onTap: () {
+            AppShell.breadcrumb.value = _prevBreadcrumb;
+            AppShell.shellNavigatorKey.currentState?.pop();
+          },
+        ),
+      ),
+      BreadcrumbSegment(_breadcrumbLabel),
+    ];
+  }
+
+  Future<void> _loadHeader() async {
+    try {
+      final header = await _prodRepo.fetchOne(widget.noProduksi);
+      if (!mounted) return;
+      setState(() {
+        _header = header;
+        _cachedBreadcrumbLabel = _breadcrumbLabel;
+      });
+      _updateBreadcrumb();
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
     if (!_isReplacing) {
-      final current = AppShell.breadcrumb.value;
-      if (current.isNotEmpty && current.last.label == _breadcrumbLabel) {
-        AppShell.breadcrumb.value = _prevBreadcrumb;
-      }
+      final prev = _prevBreadcrumb;
+      final label = _cachedBreadcrumbLabel;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final current = AppShell.breadcrumb.value;
+        if (current.isNotEmpty && current.last.label == label) {
+          AppShell.breadcrumb.value = prev;
+        }
+      });
     }
     super.dispose();
   }
@@ -444,7 +449,7 @@ class _MixerProductionInputScreenState
       return;
     }
 
-    if (widget.outputJenisId == null) {
+    if (_header?.outputJenisId == null) {
       _showSnack(
         'Jenis output belum dikonfigurasi pada produksi ini.',
         backgroundColor: Colors.orange,
@@ -457,10 +462,10 @@ class _MixerProductionInputScreenState
       barrierDismissible: false,
       builder: (_) => MixerProductionOutputFormDialog(
         noProduksi: widget.noProduksi,
-        tglProduksi: widget.tglProduksi,
-        idJenis: widget.outputJenisId!,
-        namaJenis: widget.namaJenis ?? '',
-        namaMesin: widget.namaMesin,
+        tglProduksi: _header?.tglProduksi,
+        idJenis: _header!.outputJenisId!,
+        namaJenis: _header?.outputJenisNama ?? '',
+        namaMesin: _header?.namaMesin,
         repository: _repo,
       ),
     );
@@ -476,16 +481,16 @@ class _MixerProductionInputScreenState
     if (!mounted) return;
     await ProductionFlowHelpers.openTimeline(
       context: context,
-      idMesin: widget.idMesin,
-      tanggal: widget.tglProduksi,
+      idMesin: _header?.idMesin,
+      tanggal: _header?.tglProduksi,
       onMissingContext: () => _showSnack(
         'Data mesin/tanggal tidak tersedia',
         backgroundColor: Colors.orange,
       ),
       dialogBuilder: (idMesin, tgl) => buildProductionShiftTimelineDialog(
-        namaMesin: widget.namaMesin,
+        namaMesin: _header?.namaMesin,
         tanggal: tgl,
-        shift: widget.shift ?? 1,
+        shift: _header?.shift ?? 1,
         currentNoProduksi: widget.noProduksi,
         primaryColor: _kMixerPrimary,
         borderColor: _kMixerBorder,
@@ -494,7 +499,7 @@ class _MixerProductionInputScreenState
           final list = await _prodRepo.fetchByMesinTanggalShift(
             idMesin: idMesin,
             tanggal: tgl,
-            shift: widget.shift ?? 1,
+            shift: _header?.shift ?? 1,
           );
           return list
               .map(
@@ -520,8 +525,8 @@ class _MixerProductionInputScreenState
       ({MixerProduction prod, String namaJenis})
     >(
       context: context,
-      idMesin: widget.idMesin,
-      tanggal: widget.tglProduksi,
+      idMesin: _header?.idMesin,
+      tanggal: _header?.tglProduksi,
       onMissingContext: () => _showSnack(
         'Data mesin/tanggal tidak tersedia',
         backgroundColor: Colors.orange,
@@ -539,7 +544,7 @@ class _MixerProductionInputScreenState
                   MixerType
                 >(
                   tanggal: tgl,
-                  shift: widget.shift ?? 1,
+                  shift: _header?.shift ?? 1,
                   primaryColor: _kMixerPrimary,
                   borderColor: _kMixerBorder,
                   jenisRequiredMessage: 'Pilih jenis mixer terlebih dahulu',
@@ -573,25 +578,10 @@ class _MixerProductionInputScreenState
       replaceToResult: (splitResult) async {
         if (!mounted) return;
         final newProd = splitResult.prod;
-        final namaJenis = splitResult.namaJenis.isNotEmpty
-            ? splitResult.namaJenis
-            : (newProd.outputJenisNama ?? '');
         await Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => MixerProductionInputScreen(
               noProduksi: newProd.noProduksi,
-              isLocked: newProd.isLocked,
-              lastClosedDate: newProd.lastClosedDate,
-              idMesin: newProd.idMesin,
-              namaMesin: newProd.namaMesin.isNotEmpty
-                  ? newProd.namaMesin
-                  : (widget.namaMesin ?? ''),
-              namaJenis: namaJenis,
-              outputJenisId: newProd.outputJenisId,
-              tglProduksi: newProd.tglProduksi,
-              shift: newProd.shift,
-              hourStart: newProd.hourStart,
-              hourEnd: newProd.hourEnd,
             ),
           ),
         );
@@ -701,11 +691,6 @@ class _MixerProductionInputScreenState
                                                   .map(
                                                     (o) => MixerOutputTile(
                                                       output: o,
-                                                      onPrint: () => _showSnack(
-                                                        'Fitur print mixer belum tersedia.',
-                                                        backgroundColor:
-                                                            Colors.orange,
-                                                      ),
                                                     ),
                                                   )
                                                   .toList(),
@@ -739,10 +724,13 @@ class _MixerProductionInputScreenState
                                     FloatingActionButton(
                                       heroTag: 'fab_add_mixer_output',
                                       mini: true,
-                                      backgroundColor: _kMixerOutputColor,
+                                      backgroundColor: _header == null
+                                          ? Colors.grey.shade300
+                                          : _kMixerOutputColor,
                                       foregroundColor: Colors.white,
-                                      onPressed: () =>
-                                          _openAddOutputDialog(grandInputBerat),
+                                      onPressed: _header == null
+                                          ? null
+                                          : () => _openAddOutputDialog(grandInputBerat),
                                       child: const Icon(Icons.add),
                                     ),
                                   ],
@@ -1521,6 +1509,41 @@ class _MixerProductionInputScreenState
     }
   }
 
+  // ── Skeleton toolbar ───────────────────────────────────────────────────────
+
+  Widget _buildToolbarSkeleton() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey.shade200,
+        highlightColor: Colors.grey.shade50,
+        child: Container(
+          height: 44,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border(left: BorderSide(color: Colors.grey.shade300, width: 4)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(children: [
+            _skeletonBox(w: 72, h: 20, r: 20),
+            const SizedBox(width: 16),
+            _skeletonBox(w: 140, h: 14, r: 4),
+            const SizedBox(width: 10),
+            _skeletonBox(w: 100, h: 14, r: 4),
+            const Spacer(),
+            _skeletonBox(w: 64, h: 24, r: 6),
+            const SizedBox(width: 6),
+            _skeletonBox(w: 64, h: 24, r: 6),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Widget _skeletonBox({required double w, required double h, double r = 4}) =>
+      Container(width: w, height: h, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(r)));
+
   // ── Main build ─────────────────────────────────────────────────────────────
 
   @override
@@ -1531,7 +1554,7 @@ class _MixerProductionInputScreenState
         final err = vm.inputsError(widget.noProduksi);
         final inputs = vm.inputsOf(widget.noProduksi);
         final perm = context.watch<PermissionViewModel>();
-        final locked = widget.isLocked == true;
+        final locked = _header?.isLocked == true;
         final canDelete = perm.can('label_washing:delete') && !locked;
 
         return PopScope(
@@ -1548,24 +1571,27 @@ class _MixerProductionInputScreenState
             resizeToAvoidBottomInset: false,
             body: Column(
               children: [
-                ProductionWorkspaceToolbar(
-                  noProduksi: widget.noProduksi,
-                  isLocked: locked,
-                  idMesin: widget.idMesin,
-                  namaJenis: widget.namaJenis,
-                  tglProduksi: widget.tglProduksi,
-                  shift: widget.shift,
-                  hourStart: widget.hourStart,
-                  hourEnd: widget.hourEnd,
-                  primaryColor: _kMixerPrimary,
-                  onGanti: locked ? null : _openSplitDialog,
-                  onRiwayat: _openTimelineDialog,
-                  onRefresh: () {
-                    vm.loadInputs(widget.noProduksi, force: true);
-                    vm.loadOutputs(widget.noProduksi, force: true);
-                    _showSnack('Data di-refresh');
-                  },
-                ),
+                if (_header == null)
+                  _buildToolbarSkeleton()
+                else
+                  ProductionWorkspaceToolbar(
+                    noProduksi: widget.noProduksi,
+                    isLocked: locked,
+                    idMesin: _header?.idMesin,
+                    namaJenis: _header?.outputJenisNama,
+                    tglProduksi: _header?.tglProduksi,
+                    shift: _header?.shift,
+                    hourStart: _header?.hourStart,
+                    hourEnd: _header?.hourEnd,
+                    primaryColor: _kMixerPrimary,
+                    onGanti: locked ? null : _openSplitDialog,
+                    onRiwayat: _openTimelineDialog,
+                    onRefresh: () {
+                      vm.loadInputs(widget.noProduksi, force: true);
+                      vm.loadOutputs(widget.noProduksi, force: true);
+                      _showSnack('Data di-refresh');
+                    },
+                  ),
                 Expanded(
                   child: Builder(
                     builder: (_) {

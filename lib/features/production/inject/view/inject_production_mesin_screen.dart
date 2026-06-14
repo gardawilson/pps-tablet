@@ -161,20 +161,8 @@ class _InjectProductionMesinScreenState
       if (created != null) {
         await Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => InjectProductionInputScreen(
-              noProduksi: created.noProduksi,
-              isLocked: created.isLocked,
-              lastClosedDate: created.lastClosedDate,
-              idMesin: created.idMesin,
-              namaJenis: created.namaJenis,
-              namaCetakan: created.namaCetakan,
-              namaWarna: created.namaWarna,
-              namaFurnitureMaterial: created.namaFurnitureMaterial,
-              tglProduksi: created.tglProduksi,
-              shift: created.shift,
-              hourStart: created.hourStart,
-              hourEnd: created.hourEnd,
-            ),
+            builder: (_) =>
+                InjectProductionInputScreen(noProduksi: created.noProduksi),
           ),
         );
         if (!mounted) return;
@@ -194,21 +182,8 @@ class _InjectProductionMesinScreenState
     final item = mesin.produksiList.first;
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => InjectProductionInputScreen(
-          noProduksi: item.noProduksi,
-          isLocked: false,
-          lastClosedDate: null,
-          idMesin: mesin.idMesin,
-          namaCetakan: item.namaCetakan,
-          namaWarna: item.warna,
-          namaFurnitureMaterial: item.namaFurnitureMaterial,
-          shift: item.shift,
-          tglProduksi: item.tglProduksi,
-          hourStart: item.hourStart,
-          hourEnd: item.hourEnd,
-          outputCategory: mesin.outputCategory,
-          lockedOutputs: mesin.outputs,
-        ),
+        builder: (_) =>
+            InjectProductionInputScreen(noProduksi: item.noProduksi),
       ),
     );
     if (!mounted) return;
@@ -424,20 +399,6 @@ class _InjectProductionMesinScreenState
                                 MaterialPageRoute(
                                   builder: (_) => InjectProductionInputScreen(
                                     noProduksi: row.noProduksi,
-                                    isLocked: row.isLocked,
-                                    lastClosedDate: row.lastClosedDate,
-                                    idMesin: row.idMesin,
-                                    namaJenis: row.namaJenis,
-                                    namaCetakan: row.namaCetakan,
-                                    namaWarna: row.namaWarna,
-                                    namaFurnitureMaterial:
-                                        row.namaFurnitureMaterial,
-                                    tglProduksi: row.tglProduksi,
-                                    shift: row.shift,
-                                    hourStart: row.hourStart,
-                                    hourEnd: row.hourEnd,
-                                    outputCategory: row.outputCategory,
-                                    lockedOutputs: row.outputs,
                                   ),
                                 ),
                               );
@@ -514,20 +475,6 @@ class _InjectProductionMesinScreenState
                                 MaterialPageRoute(
                                   builder: (_) => InjectProductionInputScreen(
                                     noProduksi: row.noProduksi,
-                                    isLocked: row.isLocked,
-                                    lastClosedDate: row.lastClosedDate,
-                                    idMesin: row.idMesin,
-                                    namaJenis: row.namaJenis,
-                                    namaCetakan: row.namaCetakan,
-                                    namaWarna: row.namaWarna,
-                                    namaFurnitureMaterial:
-                                        row.namaFurnitureMaterial,
-                                    tglProduksi: row.tglProduksi,
-                                    shift: row.shift,
-                                    hourStart: row.hourStart,
-                                    hourEnd: row.hourEnd,
-                                    outputCategory: row.outputCategory,
-                                    lockedOutputs: row.outputs,
                                   ),
                                 ),
                               );

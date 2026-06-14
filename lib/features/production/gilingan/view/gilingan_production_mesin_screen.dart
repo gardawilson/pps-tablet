@@ -140,8 +140,7 @@ class _GilinganProductionMesinScreenState
     if (mesin.isActive) {
       final parts = <String>[];
       if (mesin.shift != null) parts.add('Shift ${mesin.shift}');
-      parts.add(
-          '${mesin.hourStart ?? '--:--'} – ${mesin.hourEnd ?? '--:--'}');
+      parts.add('${mesin.hourStart ?? '--:--'} – ${mesin.hourEnd ?? '--:--'}');
       shiftTimeText = parts.join('  |  ');
     }
     return MesinCardData(
@@ -202,18 +201,8 @@ class _GilinganProductionMesinScreenState
     if (created != null) {
       await Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => GilinganProductionInputScreen(
-            noProduksi: created.noProduksi,
-            isLocked: created.isLocked,
-            lastClosedDate: created.lastClosedDate,
-            outputJenisId: created.outputJenisId,
-            namaJenis: created.outputJenisNama,
-            idMesin: created.idMesin,
-            tglProduksi: created.tglProduksi,
-            shift: created.shift,
-            hourStart: created.hourStart,
-            hourEnd: created.hourEnd,
-          ),
+          builder: (_) =>
+              GilinganProductionInputScreen(noProduksi: created.noProduksi),
         ),
       );
       if (!mounted) return;
@@ -250,18 +239,8 @@ class _GilinganProductionMesinScreenState
       if (created != null) {
         await Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => GilinganProductionInputScreen(
-              noProduksi: created.noProduksi,
-              isLocked: created.isLocked,
-              lastClosedDate: created.lastClosedDate,
-              outputJenisId: created.outputJenisId,
-              namaJenis: created.outputJenisNama,
-              idMesin: created.idMesin,
-              tglProduksi: created.tglProduksi,
-              shift: created.shift,
-              hourStart: created.hourStart,
-              hourEnd: created.hourEnd,
-            ),
+            builder: (_) =>
+                GilinganProductionInputScreen(noProduksi: created.noProduksi),
           ),
         );
         if (!mounted) return;
@@ -282,18 +261,8 @@ class _GilinganProductionMesinScreenState
 
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => GilinganProductionInputScreen(
-          noProduksi: mesin.noProduksi!,
-          isLocked: false,
-          lastClosedDate: null,
-          outputJenisId: mesin.outputJenisId,
-          namaJenis: mesin.outputJenisNama,
-          idMesin: mesin.idMesin,
-          tglProduksi: mesin.tglProduksi,
-          shift: mesin.shift,
-          hourStart: mesin.hourStart,
-          hourEnd: mesin.hourEnd,
-        ),
+        builder: (_) =>
+            GilinganProductionInputScreen(noProduksi: mesin.noProduksi!),
       ),
     );
     if (!mounted) return;
@@ -307,244 +276,236 @@ class _GilinganProductionMesinScreenState
     return Scaffold(
       body: LayoutBuilder(
         builder: (_, c) => Row(
-        children: [
-          // ── LEFT: mesin grid (3/5) ──────────────────────────────
-          Expanded(
-            flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                FutureBuilder<List<GilinganMesinInfo>>(
-                  future: _mesinFuture,
-                  builder: (context, snapshot) {
-                    final allMesin = snapshot.data ?? [];
-                    final activeCount =
-                        allMesin.where((m) => m.isActive).length;
-                    final inactiveCount = allMesin.length - activeCount;
-                    return MesinSectionHeader(
-                      title: 'Status Mesin Gilingan',
-                      activeCount: activeCount,
-                      inactiveCount: inactiveCount,
-                      isLoading:
-                          snapshot.connectionState == ConnectionState.waiting,
-                    );
-                  },
-                ),
-                Expanded(
-                  child: FutureBuilder<List<GilinganMesinInfo>>(
+          children: [
+            // ── LEFT: mesin grid (3/5) ──────────────────────────────
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FutureBuilder<List<GilinganMesinInfo>>(
                     future: _mesinFuture,
                     builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      if (snapshot.hasError) {
-                        return Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Text(
-                              'Gagal memuat mesin\n${snapshot.error}',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF64748B),
-                              ),
-                            ),
-                          ),
-                        );
-                      }
                       final allMesin = snapshot.data ?? [];
-                      return LayoutBuilder(
-                        builder: (context, constraints) {
-                          final cols =
-                              (constraints.maxWidth / 150).floor().clamp(2, 6);
-                          return GridView.builder(
-                            padding: const EdgeInsets.all(12),
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: cols,
-                                  mainAxisExtent: 110,
-                                  crossAxisSpacing: 10,
-                                  mainAxisSpacing: 10,
-                                ),
-                            itemCount: allMesin.length,
-                            itemBuilder: (context, index) {
-                              final mesin = allMesin[index];
-                              return ProductionMesinCard(
-                                data: _toMesinCardData(mesin),
-                                onTap: () => _onMesinTap(mesin),
-                              );
-                            },
-                          );
-                        },
+                      final activeCount = allMesin
+                          .where((m) => m.isActive)
+                          .length;
+                      final inactiveCount = allMesin.length - activeCount;
+                      return MesinSectionHeader(
+                        title: 'Status Mesin Gilingan',
+                        activeCount: activeCount,
+                        inactiveCount: inactiveCount,
+                        isLoading:
+                            snapshot.connectionState == ConnectionState.waiting,
                       );
                     },
                   ),
-                ),
-              ],
+                  Expanded(
+                    child: FutureBuilder<List<GilinganMesinInfo>>(
+                      future: _mesinFuture,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+                        if (snapshot.hasError) {
+                          return Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Text(
+                                'Gagal memuat mesin\n${snapshot.error}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF64748B),
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+                        final allMesin = snapshot.data ?? [];
+                        return LayoutBuilder(
+                          builder: (context, constraints) {
+                            final cols = (constraints.maxWidth / 150)
+                                .floor()
+                                .clamp(2, 6);
+                            return GridView.builder(
+                              padding: const EdgeInsets.all(12),
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: cols,
+                                    mainAxisExtent: 110,
+                                    crossAxisSpacing: 10,
+                                    mainAxisSpacing: 10,
+                                  ),
+                              itemCount: allMesin.length,
+                              itemBuilder: (context, index) {
+                                final mesin = allMesin[index];
+                                return ProductionMesinCard(
+                                  data: _toMesinCardData(mesin),
+                                  onTap: () => _onMesinTap(mesin),
+                                );
+                              },
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
 
-          // ── RIGHT: riwayat produksi ──────────────────────────
-          RiwayatAnimatedPanel(
-            expandedWidth: c.maxWidth * 0.4,
-            isExpanded: _isRiwayatExpanded,
-            onToggle: () => setState(() => _isRiwayatExpanded = !_isRiwayatExpanded),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                FutureBuilder<List<GilinganMesinInfo>>(
-                  future: _mesinFuture,
-                  builder: (context, snapshot) {
-                    return ProductionRiwayatHeader(
-                      mesinList: (snapshot.data ?? [])
-                          .map((m) => MesinFilterItem(
+            // ── RIGHT: riwayat produksi ──────────────────────────
+            RiwayatAnimatedPanel(
+              expandedWidth: c.maxWidth * 0.4,
+              isExpanded: _isRiwayatExpanded,
+              onToggle: () =>
+                  setState(() => _isRiwayatExpanded = !_isRiwayatExpanded),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FutureBuilder<List<GilinganMesinInfo>>(
+                    future: _mesinFuture,
+                    builder: (context, snapshot) {
+                      return ProductionRiwayatHeader(
+                        mesinList: (snapshot.data ?? [])
+                            .map(
+                              (m) => MesinFilterItem(
                                 idMesin: m.idMesin,
                                 namaMesin: m.namaMesin,
-                              ))
-                          .toList(),
-                      selectedIdMesin: _filterIdMesin,
-                      onFilterChanged: (id) {
-                        final mesinData = snapshot.data ?? [];
-                        setState(() {
-                          _filterIdMesin = id;
-                          _selectedMesinInfo = id == null
-                              ? null
-                              : mesinData
-                                    .where((m) => m.idMesin == id)
-                                    .firstOrNull;
-                        });
-                        _loadProduksiPage();
-                      },
-                      onToggle: () => setState(() => _isRiwayatExpanded = !_isRiwayatExpanded),
-                      isExpanded: _isRiwayatExpanded,
-                    );
-                  },
-                ),
-                Expanded(
-                  child: Stack(
-                    children: [
-                      RefreshIndicator(
-                        onRefresh: _loadProduksiPage,
-                        child: ProductionProduksiList<GilinganProduction>(
-                          items: _produksiItems,
-                          dataOf: _toRowData,
-                          isLoading: _produksiLoading,
-                          isFetchingMore: _produksiFetchingMore,
-                          scrollController: _produksiScrollCtl,
-                          showMesin: _filterIdMesin == null,
-                          onTap: (row) async {
-                            await Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => GilinganProductionInputScreen(
-                                  noProduksi: row.noProduksi,
-                                  isLocked: row.isLocked,
-                                  lastClosedDate: row.lastClosedDate,
-                                  outputJenisId: row.outputJenisId,
-                                  namaJenis: row.outputJenisNama,
-                                  idMesin: row.idMesin,
-                                  tglProduksi: row.tglProduksi,
-                                  shift: row.shift,
-                                  hourStart: row.hourStart,
-                                  hourEnd: row.hourEnd,
-                                ),
                               ),
-                            );
-                            if (mounted) _refreshAll();
-                          },
-                          onEdit: (row) async {
-                            await showDialog<void>(
-                              context: context,
-                              barrierDismissible: false,
-                              builder: (_) => ChangeNotifierProvider.value(
-                                value: _editVmPool,
-                                child: GilinganProductionFormDialog(
-                                  header: row,
-                                ),
-                              ),
-                            );
-                            if (mounted) _refreshAll();
-                          },
-                          onDelete: (row) async {
-                            final screenCtx = context;
-                            await showDialog<void>(
-                              context: screenCtx,
-                              barrierDismissible: false,
-                              builder: (ctx) => GilinganProductionDeleteDialog(
-                                header: row,
-                                onConfirm: () async {
-                                  final success = await _editVmPool
-                                      .deleteProduksi(row.noProduksi);
-                                  final errMsg = _editVmPool.saveError;
-                                  if (ctx.mounted) Navigator.of(ctx).pop();
-                                  if (!screenCtx.mounted) return;
-                                  if (success) {
-                                    showDialog(
-                                      context: screenCtx,
-                                      builder: (_) => SuccessStatusDialog(
-                                        title: 'Berhasil Menghapus',
-                                        message:
-                                            'No. Produksi ${row.noProduksi} berhasil dihapus.',
-                                      ),
-                                    );
-                                  } else {
-                                    showDialog(
-                                      context: screenCtx,
-                                      builder: (_) => ErrorStatusDialog(
-                                        title: 'Gagal Menghapus!',
-                                        message:
-                                            errMsg ?? 'Gagal menghapus data',
-                                      ),
-                                    );
-                                  }
-                                  _refreshAll();
-                                },
-                              ),
-                            );
-                          },
-                          onInput: (row) async {
-                            await Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => GilinganProductionInputScreen(
-                                  noProduksi: row.noProduksi,
-                                  isLocked: row.isLocked,
-                                  lastClosedDate: row.lastClosedDate,
-                                  outputJenisId: row.outputJenisId,
-                                  namaJenis: row.outputJenisNama,
-                                  idMesin: row.idMesin,
-                                  tglProduksi: row.tglProduksi,
-                                  shift: row.shift,
-                                  hourStart: row.hourStart,
-                                  hourEnd: row.hourEnd,
-                                ),
-                              ),
-                            );
-                            if (mounted) _refreshAll();
-                          },
+                            )
+                            .toList(),
+                        selectedIdMesin: _filterIdMesin,
+                        onFilterChanged: (id) {
+                          final mesinData = snapshot.data ?? [];
+                          setState(() {
+                            _filterIdMesin = id;
+                            _selectedMesinInfo = id == null
+                                ? null
+                                : mesinData
+                                      .where((m) => m.idMesin == id)
+                                      .firstOrNull;
+                          });
+                          _loadProduksiPage();
+                        },
+                        onToggle: () => setState(
+                          () => _isRiwayatExpanded = !_isRiwayatExpanded,
                         ),
-                      ),
-                      if (_selectedMesinInfo != null)
-                        Positioned(
-                          right: 16,
-                          bottom: 16,
-                          child: FloatingActionButton.small(
-                            heroTag: 'fab_backdate_gilingan',
-                            onPressed: () =>
-                                _openBackdateDialog(_selectedMesinInfo!),
-                            backgroundColor: const Color(0xFF0277BD),
-                            foregroundColor: Colors.white,
-                            tooltip: 'Tambah Backdate',
-                            child: const Icon(Icons.add),
+                        isExpanded: _isRiwayatExpanded,
+                      );
+                    },
+                  ),
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        RefreshIndicator(
+                          onRefresh: _loadProduksiPage,
+                          child: ProductionProduksiList<GilinganProduction>(
+                            items: _produksiItems,
+                            dataOf: _toRowData,
+                            isLoading: _produksiLoading,
+                            isFetchingMore: _produksiFetchingMore,
+                            scrollController: _produksiScrollCtl,
+                            showMesin: _filterIdMesin == null,
+                            onTap: (row) async {
+                              await Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => GilinganProductionInputScreen(
+                                    noProduksi: row.noProduksi,
+                                  ),
+                                ),
+                              );
+                              if (mounted) _refreshAll();
+                            },
+                            onEdit: (row) async {
+                              await showDialog<void>(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (_) => ChangeNotifierProvider.value(
+                                  value: _editVmPool,
+                                  child: GilinganProductionFormDialog(
+                                    header: row,
+                                  ),
+                                ),
+                              );
+                              if (mounted) _refreshAll();
+                            },
+                            onDelete: (row) async {
+                              final screenCtx = context;
+                              await showDialog<void>(
+                                context: screenCtx,
+                                barrierDismissible: false,
+                                builder: (ctx) => GilinganProductionDeleteDialog(
+                                  header: row,
+                                  onConfirm: () async {
+                                    final success = await _editVmPool
+                                        .deleteProduksi(row.noProduksi);
+                                    final errMsg = _editVmPool.saveError;
+                                    if (ctx.mounted) Navigator.of(ctx).pop();
+                                    if (!screenCtx.mounted) return;
+                                    if (success) {
+                                      showDialog(
+                                        context: screenCtx,
+                                        builder: (_) => SuccessStatusDialog(
+                                          title: 'Berhasil Menghapus',
+                                          message:
+                                              'No. Produksi ${row.noProduksi} berhasil dihapus.',
+                                        ),
+                                      );
+                                    } else {
+                                      showDialog(
+                                        context: screenCtx,
+                                        builder: (_) => ErrorStatusDialog(
+                                          title: 'Gagal Menghapus!',
+                                          message:
+                                              errMsg ?? 'Gagal menghapus data',
+                                        ),
+                                      );
+                                    }
+                                    _refreshAll();
+                                  },
+                                ),
+                              );
+                            },
+                            onInput: (row) async {
+                              await Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => GilinganProductionInputScreen(
+                                    noProduksi: row.noProduksi,
+                                  ),
+                                ),
+                              );
+                              if (mounted) _refreshAll();
+                            },
                           ),
                         ),
-                    ],
+                        if (_selectedMesinInfo != null)
+                          Positioned(
+                            right: 16,
+                            bottom: 16,
+                            child: FloatingActionButton.small(
+                              heroTag: 'fab_backdate_gilingan',
+                              onPressed: () =>
+                                  _openBackdateDialog(_selectedMesinInfo!),
+                              backgroundColor: const Color(0xFF0277BD),
+                              foregroundColor: Colors.white,
+                              tooltip: 'Tambah Backdate',
+                              child: const Icon(Icons.add),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
     );
   }
 }

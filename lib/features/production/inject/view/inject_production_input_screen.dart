@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shimmer/shimmer.dart';
 
 import 'package:pps_tablet/core/view/app_shell.dart';
 import 'package:pps_tablet/features/production/shared/shared.dart';
-
-import '../model/inject_production_model.dart' show InjectOutputJenis;
 
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/scan_label_dialog.dart';
@@ -16,6 +15,9 @@ import '../../shared/widgets/save_button_with_badge.dart';
 import '../../shared/widgets/unsaved_temp_warning_dialog.dart';
 import '../model/inject_output_model.dart';
 import '../model/inject_production_inputs_model.dart';
+import '../model/inject_production_model.dart'
+    show InjectOutputJenis, InjectProduction;
+import '../repository/inject_production_repository.dart';
 import '../view_model/inject_production_input_view_model.dart';
 
 import '../view_model/inject_formula_view_model.dart';
@@ -37,40 +39,8 @@ const _kInjectBorder = Color(0xFFE2E6EA);
 
 class InjectProductionInputScreen extends StatefulWidget {
   final String noProduksi;
-  final bool? isLocked;
-  final DateTime? lastClosedDate;
 
-  final int? idMesin;
-  final String? namaJenis;
-  final String? namaCetakan;
-  final String? namaWarna;
-  final String? namaFurnitureMaterial;
-  final DateTime? tglProduksi;
-  final int? shift;
-  final String? hourStart;
-  final String? hourEnd;
-
-  /// 'furnitureWip' | 'barangjadi' | null (null = bebas)
-  final String? outputCategory;
-  final List<InjectOutputJenis> lockedOutputs;
-
-  const InjectProductionInputScreen({
-    super.key,
-    required this.noProduksi,
-    this.isLocked,
-    this.lastClosedDate,
-    this.idMesin,
-    this.namaJenis,
-    this.namaCetakan,
-    this.namaWarna,
-    this.namaFurnitureMaterial,
-    this.tglProduksi,
-    this.shift,
-    this.hourStart,
-    this.hourEnd,
-    this.outputCategory,
-    this.lockedOutputs = const [],
-  });
+  const InjectProductionInputScreen({super.key, required this.noProduksi});
 
   @override
   State<InjectProductionInputScreen> createState() =>
@@ -80,35 +50,34 @@ class InjectProductionInputScreen extends StatefulWidget {
 class _InjectProductionInputScreenState
     extends State<InjectProductionInputScreen> {
   String _selectedInputTab = 'fwip';
-  late String _selectedOutputTab;
+  String _selectedOutputTab = 'fwip';
   bool _outputOnLeft = false;
 
-  // ── Formula-driven tab filtering ──────────────────────────────────────────
+  // ── Header (fetched from API) ─────────────────────────────────────────────
+  final _prodRepo = InjectProductionRepository();
+  InjectProduction? _header;
+  // Cache label so dispose() can read it after _header may be gone
+  late String _cachedBreadcrumbLabel;
 
   List<BreadcrumbSegment> _prevBreadcrumb = [];
-  String get _breadcrumbLabel => widget.noProduksi;
+  String get _breadcrumbLabel =>
+      (_header?.namaMesin ?? '').trim().isNotEmpty
+          ? _header!.namaMesin
+          : widget.noProduksi;
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
-    _selectedOutputTab = widget.outputCategory == 'barangjadi' ? 'bj' : 'fwip';
-    _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
+    _cachedBreadcrumbLabel = widget.noProduksi;
+    _loadHeader();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      AppShell.breadcrumb.value = [
-        ..._prevBreadcrumb.map(
-          (s) => BreadcrumbSegment(
-            s.label,
-            onTap: () {
-              AppShell.breadcrumb.value = _prevBreadcrumb;
-              AppShell.shellNavigatorKey.currentState?.pop();
-            },
-          ),
-        ),
-        BreadcrumbSegment(_breadcrumbLabel),
-      ];
+      // Capture prev here (not in initState) so any pending dispose callbacks
+      // from the previous screen have already fired and reset the breadcrumb.
+      _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
+      _updateBreadcrumb();
 
       final vm = context.read<InjectProductionInputViewModel>();
       if (vm.inputsOf(widget.noProduksi) == null &&
@@ -136,12 +105,49 @@ class _InjectProductionInputScreenState
     });
   }
 
+  Future<void> _loadHeader() async {
+    try {
+      final header = await _prodRepo.fetchOne(widget.noProduksi);
+      if (!mounted) return;
+      setState(() {
+        _header = header;
+        _cachedBreadcrumbLabel = _breadcrumbLabel;
+        _selectedOutputTab = header.outputCategory == 'barangjadi'
+            ? 'bj'
+            : 'fwip';
+      });
+      _updateBreadcrumb();
+    } catch (_) {}
+  }
+
+  void _updateBreadcrumb() {
+    if (!mounted) return;
+    AppShell.breadcrumb.value = [
+      ..._prevBreadcrumb.map(
+        (s) => BreadcrumbSegment(
+          s.label,
+          onTap: () {
+            AppShell.breadcrumb.value = _prevBreadcrumb;
+            AppShell.shellNavigatorKey.currentState?.pop();
+          },
+        ),
+      ),
+      BreadcrumbSegment(_breadcrumbLabel),
+    ];
+  }
+
   @override
   void dispose() {
-    final current = AppShell.breadcrumb.value;
-    if (current.isNotEmpty && current.last.label == _breadcrumbLabel) {
-      AppShell.breadcrumb.value = _prevBreadcrumb;
-    }
+    // Breadcrumb must update after the current frame — updating a ValueNotifier
+    // during unmount triggers setState on AppShell while the tree is locked.
+    final prev = _prevBreadcrumb;
+    final label = _cachedBreadcrumbLabel;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final current = AppShell.breadcrumb.value;
+      if (current.isNotEmpty && current.last.label == label) {
+        AppShell.breadcrumb.value = prev;
+      }
+    });
     super.dispose();
   }
 
@@ -256,17 +262,18 @@ class _InjectProductionInputScreenState
   // ── Split Time (Ganti) ────────────────────────────────────────────────────
 
   Future<void> _openSplitTimeDialog() async {
-    if (widget.idMesin == null || widget.tglProduksi == null) return;
+    final h = _header;
+    if (h == null || h.idMesin == 0 || h.tglProduksi == null) return;
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (_) => InjectSplitTimeDialog(
-        idMesin: widget.idMesin!,
-        tglProduksi: widget.tglProduksi!,
-        currentHourEnd: widget.hourEnd,
-        currentCetakan: widget.namaCetakan,
-        currentWarna: widget.namaWarna,
-        currentMaterial: widget.namaFurnitureMaterial,
+        idMesin: h.idMesin,
+        tglProduksi: h.tglProduksi!,
+        currentHourEnd: h.hourEnd,
+        currentCetakan: h.namaCetakan,
+        currentWarna: h.namaWarna,
+        currentMaterial: h.namaFurnitureMaterial,
       ),
     );
     if (!mounted) return;
@@ -1041,6 +1048,52 @@ class _InjectProductionInputScreenState
     );
   }
 
+  // ── Toolbar skeleton ─────────────────────────────────────────────────────
+
+  Widget _buildToolbarSkeleton() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey.shade200,
+        highlightColor: Colors.grey.shade50,
+        child: Container(
+          height: 44,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border(
+              left: BorderSide(color: Colors.grey.shade300, width: 4),
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              _skeletonBox(w: 72, h: 20, r: 20),
+              const SizedBox(width: 16),
+              _skeletonBox(w: 140, h: 14, r: 4),
+              const SizedBox(width: 10),
+              _skeletonBox(w: 100, h: 14, r: 4),
+              const Spacer(),
+              _skeletonBox(w: 64, h: 24, r: 6),
+              const SizedBox(width: 6),
+              _skeletonBox(w: 64, h: 24, r: 6),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _skeletonBox({required double w, required double h, double r = 4}) =>
+      Container(
+        width: w,
+        height: h,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(r),
+        ),
+      );
+
   // ── Output FAB visibility ────────────────────────────────────────────────
 
   bool _isFabVisible({
@@ -1050,7 +1103,7 @@ class _InjectProductionInputScreenState
   }) {
     // Reject dan Bonggolan selalu tampil
     if (isReject || isBonggolan) return true;
-    final cat = widget.outputCategory;
+    final cat = _header?.outputCategory;
     if (cat == null) return true; // tidak ada kunci, semua tampil
     if (isBj) return cat == 'barangjadi';
     return cat == 'furnitureWip'; // tab fwip
@@ -1188,8 +1241,9 @@ class _InjectProductionInputScreenState
   Future<void> _openAddFwipOutputDialog(VoidCallback onRefresh) async {
     int? lockedId;
     String? lockedNama;
-    if (widget.lockedOutputs.isNotEmpty) {
-      final picked = await _pickOutputJenis(widget.lockedOutputs);
+    final lockedOutputs = _header?.outputs ?? const [];
+    if (lockedOutputs.isNotEmpty) {
+      final picked = await _pickOutputJenis(lockedOutputs);
       if (picked == null || !mounted) return;
       lockedId = picked.idJenis;
       lockedNama = picked.namaJenis;
@@ -1199,7 +1253,7 @@ class _InjectProductionInputScreenState
       barrierDismissible: false,
       builder: (_) => ProductionFwipOutputFormDialog(
         noProduksi: widget.noProduksi,
-        tglProduksi: widget.tglProduksi,
+        tglProduksi: _header?.tglProduksi,
         accentColor: _kInjectOutput,
         lockedIdJenis: lockedId,
         lockedNamaJenis: lockedNama,
@@ -1211,8 +1265,9 @@ class _InjectProductionInputScreenState
   Future<void> _openAddBjOutputDialog(VoidCallback onRefresh) async {
     int? lockedId;
     String? lockedNama;
-    if (widget.lockedOutputs.isNotEmpty) {
-      final picked = await _pickOutputJenis(widget.lockedOutputs);
+    final lockedOutputs = _header?.outputs ?? const [];
+    if (lockedOutputs.isNotEmpty) {
+      final picked = await _pickOutputJenis(lockedOutputs);
       if (picked == null || !mounted) return;
       lockedId = picked.idJenis;
       lockedNama = picked.namaJenis;
@@ -1222,7 +1277,7 @@ class _InjectProductionInputScreenState
       barrierDismissible: false,
       builder: (_) => ProductionBjOutputFormDialog(
         noProduksi: widget.noProduksi,
-        tglProduksi: widget.tglProduksi,
+        tglProduksi: _header?.tglProduksi,
         accentColor: _kInjectOutput,
         lockedIdJenis: lockedId,
         lockedNamaJenis: lockedNama,
@@ -1237,7 +1292,7 @@ class _InjectProductionInputScreenState
       barrierDismissible: false,
       builder: (_) => ProductionRejectOutputFormDialog(
         noProduksi: widget.noProduksi,
-        tglProduksi: widget.tglProduksi,
+        tglProduksi: _header?.tglProduksi,
         accentColor: _kInjectOutput,
       ),
     );
@@ -1250,7 +1305,7 @@ class _InjectProductionInputScreenState
       barrierDismissible: false,
       builder: (_) => ProductionBonggolanOutputFormDialog(
         noProduksi: widget.noProduksi,
-        tglProduksi: widget.tglProduksi,
+        tglProduksi: _header?.tglProduksi,
         accentColor: _kInjectOutput,
       ),
     );
@@ -1345,13 +1400,13 @@ class _InjectProductionInputScreenState
                     selectedValue: _selectedOutputTab,
                     accentColor: _kInjectOutput,
                     tabs: [
-                      if (widget.outputCategory != 'barangjadi')
+                      if (_header?.outputCategory != 'barangjadi')
                         ProductionTabItem(
                           value: 'fwip',
                           label: 'Furniture WIP',
                           count: fwipOutputs.length,
                         ),
-                      if (widget.outputCategory != 'furnitureWip')
+                      if (_header?.outputCategory != 'furnitureWip')
                         ProductionTabItem(
                           value: 'bj',
                           label: 'Barang Jadi',
@@ -1460,11 +1515,13 @@ class _InjectProductionInputScreenState
                                   heroTag:
                                       'fab_add_inject_output_$_selectedOutputTab',
                                   mini: true,
-                                  backgroundColor: widget.isLocked == true
+                                  backgroundColor:
+                                      (_header == null || _header!.isLocked)
                                       ? Colors.grey.shade300
                                       : _kInjectOutput,
                                   foregroundColor: Colors.white,
-                                  onPressed: widget.isLocked == true
+                                  onPressed:
+                                      (_header == null || _header!.isLocked)
                                       ? null
                                       : () {
                                           if (isBonggolan) {
@@ -1701,7 +1758,7 @@ class _InjectProductionInputScreenState
         final err = vm.inputsError(widget.noProduksi);
         final inputs = vm.inputsOf(widget.noProduksi);
         final perm = context.watch<PermissionViewModel>();
-        final locked = widget.isLocked == true;
+        final locked = _header?.isLocked == true;
         final canDelete = perm.can('label_crusher:delete') && !locked;
 
         return PopScope(
@@ -1718,59 +1775,35 @@ class _InjectProductionInputScreenState
             resizeToAvoidBottomInset: false,
             body: Column(
               children: [
-                ProductionWorkspaceToolbar(
-                  noProduksi: widget.noProduksi,
-                  isLocked: locked,
-                  idMesin: widget.idMesin,
-                  namaJenis: widget.namaJenis,
-                  namaCetakan: widget.namaCetakan,
-                  namaWarna: widget.namaWarna,
-                  namaFurnitureMaterial: widget.namaFurnitureMaterial,
-                  tglProduksi: widget.tglProduksi,
-                  shift: widget.shift,
-                  hourStart: widget.hourStart,
-                  hourEnd: widget.hourEnd,
-                  showTimeInfo: false,
-                  primaryColor: _kInjectPrimary,
-                  onGanti: _openSplitTimeDialog,
-                  onRefresh: () {
-                    vm.loadInputs(widget.noProduksi, force: true);
-                    vm.loadOutputs(widget.noProduksi, force: true);
-                    vm.loadBjOutputs(widget.noProduksi, force: true);
-                    vm.loadRejectOutputs(widget.noProduksi, force: true);
-                    vm.loadBonggolanOutputs(widget.noProduksi, force: true);
-                    _showSnack('Data di-refresh');
-                  },
-                  trailingActions: [
-                    const SizedBox(width: 4),
-                    SizedBox(
-                      height: 26,
-                      child: TextButton.icon(
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 0,
-                          ),
-                          foregroundColor: _kInjectPrimary,
-                          backgroundColor: _kInjectPrimary.withValues(
-                            alpha: 0.07,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                        onPressed: null,
-                        icon: const Icon(Icons.timer_outlined, size: 13),
-                        label: const Text(
-                          'Cycle Time',
-                          style: TextStyle(fontSize: 11),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Consumer<InjectFormulaViewModel>(
-                      builder: (_, fvm, __) => SizedBox(
+                if (_header == null)
+                  _buildToolbarSkeleton()
+                else
+                  ProductionWorkspaceToolbar(
+                    noProduksi: widget.noProduksi,
+                    isLocked: locked,
+                    idMesin: _header?.idMesin,
+                    namaJenis: _header?.namaJenis ?? _header?.namaMesin,
+                    namaCetakan: _header?.namaCetakan,
+                    namaWarna: _header?.namaWarna,
+                    namaFurnitureMaterial: _header?.namaFurnitureMaterial,
+                    tglProduksi: _header?.tglProduksi,
+                    shift: _header?.shift,
+                    hourStart: _header?.hourStart,
+                    hourEnd: _header?.hourEnd,
+                    showTimeInfo: false,
+                    primaryColor: _kInjectPrimary,
+                    onGanti: _openSplitTimeDialog,
+                    onRefresh: () {
+                      vm.loadInputs(widget.noProduksi, force: true);
+                      vm.loadOutputs(widget.noProduksi, force: true);
+                      vm.loadBjOutputs(widget.noProduksi, force: true);
+                      vm.loadRejectOutputs(widget.noProduksi, force: true);
+                      vm.loadBonggolanOutputs(widget.noProduksi, force: true);
+                      _showSnack('Data di-refresh');
+                    },
+                    trailingActions: [
+                      const SizedBox(width: 4),
+                      SizedBox(
                         height: 26,
                         child: TextButton.icon(
                           style: TextButton.styleFrom(
@@ -1787,51 +1820,78 @@ class _InjectProductionInputScreenState
                             ),
                             visualDensity: VisualDensity.compact,
                           ),
-                          onPressed: fvm.isLoading
-                              ? null
-                              : () {
-                                  final data = fvm.data;
-                                  if (data == null) return;
-                                  showDialog<void>(
-                                    context: context,
-                                    builder: (_) =>
-                                        InjectFormulaDialog(data: data),
-                                  );
-                                },
-                          icon: fvm.isLoading
-                              ? const SizedBox(
-                                  width: 11,
-                                  height: 11,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 1.5,
-                                  ),
-                                )
-                              : const Icon(Icons.science_outlined, size: 13),
+                          onPressed: null,
+                          icon: const Icon(Icons.timer_outlined, size: 13),
                           label: const Text(
-                            'Formula',
+                            'Cycle Time',
                             style: TextStyle(fontSize: 11),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 4),
-                    SizedBox(
-                      width: 26,
-                      height: 26,
-                      child: IconButton(
-                        tooltip: 'Tukar posisi panel',
-                        padding: EdgeInsets.zero,
-                        onPressed: () =>
-                            setState(() => _outputOnLeft = !_outputOnLeft),
-                        icon: Icon(
-                          Icons.swap_horiz,
-                          size: 15,
-                          color: Colors.grey.shade400,
+                      const SizedBox(width: 4),
+                      Consumer<InjectFormulaViewModel>(
+                        builder: (_, fvm, __) => SizedBox(
+                          height: 26,
+                          child: TextButton.icon(
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 0,
+                              ),
+                              foregroundColor: _kInjectPrimary,
+                              backgroundColor: _kInjectPrimary.withValues(
+                                alpha: 0.07,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            onPressed: fvm.isLoading
+                                ? null
+                                : () {
+                                    final data = fvm.data;
+                                    if (data == null) return;
+                                    showDialog<void>(
+                                      context: context,
+                                      builder: (_) =>
+                                          InjectFormulaDialog(data: data),
+                                    );
+                                  },
+                            icon: fvm.isLoading
+                                ? const SizedBox(
+                                    width: 11,
+                                    height: 11,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 1.5,
+                                    ),
+                                  )
+                                : const Icon(Icons.science_outlined, size: 13),
+                            label: const Text(
+                              'Formula',
+                              style: TextStyle(fontSize: 11),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
+                      const SizedBox(width: 4),
+                      SizedBox(
+                        width: 26,
+                        height: 26,
+                        child: IconButton(
+                          tooltip: 'Tukar posisi panel',
+                          padding: EdgeInsets.zero,
+                          onPressed: () =>
+                              setState(() => _outputOnLeft = !_outputOnLeft),
+                          icon: Icon(
+                            Icons.swap_horiz,
+                            size: 15,
+                            color: Colors.grey.shade400,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 Expanded(
                   child: Builder(
                     builder: (_) {

@@ -77,8 +77,6 @@ class _HotStampProductionScreenState extends State<HotStampProductionScreen> {
                       MaterialPageRoute(
                         builder: (_) => HotStampingProductionInputScreen(
                           noProduksi: row.noProduksi,
-                          isLocked: row.isLocked,
-                          lastClosedDate: row.lastClosedDate,
                         ),
                       ),
                     );

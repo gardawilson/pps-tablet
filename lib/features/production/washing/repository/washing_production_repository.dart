@@ -219,6 +219,13 @@ class WashingProductionRepository {
     };
   }
 
+  Future<WashingProduction> fetchOne(String noProduksi) async {
+    final result = await fetchAll(page: 1, pageSize: 1, search: noProduksi.trim());
+    final items = result['items'] as List<WashingProduction>;
+    if (items.isEmpty) throw Exception('Data tidak ditemukan untuk $noProduksi');
+    return items.first;
+  }
+
   /// Helper kalau hanya butuh list halaman tertentu
   Future<List<WashingProduction>> fetchAllList({
     required int page,

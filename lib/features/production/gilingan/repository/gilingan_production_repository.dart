@@ -190,6 +190,17 @@ class GilinganProductionRepository {
     };
   }
 
+  Future<GilinganProduction> fetchOne(String noProduksi) async {
+    final result = await fetchAll(
+      page: 1,
+      pageSize: 1,
+      noProduksi: noProduksi.trim(),
+    );
+    final items = result['items'] as List<GilinganProduction>;
+    if (items.isEmpty) throw Exception('Data tidak ditemukan untuk $noProduksi');
+    return items.first;
+  }
+
   /// Convenience jika hanya butuh list halaman tertentu
   Future<List<GilinganProduction>> fetchAllList({
     required int page,

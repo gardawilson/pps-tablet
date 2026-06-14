@@ -25,6 +25,8 @@ import '../model/key_fitting_inputs_model.dart';
 import '../model/key_fitting_production_model.dart';
 import '../widgets/key_fitting_production_output_form_dialog.dart';
 import '../../hot_stamp/widgets/hot_stamp_reject_output_form_dialog.dart';
+import 'package:shimmer/shimmer.dart';
+import '../repository/key_fitting_production_repository.dart';
 import 'package:pps_tablet/features/production/shared/shared.dart';
 
 const _kPrimary = Color(0xFF3730A3);
@@ -34,28 +36,10 @@ const _kBorder = Color(0xFFE2E6EA);
 
 class KeyFittingProductionInputScreen extends StatefulWidget {
   final String noProduksi;
-  final bool? isLocked;
-  final DateTime? lastClosedDate;
-  final int? idMesin;
-  final String? namaJenis;
-  final int? outputJenisId;
-  final DateTime? tglProduksi;
-  final int? shift;
-  final String? hourStart;
-  final String? hourEnd;
 
   const KeyFittingProductionInputScreen({
     super.key,
     required this.noProduksi,
-    this.isLocked,
-    this.lastClosedDate,
-    this.idMesin,
-    this.namaJenis,
-    this.outputJenisId,
-    this.tglProduksi,
-    this.shift,
-    this.hourStart,
-    this.hourEnd,
   });
 
   @override
@@ -65,30 +49,30 @@ class KeyFittingProductionInputScreen extends StatefulWidget {
 
 class _KeyFittingProductionInputScreenState
     extends State<KeyFittingProductionInputScreen> {
+  final _prodRepo = KeyFittingProductionRepository();
+  KeyFittingProduction? _header;
+  late String _cachedBreadcrumbLabel;
+
   String _selectedInputTab = 'fwip';
   String _selectedOutputTab = 'fwip';
 
   List<BreadcrumbSegment> _prevBreadcrumb = [];
-  String get _breadcrumbLabel => widget.noProduksi;
+  bool _isReplacing = false;
+
+  String get _breadcrumbLabel =>
+      (_header?.namaMesin ?? '').trim().isNotEmpty
+          ? _header!.namaMesin
+          : widget.noProduksi;
 
   @override
   void initState() {
     super.initState();
-    _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
+    _cachedBreadcrumbLabel = widget.noProduksi;
+    _loadHeader();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      AppShell.breadcrumb.value = [
-        ..._prevBreadcrumb.map(
-          (s) => BreadcrumbSegment(
-            s.label,
-            onTap: () {
-              AppShell.breadcrumb.value = _prevBreadcrumb;
-              AppShell.shellNavigatorKey.currentState?.pop();
-            },
-          ),
-        ),
-        BreadcrumbSegment(_breadcrumbLabel),
-      ];
+      _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
+      _updateBreadcrumb();
 
       final vm = context.read<KeyFittingProductionInputViewModel>();
       if (vm.inputsOf(widget.noProduksi) == null &&
@@ -104,11 +88,52 @@ class _KeyFittingProductionInputScreenState
 
   @override
   void dispose() {
-    final current = AppShell.breadcrumb.value;
-    if (current.isNotEmpty && current.last.label == _breadcrumbLabel) {
-      AppShell.breadcrumb.value = _prevBreadcrumb;
+    if (!_isReplacing) {
+      final label = _cachedBreadcrumbLabel;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final current = AppShell.breadcrumb.value;
+        if (current.isNotEmpty && current.last.label == label) {
+          AppShell.breadcrumb.value = _prevBreadcrumb;
+        }
+      });
     }
     super.dispose();
+  }
+
+  Future<void> _loadHeader() async {
+    try {
+      final header = await _prodRepo.fetchOne(widget.noProduksi);
+      if (!mounted) return;
+      setState(() {
+        _header = header;
+        _cachedBreadcrumbLabel = _breadcrumbLabel;
+      });
+      _updateBreadcrumb();
+    } catch (_) {}
+  }
+
+  void _updateBreadcrumb() {
+    if (!mounted) return;
+    AppShell.breadcrumb.value = [
+      ..._prevBreadcrumb.map(
+        (s) => BreadcrumbSegment(
+          s.label,
+          onTap: () {
+            AppShell.breadcrumb.value = _prevBreadcrumb;
+            AppShell.shellNavigatorKey.currentState?.pop();
+          },
+        ),
+      ),
+      BreadcrumbSegment(_breadcrumbLabel),
+    ];
+  }
+
+  Widget _buildToolbarSkeleton() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: Container(height: 56, color: Colors.white),
+    );
   }
 
   Future<bool> _onWillPop() async {
@@ -356,8 +381,8 @@ class _KeyFittingProductionInputScreenState
       ({KeyFittingProductionInputScreen prod, String namaJenis})
     >(
       context: context,
-      idMesin: widget.idMesin,
-      tanggal: widget.tglProduksi,
+      idMesin: _header?.idMesin,
+      tanggal: _header?.tglProduksi,
       onMissingContext: () =>
           _showSnack('Data mesin atau tanggal tidak tersedia'),
       showSplitDialog: (idMesin, tanggal) =>
@@ -376,7 +401,7 @@ class _KeyFittingProductionInputScreenState
                     FurnitureWipType
                   >(
                     tanggal: tanggal,
-                    shift: widget.shift ?? 1,
+                    shift: _header?.shift ?? 1,
                     primaryColor: _kPrimary,
                     borderColor: _kBorder,
                     jenisRequiredMessage:
@@ -401,14 +426,6 @@ class _KeyFittingProductionInputScreenState
                       return (
                         prod: KeyFittingProductionInputScreen(
                           noProduksi: newProd.noProduksi,
-                          idMesin: newProd.idMesin,
-                          isLocked: false,
-                          namaJenis: newProd.outputJenisNama ?? jenis.nama,
-                          outputJenisId: newProd.outputJenisId,
-                          tglProduksi: newProd.tglProduksi,
-                          shift: newProd.shift,
-                          hourStart: newProd.hourStart,
-                          hourEnd: newProd.hourEnd,
                         ),
                         namaJenis: newProd.outputJenisNama ?? jenis.nama,
                       );
@@ -434,9 +451,9 @@ class _KeyFittingProductionInputScreenState
       barrierDismissible: false,
       builder: (_) => KeyFittingProductionOutputFormDialog(
         noProduksi: widget.noProduksi,
-        tglProduksi: widget.tglProduksi,
-        outputJenisId: widget.outputJenisId,
-        namaJenis: widget.namaJenis,
+        tglProduksi: _header?.tglProduksi,
+        outputJenisId: _header?.outputJenisId,
+        namaJenis: _header?.outputJenisNama,
       ),
     );
     if (saved == true && mounted) onSuccess();
@@ -450,7 +467,7 @@ class _KeyFittingProductionInputScreenState
       barrierDismissible: false,
       builder: (_) => HotStampRejectOutputFormDialog(
         noProduksi: widget.noProduksi,
-        tglProduksi: widget.tglProduksi,
+        tglProduksi: _header?.tglProduksi,
       ),
     );
     if (!mounted || createdNos == null || createdNos.isEmpty) return;
@@ -1028,7 +1045,7 @@ class _KeyFittingProductionInputScreenState
         final err = vm.inputsError(widget.noProduksi);
         final inputs = vm.inputsOf(widget.noProduksi);
         final perm = context.watch<PermissionViewModel>();
-        final locked = widget.isLocked == true;
+        final locked = _header?.isLocked == true;
         final canDelete = perm.can('label_crusher:delete') && !locked;
 
         return PopScope(
@@ -1045,22 +1062,27 @@ class _KeyFittingProductionInputScreenState
             resizeToAvoidBottomInset: false,
             body: Column(
               children: [
-                ProductionWorkspaceToolbar(
-                  noProduksi: widget.noProduksi,
-                  isLocked: locked,
-                  idMesin: widget.idMesin,
-                  namaJenis: widget.namaJenis,
-                  tglProduksi: widget.tglProduksi,
-                  shift: widget.shift,
-                  hourStart: widget.hourStart,
-                  hourEnd: widget.hourEnd,
-                  primaryColor: _kPrimary,
-                  onGanti: locked ? null : _openSplitDialog,
-                  onRefresh: () {
-                    vm.loadInputs(widget.noProduksi, force: true);
-                    _showSnack('Data di-refresh');
-                  },
-                ),
+                if (_header == null)
+                  _buildToolbarSkeleton()
+                else
+                  ProductionWorkspaceToolbar(
+                    noProduksi: widget.noProduksi,
+                    isLocked: locked,
+                    idMesin: _header?.idMesin,
+                    namaJenis: _header?.outputJenisNama,
+                    tglProduksi: _header?.tglProduksi,
+                    shift: _header?.shift,
+                    hourStart: _header?.hourStart,
+                    hourEnd: _header?.hourEnd,
+                    primaryColor: _kPrimary,
+                    onGanti: locked ? null : _openSplitDialog,
+                    onRefresh: () {
+                      _loadHeader();
+                      vm.loadInputs(widget.noProduksi, force: true);
+                      vm.loadOutputs(widget.noProduksi, force: true);
+                      _showSnack('Data di-refresh');
+                    },
+                  ),
                 Expanded(
                   child: Builder(
                     builder: (_) {

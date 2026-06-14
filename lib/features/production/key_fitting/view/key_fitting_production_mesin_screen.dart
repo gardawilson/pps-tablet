@@ -154,18 +154,8 @@ class _KeyFittingProductionMesinScreenState
       if (created != null) {
         await Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => KeyFittingProductionInputScreen(
-              noProduksi: created.noProduksi,
-              isLocked: created.isLocked,
-              lastClosedDate: created.lastClosedDate,
-              idMesin: created.idMesin,
-              namaJenis: created.outputJenisNama,
-              outputJenisId: created.outputJenisId,
-              tglProduksi: created.tglProduksi,
-              shift: created.shift,
-              hourStart: created.hourStart,
-              hourEnd: created.hourEnd,
-            ),
+            builder: (_) =>
+                KeyFittingProductionInputScreen(noProduksi: created.noProduksi),
           ),
         );
         if (!mounted) return;
@@ -209,18 +199,8 @@ class _KeyFittingProductionMesinScreenState
       if (created != null) {
         await Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => KeyFittingProductionInputScreen(
-              noProduksi: created.noProduksi,
-              isLocked: created.isLocked,
-              lastClosedDate: created.lastClosedDate,
-              idMesin: created.idMesin,
-              namaJenis: created.outputJenisNama,
-              outputJenisId: created.outputJenisId,
-              tglProduksi: created.tglProduksi,
-              shift: created.shift,
-              hourStart: created.hourStart,
-              hourEnd: created.hourEnd,
-            ),
+            builder: (_) =>
+                KeyFittingProductionInputScreen(noProduksi: created.noProduksi),
           ),
         );
         if (!mounted) return;
@@ -242,18 +222,8 @@ class _KeyFittingProductionMesinScreenState
     }
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => KeyFittingProductionInputScreen(
-          noProduksi: item.noProduksi,
-          isLocked: false,
-          lastClosedDate: null,
-          idMesin: mesin.idMesin,
-          namaJenis: item.outputJenisNama,
-          outputJenisId: item.outputJenisId,
-          tglProduksi: item.tglProduksi,
-          shift: item.shift,
-          hourStart: item.hourStart,
-          hourEnd: item.hourEnd,
-        ),
+        builder: (_) =>
+            KeyFittingProductionInputScreen(noProduksi: item.noProduksi),
       ),
     );
     if (!mounted) return;
@@ -302,257 +272,247 @@ class _KeyFittingProductionMesinScreenState
     return Scaffold(
       body: LayoutBuilder(
         builder: (_, c) => Row(
-        children: [
-          // ── LEFT: mesin grid (3/5) ──────────────────────────────
-          Expanded(
-            flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                FutureBuilder<List<KeyFittingMesinInfo>>(
-                  future: _mesinFuture,
-                  builder: (context, snapshot) {
-                    final allMesin = snapshot.data ?? [];
-                    final activeCount = allMesin
-                        .where((m) => m.isActive)
-                        .length;
-                    final inactiveCount = allMesin.length - activeCount;
-                    return MesinSectionHeader(
-                      title: 'Status Mesin Pasang Kunci',
-                      activeCount: activeCount,
-                      inactiveCount: inactiveCount,
-                      isLoading:
-                          snapshot.connectionState == ConnectionState.waiting,
-                    );
-                  },
-                ),
-                Expanded(
-                  child: FutureBuilder<List<KeyFittingMesinInfo>>(
+          children: [
+            // ── LEFT: mesin grid (3/5) ──────────────────────────────
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FutureBuilder<List<KeyFittingMesinInfo>>(
                     future: _mesinFuture,
                     builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      if (snapshot.hasError) {
-                        return Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Text(
-                              'Gagal memuat mesin\n${snapshot.error}',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF64748B),
-                              ),
-                            ),
-                          ),
-                        );
-                      }
                       final allMesin = snapshot.data ?? [];
-                      return LayoutBuilder(
-                        builder: (context, constraints) {
-                          final cols =
-                              (constraints.maxWidth / 150).floor().clamp(2, 6);
-                          return GridView.builder(
-                            padding: const EdgeInsets.all(12),
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: cols,
-                                  mainAxisExtent: 110,
-                                  crossAxisSpacing: 10,
-                                  mainAxisSpacing: 10,
-                                ),
-                            itemCount: allMesin.length,
-                            itemBuilder: (context, index) {
-                              final mesin = allMesin[index];
-                              return ProductionMesinCard(
-                                data: _toMesinCardData(mesin),
-                                onTap: () => _onMesinTap(mesin),
-                              );
-                            },
-                          );
-                        },
+                      final activeCount = allMesin
+                          .where((m) => m.isActive)
+                          .length;
+                      final inactiveCount = allMesin.length - activeCount;
+                      return MesinSectionHeader(
+                        title: 'Status Mesin Pasang Kunci',
+                        activeCount: activeCount,
+                        inactiveCount: inactiveCount,
+                        isLoading:
+                            snapshot.connectionState == ConnectionState.waiting,
                       );
                     },
                   ),
-                ),
-              ],
-            ),
-          ),
-
-          // ── RIGHT: riwayat produksi ──────────────────────────
-          RiwayatAnimatedPanel(
-            expandedWidth: c.maxWidth * 0.4,
-            isExpanded: _isRiwayatExpanded,
-            onToggle: () => setState(() => _isRiwayatExpanded = !_isRiwayatExpanded),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                FutureBuilder<List<KeyFittingMesinInfo>>(
-                  future: _mesinFuture,
-                  builder: (context, snapshot) {
-                    return ProductionRiwayatHeader(
-                      mesinList: (snapshot.data ?? [])
-                          .map(
-                            (m) => MesinFilterItem(
-                              idMesin: m.idMesin,
-                              namaMesin: m.namaMesin,
-                            ),
-                          )
-                          .toList(),
-                      selectedIdMesin: _filterIdMesin,
-                      onFilterChanged: (id) {
-                        final mesinData = snapshot.data ?? [];
-                        setState(() {
-                          _filterIdMesin = id;
-                          _selectedMesinInfo = id == null
-                              ? null
-                              : mesinData
-                                    .where((m) => m.idMesin == id)
-                                    .firstOrNull;
-                        });
-                        _loadProduksiPage();
-                      },
-                      onToggle: () => setState(() => _isRiwayatExpanded = !_isRiwayatExpanded),
-                      isExpanded: _isRiwayatExpanded,
-                    );
-                  },
-                ),
-                Expanded(
-                  child: Stack(
-                    children: [
-                      RefreshIndicator(
-                        onRefresh: _loadProduksiPage,
-                        child: ProductionProduksiList<KeyFittingProduction>(
-                          items: _produksiItems,
-                          dataOf: _toRowData,
-                          isLoading: _produksiLoading,
-                          isFetchingMore: _produksiFetchingMore,
-                          scrollController: _produksiScrollCtl,
-                          showMesin: _filterIdMesin == null,
-                          onTap: (row) async {
-                            await Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => KeyFittingProductionInputScreen(
-                                  noProduksi: row.noProduksi,
-                                  isLocked: row.isLocked,
-                                  lastClosedDate: row.lastClosedDate,
-                                  idMesin: row.idMesin,
-                                  namaJenis: row.outputJenisNama,
-                                  outputJenisId: row.outputJenisId,
-                                  tglProduksi: row.tglProduksi,
-                                  shift: row.shift,
-                                  hourStart: row.hourStart,
-                                  hourEnd: row.hourEnd,
+                  Expanded(
+                    child: FutureBuilder<List<KeyFittingMesinInfo>>(
+                      future: _mesinFuture,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+                        if (snapshot.hasError) {
+                          return Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Text(
+                                'Gagal memuat mesin\n${snapshot.error}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF64748B),
                                 ),
                               ),
+                            ),
+                          );
+                        }
+                        final allMesin = snapshot.data ?? [];
+                        return LayoutBuilder(
+                          builder: (context, constraints) {
+                            final cols = (constraints.maxWidth / 150)
+                                .floor()
+                                .clamp(2, 6);
+                            return GridView.builder(
+                              padding: const EdgeInsets.all(12),
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: cols,
+                                    mainAxisExtent: 110,
+                                    crossAxisSpacing: 10,
+                                    mainAxisSpacing: 10,
+                                  ),
+                              itemCount: allMesin.length,
+                              itemBuilder: (context, index) {
+                                final mesin = allMesin[index];
+                                return ProductionMesinCard(
+                                  data: _toMesinCardData(mesin),
+                                  onTap: () => _onMesinTap(mesin),
+                                );
+                              },
                             );
-                            if (mounted) _refreshAll();
                           },
-                          onEdit: (row) async {
-                            final editVm = KeyFittingProductionViewModel();
-                            try {
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── RIGHT: riwayat produksi ──────────────────────────
+            RiwayatAnimatedPanel(
+              expandedWidth: c.maxWidth * 0.4,
+              isExpanded: _isRiwayatExpanded,
+              onToggle: () =>
+                  setState(() => _isRiwayatExpanded = !_isRiwayatExpanded),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FutureBuilder<List<KeyFittingMesinInfo>>(
+                    future: _mesinFuture,
+                    builder: (context, snapshot) {
+                      return ProductionRiwayatHeader(
+                        mesinList: (snapshot.data ?? [])
+                            .map(
+                              (m) => MesinFilterItem(
+                                idMesin: m.idMesin,
+                                namaMesin: m.namaMesin,
+                              ),
+                            )
+                            .toList(),
+                        selectedIdMesin: _filterIdMesin,
+                        onFilterChanged: (id) {
+                          final mesinData = snapshot.data ?? [];
+                          setState(() {
+                            _filterIdMesin = id;
+                            _selectedMesinInfo = id == null
+                                ? null
+                                : mesinData
+                                      .where((m) => m.idMesin == id)
+                                      .firstOrNull;
+                          });
+                          _loadProduksiPage();
+                        },
+                        onToggle: () => setState(
+                          () => _isRiwayatExpanded = !_isRiwayatExpanded,
+                        ),
+                        isExpanded: _isRiwayatExpanded,
+                      );
+                    },
+                  ),
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        RefreshIndicator(
+                          onRefresh: _loadProduksiPage,
+                          child: ProductionProduksiList<KeyFittingProduction>(
+                            items: _produksiItems,
+                            dataOf: _toRowData,
+                            isLoading: _produksiLoading,
+                            isFetchingMore: _produksiFetchingMore,
+                            scrollController: _produksiScrollCtl,
+                            showMesin: _filterIdMesin == null,
+                            onTap: (row) async {
+                              await Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      KeyFittingProductionInputScreen(
+                                        noProduksi: row.noProduksi,
+                                      ),
+                                ),
+                              );
+                              if (mounted) _refreshAll();
+                            },
+                            onEdit: (row) async {
+                              final editVm = KeyFittingProductionViewModel();
+                              try {
+                                await showDialog<void>(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  builder: (_) => ChangeNotifierProvider.value(
+                                    value: editVm,
+                                    child: KeyFittingProductionFormDialog(
+                                      header: row,
+                                    ),
+                                  ),
+                                );
+                              } finally {
+                                editVm.dispose();
+                              }
+                              if (mounted) _refreshAll();
+                            },
+                            onDelete: (row) async {
                               await showDialog<void>(
                                 context: context,
                                 barrierDismissible: false,
-                                builder: (_) => ChangeNotifierProvider.value(
-                                  value: editVm,
-                                  child: KeyFittingProductionFormDialog(
-                                    header: row,
-                                  ),
+                                builder: (ctx) => KeyFittingProductionDeleteDialog(
+                                  header: row,
+                                  onConfirm: () async {
+                                    final deleteVm =
+                                        KeyFittingProductionViewModel();
+                                    final success = await deleteVm
+                                        .deleteProduksi(row.noProduksi);
+                                    final errMsg = deleteVm.saveError;
+                                    deleteVm.dispose();
+                                    if (ctx.mounted) Navigator.of(ctx).pop();
+                                    if (!mounted) return;
+                                    if (success) {
+                                      // ignore: use_build_context_synchronously
+                                      showDialog(
+                                        context: context,
+                                        builder: (_) => SuccessStatusDialog(
+                                          title: 'Berhasil Menghapus',
+                                          message:
+                                              'No. Produksi ${row.noProduksi} berhasil dihapus.',
+                                        ),
+                                      );
+                                    } else {
+                                      // ignore: use_build_context_synchronously
+                                      showDialog(
+                                        context: context,
+                                        builder: (_) => ErrorStatusDialog(
+                                          title: 'Gagal Menghapus!',
+                                          message:
+                                              errMsg ?? 'Gagal menghapus data',
+                                        ),
+                                      );
+                                    }
+                                    _refreshAll();
+                                  },
                                 ),
                               );
-                            } finally {
-                              editVm.dispose();
-                            }
-                            if (mounted) _refreshAll();
-                          },
-                          onDelete: (row) async {
-                            await showDialog<void>(
-                              context: context,
-                              barrierDismissible: false,
-                              builder: (ctx) => KeyFittingProductionDeleteDialog(
-                                header: row,
-                                onConfirm: () async {
-                                  final deleteVm =
-                                      KeyFittingProductionViewModel();
-                                  final success = await deleteVm.deleteProduksi(
-                                    row.noProduksi,
-                                  );
-                                  final errMsg = deleteVm.saveError;
-                                  deleteVm.dispose();
-                                  if (ctx.mounted) Navigator.of(ctx).pop();
-                                  if (!mounted) return;
-                                  if (success) {
-                                    // ignore: use_build_context_synchronously
-                                    showDialog(
-                                      context: context,
-                                      builder: (_) => SuccessStatusDialog(
-                                        title: 'Berhasil Menghapus',
-                                        message:
-                                            'No. Produksi ${row.noProduksi} berhasil dihapus.',
+                            },
+                            onInput: (row) async {
+                              await Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      KeyFittingProductionInputScreen(
+                                        noProduksi: row.noProduksi,
                                       ),
-                                    );
-                                  } else {
-                                    // ignore: use_build_context_synchronously
-                                    showDialog(
-                                      context: context,
-                                      builder: (_) => ErrorStatusDialog(
-                                        title: 'Gagal Menghapus!',
-                                        message:
-                                            errMsg ?? 'Gagal menghapus data',
-                                      ),
-                                    );
-                                  }
-                                  _refreshAll();
-                                },
-                              ),
-                            );
-                          },
-                          onInput: (row) async {
-                            await Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => KeyFittingProductionInputScreen(
-                                  noProduksi: row.noProduksi,
-                                  isLocked: row.isLocked,
-                                  lastClosedDate: row.lastClosedDate,
-                                  idMesin: row.idMesin,
-                                  namaJenis: row.outputJenisNama,
-                                  outputJenisId: row.outputJenisId,
-                                  tglProduksi: row.tglProduksi,
-                                  shift: row.shift,
-                                  hourStart: row.hourStart,
-                                  hourEnd: row.hourEnd,
                                 ),
-                              ),
-                            );
-                            if (mounted) _refreshAll();
-                          },
-                        ),
-                      ),
-                      if (_selectedMesinInfo != null)
-                        Positioned(
-                          right: 16,
-                          bottom: 16,
-                          child: FloatingActionButton.small(
-                            heroTag: 'fab_backdate_keyfitting',
-                            onPressed: () =>
-                                _openBackdateDialog(_selectedMesinInfo!),
-                            backgroundColor: const Color(0xFF1D4ED8),
-                            foregroundColor: Colors.white,
-                            tooltip: 'Tambah Backdate',
-                            child: const Icon(Icons.add),
+                              );
+                              if (mounted) _refreshAll();
+                            },
                           ),
                         ),
-                    ],
+                        if (_selectedMesinInfo != null)
+                          Positioned(
+                            right: 16,
+                            bottom: 16,
+                            child: FloatingActionButton.small(
+                              heroTag: 'fab_backdate_keyfitting',
+                              onPressed: () =>
+                                  _openBackdateDialog(_selectedMesinInfo!),
+                              backgroundColor: const Color(0xFF1D4ED8),
+                              foregroundColor: Colors.white,
+                              tooltip: 'Tambah Backdate',
+                              child: const Icon(Icons.add),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
     );
   }
 }

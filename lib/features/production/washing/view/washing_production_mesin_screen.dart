@@ -195,19 +195,7 @@ class _WashingProductionMesinScreenState
     if (created != null) {
       await Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => WashingProductionInputScreen(
-            noProduksi: created.noProduksi,
-            idMesin: created.idMesin,
-            isLocked: created.isLocked,
-            lastClosedDate: created.lastClosedDate,
-            namaMesin: created.namaMesin,
-            namaJenis: created.outputJenisNama,
-            outputJenisId: created.outputJenisId,
-            tglProduksi: created.tglProduksi,
-            shift: created.shift,
-            hourStart: created.hourStart,
-            hourEnd: created.hourEnd,
-          ),
+          builder: (_) => WashingProductionInputScreen(noProduksi: created.noProduksi),
         ),
       );
       if (!mounted) return;
@@ -239,19 +227,7 @@ class _WashingProductionMesinScreenState
     if (created != null) {
       await Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => WashingProductionInputScreen(
-            noProduksi: created.noProduksi,
-            idMesin: created.idMesin,
-            isLocked: created.isLocked,
-            lastClosedDate: created.lastClosedDate,
-            namaMesin: created.namaMesin,
-            namaJenis: created.outputJenisNama,
-            outputJenisId: created.outputJenisId,
-            tglProduksi: created.tglProduksi,
-            shift: created.shift,
-            hourStart: created.hourStart,
-            hourEnd: created.hourEnd,
-          ),
+          builder: (_) => WashingProductionInputScreen(noProduksi: created.noProduksi),
         ),
       );
       if (!mounted) return;
@@ -269,19 +245,7 @@ class _WashingProductionMesinScreenState
 
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => WashingProductionInputScreen(
-          noProduksi: mesin.noProduksi!,
-          idMesin: mesin.idMesin,
-          isLocked: false,
-          lastClosedDate: null,
-          namaMesin: mesin.namaMesin,
-          namaJenis: mesin.outputJenisNama,
-          outputJenisId: mesin.outputJenisId,
-          tglProduksi: mesin.tglProduksi,
-          shift: mesin.shift,
-          hourStart: mesin.hourStart,
-          hourEnd: mesin.hourEnd,
-        ),
+        builder: (_) => WashingProductionInputScreen(noProduksi: mesin.noProduksi!),
       ),
     );
     if (!mounted) return;
@@ -426,19 +390,7 @@ class _WashingProductionMesinScreenState
                             onTap: (row) async {
                               await Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) => WashingProductionInputScreen(
-                                    noProduksi: row.noProduksi,
-                                    idMesin: row.idMesin,
-                                    isLocked: row.isLocked,
-                                    lastClosedDate: row.lastClosedDate,
-                                    namaMesin: row.namaMesin,
-                                    namaJenis: row.outputJenisNama,
-                                    outputJenisId: row.outputJenisId,
-                                    tglProduksi: row.tglProduksi,
-                                    shift: row.shift,
-                                    hourStart: row.hourStart,
-                                    hourEnd: row.hourEnd,
-                                  ),
+                                  builder: (_) => WashingProductionInputScreen(noProduksi: row.noProduksi),
                                 ),
                               );
                               if (mounted) _refreshAll();
@@ -510,19 +462,7 @@ class _WashingProductionMesinScreenState
                             onInput: (row) async {
                               await Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) => WashingProductionInputScreen(
-                                    noProduksi: row.noProduksi,
-                                    idMesin: row.idMesin,
-                                    isLocked: row.isLocked,
-                                    lastClosedDate: row.lastClosedDate,
-                                    namaMesin: row.namaMesin,
-                                    namaJenis: row.outputJenisNama,
-                                    outputJenisId: row.outputJenisId,
-                                    tglProduksi: row.tglProduksi,
-                                    shift: row.shift,
-                                    hourStart: row.hourStart,
-                                    hourEnd: row.hourEnd,
-                                  ),
+                                  builder: (_) => WashingProductionInputScreen(noProduksi: row.noProduksi),
                                 ),
                               );
                               if (mounted) _refreshAll();

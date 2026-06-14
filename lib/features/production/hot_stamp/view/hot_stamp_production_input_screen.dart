@@ -26,6 +26,8 @@ import '../model/hot_stamping_inputs_model.dart';
 import '../widgets/hot_stamp_output_tile.dart';
 import '../widgets/hot_stamp_production_output_form_dialog.dart';
 import '../widgets/hot_stamp_reject_output_form_dialog.dart';
+import 'package:shimmer/shimmer.dart';
+import '../repository/hot_stamp_production_repository.dart';
 import 'package:pps_tablet/features/production/shared/shared.dart';
 
 // ── Colour palette ─────────────────────────────────────────────────────────────
@@ -36,30 +38,10 @@ const _kStampingBorder = Color(0xFFE2E6EA);
 
 class HotStampingProductionInputScreen extends StatefulWidget {
   final String noProduksi;
-  final bool? isLocked;
-  final DateTime? lastClosedDate;
-
-  // Header info (dari mesin screen)
-  final int? idMesin;
-  final String? namaJenis;
-  final int? outputJenisId;
-  final DateTime? tglProduksi;
-  final int? shift;
-  final String? hourStart;
-  final String? hourEnd;
 
   const HotStampingProductionInputScreen({
     super.key,
     required this.noProduksi,
-    this.isLocked,
-    this.lastClosedDate,
-    this.idMesin,
-    this.namaJenis,
-    this.outputJenisId,
-    this.tglProduksi,
-    this.shift,
-    this.hourStart,
-    this.hourEnd,
   });
 
   @override
@@ -69,33 +51,32 @@ class HotStampingProductionInputScreen extends StatefulWidget {
 
 class _HotStampingProductionInputScreenState
     extends State<HotStampingProductionInputScreen> {
+  final _prodRepo = HotStampProductionRepository();
+  HotStampProduction? _header;
+  late String _cachedBreadcrumbLabel;
+
   String _selectedInputTab = 'fwip';
   String _selectedOutputTab = 'fwip';
 
   List<BreadcrumbSegment> _prevBreadcrumb = [];
+  bool _isReplacing = false;
 
-  String get _breadcrumbLabel => widget.noProduksi;
+  String get _breadcrumbLabel =>
+      (_header?.namaMesin ?? '').trim().isNotEmpty
+          ? _header!.namaMesin
+          : widget.noProduksi;
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
-    _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
+    _cachedBreadcrumbLabel = widget.noProduksi;
+    _loadHeader();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      AppShell.breadcrumb.value = [
-        ..._prevBreadcrumb.map(
-          (s) => BreadcrumbSegment(
-            s.label,
-            onTap: () {
-              AppShell.breadcrumb.value = _prevBreadcrumb;
-              AppShell.shellNavigatorKey.currentState?.pop();
-            },
-          ),
-        ),
-        BreadcrumbSegment(_breadcrumbLabel),
-      ];
+      _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
+      _updateBreadcrumb();
 
       final vm = context.read<HotStampingProductionInputViewModel>();
       if (vm.inputsOf(widget.noProduksi) == null &&
@@ -111,11 +92,52 @@ class _HotStampingProductionInputScreenState
 
   @override
   void dispose() {
-    final current = AppShell.breadcrumb.value;
-    if (current.isNotEmpty && current.last.label == _breadcrumbLabel) {
-      AppShell.breadcrumb.value = _prevBreadcrumb;
+    if (!_isReplacing) {
+      final label = _cachedBreadcrumbLabel;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final current = AppShell.breadcrumb.value;
+        if (current.isNotEmpty && current.last.label == label) {
+          AppShell.breadcrumb.value = _prevBreadcrumb;
+        }
+      });
     }
     super.dispose();
+  }
+
+  Future<void> _loadHeader() async {
+    try {
+      final header = await _prodRepo.fetchOne(widget.noProduksi);
+      if (!mounted) return;
+      setState(() {
+        _header = header;
+        _cachedBreadcrumbLabel = _breadcrumbLabel;
+      });
+      _updateBreadcrumb();
+    } catch (_) {}
+  }
+
+  void _updateBreadcrumb() {
+    if (!mounted) return;
+    AppShell.breadcrumb.value = [
+      ..._prevBreadcrumb.map(
+        (s) => BreadcrumbSegment(
+          s.label,
+          onTap: () {
+            AppShell.breadcrumb.value = _prevBreadcrumb;
+            AppShell.shellNavigatorKey.currentState?.pop();
+          },
+        ),
+      ),
+      BreadcrumbSegment(_breadcrumbLabel),
+    ];
+  }
+
+  Widget _buildToolbarSkeleton() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: Container(height: 56, color: Colors.white),
+    );
   }
 
   // ── Back ───────────────────────────────────────────────────────────────────
@@ -153,8 +175,8 @@ class _HotStampingProductionInputScreenState
       ({HotStampProduction prod, String namaJenis})
     >(
       context: context,
-      idMesin: widget.idMesin,
-      tanggal: widget.tglProduksi,
+      idMesin: _header?.idMesin,
+      tanggal: _header?.tglProduksi,
       onMissingContext: () =>
           _showSnack('Data mesin atau tanggal tidak tersedia'),
       showSplitDialog: (idMesin, tanggal) =>
@@ -171,7 +193,7 @@ class _HotStampingProductionInputScreenState
                     FurnitureWipType
                   >(
                     tanggal: tanggal,
-                    shift: widget.shift ?? 1,
+                    shift: _header?.shift ?? 1,
                     primaryColor: _kStampingPrimary,
                     borderColor: _kStampingBorder,
                     jenisRequiredMessage:
@@ -205,22 +227,11 @@ class _HotStampingProductionInputScreenState
       },
       replaceToResult: (splitResult) async {
         if (!mounted) return;
-        final newProd = splitResult.prod;
-        final namaJenis = splitResult.namaJenis.isNotEmpty
-            ? splitResult.namaJenis
-            : (newProd.outputJenisNama ?? '');
+        _isReplacing = true;
         await Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => HotStampingProductionInputScreen(
-              noProduksi: newProd.noProduksi,
-              idMesin: newProd.idMesin,
-              isLocked: false,
-              namaJenis: namaJenis,
-              outputJenisId: newProd.outputJenisId,
-              tglProduksi: newProd.tglProduksi,
-              shift: newProd.shift,
-              hourStart: newProd.hourStart,
-              hourEnd: newProd.hourEnd,
+              noProduksi: splitResult.prod.noProduksi,
             ),
           ),
         );
@@ -795,9 +806,9 @@ class _HotStampingProductionInputScreenState
       barrierDismissible: false,
       builder: (_) => HotStampProductionOutputFormDialog(
         noProduksi: widget.noProduksi,
-        tglProduksi: widget.tglProduksi,
-        outputJenisId: widget.outputJenisId,
-        namaJenis: widget.namaJenis,
+        tglProduksi: _header?.tglProduksi,
+        outputJenisId: _header?.outputJenisId,
+        namaJenis: _header?.outputJenisNama,
       ),
     );
     if (saved == true && mounted) onSuccess();
@@ -811,7 +822,7 @@ class _HotStampingProductionInputScreenState
       barrierDismissible: false,
       builder: (_) => HotStampRejectOutputFormDialog(
         noProduksi: widget.noProduksi,
-        tglProduksi: widget.tglProduksi,
+        tglProduksi: _header?.tglProduksi,
       ),
     );
 
@@ -1079,7 +1090,7 @@ class _HotStampingProductionInputScreenState
         final err = vm.inputsError(widget.noProduksi);
         final inputs = vm.inputsOf(widget.noProduksi);
         final perm = context.watch<PermissionViewModel>();
-        final locked = widget.isLocked == true;
+        final locked = _header?.isLocked == true;
         final canDelete = perm.can('label_crusher:delete') && !locked;
 
         return PopScope(
@@ -1096,15 +1107,18 @@ class _HotStampingProductionInputScreenState
             resizeToAvoidBottomInset: false,
             body: Column(
               children: [
+                if (_header == null)
+                  _buildToolbarSkeleton()
+                else
                 ProductionWorkspaceToolbar(
                   noProduksi: widget.noProduksi,
                   isLocked: locked,
-                  idMesin: widget.idMesin,
-                  namaJenis: widget.namaJenis,
-                  tglProduksi: widget.tglProduksi,
-                  shift: widget.shift,
-                  hourStart: widget.hourStart,
-                  hourEnd: widget.hourEnd,
+                  idMesin: _header?.idMesin,
+                  namaJenis: _header?.outputJenisNama,
+                  tglProduksi: _header?.tglProduksi,
+                  shift: _header?.shift,
+                  hourStart: _header?.hourStart,
+                  hourEnd: _header?.hourEnd,
                   primaryColor: _kStampingPrimary,
                   onGanti: locked ? null : _openSplitDialog,
                   onRefresh: () {

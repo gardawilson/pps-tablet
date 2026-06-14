@@ -76,8 +76,6 @@ class _MixerProductionScreenState extends State<MixerProductionScreen> {
                       MaterialPageRoute(
                         builder: (_) => MixerProductionInputScreen(
                           noProduksi: row.noProduksi,
-                          isLocked: row.isLocked,
-                          lastClosedDate: row.lastClosedDate,
                         ),
                       ),
                     );

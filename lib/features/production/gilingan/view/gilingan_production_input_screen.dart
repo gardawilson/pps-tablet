@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shimmer/shimmer.dart';
 
 import 'package:pps_tablet/core/view/app_shell.dart';
 import 'package:pps_tablet/features/production/gilingan/view_model/gilingan_production_input_view_model.dart';
@@ -33,28 +34,10 @@ const _kGilinganBorder = Color(0xFFE2E6EA);
 
 class GilinganProductionInputScreen extends StatefulWidget {
   final String noProduksi;
-  final bool? isLocked;
-  final DateTime? lastClosedDate;
-  final int? outputJenisId;
-  final String? namaJenis;
-  final int? idMesin;
-  final DateTime? tglProduksi;
-  final int? shift;
-  final String? hourStart;
-  final String? hourEnd;
 
   const GilinganProductionInputScreen({
     super.key,
     required this.noProduksi,
-    this.isLocked,
-    this.lastClosedDate,
-    this.outputJenisId,
-    this.namaJenis,
-    this.idMesin,
-    this.tglProduksi,
-    this.shift,
-    this.hourStart,
-    this.hourEnd,
   });
 
   @override
@@ -65,37 +48,31 @@ class GilinganProductionInputScreen extends StatefulWidget {
 class _GilinganProductionInputScreenState
     extends State<GilinganProductionInputScreen> {
   final _repo = GilinganProductionInputRepository();
+  final _prodRepo = GilinganProductionRepository();
   bool _isReplacing = false;
 
-  String _selectedMode =
-      'full'; // mutable — diubah via setState saat mode scan berubah
+  String _selectedMode = 'full';
   String _selectedInputTab = 'broker';
 
   List<BreadcrumbSegment> _prevBreadcrumb = [];
 
+  GilinganProduction? _header;
+  late String _cachedBreadcrumbLabel;
+
   String get _breadcrumbLabel {
-    final m = (widget.namaJenis ?? '').trim();
+    final m = (_header?.namaMesin ?? '').trim();
     return m.isNotEmpty ? m : widget.noProduksi;
   }
 
   @override
   void initState() {
     super.initState();
-    _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
+    _cachedBreadcrumbLabel = widget.noProduksi;
+    _loadHeader();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      AppShell.breadcrumb.value = [
-        ..._prevBreadcrumb.map(
-          (s) => BreadcrumbSegment(
-            s.label,
-            onTap: () {
-              AppShell.breadcrumb.value = _prevBreadcrumb;
-              AppShell.shellNavigatorKey.currentState?.pop();
-            },
-          ),
-        ),
-        BreadcrumbSegment(_breadcrumbLabel),
-      ];
+      _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
+      _updateBreadcrumb();
 
       final vm = context.read<GilinganProductionInputViewModel>();
       if (vm.inputsOf(widget.noProduksi) == null &&
@@ -109,13 +86,45 @@ class _GilinganProductionInputScreenState
     });
   }
 
+  void _updateBreadcrumb() {
+    if (!mounted) return;
+    AppShell.breadcrumb.value = [
+      ..._prevBreadcrumb.map(
+        (s) => BreadcrumbSegment(
+          s.label,
+          onTap: () {
+            AppShell.breadcrumb.value = _prevBreadcrumb;
+            AppShell.shellNavigatorKey.currentState?.pop();
+          },
+        ),
+      ),
+      BreadcrumbSegment(_breadcrumbLabel),
+    ];
+  }
+
+  Future<void> _loadHeader() async {
+    try {
+      final header = await _prodRepo.fetchOne(widget.noProduksi);
+      if (!mounted) return;
+      setState(() {
+        _header = header;
+        _cachedBreadcrumbLabel = _breadcrumbLabel;
+      });
+      _updateBreadcrumb();
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
     if (!_isReplacing) {
-      final current = AppShell.breadcrumb.value;
-      if (current.isNotEmpty && current.last.label == _breadcrumbLabel) {
-        AppShell.breadcrumb.value = _prevBreadcrumb;
-      }
+      final prev = _prevBreadcrumb;
+      final label = _cachedBreadcrumbLabel;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final current = AppShell.breadcrumb.value;
+        if (current.isNotEmpty && current.last.label == label) {
+          AppShell.breadcrumb.value = prev;
+        }
+      });
     }
     super.dispose();
   }
@@ -1020,8 +1029,8 @@ class _GilinganProductionInputScreenState
       ({GilinganProduction prod, String namaJenis})
     >(
       context: context,
-      idMesin: widget.idMesin,
-      tanggal: widget.tglProduksi,
+      idMesin: _header?.idMesin,
+      tanggal: _header?.tglProduksi,
       onMissingContext: () => _showSnack(
         'Data mesin/tanggal tidak tersedia',
         backgroundColor: Colors.orange,
@@ -1039,7 +1048,7 @@ class _GilinganProductionInputScreenState
                   GilinganType
                 >(
                   tanggal: tgl,
-                  shift: widget.shift ?? 1,
+                  shift: _header?.shift ?? 1,
                   primaryColor: _kGilinganPrimary,
                   borderColor: _kGilinganBorder,
                   jenisRequiredMessage: 'Pilih jenis gilingan terlebih dahulu',
@@ -1074,22 +1083,10 @@ class _GilinganProductionInputScreenState
       replaceToResult: (splitResult) async {
         if (!mounted) return;
         final newProd = splitResult.prod;
-        final namaJenis = splitResult.namaJenis.isNotEmpty
-            ? splitResult.namaJenis
-            : (newProd.outputJenisNama ?? '');
         await Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => GilinganProductionInputScreen(
               noProduksi: newProd.noProduksi,
-              idMesin: newProd.idMesin,
-              shift: newProd.shift,
-              tglProduksi: newProd.tglProduksi,
-              isLocked: false,
-              lastClosedDate: null,
-              outputJenisId: newProd.outputJenisId,
-              namaJenis: namaJenis,
-              hourStart: newProd.hourStart,
-              hourEnd: newProd.hourEnd,
             ),
           ),
         );
@@ -1103,16 +1100,16 @@ class _GilinganProductionInputScreenState
     if (!mounted) return;
     await ProductionFlowHelpers.openTimeline(
       context: context,
-      idMesin: widget.idMesin,
-      tanggal: widget.tglProduksi,
+      idMesin: _header?.idMesin,
+      tanggal: _header?.tglProduksi,
       onMissingContext: () => _showSnack(
         'Data mesin/tanggal tidak tersedia',
         backgroundColor: Colors.orange,
       ),
       dialogBuilder: (idMesin, tgl) => buildProductionShiftTimelineDialog(
-        namaMesin: widget.namaJenis,
+        namaMesin: _header?.outputJenisNama,
         tanggal: tgl,
-        shift: widget.shift ?? 1,
+        shift: _header?.shift ?? 1,
         currentNoProduksi: widget.noProduksi,
         primaryColor: _kGilinganPrimary,
         borderColor: _kGilinganBorder,
@@ -1122,7 +1119,7 @@ class _GilinganProductionInputScreenState
               .fetchByMesinTanggalShift(
                 idMesin: idMesin,
                 tanggal: tgl,
-                shift: widget.shift ?? 1,
+                shift: _header?.shift ?? 1,
               );
           return list
               .map(
@@ -1160,7 +1157,7 @@ class _GilinganProductionInputScreenState
         noProduksi: widget.noProduksi,
         idJenis: outputJenisId,
         namaJenis: namaJenis ?? '',
-        tglProduksi: widget.tglProduksi,
+        tglProduksi: _header?.tglProduksi,
         repository: _repo,
       ),
     );
@@ -1310,12 +1307,16 @@ class _GilinganProductionInputScreenState
                                     FloatingActionButton(
                                       heroTag: 'fab_add_gilingan_output',
                                       mini: true,
-                                      backgroundColor: _kGilinganOutputColor,
+                                      backgroundColor: _header == null
+                                          ? Colors.grey.shade300
+                                          : _kGilinganOutputColor,
                                       foregroundColor: Colors.white,
-                                      onPressed: () => _openAddOutputDialog(
-                                        outputJenisId,
-                                        namaJenis,
-                                      ),
+                                      onPressed: _header == null
+                                          ? null
+                                          : () => _openAddOutputDialog(
+                                              outputJenisId,
+                                              namaJenis,
+                                            ),
                                       child: const Icon(Icons.add),
                                     ),
                                   ],
@@ -1333,6 +1334,41 @@ class _GilinganProductionInputScreenState
     );
   }
 
+  // ── Skeleton toolbar ───────────────────────────────────────────────────────
+
+  Widget _buildToolbarSkeleton() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey.shade200,
+        highlightColor: Colors.grey.shade50,
+        child: Container(
+          height: 44,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border(left: BorderSide(color: Colors.grey.shade300, width: 4)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(children: [
+            _skeletonBox(w: 72, h: 20, r: 20),
+            const SizedBox(width: 16),
+            _skeletonBox(w: 140, h: 14, r: 4),
+            const SizedBox(width: 10),
+            _skeletonBox(w: 100, h: 14, r: 4),
+            const Spacer(),
+            _skeletonBox(w: 64, h: 24, r: 6),
+            const SizedBox(width: 6),
+            _skeletonBox(w: 64, h: 24, r: 6),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Widget _skeletonBox({required double w, required double h, double r = 4}) =>
+      Container(width: w, height: h, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(r)));
+
   // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
@@ -1343,7 +1379,7 @@ class _GilinganProductionInputScreenState
         final err = vm.inputsError(widget.noProduksi);
         final inputs = vm.inputsOf(widget.noProduksi);
         final perm = context.watch<PermissionViewModel>();
-        final locked = widget.isLocked == true;
+        final locked = _header?.isLocked == true;
 
         final canDelete = perm.can('label_washing:delete') && !locked;
 
@@ -1398,23 +1434,26 @@ class _GilinganProductionInputScreenState
             resizeToAvoidBottomInset: false,
             body: Column(
               children: [
-                ProductionWorkspaceToolbar(
-                  noProduksi: widget.noProduksi,
-                  isLocked: locked,
-                  primaryColor: _kGilinganPrimary,
-                  idMesin: widget.idMesin,
-                  tglProduksi: widget.tglProduksi,
-                  shift: widget.shift,
-                  namaJenis: widget.namaJenis,
-                  hourStart: widget.hourStart,
-                  hourEnd: widget.hourEnd,
-                  onRefresh: () {
-                    vm.loadInputs(widget.noProduksi, force: true);
-                    _showSnack('Data di-refresh');
-                  },
-                  onGanti: locked ? null : _openSplitDialog,
-                  onRiwayat: _openTimelineDialog,
-                ),
+                if (_header == null)
+                  _buildToolbarSkeleton()
+                else
+                  ProductionWorkspaceToolbar(
+                    noProduksi: widget.noProduksi,
+                    isLocked: locked,
+                    primaryColor: _kGilinganPrimary,
+                    idMesin: _header?.idMesin,
+                    tglProduksi: _header?.tglProduksi,
+                    shift: _header?.shift,
+                    namaJenis: _header?.outputJenisNama,
+                    hourStart: _header?.hourStart,
+                    hourEnd: _header?.hourEnd,
+                    onRefresh: () {
+                      vm.loadInputs(widget.noProduksi, force: true);
+                      _showSnack('Data di-refresh');
+                    },
+                    onGanti: locked ? null : _openSplitDialog,
+                    onRiwayat: _openTimelineDialog,
+                  ),
                 Expanded(
                   child: Builder(
                     builder: (_) {
@@ -1447,16 +1486,10 @@ class _GilinganProductionInputScreenState
                                 outputs: outputs,
                                 isLoading: outputLoading,
                                 error: outputErr,
-                                outputJenisId:
-                                    widget.outputJenisId ??
-                                    (outputs.isNotEmpty
-                                        ? outputs.first.idJenis
-                                        : null),
-                                namaJenis:
-                                    widget.namaJenis ??
-                                    (outputs.isNotEmpty
-                                        ? outputs.first.namaJenis
-                                        : null),
+                                outputJenisId: _header?.outputJenisId ??
+                                    (outputs.isNotEmpty ? outputs.first.idJenis : null),
+                                namaJenis: _header?.outputJenisNama ??
+                                    (outputs.isNotEmpty ? outputs.first.namaJenis : null),
                               ),
                             ),
                           ],

@@ -1,11 +1,223 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
 
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
+import '../../../../common/widgets/list_item_skeleton.dart';
+import '../../../../core/network/endpoints.dart';
+import '../../../../core/services/token_storage.dart';
 import '../../../cetakan/model/mst_cetakan_model.dart';
 import '../../../cetakan/repository/cetakan_repository.dart';
 import '../../../furniture_material/model/furniture_material_lookup_model.dart';
 import '../../../furniture_material/repository/furniture_material_lookup_repository.dart';
 import '../../../warna/model/warna_model.dart';
 import '../../../warna/repository/warna_repository.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Output mapping model
+// ─────────────────────────────────────────────────────────────────────────────
+
+class OutputMappingItem {
+  final String kategori;
+  final int idOutput;
+  final String namaOutput;
+
+  const OutputMappingItem({
+    required this.kategori,
+    required this.idOutput,
+    required this.namaOutput,
+  });
+
+  factory OutputMappingItem.fromJson(Map<String, dynamic> j) =>
+      OutputMappingItem(
+        kategori: j['kategori'] as String? ?? '',
+        idOutput: (j['idOutput'] as num?)?.toInt() ?? 0,
+        namaOutput: j['namaOutput'] as String? ?? '-',
+      );
+}
+
+class OutputMappingResult {
+  final String outputType;
+  final List<OutputMappingItem> items;
+
+  const OutputMappingResult({required this.outputType, required this.items});
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Furniture WIP compositions model
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _WipKomposisi {
+  final int idCetakan;
+  final String namaCetakan;
+  final int idWarna;
+  final String namaWarna;
+  final int? idFurnitureMaterial;
+  final String? namaFurnitureMaterial;
+
+  const _WipKomposisi({
+    required this.idCetakan,
+    required this.namaCetakan,
+    required this.idWarna,
+    required this.namaWarna,
+    this.idFurnitureMaterial,
+    this.namaFurnitureMaterial,
+  });
+
+  factory _WipKomposisi.fromJson(Map<String, dynamic> j) => _WipKomposisi(
+    idCetakan: (j['IdCetakan'] as num?)?.toInt() ?? 0,
+    namaCetakan: j['NamaCetakan'] as String? ?? '-',
+    idWarna: (j['IdWarna'] as num?)?.toInt() ?? 0,
+    namaWarna: j['NamaWarna'] as String? ?? '-',
+    idFurnitureMaterial: (j['IdFurnitureMaterial'] as num?)?.toInt(),
+    namaFurnitureMaterial: j['NamaFurnitureMaterial'] as String?,
+  );
+}
+
+class _WipComposition {
+  final int idFurnitureWIP;
+  final String namaFurnitureWIP;
+  final List<_WipKomposisi> komposisi;
+
+  const _WipComposition({
+    required this.idFurnitureWIP,
+    required this.namaFurnitureWIP,
+    required this.komposisi,
+  });
+
+  factory _WipComposition.fromJson(Map<String, dynamic> j) => _WipComposition(
+    idFurnitureWIP: (j['IdFurnitureWIP'] as num?)?.toInt() ?? 0,
+    namaFurnitureWIP: j['NamaFurnitureWIP'] as String? ?? '-',
+    komposisi: (j['Komposisi'] as List? ?? [])
+        .map((e) => _WipKomposisi.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList(),
+  );
+}
+
+Future<List<_WipComposition>> _fetchWipCompositions() async {
+  try {
+    final token = await TokenStorage.getToken();
+    final resp = await http
+        .get(
+          Uri.parse(
+            '${ApiConstants.baseUrl}/api/mst/material/furniture-wip-compositions',
+          ),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(const Duration(seconds: 15));
+    if (resp.statusCode != 200) return [];
+    final body =
+        jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    final list = body['data'] as List? ?? [];
+    return list
+        .map(
+          (e) => _WipComposition.fromJson(Map<String, dynamic>.from(e as Map)),
+        )
+        .toList();
+  } catch (_) {
+    return [];
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Barang Jadi compositions model
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _BarangJadiComposition {
+  final int idBarangJadi;
+  final String namaBarangJadi;
+  final List<_WipKomposisi> komposisi;
+
+  const _BarangJadiComposition({
+    required this.idBarangJadi,
+    required this.namaBarangJadi,
+    required this.komposisi,
+  });
+
+  factory _BarangJadiComposition.fromJson(Map<String, dynamic> j) =>
+      _BarangJadiComposition(
+        idBarangJadi: (j['IdBarangJadi'] as num?)?.toInt() ?? 0,
+        namaBarangJadi: j['NamaBarangJadi'] as String? ?? '-',
+        komposisi: (j['Komposisi'] as List? ?? [])
+            .map(
+              (e) =>
+                  _WipKomposisi.fromJson(Map<String, dynamic>.from(e as Map)),
+            )
+            .toList(),
+      );
+}
+
+Future<List<_BarangJadiComposition>> _fetchBarangJadiCompositions() async {
+  try {
+    final token = await TokenStorage.getToken();
+    final resp = await http
+        .get(
+          Uri.parse(
+            '${ApiConstants.baseUrl}/api/mst/material/barang-jadi-compositions',
+          ),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(const Duration(seconds: 15));
+    if (resp.statusCode != 200) return [];
+    final body =
+        jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    final list = body['data'] as List? ?? [];
+    return list
+        .map(
+          (e) => _BarangJadiComposition.fromJson(
+            Map<String, dynamic>.from(e as Map),
+          ),
+        )
+        .toList();
+  } catch (_) {
+    return [];
+  }
+}
+
+Future<OutputMappingResult?> _fetchOutputMapping({
+  required int idCetakan,
+  required int idWarna,
+  int? idFurnitureMaterial,
+}) async {
+  try {
+    final token = await TokenStorage.getToken();
+    var url =
+        '${ApiConstants.baseUrl}/api/mst/material/output?idCetakan=$idCetakan&idWarna=$idWarna';
+    if (idFurnitureMaterial != null && idFurnitureMaterial != 0) {
+      url += '&idFurnitureMaterial=$idFurnitureMaterial';
+    }
+    final resp = await http
+        .get(
+          Uri.parse(url),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        )
+        .timeout(const Duration(seconds: 10));
+    if (resp.statusCode != 200) return null;
+    final body =
+        jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    final data = body['data'] as Map<String, dynamic>?;
+    if (data == null) return null;
+    final outputType = data['outputType'] as String? ?? '';
+    final items = (data['items'] as List? ?? [])
+        .map(
+          (e) =>
+              OutputMappingItem.fromJson(Map<String, dynamic>.from(e as Map)),
+        )
+        .toList();
+    return OutputMappingResult(outputType: outputType, items: items);
+  } catch (_) {
+    return null;
+  }
+}
 
 typedef CetakanWarnaMaterialResult = ({
   MstCetakan cetakan,
@@ -36,8 +248,8 @@ class CetakanWarnaMaterialPickerField extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasCetakan = selectedCetakan != null;
     final hasWarna = selectedWarna != null;
-    final hasMaterial = selectedMaterial != null &&
-        selectedMaterial!.idFurnitureMaterial != 0;
+    final hasMaterial =
+        selectedMaterial != null && selectedMaterial!.idFurnitureMaterial != 0;
 
     return _PickerContainer(
       hasValue: hasCetakan,
@@ -161,11 +373,7 @@ class _Col extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                icon,
-                size: 10,
-                color: const Color(0xFF9CA3AF),
-              ),
+              Icon(icon, size: 10, color: const Color(0xFF9CA3AF)),
               const SizedBox(width: 4),
               Text(
                 label,
@@ -184,7 +392,9 @@ class _Col extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: isEmpty ? FontWeight.w400 : FontWeight.w600,
-              color: isEmpty ? const Color(0xFFD1D5DB) : const Color(0xFF374151),
+              color: isEmpty
+                  ? const Color(0xFFD1D5DB)
+                  : const Color(0xFF374151),
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -267,6 +477,9 @@ class _CetakanWarnaMaterialPickerDialogState
   bool _loadingWarna = false;
   bool _loadingMaterial = false;
 
+  OutputMappingResult? _outputResult;
+  bool _loadingOutput = false;
+
   @override
   void initState() {
     super.initState();
@@ -275,13 +488,17 @@ class _CetakanWarnaMaterialPickerDialogState
     _selectedMaterial = widget.initialMaterial;
 
     if (_selectedCetakan != null) {
+      final savedWarna = widget.initialWarna;
+      final savedMaterial = widget.initialMaterial;
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         await _loadWarna(_selectedCetakan!.idCetakan);
-        if (_selectedWarna != null) {
-          await _loadMaterial(
-            _selectedCetakan!.idCetakan,
-            _selectedWarna!.idWarna,
-          );
+        if (savedWarna != null && mounted) {
+          setState(() => _selectedWarna = savedWarna);
+          await _loadMaterial(_selectedCetakan!.idCetakan, savedWarna.idWarna);
+          if (savedMaterial != null && mounted) {
+            setState(() => _selectedMaterial = savedMaterial);
+          }
+          await _refreshOutput();
         }
       });
     }
@@ -299,6 +516,7 @@ class _CetakanWarnaMaterialPickerDialogState
       _selectedWarna = null;
       _materialList = [];
       _selectedMaterial = null;
+      _outputResult = null;
     });
     try {
       final list = await WarnaRepository().fetchByCetakan(idCetakan);
@@ -316,6 +534,7 @@ class _CetakanWarnaMaterialPickerDialogState
       _loadingMaterial = true;
       _materialList = [];
       _selectedMaterial = null;
+      _outputResult = null;
     });
     try {
       final list = await FurnitureMaterialLookupRepository()
@@ -332,15 +551,33 @@ class _CetakanWarnaMaterialPickerDialogState
     }
   }
 
-  bool get _canConfirm =>
-      _selectedCetakan != null && _selectedWarna != null;
+  Future<void> _refreshOutput() async {
+    final cetakan = _selectedCetakan;
+    final warna = _selectedWarna;
+    if (cetakan == null || warna == null) {
+      if (mounted) setState(() => _outputResult = null);
+      return;
+    }
+    if (mounted) setState(() => _loadingOutput = true);
+    final result = await _fetchOutputMapping(
+      idCetakan: cetakan.idCetakan,
+      idWarna: warna.idWarna,
+      idFurnitureMaterial: _selectedMaterial?.idFurnitureMaterial,
+    );
+    if (!mounted) return;
+    setState(() {
+      _outputResult = result;
+      _loadingOutput = false;
+    });
+  }
+
+  bool get _canConfirm => _selectedCetakan != null && _selectedWarna != null;
 
   @override
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding:
-          const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Container(
         width: 780,
         height: 520,
@@ -365,7 +602,7 @@ class _CetakanWarnaMaterialPickerDialogState
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
+                    colors: [Color(0xFF1E40AF), Color(0xFF3B82F6)],
                   ),
                 ),
                 child: Row(
@@ -377,8 +614,11 @@ class _CetakanWarnaMaterialPickerDialogState
                         color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.layers_rounded,
-                          size: 18, color: Colors.white),
+                      child: const Icon(
+                        Icons.layers_rounded,
+                        size: 18,
+                        color: Colors.white,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     const Text(
@@ -401,8 +641,11 @@ class _CetakanWarnaMaterialPickerDialogState
                           color: Colors.white.withValues(alpha: 0.2),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.close,
-                            size: 16, color: Colors.white),
+                        child: const Icon(
+                          Icons.close,
+                          size: 16,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ],
@@ -433,14 +676,13 @@ class _CetakanWarnaMaterialPickerDialogState
                                       final c = widget.cetakanList[i];
                                       final active =
                                           _selectedCetakan?.idCetakan ==
-                                              c.idCetakan;
+                                          c.idCetakan;
                                       return _ListItem(
                                         label: c.namaCetakan,
                                         isActive: active,
                                         activeColor: const Color(0xFF2563EB),
                                         onTap: () async {
-                                          setState(
-                                              () => _selectedCetakan = c);
+                                          setState(() => _selectedCetakan = c);
                                           await _loadWarna(c.idCetakan);
                                         },
                                       );
@@ -451,8 +693,7 @@ class _CetakanWarnaMaterialPickerDialogState
                       ),
                     ),
 
-                    const VerticalDivider(
-                        width: 1, color: Color(0xFFE5E7EB)),
+                    const VerticalDivider(width: 1, color: Color(0xFFE5E7EB)),
 
                     // ── Kolom 2: Warna ────────────────────────────────
                     SizedBox(
@@ -462,106 +703,102 @@ class _CetakanWarnaMaterialPickerDialogState
                           _ColHeader(
                             label: 'WARNA',
                             icon: Icons.palette_outlined,
-                            color: const Color(0xFF7C3AED),
+                            color: const Color(0xFF475569),
                           ),
                           Expanded(
                             child: _selectedCetakan == null
                                 ? const _EmptyMsg(
-                                    'Pilih cetakan\nterlebih dahulu')
+                                    'Pilih cetakan\nterlebih dahulu',
+                                  )
                                 : _loadingWarna
-                                    ? const _Loading()
-                                    : _warnaList.isEmpty
-                                        ? const _EmptyMsg(
-                                            'Tidak ada warna\nuntuk cetakan ini')
-                                        : ListView.builder(
-                                            itemCount: _warnaList.length,
-                                            itemBuilder: (_, i) {
-                                              final w = _warnaList[i];
-                                              final active =
-                                                  _selectedWarna?.idWarna ==
-                                                      w.idWarna;
-                                              return _ListItem(
-                                                label: w.warna,
-                                                isActive: active,
-                                                activeColor:
-                                                    const Color(0xFF7C3AED),
-                                                onTap: () async {
-                                                  setState(
-                                                      () => _selectedWarna = w);
-                                                  await _loadMaterial(
-                                                    _selectedCetakan!
-                                                        .idCetakan,
-                                                    w.idWarna,
-                                                  );
-                                                },
-                                              );
-                                            },
-                                          ),
+                                ? const ListItemSkeleton()
+                                : _warnaList.isEmpty
+                                ? const _EmptyMsg(
+                                    'Tidak ada warna\nuntuk cetakan ini',
+                                  )
+                                : ListView.builder(
+                                    itemCount: _warnaList.length,
+                                    itemBuilder: (_, i) {
+                                      final w = _warnaList[i];
+                                      final active =
+                                          _selectedWarna?.idWarna == w.idWarna;
+                                      return _ListItem(
+                                        label: w.warna,
+                                        isActive: active,
+                                        activeColor: const Color(0xFF2563EB),
+                                        onTap: () async {
+                                          setState(() => _selectedWarna = w);
+                                          await _loadMaterial(
+                                            _selectedCetakan!.idCetakan,
+                                            w.idWarna,
+                                          );
+                                          await _refreshOutput();
+                                        },
+                                      );
+                                    },
+                                  ),
                           ),
                         ],
                       ),
                     ),
 
-                    const VerticalDivider(
-                        width: 1, color: Color(0xFFE5E7EB)),
+                    const VerticalDivider(width: 1, color: Color(0xFFE5E7EB)),
 
-                    // ── Kolom 3: Furniture Material ───────────────────
+                    // ── Kolom 3:  Material ───────────────────
                     Expanded(
                       child: Column(
                         children: [
                           _ColHeader(
-                            label: 'FURNITURE MATERIAL',
+                            label: 'MATERIAL',
                             icon: Icons.inventory_2_outlined,
-                            color: const Color(0xFF059669),
+                            color: const Color(0xFF475569),
                           ),
                           Expanded(
                             child: _selectedWarna == null
                                 ? const _EmptyMsg(
-                                    'Pilih warna\nterlebih dahulu')
+                                    'Pilih warna\nterlebih dahulu',
+                                  )
                                 : _loadingMaterial
-                                    ? const _Loading()
-                                    : _materialList.isEmpty
-                                        ? _NoMaterialItem(
-                                            isSelected:
-                                                _selectedMaterial == null,
-                                            onTap: () => setState(
-                                                () => _selectedMaterial =
-                                                    null),
-                                          )
-                                        : ListView.builder(
-                                            itemCount:
-                                                _materialList.length + 1,
-                                            itemBuilder: (_, i) {
-                                              if (i == 0) {
-                                                return _NoMaterialItem(
-                                                  isSelected:
-                                                      _selectedMaterial ==
-                                                          null,
-                                                  onTap: () => setState(
-                                                      () =>
-                                                          _selectedMaterial =
-                                                              null),
-                                                );
-                                              }
-                                              final m =
-                                                  _materialList[i - 1];
-                                              final active =
-                                                  _selectedMaterial
-                                                          ?.idFurnitureMaterial ==
-                                                      m.idFurnitureMaterial;
-                                              return _ListItem(
-                                                label: m.displayText,
-                                                sublabel: m.itemCode,
-                                                isActive: active,
-                                                activeColor:
-                                                    const Color(0xFF059669),
-                                                onTap: () => setState(
-                                                    () =>
-                                                        _selectedMaterial =
-                                                            m),
-                                              );
-                                            },
-                                          ),
+                                ? const ListItemSkeleton()
+                                : _materialList.isEmpty
+                                ? _NoMaterialItem(
+                                    isSelected: _selectedMaterial == null,
+                                    onTap: () async {
+                                      setState(() => _selectedMaterial = null);
+                                      await _refreshOutput();
+                                    },
+                                  )
+                                : ListView.builder(
+                                    itemCount: _materialList.length + 1,
+                                    itemBuilder: (_, i) {
+                                      if (i == 0) {
+                                        return _NoMaterialItem(
+                                          isSelected: _selectedMaterial == null,
+                                          onTap: () async {
+                                            setState(
+                                              () => _selectedMaterial = null,
+                                            );
+                                            await _refreshOutput();
+                                          },
+                                        );
+                                      }
+                                      final m = _materialList[i - 1];
+                                      final active =
+                                          _selectedMaterial
+                                              ?.idFurnitureMaterial ==
+                                          m.idFurnitureMaterial;
+                                      return _ListItem(
+                                        label: m.displayText,
+                                        sublabel: m.itemCode,
+                                        isActive: active,
+                                        activeColor: const Color(0xFF2563EB),
+                                        onTap: () async {
+                                          setState(() => _selectedMaterial = m);
+                                          await _refreshOutput();
+                                        },
+                                      );
+                                    },
+                                  ),
                           ),
                         ],
                       ),
@@ -570,40 +807,35 @@ class _CetakanWarnaMaterialPickerDialogState
                 ),
               ),
 
+              // ── Output mapping strip ─────────────────────────────────
+              if (_loadingOutput ||
+                  (_outputResult != null && _selectedWarna != null))
+                _OutputMappingStrip(
+                  loading: _loadingOutput,
+                  result: _outputResult,
+                ),
+
               // ── Footer ──────────────────────────────────────────────
               Container(
                 height: 56,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: const BoxDecoration(
-                  border:
-                      Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+                  border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
                 ),
                 child: Row(
                   children: [
-                    // preview pilihan
-                    Expanded(
-                      child: _selectedCetakan == null
-                          ? const Text(
-                              'Belum ada yang dipilih',
-                              style: TextStyle(
-                                  fontSize: 12, color: Color(0xFF9CA3AF)),
-                            )
-                          : Wrap(
-                              spacing: 6,
-                              children: [
-                                _FooterChip(
-                                    _selectedCetakan!.namaCetakan,
-                                    const Color(0xFF2563EB)),
-                                if (_selectedWarna != null)
-                                  _FooterChip(_selectedWarna!.warna,
-                                      const Color(0xFF7C3AED)),
-                                if (_selectedMaterial != null)
-                                  _FooterChip(
-                                      _selectedMaterial!.nama ?? '-',
-                                      const Color(0xFF059669)),
-                              ],
-                            ),
+                    TextButton.icon(
+                      onPressed: () => showDialog<void>(
+                        context: context,
+                        builder: (_) => const _PanduanDialog(),
+                      ),
+                      icon: const Icon(Icons.menu_book_outlined, size: 15),
+                      label: const Text('Panduan'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF6B7280),
+                      ),
                     ),
+                    const Spacer(),
                     OutlinedButton(
                       onPressed: () => Navigator.of(context).pop(null),
                       child: const Text('Batal'),
@@ -612,13 +844,13 @@ class _CetakanWarnaMaterialPickerDialogState
                     ElevatedButton(
                       onPressed: _canConfirm
                           ? () => Navigator.of(context).pop((
-                                cetakan: _selectedCetakan!,
-                                warna: _selectedWarna!,
-                                material: _selectedMaterial,
-                              ))
+                              cetakan: _selectedCetakan!,
+                              warna: _selectedWarna!,
+                              material: _selectedMaterial,
+                            ))
                           : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0F766E),
+                        backgroundColor: const Color(0xFF2563EB),
                         foregroundColor: Colors.white,
                       ),
                       child: const Text('Pilih'),
@@ -692,8 +924,7 @@ class _ListItem extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         color: isActive
             ? activeColor.withValues(alpha: 0.08)
             : Colors.transparent,
@@ -719,9 +950,7 @@ class _ListItem extends StatelessWidget {
                       fontWeight: isActive
                           ? FontWeight.w600
                           : FontWeight.normal,
-                      color: isActive
-                          ? activeColor
-                          : const Color(0xFF374151),
+                      color: isActive ? activeColor : const Color(0xFF374151),
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -746,23 +975,20 @@ class _ListItem extends StatelessWidget {
 }
 
 class _NoMaterialItem extends StatelessWidget {
-  const _NoMaterialItem({
-    required this.isSelected,
-    required this.onTap,
-  });
+  const _NoMaterialItem({required this.isSelected, required this.onTap});
   final bool isSelected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    const color = Color(0xFF6B7280);
+    const activeColor = Color(0xFF2563EB);
+    const inactiveColor = Color(0xFF9CA3AF);
     return InkWell(
       onTap: onTap,
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         color: isSelected
-            ? const Color(0xFFF3F4F6)
+            ? activeColor.withValues(alpha: 0.08)
             : Colors.transparent,
         child: Row(
           children: [
@@ -771,22 +997,22 @@ class _NoMaterialItem extends StatelessWidget {
               height: 7,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isSelected ? color : const Color(0xFFCBD5E1),
+                color: isSelected ? activeColor : const Color(0xFFCBD5E1),
               ),
             ),
             const SizedBox(width: 8),
-            const Expanded(
+            Expanded(
               child: Text(
                 'Tidak ada material',
                 style: TextStyle(
                   fontSize: 12,
                   fontStyle: FontStyle.italic,
-                  color: color,
+                  color: isSelected ? activeColor : inactiveColor,
                 ),
               ),
             ),
             if (isSelected)
-              const Icon(Icons.check_circle, size: 14, color: color),
+              const Icon(Icons.check_circle, size: 14, color: activeColor),
           ],
         ),
       ),
@@ -813,36 +1039,614 @@ class _EmptyMsg extends StatelessWidget {
   }
 }
 
-class _Loading extends StatelessWidget {
-  const _Loading();
+class _OutputMappingStrip extends StatelessWidget {
+  const _OutputMappingStrip({required this.loading, required this.result});
+  final bool loading;
+  final OutputMappingResult? result;
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: CircularProgressIndicator(strokeWidth: 2),
+    if (loading) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: const BoxDecoration(
+          color: Color(0xFFF8FAFC),
+          border: Border(
+            top: BorderSide(color: Color(0xFFE5E7EB)),
+            bottom: BorderSide(color: Color(0xFFE5E7EB)),
+          ),
+        ),
+        child: const Row(
+          children: [
+            SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(strokeWidth: 1.5),
+            ),
+            SizedBox(width: 8),
+            Text(
+              'Mengecek output...',
+              style: TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final r = result;
+    if (r == null || r.items.isEmpty) return const SizedBox.shrink();
+
+    final isBarangJadi = r.outputType == 'barangjadi';
+    const badgeColor = Color(0xFF16A34A);
+    final badgeLabel = isBarangJadi ? 'Barang Jadi' : 'Furniture WIP';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: badgeColor.withValues(alpha: 0.04),
+        border: Border(
+          top: BorderSide(color: badgeColor.withValues(alpha: 0.2)),
+          bottom: BorderSide(color: badgeColor.withValues(alpha: 0.2)),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.output_rounded, size: 13, color: badgeColor),
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+              color: badgeColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              badgeLabel,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: badgeColor,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: r.items
+                  .map(
+                    (item) => Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: badgeColor.withValues(alpha: 0.09),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: badgeColor.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: Text(
+                        item.namaOutput,
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: badgeColor,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _FooterChip extends StatelessWidget {
-  const _FooterChip(this.label, this.color);
-  final String label;
-  final Color color;
+// ─────────────────────────────────────────────────────────────────────────────
+// Panduan dialog: daftar Furniture WIP beserta komposisi cetakan+warna+material
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _PanduanDialog extends StatefulWidget {
+  const _PanduanDialog();
+
+  @override
+  State<_PanduanDialog> createState() => _PanduanDialogState();
+}
+
+class _PanduanDialogState extends State<_PanduanDialog>
+    with SingleTickerProviderStateMixin {
+  // Furniture WIP
+  List<_WipComposition> _allWip = [];
+  List<_WipComposition> _filteredWip = [];
+  bool _loadingWip = true;
+
+  // Barang Jadi
+  List<_BarangJadiComposition> _allBj = [];
+  List<_BarangJadiComposition> _filteredBj = [];
+  bool _loadingBj = true;
+
+  late final TabController _tabCtrl;
+  final _searchCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _tabCtrl = TabController(length: 2, vsync: this);
+    _tabCtrl.addListener(() {
+      _searchCtrl.clear();
+      setState(() {});
+    });
+    _loadWip();
+    _loadBj();
+    _searchCtrl.addListener(_filter);
+  }
+
+  @override
+  void dispose() {
+    _tabCtrl.dispose();
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadWip() async {
+    final data = await _fetchWipCompositions();
+    if (!mounted) return;
+    setState(() {
+      _allWip = data;
+      _filteredWip = data;
+      _loadingWip = false;
+    });
+  }
+
+  Future<void> _loadBj() async {
+    final data = await _fetchBarangJadiCompositions();
+    if (!mounted) return;
+    setState(() {
+      _allBj = data;
+      _filteredBj = data;
+      _loadingBj = false;
+    });
+  }
+
+  void _filter() {
+    final q = _searchCtrl.text.trim().toLowerCase();
+    setState(() {
+      if (_tabCtrl.index == 0) {
+        _filteredWip = q.isEmpty
+            ? _allWip
+            : _allWip
+                  .where((w) => w.namaFurnitureWIP.toLowerCase().contains(q))
+                  .toList();
+      } else {
+        _filteredBj = q.isEmpty
+            ? _allBj
+            : _allBj
+                  .where((b) => b.namaBarangJadi.toLowerCase().contains(q))
+                  .toList();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      child: Container(
+        width: 640,
+        height: 620,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Column(
+            children: [
+              // header
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF1D4ED8), Color(0xFF3B82F6)],
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    SizedBox(
+                      height: 52,
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.menu_book_outlined,
+                            size: 18,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'Panduan Cetakan, Warna & Material',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const Spacer(),
+                          InkWell(
+                            onTap: () => Navigator.of(context).pop(),
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              width: 26,
+                              height: 26,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.close,
+                                size: 14,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    TabBar(
+                      controller: _tabCtrl,
+                      indicatorColor: Colors.white,
+                      indicatorWeight: 2.5,
+                      labelColor: Colors.white,
+                      unselectedLabelColor: Colors.white.withValues(alpha: 0.6),
+                      labelStyle: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      unselectedLabelStyle: const TextStyle(fontSize: 12),
+                      tabs: const [
+                        Tab(text: 'Furniture WIP'),
+                        Tab(text: 'Barang Jadi'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // search
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+                child: TextField(
+                  controller: _searchCtrl,
+                  decoration: InputDecoration(
+                    hintText: _tabCtrl.index == 0
+                        ? 'Cari jenis Furniture WIP...'
+                        : 'Cari jenis Barang Jadi...',
+                    hintStyle: const TextStyle(fontSize: 12),
+                    prefixIcon: const Icon(Icons.search, size: 16),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 9,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                    ),
+                  ),
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
+
+              // list
+              Expanded(
+                child: TabBarView(
+                  controller: _tabCtrl,
+                  children: [
+                    // ── Tab 0: Furniture WIP ────────────────────────
+                    _buildList(
+                      loading: _loadingWip,
+                      isEmpty: _filteredWip.isEmpty,
+                      child: Column(
+                        children: [
+                          const _PanduanTableHeader(
+                            jenisLabel: 'JENIS FURNITURE WIP',
+                          ),
+                          Expanded(
+                            child: ListView.builder(
+                              itemCount: _filteredWip.length,
+                              itemBuilder: (_, i) => _PanduanItem(
+                                nama: _filteredWip[i].namaFurnitureWIP,
+                                komposisi: _filteredWip[i].komposisi,
+                                isEven: i.isEven,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // ── Tab 1: Barang Jadi ──────────────────────────
+                    _buildList(
+                      loading: _loadingBj,
+                      isEmpty: _filteredBj.isEmpty,
+                      child: Column(
+                        children: [
+                          const _PanduanTableHeader(
+                            jenisLabel: 'JENIS BARANG JADI',
+                          ),
+                          Expanded(
+                            child: ListView.builder(
+                              itemCount: _filteredBj.length,
+                              itemBuilder: (_, i) => _PanduanItem(
+                                nama: _filteredBj[i].namaBarangJadi,
+                                komposisi: _filteredBj[i].komposisi,
+                                isEven: i.isEven,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildList({
+    required bool loading,
+    required bool isEmpty,
+    required Widget child,
+  }) {
+    if (loading) return const TableRowSkeleton();
+    if (isEmpty) {
+      return const Center(
+        child: Text(
+          'Tidak ada data',
+          style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+        ),
+      );
+    }
+    return child;
+  }
+}
+
+// ── Table header (rendered once above the list) ───────────────────────────────
+
+class _PanduanTableHeader extends StatelessWidget {
+  const _PanduanTableHeader({this.jenisLabel = 'JENIS FURNITURE WIP'});
+  final String jenisLabel;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: const BoxDecoration(
+        color: Color(0xFFF1F5F9),
+        border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 5,
+            child: Text(
+              jenisLabel,
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF64748B),
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            flex: 3,
+            child: Text(
+              'CETAKAN',
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF64748B),
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            flex: 2,
+            child: Text(
+              'WARNA',
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF64748B),
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            flex: 3,
+            child: Text(
+              'MATERIAL',
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF64748B),
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── One row per komposisi entry ───────────────────────────────────────────────
+
+class _PanduanItem extends StatelessWidget {
+  const _PanduanItem({
+    required this.nama,
+    required this.komposisi,
+    required this.isEven,
+  });
+  final String nama;
+  final List<_WipKomposisi> komposisi;
+  final bool isEven;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = komposisi;
+    return Container(
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
+        color: isEven ? Colors.white : const Color(0xFFF8FAFC),
+        border: const Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
       ),
-      child: Text(
-        label,
-        style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w500),
-        overflow: TextOverflow.ellipsis,
-      ),
+      child: rows.isEmpty
+          ? Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 5,
+                    child: Text(
+                      nama,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1E293B),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    flex: 3,
+                    child: Text(
+                      'N/A',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF9CA3AF),
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    flex: 2,
+                    child: Text(
+                      'N/A',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF9CA3AF),
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    flex: 3,
+                    child: Text(
+                      'N/A',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF9CA3AF),
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : Column(
+              children: List.generate(rows.length, (i) {
+                final k = rows[i];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 7,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 5,
+                        child: i == 0
+                            ? Text(
+                                nama,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF1E293B),
+                                ),
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          k.namaCetakan,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          k.namaWarna,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          k.namaFurnitureMaterial ?? '-',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: k.namaFurnitureMaterial != null
+                                ? const Color(0xFF1E293B)
+                                : const Color(0xFF9CA3AF),
+                            fontStyle: k.namaFurnitureMaterial == null
+                                ? FontStyle.italic
+                                : FontStyle.normal,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ),
     );
   }
 }

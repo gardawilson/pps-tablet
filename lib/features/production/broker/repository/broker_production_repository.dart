@@ -282,6 +282,13 @@ class BrokerProductionRepository {
     };
   }
 
+  Future<BrokerProduction> fetchOne(String noProduksiValue) async {
+    final result = await fetchAll(page: 1, pageSize: 1, noProduksi: noProduksiValue.trim());
+    final items = result['items'] as List<BrokerProduction>;
+    if (items.isEmpty) throw Exception('Data tidak ditemukan untuk $noProduksiValue');
+    return items.first;
+  }
+
   /// Convenience jika hanya butuh list halaman tertentu
   Future<List<BrokerProduction>> fetchAllList({
     required int page,

@@ -77,8 +77,6 @@ class _PackingProductionScreenState extends State<PackingProductionScreen> {
                       MaterialPageRoute(
                         builder: (_) => PackingProductionInputScreen(
                           noProduksi: row.noPacking,
-                          isLocked: row.isLocked,
-                          lastClosedDate: row.lastClosedDate,
                         ),
                       ),
                     );

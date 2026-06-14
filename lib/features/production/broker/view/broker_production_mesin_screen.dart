@@ -192,16 +192,6 @@ class _BrokerProductionMesinScreenState
           MaterialPageRoute(
             builder: (_) => BrokerProductionInputScreen(
               noProduksi: created.noProduksi,
-              idMesin: created.idMesin,
-              namaMesin: created.namaMesin,
-              shift: created.shift,
-              tglProduksi: created.tglProduksi,
-              isLocked: created.isLocked,
-              lastClosedDate: created.lastClosedDate,
-              hourStart: created.hourStart,
-              hourEnd: created.hourEnd,
-              namaJenis: created.outputJenisNama,
-              outputJenisId: created.outputJenisId,
             ),
           ),
         );
@@ -244,18 +234,6 @@ class _BrokerProductionMesinScreenState
         MaterialPageRoute(
           builder: (_) => BrokerProductionInputScreen(
             noProduksi: created.noProduksi,
-            idMesin: created.idMesin,
-            namaMesin: created.namaMesin.isNotEmpty
-                ? created.namaMesin
-                : mesin.namaMesin,
-            shift: created.shift,
-            tglProduksi: created.tglProduksi,
-            isLocked: created.isLocked,
-            lastClosedDate: created.lastClosedDate,
-            hourStart: created.hourStart,
-            hourEnd: created.hourEnd,
-            namaJenis: created.outputJenisNama,
-            outputJenisId: created.outputJenisId,
           ),
         ),
       );
@@ -277,16 +255,6 @@ class _BrokerProductionMesinScreenState
       MaterialPageRoute(
         builder: (_) => BrokerProductionInputScreen(
           noProduksi: item.noProduksi,
-          idMesin: mesin.idMesin,
-          namaMesin: mesin.namaMesin,
-          shift: item.shift ?? 1,
-          tglProduksi: item.tglProduksi,
-          isLocked: false,
-          lastClosedDate: null,
-          hourStart: item.hourStart,
-          hourEnd: item.hourEnd,
-          namaJenis: item.outputJenisNama,
-          outputJenisId: item.outputJenisId,
         ),
       ),
     );
@@ -435,16 +403,6 @@ class _BrokerProductionMesinScreenState
                                 MaterialPageRoute(
                                   builder: (_) => BrokerProductionInputScreen(
                                     noProduksi: row.noProduksi,
-                                    idMesin: row.idMesin,
-                                    namaMesin: row.namaMesin,
-                                    shift: row.shift,
-                                    tglProduksi: row.tglProduksi,
-                                    isLocked: row.isLocked,
-                                    lastClosedDate: row.lastClosedDate,
-                                    hourStart: row.hourStart,
-                                    hourEnd: row.hourEnd,
-                                    namaJenis: row.outputJenisNama,
-                                    outputJenisId: row.outputJenisId,
                                   ),
                                 ),
                               );
@@ -514,16 +472,6 @@ class _BrokerProductionMesinScreenState
                                 MaterialPageRoute(
                                   builder: (_) => BrokerProductionInputScreen(
                                     noProduksi: row.noProduksi,
-                                    idMesin: row.idMesin,
-                                    namaMesin: row.namaMesin,
-                                    shift: row.shift,
-                                    tglProduksi: row.tglProduksi,
-                                    isLocked: row.isLocked,
-                                    lastClosedDate: row.lastClosedDate,
-                                    hourStart: row.hourStart,
-                                    hourEnd: row.hourEnd,
-                                    namaJenis: row.outputJenisNama,
-                                    outputJenisId: row.outputJenisId,
                                   ),
                                 ),
                               );

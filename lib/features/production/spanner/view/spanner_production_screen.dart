@@ -77,8 +77,6 @@ class _SpannerProductionScreenState extends State<SpannerProductionScreen> {
                       MaterialPageRoute(
                         builder: (_) => SpannerProductionInputScreen(
                           noProduksi: row.noProduksi,
-                          isLocked: row.isLocked,
-                          lastClosedDate: row.lastClosedDate,
                         ),
                       ),
                     );

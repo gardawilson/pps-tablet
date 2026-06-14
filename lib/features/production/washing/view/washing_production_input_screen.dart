@@ -1,6 +1,7 @@
 // lib/features/production/washing/view/washing_production_input_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shimmer/shimmer.dart';
 
 import 'package:pps_tablet/core/view/app_shell.dart';
 import 'package:pps_tablet/features/production/washing/view_model/washing_production_input_view_model.dart';
@@ -39,32 +40,10 @@ const _kWashingBorder = Color(0xFFE2E6EA);
 
 class WashingProductionInputScreen extends StatefulWidget {
   final String noProduksi;
-  final int? idMesin;
-  final bool? isLocked;
-  final DateTime? lastClosedDate;
-
-  // Header info — passed from list screen (WashingProduction model)
-  final String? namaMesin;
-  final String? namaJenis;
-  final int? outputJenisId;
-  final DateTime? tglProduksi;
-  final int? shift;
-  final String? hourStart;
-  final String? hourEnd;
 
   const WashingProductionInputScreen({
     super.key,
     required this.noProduksi,
-    this.idMesin,
-    this.isLocked,
-    this.lastClosedDate,
-    this.namaMesin,
-    this.namaJenis,
-    this.outputJenisId,
-    this.tglProduksi,
-    this.shift,
-    this.hourStart,
-    this.hourEnd,
   });
 
   @override
@@ -75,6 +54,10 @@ class WashingProductionInputScreen extends StatefulWidget {
 class _WashingProductionInputScreenState
     extends State<WashingProductionInputScreen> {
   final _repo = WashingProductionInputRepository();
+  final _prodRepo = WashingProductionRepository();
+
+  WashingProduction? _header;
+  late String _cachedBreadcrumbLabel;
 
   String _selectedMode = 'full';
   String _selectedInputTab = 'bb';
@@ -82,29 +65,21 @@ class _WashingProductionInputScreenState
 
   List<BreadcrumbSegment> _prevBreadcrumb = [];
   bool _isReplacing = false;
-  String get _breadcrumbLabel {
-    final machineName = (widget.namaMesin ?? '').trim();
-    return machineName.isNotEmpty ? machineName : widget.noProduksi;
-  }
+
+  String get _breadcrumbLabel =>
+      (_header?.namaMesin ?? '').trim().isNotEmpty
+          ? _header!.namaMesin
+          : widget.noProduksi;
 
   @override
   void initState() {
     super.initState();
-    _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
+    _cachedBreadcrumbLabel = widget.noProduksi;
+    _loadHeader();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      AppShell.breadcrumb.value = [
-        ..._prevBreadcrumb.map(
-          (s) => BreadcrumbSegment(
-            s.label,
-            onTap: () {
-              AppShell.breadcrumb.value = _prevBreadcrumb;
-              AppShell.shellNavigatorKey.currentState?.pop();
-            },
-          ),
-        ),
-        BreadcrumbSegment(_breadcrumbLabel),
-      ];
+      _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
+      _updateBreadcrumb();
 
       final vm = context.read<WashingProductionInputViewModel>();
       if (vm.inputsOf(widget.noProduksi) == null &&
@@ -118,17 +93,45 @@ class _WashingProductionInputScreenState
     });
   }
 
+  Future<void> _loadHeader() async {
+    try {
+      final header = await _prodRepo.fetchOne(widget.noProduksi);
+      if (!mounted) return;
+      setState(() {
+        _header = header;
+        _cachedBreadcrumbLabel = _breadcrumbLabel;
+      });
+      _updateBreadcrumb();
+    } catch (_) {}
+  }
+
+  void _updateBreadcrumb() {
+    if (!mounted) return;
+    AppShell.breadcrumb.value = [
+      ..._prevBreadcrumb.map(
+        (s) => BreadcrumbSegment(
+          s.label,
+          onTap: () {
+            AppShell.breadcrumb.value = _prevBreadcrumb;
+            AppShell.shellNavigatorKey.currentState?.pop();
+          },
+        ),
+      ),
+      BreadcrumbSegment(_breadcrumbLabel),
+    ];
+  }
+
   @override
   void dispose() {
-    // Guard: hanya restore jika breadcrumb terakhir masih milik screen ini.
-    // Jika sidebar sudah ganti breadcrumb (via pushNamedAndRemoveUntil),
-    // jangan overwrite — itu yang menyebabkan breadcrumb kacau saat pindah menu.
     if (!_isReplacing) {
-      final current = AppShell.breadcrumb.value;
-      final ourLabel = _breadcrumbLabel;
-      if (current.isNotEmpty && current.last.label == ourLabel) {
-        AppShell.breadcrumb.value = _prevBreadcrumb;
-      }
+      final prev = _prevBreadcrumb;
+      final label = _cachedBreadcrumbLabel;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final current = AppShell.breadcrumb.value;
+        if (current.isNotEmpty && current.last.label == label) {
+          AppShell.breadcrumb.value = prev;
+        }
+      });
     }
     super.dispose();
   }
@@ -206,8 +209,8 @@ class _WashingProductionInputScreenState
       ({WashingProduction prod, String namaJenis})
     >(
       context: context,
-      idMesin: widget.idMesin,
-      tanggal: widget.tglProduksi,
+      idMesin: _header?.idMesin,
+      tanggal: _header?.tglProduksi,
       onMissingContext: () => _showSnack(
         'Data mesin/tanggal tidak tersedia',
         backgroundColor: Colors.orange,
@@ -222,7 +225,7 @@ class _WashingProductionInputScreenState
                 WashingType
               >(
                 tanggal: tgl,
-                shift: widget.shift ?? 1,
+                shift: _header?.shift ?? 1,
                 primaryColor: _kWashingPrimary,
                 borderColor: _kWashingBorder,
                 jenisRequiredMessage: 'Pilih jenis washing terlebih dahulu',
@@ -250,25 +253,10 @@ class _WashingProductionInputScreenState
       },
       replaceToResult: (splitResult) async {
         if (!mounted) return;
-        final newProd = splitResult.prod;
-        final namaJenis = splitResult.namaJenis.isNotEmpty
-            ? splitResult.namaJenis
-            : (newProd.outputJenisNama ?? '');
-
         await Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => WashingProductionInputScreen(
-              noProduksi: newProd.noProduksi,
-              idMesin: newProd.idMesin,
-              namaMesin: widget.namaMesin,
-              shift: newProd.shift,
-              tglProduksi: newProd.tglProduksi,
-              isLocked: false,
-              lastClosedDate: null,
-              hourStart: newProd.hourStart,
-              hourEnd: newProd.hourEnd,
-              namaJenis: namaJenis,
-              outputJenisId: newProd.outputJenisId,
+              noProduksi: splitResult.prod.noProduksi,
             ),
           ),
         );
@@ -280,16 +268,16 @@ class _WashingProductionInputScreenState
     if (!mounted) return;
     await ProductionFlowHelpers.openTimeline(
       context: context,
-      idMesin: widget.idMesin,
-      tanggal: widget.tglProduksi,
+      idMesin: _header?.idMesin,
+      tanggal: _header?.tglProduksi,
       onMissingContext: () => _showSnack(
         'Data mesin/tanggal tidak tersedia',
         backgroundColor: Colors.orange,
       ),
       dialogBuilder: (idMesin, tgl) => buildProductionShiftTimelineDialog(
-        namaMesin: widget.namaMesin,
+        namaMesin: _header?.namaMesin,
         tanggal: tgl,
-        shift: widget.shift ?? 1,
+        shift: _header?.shift ?? 1,
         currentNoProduksi: widget.noProduksi,
         primaryColor: _kWashingPrimary,
         borderColor: _kWashingBorder,
@@ -299,7 +287,7 @@ class _WashingProductionInputScreenState
               .fetchByMesinTanggalShift(
                 idMesin: idMesin,
                 tanggal: tgl,
-                shift: widget.shift ?? 1,
+                shift: _header?.shift ?? 1,
               );
           return list
               .map(
@@ -671,6 +659,14 @@ class _WashingProductionInputScreenState
     }
   }
 
+  Widget _buildToolbarSkeleton() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade300,
+      highlightColor: Colors.grey.shade100,
+      child: Container(height: 56, color: Colors.white),
+    );
+  }
+
   // ── Input panel ────────────────────────────────────────────────────────────
   //
   // Header mengikuti broker _buildInputPanel:
@@ -905,7 +901,7 @@ class _WashingProductionInputScreenState
         );
         return;
       }
-      if (widget.outputJenisId == null) {
+      if (_header?.outputJenisId == null) {
         _showSnack(
           'Jenis output belum dikonfigurasi pada produksi ini.',
           backgroundColor: Colors.orange,
@@ -917,10 +913,10 @@ class _WashingProductionInputScreenState
         barrierDismissible: false,
         builder: (_) => WashingProductionOutputFormDialog(
           noProduksi: widget.noProduksi,
-          tglProduksi: widget.tglProduksi,
-          idJenis: widget.outputJenisId!,
-          namaJenis: widget.namaJenis ?? '',
-          namaMesin: widget.namaMesin,
+          tglProduksi: _header?.tglProduksi,
+          idJenis: _header!.outputJenisId!,
+          namaJenis: _header?.outputJenisNama ?? '',
+          namaMesin: _header?.namaMesin,
           repository: _repo,
         ),
       );
@@ -1033,11 +1029,6 @@ class _WashingProductionInputScreenState
                                                     .map(
                                                       (o) => WashingOutputTile(
                                                         output: o,
-                                                        onPrint: () => _showSnack(
-                                                          'Fitur print washing belum tersedia.',
-                                                          backgroundColor:
-                                                              Colors.orange,
-                                                        ),
                                                       ),
                                                     )
                                                     .toList(),
@@ -1072,9 +1063,11 @@ class _WashingProductionInputScreenState
                                     FloatingActionButton(
                                       heroTag: 'fab_add_washing_output',
                                       mini: true,
-                                      backgroundColor: _kWashingOutput,
+                                      backgroundColor: _header == null
+                                          ? Colors.grey.shade300
+                                          : _kWashingOutput,
                                       foregroundColor: Colors.white,
-                                      onPressed: onAddWashing,
+                                      onPressed: _header == null ? null : onAddWashing,
                                       child: const Icon(Icons.add),
                                     ),
                                   ],
@@ -1501,7 +1494,7 @@ class _WashingProductionInputScreenState
         final err = vm.inputsError(widget.noProduksi);
         final inputs = vm.inputsOf(widget.noProduksi);
         final perm = context.watch<PermissionViewModel>();
-        final locked = widget.isLocked == true;
+        final locked = _header?.isLocked == true;
 
         final canDelete = perm.can('label_washing:delete') && !locked;
 
@@ -1526,23 +1519,26 @@ class _WashingProductionInputScreenState
               children: [
                 // ── Workspace toolbar (status info) ────────────────────
                 // Posisi & struktur identik dengan BrokerWorkspaceToolbar.
-                WashingWorkspaceToolbar(
-                  noProduksi: widget.noProduksi,
-                  isLocked: locked,
-                  idMesin: widget.idMesin,
-                  namaJenis: widget.namaJenis,
-                  tglProduksi: widget.tglProduksi,
-                  shift: widget.shift,
-                  hourStart: widget.hourStart,
-                  hourEnd: widget.hourEnd,
-                  onRefresh: () {
-                    vm.loadInputs(widget.noProduksi, force: true);
-                    vm.loadOutputs(widget.noProduksi, force: true);
-                    _showSnack('Data di-refresh');
-                  },
-                  onGanti: _openSplitDialog,
-                  onRiwayat: _openTimelineDialog,
-                ),
+                if (_header == null)
+                  _buildToolbarSkeleton()
+                else
+                  WashingWorkspaceToolbar(
+                    noProduksi: widget.noProduksi,
+                    isLocked: locked,
+                    idMesin: _header!.idMesin,
+                    namaJenis: _header!.outputJenisNama,
+                    tglProduksi: _header!.tglProduksi,
+                    shift: _header!.shift,
+                    hourStart: _header!.hourStart,
+                    hourEnd: _header!.hourEnd,
+                    onRefresh: () {
+                      vm.loadInputs(widget.noProduksi, force: true);
+                      vm.loadOutputs(widget.noProduksi, force: true);
+                      _showSnack('Data di-refresh');
+                    },
+                    onGanti: _openSplitDialog,
+                    onRiwayat: _openTimelineDialog,
+                  ),
 
                 // ── Body ────────────────────────────────────────────────
                 Expanded(

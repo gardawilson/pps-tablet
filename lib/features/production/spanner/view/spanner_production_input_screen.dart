@@ -21,9 +21,11 @@ import '../../shared/widgets/unsaved_temp_warning_dialog.dart';
 import '../model/spanner_inputs_model.dart';
 import '../model/spanner_output_model.dart';
 import '../model/spanner_production_model.dart';
+import '../repository/spanner_production_repository.dart';
 import '../widgets/spanner_production_output_form_dialog.dart';
 import '../widgets/spanner_reject_output_form_dialog.dart';
 import 'package:pps_tablet/features/production/shared/shared.dart';
+import 'package:shimmer/shimmer.dart';
 
 // ── Colour palette ─────────────────────────────────────────────────────────────
 const _kSpannerPrimary = Color(0xFF3730A3); // indigo — input
@@ -33,29 +35,10 @@ const _kSpannerBorder = Color(0xFFE2E6EA);
 
 class SpannerProductionInputScreen extends StatefulWidget {
   final String noProduksi;
-  final bool? isLocked;
-  final DateTime? lastClosedDate;
-
-  final int? idMesin;
-  final String? namaJenis;
-  final int? outputJenisId;
-  final DateTime? tglProduksi;
-  final int? shift;
-  final String? hourStart;
-  final String? hourEnd;
 
   const SpannerProductionInputScreen({
     super.key,
     required this.noProduksi,
-    this.isLocked,
-    this.lastClosedDate,
-    this.idMesin,
-    this.namaJenis,
-    this.outputJenisId,
-    this.tglProduksi,
-    this.shift,
-    this.hourStart,
-    this.hourEnd,
   });
 
   @override
@@ -65,33 +48,31 @@ class SpannerProductionInputScreen extends StatefulWidget {
 
 class _SpannerProductionInputScreenState
     extends State<SpannerProductionInputScreen> {
+  final _prodRepo = SpannerProductionRepository();
+  SpannerProduction? _header;
+  late String _cachedBreadcrumbLabel;
   String _selectedInputTab = 'fwip';
   String _selectedOutputTab = 'fwip';
 
   List<BreadcrumbSegment> _prevBreadcrumb = [];
+  bool _isReplacing = false;
 
-  String get _breadcrumbLabel => widget.noProduksi;
+  String get _breadcrumbLabel =>
+      (_header?.namaMesin ?? '').trim().isNotEmpty
+          ? _header!.namaMesin
+          : widget.noProduksi;
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
-    _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
+    _cachedBreadcrumbLabel = widget.noProduksi;
+    _loadHeader();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      AppShell.breadcrumb.value = [
-        ..._prevBreadcrumb.map(
-          (s) => BreadcrumbSegment(
-            s.label,
-            onTap: () {
-              AppShell.breadcrumb.value = _prevBreadcrumb;
-              AppShell.shellNavigatorKey.currentState?.pop();
-            },
-          ),
-        ),
-        BreadcrumbSegment(_breadcrumbLabel),
-      ];
+      _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
+      _updateBreadcrumb();
 
       final vm = context.read<SpannerProductionInputViewModel>();
       if (vm.inputsOf(widget.noProduksi) == null &&
@@ -107,11 +88,52 @@ class _SpannerProductionInputScreenState
 
   @override
   void dispose() {
-    final current = AppShell.breadcrumb.value;
-    if (current.isNotEmpty && current.last.label == _breadcrumbLabel) {
-      AppShell.breadcrumb.value = _prevBreadcrumb;
+    if (!_isReplacing) {
+      final label = _cachedBreadcrumbLabel;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final current = AppShell.breadcrumb.value;
+        if (current.isNotEmpty && current.last.label == label) {
+          AppShell.breadcrumb.value = _prevBreadcrumb;
+        }
+      });
     }
     super.dispose();
+  }
+
+  Future<void> _loadHeader() async {
+    try {
+      final header = await _prodRepo.fetchOne(widget.noProduksi);
+      if (!mounted) return;
+      setState(() {
+        _header = header;
+        _cachedBreadcrumbLabel = _breadcrumbLabel;
+      });
+      _updateBreadcrumb();
+    } catch (_) {}
+  }
+
+  void _updateBreadcrumb() {
+    if (!mounted) return;
+    AppShell.breadcrumb.value = [
+      ..._prevBreadcrumb.map(
+        (s) => BreadcrumbSegment(
+          s.label,
+          onTap: () {
+            AppShell.breadcrumb.value = _prevBreadcrumb;
+            AppShell.shellNavigatorKey.currentState?.pop();
+          },
+        ),
+      ),
+      BreadcrumbSegment(_breadcrumbLabel),
+    ];
+  }
+
+  Widget _buildToolbarSkeleton() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: Container(height: 56, color: Colors.white),
+    );
   }
 
   // ── Back ───────────────────────────────────────────────────────────────────
@@ -149,8 +171,8 @@ class _SpannerProductionInputScreenState
       ({SpannerProduction prod, String namaJenis})
     >(
       context: context,
-      idMesin: widget.idMesin,
-      tanggal: widget.tglProduksi,
+      idMesin: _header?.idMesin,
+      tanggal: _header?.tglProduksi,
       onMissingContext: () =>
           _showSnack('Data mesin atau tanggal tidak tersedia'),
       showSplitDialog: (idMesin, tanggal) =>
@@ -167,7 +189,7 @@ class _SpannerProductionInputScreenState
                     FurnitureWipType
                   >(
                     tanggal: tanggal,
-                    shift: widget.shift ?? 1,
+                    shift: _header?.shift ?? 1,
                     primaryColor: _kSpannerPrimary,
                     borderColor: _kSpannerBorder,
                     jenisRequiredMessage:
@@ -201,22 +223,11 @@ class _SpannerProductionInputScreenState
       },
       replaceToResult: (splitResult) async {
         if (!mounted) return;
-        final newProd = splitResult.prod;
-        final namaJenis = splitResult.namaJenis.isNotEmpty
-            ? splitResult.namaJenis
-            : (newProd.outputJenisNama ?? '');
+        _isReplacing = true;
         await Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => SpannerProductionInputScreen(
-              noProduksi: newProd.noProduksi,
-              idMesin: newProd.idMesin,
-              isLocked: false,
-              namaJenis: namaJenis,
-              outputJenisId: newProd.outputJenisId,
-              tglProduksi: newProd.tglProduksi,
-              shift: newProd.shift,
-              hourStart: newProd.hourStart,
-              hourEnd: newProd.hourEnd,
+              noProduksi: splitResult.prod.noProduksi,
             ),
           ),
         );
@@ -802,9 +813,9 @@ class _SpannerProductionInputScreenState
       barrierDismissible: false,
       builder: (_) => SpannerProductionOutputFormDialog(
         noProduksi: widget.noProduksi,
-        tglProduksi: widget.tglProduksi,
-        outputJenisId: widget.outputJenisId,
-        namaJenis: widget.namaJenis,
+        tglProduksi: _header?.tglProduksi,
+        outputJenisId: _header?.outputJenisId,
+        namaJenis: _header?.outputJenisNama,
       ),
     );
     if (saved == true && mounted) onSuccess();
@@ -818,7 +829,7 @@ class _SpannerProductionInputScreenState
       barrierDismissible: false,
       builder: (_) => SpannerRejectOutputFormDialog(
         noProduksi: widget.noProduksi,
-        tglProduksi: widget.tglProduksi,
+        tglProduksi: _header?.tglProduksi,
       ),
     );
 
@@ -1083,7 +1094,7 @@ class _SpannerProductionInputScreenState
         final err = vm.inputsError(widget.noProduksi);
         final inputs = vm.inputsOf(widget.noProduksi);
         final perm = context.watch<PermissionViewModel>();
-        final locked = widget.isLocked == true;
+        final locked = _header?.isLocked == true;
         final canDelete = perm.can('label_crusher:delete') && !locked;
 
         return PopScope(
@@ -1099,22 +1110,27 @@ class _SpannerProductionInputScreenState
             resizeToAvoidBottomInset: false,
             body: Column(
               children: [
-                ProductionWorkspaceToolbar(
-                  noProduksi: widget.noProduksi,
-                  isLocked: locked,
-                  idMesin: widget.idMesin,
-                  namaJenis: widget.namaJenis,
-                  tglProduksi: widget.tglProduksi,
-                  shift: widget.shift,
-                  hourStart: widget.hourStart,
-                  hourEnd: widget.hourEnd,
-                  primaryColor: _kSpannerPrimary,
-                  onGanti: locked ? null : _openSplitDialog,
-                  onRefresh: () {
-                    vm.loadInputs(widget.noProduksi, force: true);
-                    _showSnack('Data di-refresh');
-                  },
-                ),
+                if (_header == null)
+                  _buildToolbarSkeleton()
+                else
+                  ProductionWorkspaceToolbar(
+                    noProduksi: widget.noProduksi,
+                    isLocked: locked,
+                    idMesin: _header?.idMesin,
+                    namaJenis: _header?.outputJenisNama,
+                    tglProduksi: _header?.tglProduksi,
+                    shift: _header?.shift,
+                    hourStart: _header?.hourStart,
+                    hourEnd: _header?.hourEnd,
+                    primaryColor: _kSpannerPrimary,
+                    onGanti: locked ? null : _openSplitDialog,
+                    onRefresh: () {
+                      _loadHeader();
+                      vm.loadInputs(widget.noProduksi, force: true);
+                      vm.loadOutputs(widget.noProduksi, force: true);
+                      _showSnack('Data di-refresh');
+                    },
+                  ),
                 Expanded(
                   child: Builder(
                     builder: (_) {

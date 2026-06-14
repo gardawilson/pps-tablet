@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:pps_tablet/core/view/app_shell.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/scan_label_dialog.dart';
@@ -12,9 +13,11 @@ import '../../shared/models/production_label_lookup_result.dart';
 import '../model/packing_output_model.dart';
 import '../view_model/packing_production_input_view_model.dart';
 import '../model/packing_production_inputs_model.dart';
-
+import '../model/packing_production_model.dart';
+import '../repository/packing_production_repository.dart';
 import '../widgets/packing_production_output_form_dialog.dart';
 import 'package:pps_tablet/features/production/shared/shared.dart';
+import 'package:shimmer/shimmer.dart';
 
 // ── Colour palette ──────────────────────────────────────────────────────────────
 const _kPrimary = Color(0xFF3730A3); // indigo — input
@@ -24,28 +27,10 @@ const _kBorder = Color(0xFFE2E6EA);
 
 class PackingProductionInputScreen extends StatefulWidget {
   final String noProduksi;
-  final bool? isLocked;
-  final DateTime? lastClosedDate;
-  final int? outputJenisId;
-  final String? namaJenis;
-  final DateTime? tglProduksi;
-  final int? idMesin;
-  final int? shift;
-  final String? hourStart;
-  final String? hourEnd;
 
   const PackingProductionInputScreen({
     super.key,
     required this.noProduksi,
-    this.isLocked,
-    this.lastClosedDate,
-    this.outputJenisId,
-    this.namaJenis,
-    this.tglProduksi,
-    this.idMesin,
-    this.shift,
-    this.hourStart,
-    this.hourEnd,
   });
 
   @override
@@ -55,14 +40,27 @@ class PackingProductionInputScreen extends StatefulWidget {
 
 class _PackingProductionInputScreenState
     extends State<PackingProductionInputScreen> {
+  final _prodRepo = PackingProductionRepository();
+  PackingProduction? _header;
+  late String _cachedBreadcrumbLabel;
   String _selectedInputTab = 'fwip';
   String _selectedOutputTab = 'bj';
+  List<BreadcrumbSegment> _prevBreadcrumb = [];
+
+  String get _breadcrumbLabel =>
+      (_header?.namaMesin ?? '').trim().isNotEmpty
+          ? _header!.namaMesin
+          : widget.noProduksi;
 
   @override
   void initState() {
     super.initState();
+    _cachedBreadcrumbLabel = widget.noProduksi;
+    _loadHeader();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
+      _updateBreadcrumb();
       final vm = context.read<PackingProductionInputViewModel>();
       if (vm.inputsOf(widget.noProduksi) == null &&
           !vm.isInputsLoading(widget.noProduksi)) {
@@ -73,6 +71,54 @@ class _PackingProductionInputScreenState
         vm.loadOutputs(widget.noProduksi);
       }
     });
+  }
+
+  @override
+  void dispose() {
+    final label = _cachedBreadcrumbLabel;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final current = AppShell.breadcrumb.value;
+      if (current.isNotEmpty && current.last.label == label) {
+        AppShell.breadcrumb.value = _prevBreadcrumb;
+      }
+    });
+    super.dispose();
+  }
+
+  Future<void> _loadHeader() async {
+    try {
+      final header = await _prodRepo.fetchOne(widget.noProduksi);
+      if (!mounted) return;
+      setState(() {
+        _header = header;
+        _cachedBreadcrumbLabel = _breadcrumbLabel;
+      });
+      _updateBreadcrumb();
+    } catch (_) {}
+  }
+
+  void _updateBreadcrumb() {
+    if (!mounted) return;
+    AppShell.breadcrumb.value = [
+      ..._prevBreadcrumb.map(
+        (segment) => BreadcrumbSegment(
+          segment.label,
+          onTap: () {
+            AppShell.breadcrumb.value = _prevBreadcrumb;
+            AppShell.shellNavigatorKey.currentState?.pop();
+          },
+        ),
+      ),
+      BreadcrumbSegment(_breadcrumbLabel),
+    ];
+  }
+
+  Widget _buildToolbarSkeleton() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: Container(height: 56, color: Colors.white),
+    );
   }
 
   // ── Back ──────────────────────────────────────────────────────────────────
@@ -678,9 +724,9 @@ class _PackingProductionInputScreenState
       barrierDismissible: false,
       builder: (_) => PackingProductionOutputFormDialog(
         noPacking: widget.noProduksi,
-        tglProduksi: widget.tglProduksi,
-        outputJenisId: widget.outputJenisId,
-        namaJenis: widget.namaJenis,
+        tglProduksi: _header?.tglProduksi,
+        outputJenisId: _header?.outputJenisId,
+        namaJenis: _header?.outputJenisNama,
       ),
     );
     if (result == true) {
@@ -873,7 +919,7 @@ class _PackingProductionInputScreenState
         final err = vm.inputsError(widget.noProduksi);
         final inputs = vm.inputsOf(widget.noProduksi);
         final perm = context.watch<PermissionViewModel>();
-        final locked = widget.isLocked == true;
+        final locked = _header?.isLocked == true;
         final canDelete = perm.can('label_packing:delete') && !locked;
 
         return PopScope(
@@ -889,21 +935,26 @@ class _PackingProductionInputScreenState
             resizeToAvoidBottomInset: false,
             body: Column(
               children: [
-                ProductionWorkspaceToolbar(
-                  noProduksi: widget.noProduksi,
-                  isLocked: locked,
-                  primaryColor: _kPrimary,
-                  idMesin: widget.idMesin,
-                  shift: widget.shift,
-                  tglProduksi: widget.tglProduksi,
-                  hourStart: widget.hourStart,
-                  hourEnd: widget.hourEnd,
-                  namaJenis: widget.namaJenis,
-                  onRefresh: () {
-                    vm.loadInputs(widget.noProduksi, force: true);
-                    _showSnack('Data di-refresh');
-                  },
-                ),
+                if (_header == null)
+                  _buildToolbarSkeleton()
+                else
+                  ProductionWorkspaceToolbar(
+                    noProduksi: widget.noProduksi,
+                    isLocked: locked,
+                    primaryColor: _kPrimary,
+                    idMesin: _header?.idMesin,
+                    shift: _header?.shift,
+                    tglProduksi: _header?.tglProduksi,
+                    hourStart: _header?.hourStart,
+                    hourEnd: _header?.hourEnd,
+                    namaJenis: _header?.outputJenisNama,
+                    onRefresh: () {
+                      _loadHeader();
+                      vm.loadInputs(widget.noProduksi, force: true);
+                      vm.loadOutputs(widget.noProduksi, force: true);
+                      _showSnack('Data di-refresh');
+                    },
+                  ),
                 Expanded(
                   child: Builder(
                     builder: (_) {

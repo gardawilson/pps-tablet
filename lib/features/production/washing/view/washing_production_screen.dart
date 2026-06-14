@@ -84,16 +84,6 @@ class _WashingProductionScreenState extends State<WashingProductionScreen> {
                       MaterialPageRoute(
                         builder: (_) => WashingProductionInputScreen(
                           noProduksi: row.noProduksi,
-                          idMesin: row.idMesin,
-                          isLocked: row.isLocked,
-                          lastClosedDate: row.lastClosedDate,
-                          namaMesin: row.namaMesin,
-                          namaJenis: row.outputJenisNama,
-                          outputJenisId: row.outputJenisId,
-                          tglProduksi: row.tglProduksi,
-                          shift: row.shift,
-                          hourStart: row.hourStart,
-                          hourEnd: row.hourEnd,
                         ),
                       ),
                     );
@@ -258,10 +248,7 @@ class _WashingProductionScreenState extends State<WashingProductionScreen> {
   // =========================================================
   //  DIALOG EDIT (kalau nanti sudah ada endpoint update)
   // =========================================================
-  Future<void> _openEditDialog(
-    BuildContext ctx,
-    WashingProduction row,
-  ) async {
+  Future<void> _openEditDialog(BuildContext ctx, WashingProduction row) async {
     final updated = await showDialog<WashingProduction>(
       context: ctx,
       barrierDismissible: false,

@@ -156,15 +156,6 @@ class _HotStampProductionMesinScreenState
           MaterialPageRoute(
             builder: (_) => HotStampingProductionInputScreen(
               noProduksi: created.noProduksi,
-              idMesin: created.idMesin,
-              isLocked: created.isLocked,
-              lastClosedDate: created.lastClosedDate,
-              namaJenis: created.outputJenisNama,
-              outputJenisId: created.outputJenisId,
-              tglProduksi: created.tglProduksi,
-              shift: created.shift,
-              hourStart: created.hourStart,
-              hourEnd: created.hourEnd,
             ),
           ),
         );
@@ -211,15 +202,6 @@ class _HotStampProductionMesinScreenState
           MaterialPageRoute(
             builder: (_) => HotStampingProductionInputScreen(
               noProduksi: created.noProduksi,
-              idMesin: created.idMesin,
-              isLocked: created.isLocked,
-              lastClosedDate: created.lastClosedDate,
-              namaJenis: created.outputJenisNama,
-              outputJenisId: created.outputJenisId,
-              tglProduksi: created.tglProduksi,
-              shift: created.shift,
-              hourStart: created.hourStart,
-              hourEnd: created.hourEnd,
             ),
           ),
         );
@@ -242,18 +224,8 @@ class _HotStampProductionMesinScreenState
     }
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => HotStampingProductionInputScreen(
-          noProduksi: item.noProduksi,
-          idMesin: mesin.idMesin,
-          isLocked: false,
-          lastClosedDate: null,
-          namaJenis: item.outputJenisNama,
-          outputJenisId: item.outputJenisId,
-          tglProduksi: item.tglProduksi,
-          shift: item.shift,
-          hourStart: item.hourStart,
-          hourEnd: item.hourEnd,
-        ),
+        builder: (_) =>
+            HotStampingProductionInputScreen(noProduksi: item.noProduksi),
       ),
     );
     if (!mounted) return;
@@ -468,15 +440,6 @@ class _HotStampProductionMesinScreenState
                                   builder: (_) =>
                                       HotStampingProductionInputScreen(
                                         noProduksi: row.noProduksi,
-                                        idMesin: row.idMesin,
-                                        isLocked: row.isLocked,
-                                        lastClosedDate: row.lastClosedDate,
-                                        namaJenis: row.outputJenisNama,
-                                        outputJenisId: row.outputJenisId,
-                                        tglProduksi: row.tglProduksi,
-                                        shift: row.shift,
-                                        hourStart: row.hourStart,
-                                        hourEnd: row.hourEnd,
                                       ),
                                 ),
                               );
@@ -547,15 +510,6 @@ class _HotStampProductionMesinScreenState
                                   builder: (_) =>
                                       HotStampingProductionInputScreen(
                                         noProduksi: row.noProduksi,
-                                        idMesin: row.idMesin,
-                                        isLocked: row.isLocked,
-                                        lastClosedDate: row.lastClosedDate,
-                                        namaJenis: row.outputJenisNama,
-                                        outputJenisId: row.outputJenisId,
-                                        tglProduksi: row.tglProduksi,
-                                        shift: row.shift,
-                                        hourStart: row.hourStart,
-                                        hourEnd: row.hourEnd,
                                       ),
                                 ),
                               );

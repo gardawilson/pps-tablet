@@ -99,6 +99,19 @@ class PackingProductionRepository {
     };
   }
 
+  Future<PackingProduction> fetchOne(String noPacking) async {
+    final result = await fetchAll(
+      page: 1,
+      pageSize: 1,
+      noPacking: noPacking.trim(),
+    );
+    final items = result['items'] as List<PackingProduction>;
+    if (items.isEmpty) {
+      throw Exception('Data tidak ditemukan untuk $noPacking');
+    }
+    return items.first;
+  }
+
   /// Convenience if you only need list for a given page
   Future<List<PackingProduction>> fetchAllList({
     required int page,

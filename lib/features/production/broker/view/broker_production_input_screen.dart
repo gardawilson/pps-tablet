@@ -35,6 +35,7 @@ import '../../../label/broker/repository/broker_repository.dart';
 import '../../../label/bonggolan/repository/bonggolan_repository.dart';
 import '../../../broker_type/model/broker_type_model.dart';
 import '../../../broker_type/widgets/broker_type_dropdown.dart';
+import 'package:shimmer/shimmer.dart';
 import '../widgets/broker_workspace_toolbar.dart';
 
 const _kBrokerPrimary = Color(0xFF1E6FD9);
@@ -45,31 +46,10 @@ const _kBrokerOutput = Color(0xFF0A7349);
 
 class BrokerProductionInputScreen extends StatefulWidget {
   final String noProduksi;
-  final int? idMesin;
-  final String? namaMesin;
-  final int? shift;
-  final DateTime? tglProduksi;
-
-  final bool? isLocked;
-  final DateTime? lastClosedDate;
-  final String? hourStart;
-  final String? hourEnd;
-  final String? namaJenis;
-  final int? outputJenisId;
 
   const BrokerProductionInputScreen({
     super.key,
     required this.noProduksi,
-    this.idMesin,
-    this.namaMesin,
-    this.shift,
-    this.tglProduksi,
-    this.isLocked,
-    this.lastClosedDate,
-    this.hourStart,
-    this.hourEnd,
-    this.namaJenis,
-    this.outputJenisId,
   });
 
   @override
@@ -79,35 +59,32 @@ class BrokerProductionInputScreen extends StatefulWidget {
 
 class _BrokerProductionInputScreenState
     extends State<BrokerProductionInputScreen> {
+  final _prodRepo = BrokerProductionRepository();
+
+  BrokerProduction? _header;
+  late String _cachedBreadcrumbLabel;
+
   String _selectedMode = 'full';
   String _selectedInputTab = 'broker';
   String _selectedOutputTab = 'broker';
 
   List<BreadcrumbSegment> _prevBreadcrumb = [];
   bool _isReplacing = false;
-  String get _breadcrumbLabel {
-    final machineName = (widget.namaMesin ?? '').trim();
-    return machineName.isNotEmpty ? machineName : widget.noProduksi;
-  }
+
+  String get _breadcrumbLabel =>
+      (_header?.namaMesin ?? '').trim().isNotEmpty
+          ? _header!.namaMesin
+          : widget.noProduksi;
 
   @override
   void initState() {
     super.initState();
-    _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
+    _cachedBreadcrumbLabel = widget.noProduksi;
+    _loadHeader();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      AppShell.breadcrumb.value = [
-        ..._prevBreadcrumb.map(
-          (s) => BreadcrumbSegment(
-            s.label,
-            onTap: () {
-              AppShell.breadcrumb.value = _prevBreadcrumb;
-              AppShell.shellNavigatorKey.currentState?.pop();
-            },
-          ),
-        ),
-        BreadcrumbSegment(_breadcrumbLabel),
-      ];
+      _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
+      _updateBreadcrumb();
       context.read<BrokerProductionInputViewModel>().loadInputs(
         widget.noProduksi,
         force: true,
@@ -118,17 +95,59 @@ class _BrokerProductionInputScreenState
     });
   }
 
+  Future<void> _loadHeader() async {
+    try {
+      final header = await _prodRepo.fetchOne(widget.noProduksi);
+      if (!mounted) return;
+      setState(() {
+        _header = header;
+        _cachedBreadcrumbLabel = _breadcrumbLabel;
+      });
+      _updateBreadcrumb();
+    } catch (_) {}
+  }
+
+  Widget _buildToolbarSkeleton() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: Container(
+        height: 56,
+        color: Colors.white,
+      ),
+    );
+  }
+
+  void _updateBreadcrumb() {
+    if (!mounted) return;
+    AppShell.breadcrumb.value = [
+      ..._prevBreadcrumb.map(
+        (s) => BreadcrumbSegment(
+          s.label,
+          onTap: () {
+            AppShell.breadcrumb.value = _prevBreadcrumb;
+            AppShell.shellNavigatorKey.currentState?.pop();
+          },
+        ),
+      ),
+      BreadcrumbSegment(_breadcrumbLabel),
+    ];
+  }
+
   @override
   void dispose() {
     // Guard: hanya restore jika breadcrumb terakhir masih milik screen ini.
     // Jika sidebar sudah ganti breadcrumb (via pushNamedAndRemoveUntil),
     // jangan overwrite � itu yang menyebabkan breadcrumb kacau saat pindah menu.
     if (!_isReplacing) {
-      final current = AppShell.breadcrumb.value;
-      final ourLabel = _breadcrumbLabel;
-      if (current.isNotEmpty && current.last.label == ourLabel) {
-        AppShell.breadcrumb.value = _prevBreadcrumb;
-      }
+      final prev = _prevBreadcrumb;
+      final label = _cachedBreadcrumbLabel;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final current = AppShell.breadcrumb.value;
+        if (current.isNotEmpty && current.last.label == label) {
+          AppShell.breadcrumb.value = prev;
+        }
+      });
     }
     super.dispose();
   }
@@ -172,16 +191,16 @@ class _BrokerProductionInputScreenState
     if (!mounted) return;
     await ProductionFlowHelpers.openTimeline(
       context: context,
-      idMesin: widget.idMesin,
-      tanggal: widget.tglProduksi,
+      idMesin: _header?.idMesin,
+      tanggal: _header?.tglProduksi,
       onMissingContext: () => _showSnack(
         'Data mesin/tanggal tidak tersedia',
         backgroundColor: Colors.orange,
       ),
       dialogBuilder: (idMesin, tgl) => buildProductionShiftTimelineDialog(
-        namaMesin: widget.namaMesin,
+        namaMesin: _header?.namaMesin,
         tanggal: tgl,
-        shift: widget.shift ?? 1,
+        shift: _header?.shift ?? 1,
         currentNoProduksi: widget.noProduksi,
         primaryColor: _kBrokerPrimary,
         borderColor: _kBrokerBorder,
@@ -190,7 +209,7 @@ class _BrokerProductionInputScreenState
               .fetchByMesinTanggalShift(
                 idMesin: idMesin,
                 tanggal: tgl,
-                shift: widget.shift ?? 1,
+                shift: _header?.shift ?? 1,
               );
           return list
               .map(
@@ -214,8 +233,8 @@ class _BrokerProductionInputScreenState
       ({BrokerProduction prod, String namaJenis})
     >(
       context: context,
-      idMesin: widget.idMesin,
-      tanggal: widget.tglProduksi,
+      idMesin: _header?.idMesin,
+      tanggal: _header?.tglProduksi,
       onMissingContext: () => _showSnack(
         'Data mesin/tanggal tidak tersedia',
         backgroundColor: Colors.orange,
@@ -230,7 +249,7 @@ class _BrokerProductionInputScreenState
                 BrokerType
               >(
                 tanggal: tgl,
-                shift: widget.shift ?? 1,
+                shift: _header?.shift ?? 1,
                 primaryColor: _kBrokerPrimary,
                 borderColor: _kBrokerBorder,
                 jenisRequiredMessage: 'Pilih jenis broker terlebih dahulu',
@@ -258,25 +277,10 @@ class _BrokerProductionInputScreenState
       },
       replaceToResult: (splitResult) async {
         if (!mounted) return;
-        final newProd = splitResult.prod;
-        final namaJenis = splitResult.namaJenis.isNotEmpty
-            ? splitResult.namaJenis
-            : newProd.outputJenisNama;
-
         await Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => BrokerProductionInputScreen(
-              noProduksi: newProd.noProduksi,
-              idMesin: newProd.idMesin,
-              namaMesin: widget.namaMesin,
-              shift: newProd.shift,
-              tglProduksi: newProd.tglProduksi,
-              isLocked: false,
-              lastClosedDate: null,
-              hourStart: newProd.hourStart,
-              hourEnd: newProd.hourEnd,
-              namaJenis: namaJenis,
-              outputJenisId: newProd.outputJenisId,
+              noProduksi: splitResult.prod.noProduksi,
             ),
           ),
         );
@@ -845,15 +849,15 @@ class _BrokerProductionInputScreenState
       }
 
       if (isBrokerOutputTab) {
-        if (widget.outputJenisId != null) {
+        if (_header?.outputJenisId != null) {
           await showDialog<void>(
             context: context,
             builder: (_) => BrokerProductionOutputFormDialog(
               noProduksi: widget.noProduksi,
-              tglProduksi: widget.tglProduksi,
-              outputJenisId: widget.outputJenisId!,
-              outputJenisNama: widget.namaJenis ?? '',
-              namaMesin: widget.namaMesin,
+              tglProduksi: _header?.tglProduksi,
+              outputJenisId: _header!.outputJenisId!,
+              outputJenisNama: _header?.outputJenisNama ?? '',
+              namaMesin: _header?.namaMesin,
             ),
           );
         } else {
@@ -861,8 +865,8 @@ class _BrokerProductionInputScreenState
             context: context,
             builder: (_) => BrokerFormDialog(
               preselectNoProduksi: widget.noProduksi,
-              preselectNamaMesin: widget.namaMesin,
-              preselectDate: widget.tglProduksi,
+              preselectNamaMesin: _header?.namaMesin,
+              preselectDate: _header?.tglProduksi,
             ),
           );
         }
@@ -871,8 +875,8 @@ class _BrokerProductionInputScreenState
           context: context,
           builder: (_) => BonggolanProductionOutputFormDialog(
             noProduksi: widget.noProduksi,
-            tglProduksi: widget.tglProduksi,
-            namaMesin: widget.namaMesin,
+            tglProduksi: _header?.tglProduksi,
+            namaMesin: _header?.namaMesin,
           ),
         );
       }
@@ -1041,10 +1045,10 @@ class _BrokerProductionInputScreenState
                                     FloatingActionButton(
                                       heroTag: 'fab_add_broker_output',
                                       mini: true,
-                                      backgroundColor: _kBrokerOutput,
+                                      backgroundColor: _header == null ? Colors.grey.shade300 : _kBrokerOutput,
                                       foregroundColor: Colors.white,
                                       tooltip: 'Tambah $activeOutputLabel',
-                                      onPressed: onAddOutput,
+                                      onPressed: _header == null ? null : onAddOutput,
                                       child: const Icon(Icons.add),
                                     ),
                                   ],
@@ -1845,7 +1849,7 @@ class _BrokerProductionInputScreenState
         final outputs = vm.outputsOf(widget.noProduksi);
         final bonggolanOutputs = vm.bonggolanOutputsOf(widget.noProduksi);
         final perm = context.watch<PermissionViewModel>();
-        final locked = widget.isLocked == true;
+        final locked = _header?.isLocked == true;
 
         final canDeleteByPerm = perm.can('label_broker:delete');
         final canDelete = canDeleteByPerm && !locked;
@@ -1920,20 +1924,23 @@ class _BrokerProductionInputScreenState
                 final mixerGroups = groupBy(mixerAll, mixerTitleKey);
                 final rejectGroups = groupBy(rejectAll, rejectTitleKey);
 
-                final locked = widget.isLocked == true;
-                final closed = widget.lastClosedDate; // boleh null
+                final locked = _header?.isLocked == true;
+                final closed = _header?.lastClosedDate; // boleh null
 
                 return Column(
                   children: [
+                    if (_header == null)
+                      _buildToolbarSkeleton()
+                    else
                     BrokerWorkspaceToolbar(
                       noProduksi: widget.noProduksi,
-                      idMesin: widget.idMesin,
-                      shift: widget.shift,
-                      tglProduksi: widget.tglProduksi,
+                      idMesin: _header?.idMesin,
+                      shift: _header?.shift,
+                      tglProduksi: _header?.tglProduksi,
                       isLocked: locked,
-                      hourStart: widget.hourStart,
-                      hourEnd: widget.hourEnd,
-                      namaJenis: widget.namaJenis,
+                      hourStart: _header?.hourStart,
+                      hourEnd: _header?.hourEnd,
+                      namaJenis: _header?.outputJenisNama,
                       onGanti: _openSplitDialog,
                       onTimeline: _openTimelineDialog,
                       onRefresh: () {

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../shared/shared.dart';
+import '../../shared/widgets/production_output_detail_dialog.dart';
+import '../../../label/gilingan/repository/gilingan_repository.dart';
+import '../../../../core/network/endpoints.dart';
 import '../model/gilingan_output_model.dart';
 
 const _kGilinganOutput = Color(0xFF00796B);
@@ -22,7 +25,18 @@ class GilinganOutputTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         onTap: () => showDialog<void>(
           context: context,
-          builder: (_) => GilinganOutputDetailDialog(output: output),
+          builder: (_) => ProductionOutputDetailDialog(
+            labelCode: output.noGilingan,
+            namaJenis: output.namaJenis,
+            printCount: output.hasPrinted,
+            accentColor: _kGilinganOutput,
+            pdfUrl: ApiConstants.gilinganLabelPdf(output.noGilingan),
+            feature: 'gilingan',
+            markAsPrinted: () => GilinganRepository().markAsPrinted(output.noGilingan),
+            metrics: [
+              (icon: Icons.scale_outlined, text: '${num2(output.berat)} kg'),
+            ],
+          ),
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -173,141 +187,3 @@ class GilinganOutputGrandTotalBar extends StatelessWidget {
   }
 }
 
-class GilinganOutputDetailDialog extends StatelessWidget {
-  final GilinganOutput output;
-
-  const GilinganOutputDetailDialog({super.key, required this.output});
-
-  static String _fmt(double v) {
-    final s = v.toStringAsFixed(2);
-    return s.endsWith('.00') ? s.substring(0, s.length - 3) : s;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.white,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480, maxHeight: 320),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              decoration: const BoxDecoration(
-                color: _kGilinganOutput,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.precision_manufacturing_outlined,
-                      color: Colors.white, size: 16),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          output.namaJenis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          output.noGilingan,
-                          style: const TextStyle(color: Colors.white70, fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.print_outlined, size: 12, color: Colors.white),
-                        const SizedBox(width: 4),
-                        Text(
-                          output.hasPrinted > 0 ? 'x${output.hasPrinted} Print' : 'Belum Print',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close, color: Colors.white, size: 16),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1, color: _kGilinganBorder),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  Expanded(child: _InfoCell(label: 'No Gilingan', value: output.noGilingan)),
-                  Expanded(child: _InfoCell(label: 'Berat', value: '${_fmt(output.berat)} kg')),
-                  Expanded(child: _InfoCell(label: 'Jenis', value: output.namaJenis)),
-                ],
-              ),
-            ),
-            const Divider(height: 1, color: _kGilinganBorder),
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: _kGilinganBorder),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: const Text('Tutup'),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _InfoCell extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _InfoCell({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))),
-        const SizedBox(height: 3),
-        Text(value,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-      ],
-    );
-  }
-}

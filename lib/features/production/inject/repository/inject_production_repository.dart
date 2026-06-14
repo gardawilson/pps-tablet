@@ -220,6 +220,27 @@ class InjectProductionRepository {
   }
 
   /* =============================
+   * GET SINGLE
+   * GET /api/production/inject/:noProduksi
+   * ============================= */
+
+  Future<InjectProduction> fetchOne(String noProduksi) async {
+    final no = noProduksi.trim();
+    if (no.isEmpty) throw ArgumentError('noProduksi tidak boleh kosong');
+    final body = await api.getJson(
+      '/api/production/inject',
+      query: {'noProduksi': no},
+    );
+    final data = body['data'];
+    if (data is! List || data.isEmpty) {
+      throw Exception('Data tidak ditemukan untuk $noProduksi');
+    }
+    return InjectProduction.fromJson(
+      Map<String, dynamic>.from(data.first as Map),
+    );
+  }
+
+  /* =============================
    * CRUD HEADER (Create / Update / Delete) - new
    * ============================= */
 

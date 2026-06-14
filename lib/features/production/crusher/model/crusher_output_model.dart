@@ -5,7 +5,7 @@ class CrusherOutput {
   final String noCrusher;
   final int idJenis;
   final String namaJenis;
-  final bool hasBeenPrinted;
+  final int hasBeenPrinted;
   final double berat;
 
   const CrusherOutput({
@@ -29,7 +29,7 @@ class CrusherOutput {
       noCrusher: (j['NoCrusher'] ?? '').toString(),
       idJenis: (j['IdJenis'] as num?)?.toInt() ?? 0,
       namaJenis: (j['NamaJenis'] ?? '').toString(),
-      hasBeenPrinted: (j['HasBeenPrinted'] as num?)?.toInt() == 1,
+      hasBeenPrinted: (j['HasBeenPrinted'] as num?)?.toInt() ?? 0,
       berat: toDouble(j['Berat']),
     );
   }

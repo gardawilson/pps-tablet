@@ -215,13 +215,6 @@ class _ProductionCard extends StatelessWidget {
           MaterialPageRoute(
             builder: (_) => BrokerProductionInputScreen(
               noProduksi: row.noProduksi,
-              namaMesin: row.namaMesin,
-              shift: row.shift,
-              tglProduksi: row.tglProduksi,
-              isLocked: row.isLocked,
-              lastClosedDate: row.lastClosedDate,
-              hourStart: row.hourStart,
-              hourEnd: row.hourEnd,
             ),
           ),
         ),

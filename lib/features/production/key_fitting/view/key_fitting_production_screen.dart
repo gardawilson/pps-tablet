@@ -78,8 +78,6 @@ class _KeyFittingProductionScreenState
                       MaterialPageRoute(
                         builder: (_) => KeyFittingProductionInputScreen(
                           noProduksi: row.noProduksi,
-                          isLocked: row.isLocked,
-                          lastClosedDate: row.lastClosedDate,
                         ),
                       ),
                     );

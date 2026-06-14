@@ -17,6 +17,7 @@ import '../../../crusher_type/model/crusher_type_model.dart';
 import '../../../crusher_type/repository/crusher_type_repository.dart';
 import '../../../crusher_type/view_model/crusher_type_view_model.dart';
 import '../../../crusher_type/widgets/crusher_type_dropdown.dart';
+import 'package:shimmer/shimmer.dart';
 import '../repository/crusher_production_repository.dart';
 import '../widgets/crusher_workspace_toolbar.dart';
 import '../model/crusher_inputs_model.dart';
@@ -36,30 +37,10 @@ const _kCrusherBorder = Color(0xFFE2E6EA);
 
 class CrusherProductionInputScreen extends StatefulWidget {
   final String noCrusherProduksi;
-  final bool? isLocked;
-  final DateTime? lastClosedDate;
-
-  // Header info
-  final int? idMesin;
-  final String? namaJenis;
-  final int? outputJenisId;
-  final int? shift;
-  final DateTime? tglProduksi;
-  final String? hourStart;
-  final String? hourEnd;
 
   const CrusherProductionInputScreen({
     super.key,
     required this.noCrusherProduksi,
-    this.isLocked,
-    this.lastClosedDate,
-    this.idMesin,
-    this.namaJenis,
-    this.outputJenisId,
-    this.shift,
-    this.tglProduksi,
-    this.hourStart,
-    this.hourEnd,
   });
 
   @override
@@ -70,6 +51,9 @@ class CrusherProductionInputScreen extends StatefulWidget {
 class _CrusherProductionInputScreenState
     extends State<CrusherProductionInputScreen> {
   final _repo = CrusherProductionInputRepository();
+  final _prodRepo = CrusherProductionRepository();
+  CrusherProduction? _header;
+  late String _cachedBreadcrumbLabel;
 
   String _selectedMode = 'full';
   String _selectedInputTab = 'bb';
@@ -78,28 +62,22 @@ class _CrusherProductionInputScreenState
   bool _isReplacing = false;
 
   String get _breadcrumbLabel {
-    final name = (widget.namaJenis ?? '').trim();
-    return name.isNotEmpty ? name : widget.noCrusherProduksi;
+    if (_header != null) {
+      final name = _header!.namaMesin.trim();
+      return name.isNotEmpty ? name : widget.noCrusherProduksi;
+    }
+    return widget.noCrusherProduksi;
   }
 
   @override
   void initState() {
     super.initState();
-    _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
+    _cachedBreadcrumbLabel = widget.noCrusherProduksi;
+    _loadHeader();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      AppShell.breadcrumb.value = [
-        ..._prevBreadcrumb.map(
-          (s) => BreadcrumbSegment(
-            s.label,
-            onTap: () {
-              AppShell.breadcrumb.value = _prevBreadcrumb;
-              AppShell.shellNavigatorKey.currentState?.pop();
-            },
-          ),
-        ),
-        BreadcrumbSegment(_breadcrumbLabel),
-      ];
+      _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
+      _updateBreadcrumb();
 
       final vm = context.read<CrusherProductionInputViewModel>();
       if (vm.inputsOf(widget.noCrusherProduksi) == null &&
@@ -116,12 +94,51 @@ class _CrusherProductionInputScreenState
   @override
   void dispose() {
     if (!_isReplacing) {
-      final current = AppShell.breadcrumb.value;
-      if (current.isNotEmpty && current.last.label == _breadcrumbLabel) {
-        AppShell.breadcrumb.value = _prevBreadcrumb;
-      }
+      final label = _cachedBreadcrumbLabel;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final current = AppShell.breadcrumb.value;
+        if (current.isNotEmpty && current.last.label == label) {
+          AppShell.breadcrumb.value = _prevBreadcrumb;
+        }
+      });
     }
     super.dispose();
+  }
+
+  Future<void> _loadHeader() async {
+    try {
+      final header = await _prodRepo.fetchOne(widget.noCrusherProduksi);
+      if (!mounted) return;
+      setState(() {
+        _header = header;
+        _cachedBreadcrumbLabel = _breadcrumbLabel;
+      });
+      _updateBreadcrumb();
+    } catch (_) {}
+  }
+
+  void _updateBreadcrumb() {
+    if (!mounted) return;
+    AppShell.breadcrumb.value = [
+      ..._prevBreadcrumb.map(
+        (s) => BreadcrumbSegment(
+          s.label,
+          onTap: () {
+            AppShell.breadcrumb.value = _prevBreadcrumb;
+            AppShell.shellNavigatorKey.currentState?.pop();
+          },
+        ),
+      ),
+      BreadcrumbSegment(_breadcrumbLabel),
+    ];
+  }
+
+  Widget _buildToolbarSkeleton() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: Container(height: 56, color: Colors.white),
+    );
   }
 
   // ── Back / WillPop ─────────────────────────────────────────────────────────
@@ -824,7 +841,7 @@ class _CrusherProductionInputScreenState
   // ── Add output dialog ──────────────────────────────────────────────────────
 
   Future<void> _openAddOutputDialog() async {
-    if (widget.outputJenisId == null) {
+    if (_header?.outputJenisId == null) {
       _showSnack(
         'Jenis output belum dikonfigurasi pada produksi ini.',
         backgroundColor: Colors.orange,
@@ -836,9 +853,9 @@ class _CrusherProductionInputScreenState
       barrierDismissible: false,
       builder: (_) => CrusherProductionOutputFormDialog(
         noProduksi: widget.noCrusherProduksi,
-        idJenis: widget.outputJenisId!,
-        namaJenis: widget.namaJenis ?? '',
-        tglProduksi: widget.tglProduksi,
+        idJenis: _header!.outputJenisId!,
+        namaJenis: _header?.outputJenisNama ?? '',
+        tglProduksi: _header?.tanggal,
         repository: _repo,
       ),
     );
@@ -858,8 +875,8 @@ class _CrusherProductionInputScreenState
       ({CrusherProduction prod, String namaJenis})
     >(
       context: context,
-      idMesin: widget.idMesin,
-      tanggal: widget.tglProduksi,
+      idMesin: _header?.idMesin,
+      tanggal: _header?.tanggal,
       onMissingContext: () => _showSnack(
         'Data mesin/tanggal tidak tersedia',
         backgroundColor: Colors.orange,
@@ -877,7 +894,7 @@ class _CrusherProductionInputScreenState
                   CrusherType
                 >(
                   tanggal: tgl,
-                  shift: widget.shift ?? 1,
+                  shift: _header?.shift ?? 1,
                   primaryColor: _kCrusherPrimary,
                   borderColor: _kCrusherBorder,
                   jenisRequiredMessage: 'Pilih jenis crusher terlebih dahulu',
@@ -910,23 +927,10 @@ class _CrusherProductionInputScreenState
       },
       replaceToResult: (splitResult) async {
         if (!mounted) return;
-        final newProd = splitResult.prod;
-        final namaJenis = splitResult.namaJenis.isNotEmpty
-            ? splitResult.namaJenis
-            : (newProd.outputJenisNama ?? '');
         await Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => CrusherProductionInputScreen(
-              noCrusherProduksi: newProd.noCrusherProduksi,
-              idMesin: newProd.idMesin,
-              shift: newProd.shift,
-              tglProduksi: newProd.tanggal,
-              isLocked: false,
-              lastClosedDate: null,
-              hourStart: newProd.hourStart,
-              hourEnd: newProd.hourEnd,
-              namaJenis: namaJenis,
-              outputJenisId: newProd.outputJenisId,
+              noCrusherProduksi: splitResult.prod.noCrusherProduksi,
             ),
           ),
         );
@@ -940,16 +944,16 @@ class _CrusherProductionInputScreenState
     if (!mounted) return;
     await ProductionFlowHelpers.openTimeline(
       context: context,
-      idMesin: widget.idMesin,
-      tanggal: widget.tglProduksi,
+      idMesin: _header?.idMesin,
+      tanggal: _header?.tanggal,
       onMissingContext: () => _showSnack(
         'Data mesin/tanggal tidak tersedia',
         backgroundColor: Colors.orange,
       ),
       dialogBuilder: (idMesin, tgl) => buildProductionShiftTimelineDialog(
-        namaMesin: widget.namaJenis,
+        namaMesin: _header?.outputJenisNama,
         tanggal: tgl,
-        shift: widget.shift ?? 1,
+        shift: _header?.shift ?? 1,
         currentNoProduksi: widget.noCrusherProduksi,
         primaryColor: _kCrusherPrimary,
         borderColor: _kCrusherBorder,
@@ -959,7 +963,7 @@ class _CrusherProductionInputScreenState
               .fetchByMesinTanggalShift(
                 idMesin: idMesin,
                 tanggal: tgl,
-                shift: widget.shift ?? 1,
+                shift: _header?.shift ?? 1,
               );
           return list
               .map(
@@ -1119,9 +1123,9 @@ class _CrusherProductionInputScreenState
                                     FloatingActionButton(
                                       heroTag: 'fab_add_crusher_output',
                                       mini: true,
-                                      backgroundColor: _kCrusherOutput,
+                                      backgroundColor: _header == null ? Colors.grey.shade300 : _kCrusherOutput,
                                       foregroundColor: Colors.white,
-                                      onPressed: _openAddOutputDialog,
+                                      onPressed: _header == null ? null : _openAddOutputDialog,
                                       child: const Icon(Icons.add),
                                     ),
                                   ],
@@ -1170,7 +1174,7 @@ class _CrusherProductionInputScreenState
         final err = vm.inputsError(widget.noCrusherProduksi);
         final inputs = vm.inputsOf(widget.noCrusherProduksi);
         final perm = context.watch<PermissionViewModel>();
-        final locked = widget.isLocked == true;
+        final locked = _header?.isLocked == true;
 
         final canDelete = perm.can('label_washing:delete') && !locked;
 
@@ -1210,15 +1214,18 @@ class _CrusherProductionInputScreenState
             resizeToAvoidBottomInset: false,
             body: Column(
               children: [
+                if (_header == null)
+                  _buildToolbarSkeleton()
+                else
                 CrusherWorkspaceToolbar(
                   noProduksi: widget.noCrusherProduksi,
                   isLocked: locked,
-                  idMesin: widget.idMesin,
-                  namaJenis: widget.namaJenis,
-                  tglProduksi: widget.tglProduksi,
-                  shift: widget.shift,
-                  hourStart: widget.hourStart,
-                  hourEnd: widget.hourEnd,
+                  idMesin: _header?.idMesin,
+                  namaJenis: _header?.outputJenisNama,
+                  tglProduksi: _header?.tanggal,
+                  shift: _header?.shift,
+                  hourStart: _header?.hourStart,
+                  hourEnd: _header?.hourEnd,
                   onRefresh: () {
                     vm.loadInputs(widget.noCrusherProduksi, force: true);
                     _showSnack('Data di-refresh');

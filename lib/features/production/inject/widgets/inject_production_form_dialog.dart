@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../common/widgets/app_number_field.dart';
 import '../../../../core/network/endpoints.dart';
 import '../../../../core/services/token_storage.dart';
 import '../../../../core/utils/date_formatter.dart';
@@ -64,9 +63,6 @@ class _InjectProductionFormDialogState
   late final TextEditingController dateCreatedCtrl;
   late final TextEditingController hourStartCtrl;
   late final TextEditingController hourEndCtrl;
-  late final TextEditingController hourMeterCtrl;
-  late final TextEditingController beratProdukCtrl;
-
   MstMesin? _selectedMesin;
   MstRegu? _selectedRegu;
   List<MstOperator> _selectedOperators = [];
@@ -118,18 +114,11 @@ class _InjectProductionFormDialogState
       if (mounted) _checkOverlap();
     });
 
-    hourMeterCtrl = TextEditingController(
-      text: widget.header?.hourMeter?.toString() ?? '',
-    );
-    beratProdukCtrl = TextEditingController(
-      text: widget.header?.beratProdukHasilTimbang?.toString() ?? '',
-    );
-
     _selectedFurnitureMaterial = _noneFurnitureMaterial;
 
     final h = widget.header;
     if (h != null) {
-      // Pre-fill operator dari header (edit mode)
+      // Pre-fill operator
       if (h.idOperator != 0) {
         _selectedOperators = [
           MstOperator(
@@ -139,8 +128,53 @@ class _InjectProductionFormDialogState
           ),
         ];
       }
-      // Cetakan/warna/material: model hanya punya ID, nama tidak tersedia.
-      // User perlu re-pick lewat dialog saat edit.
+      // Pre-fill cetakan (stub — picker akan replace dengan objek lengkap saat user membuka)
+      if (h.idCetakan != null && h.idCetakan != 0) {
+        _selectedCetakan = MstCetakan(
+          idCetakan: h.idCetakan!,
+          idBj: 0,
+          enable: true,
+          namaCetakan: h.namaCetakan ?? '',
+          lebar: 0,
+          panjang: 0,
+          tebal: 0,
+          beratCetakan: 0,
+          beratCavity: 0,
+          jumlahCavity: 0,
+          hotRunner: false,
+          hydrolicCore: false,
+          electricalSwitch: false,
+          inputAngin: false,
+          inputAir: false,
+          cycleTime: 0,
+          pcsPerJam: 0,
+        );
+      }
+      // Pre-fill warna
+      if (h.idWarna != null && h.idWarna != 0) {
+        _selectedWarna = MstWarna(
+          idWarna: h.idWarna!,
+          warna: h.namaWarna ?? '',
+          enable: true,
+        );
+      }
+      // Pre-fill furniture material
+      if (h.idFurnitureMaterial != null && h.idFurnitureMaterial != 0) {
+        _selectedFurnitureMaterial = FurnitureMaterialLookupResult(
+          idFurnitureMaterial: h.idFurnitureMaterial!,
+          nama: h.namaFurnitureMaterial ?? '',
+          itemCode: null,
+          enable: true,
+        );
+      }
+      // Pre-fill regu
+      if (h.idRegu != null && h.idRegu != 0) {
+        _selectedRegu = MstRegu(
+          idRegu: h.idRegu!,
+          idBagian: 0,
+          namaRegu: h.namaRegu ?? '',
+        );
+      }
     }
   }
 
@@ -163,8 +197,6 @@ class _InjectProductionFormDialogState
     dateCreatedCtrl.dispose();
     hourStartCtrl.dispose();
     hourEndCtrl.dispose();
-    hourMeterCtrl.dispose();
-    beratProdukCtrl.dispose();
     super.dispose();
   }
 
@@ -179,8 +211,10 @@ class _InjectProductionFormDialogState
     if (picked == null || !mounted) return;
     setState(() {
       _selectedDate = picked;
-      dateCreatedCtrl.text =
-          DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(picked);
+      dateCreatedCtrl.text = DateFormat(
+        'EEEE, dd MMM yyyy',
+        'id_ID',
+      ).format(picked);
     });
     if (_selectedShift != null) await _fetchShiftHour(_selectedShift!);
     await _checkOverlap();
@@ -189,15 +223,19 @@ class _InjectProductionFormDialogState
   Future<void> _fetchShiftHour(int shift) async {
     final tanggal = DateFormat('yyyy-MM-dd').format(_selectedDate);
     final base = ApiConstants.baseUrl.replaceFirst(RegExp(r'/*$'), '');
-    final url =
-        Uri.parse('$base/api/mst/shift/hour?tanggal=$tanggal&shift=$shift');
+    final url = Uri.parse(
+      '$base/api/mst/shift/hour?tanggal=$tanggal&shift=$shift',
+    );
     try {
       final token = await TokenStorage.getToken();
       final res = await http
-          .get(url, headers: {
-            'Authorization': 'Bearer $token',
-            'Accept': 'application/json',
-          })
+          .get(
+            url,
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Accept': 'application/json',
+            },
+          )
           .timeout(const Duration(seconds: 10));
       if (res.statusCode != 200 || !mounted) return;
       final body =
@@ -226,7 +264,9 @@ class _InjectProductionFormDialogState
       '🔍 [OVERLAP] _checkOverlap called → start="$start", end="$end", idMesin=$idMesin',
     );
     if (start.isEmpty || end.isEmpty || idMesin == null) {
-      debugPrint('🔍 [OVERLAP] early-return: start.isEmpty=${start.isEmpty}, end.isEmpty=${end.isEmpty}, idMesin==null=${idMesin == null}');
+      debugPrint(
+        '🔍 [OVERLAP] early-return: start.isEmpty=${start.isEmpty}, end.isEmpty=${end.isEmpty}, idMesin==null=${idMesin == null}',
+      );
       vm.clear();
       return;
     }
@@ -273,8 +313,8 @@ class _InjectProductionFormDialogState
       initialWarna: _selectedWarna,
       initialMaterial:
           _selectedFurnitureMaterial?.idFurnitureMaterial == _noneFurnitureId
-              ? null
-              : _selectedFurnitureMaterial,
+          ? null
+          : _selectedFurnitureMaterial,
     );
     if (mounted) setState(() => _loadingCetakanWarna = false);
     if (result != null && mounted) {
@@ -301,14 +341,13 @@ class _InjectProductionFormDialogState
 
     final mesinId = _selectedMesin?.idMesin ?? widget.header?.idMesin;
     if (mesinId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mesin wajib dipilih')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Mesin wajib dipilih')));
       return;
     }
 
-    final idOperatorList =
-        _selectedOperators.map((o) => o.idOperator).toList();
+    final idOperatorList = _selectedOperators.map((o) => o.idOperator).toList();
     if (idOperatorList.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Minimal 1 operator wajib dipilih')),
@@ -317,9 +356,9 @@ class _InjectProductionFormDialogState
     }
 
     if (_selectedShift == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Shift wajib dipilih')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Shift wajib dipilih')));
       return;
     }
 
@@ -333,15 +372,15 @@ class _InjectProductionFormDialogState
     }
 
     if (_selectedCetakan == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cetakan wajib dipilih')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Cetakan wajib dipilih')));
       return;
     }
     if (_selectedWarna == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Warna wajib dipilih')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Warna wajib dipilih')));
       return;
     }
 
@@ -358,13 +397,9 @@ class _InjectProductionFormDialogState
 
     final pickedFm = _selectedFurnitureMaterial;
     final int? idFurnitureMaterial =
-        (pickedFm == null ||
-                pickedFm.idFurnitureMaterial == _noneFurnitureId)
-            ? null
-            : pickedFm.idFurnitureMaterial;
-
-    final hourMeter = double.tryParse(hourMeterCtrl.text.trim());
-    final beratProduk = double.tryParse(beratProdukCtrl.text.trim());
+        (pickedFm == null || pickedFm.idFurnitureMaterial == _noneFurnitureId)
+        ? null
+        : pickedFm.idFurnitureMaterial;
 
     final prodVm = context.read<InjectProductionViewModel>();
 
@@ -389,8 +424,6 @@ class _InjectProductionFormDialogState
           idCetakan: _selectedCetakan!.idCetakan,
           idWarna: _selectedWarna!.idWarna,
           idFurnitureMaterial: idFurnitureMaterial,
-          hourMeter: hourMeter,
-          beratProdukHasilTimbang: beratProduk,
           hourStart: hourStartSql,
           hourEnd: hourEndSql,
         );
@@ -405,8 +438,6 @@ class _InjectProductionFormDialogState
           idCetakan: _selectedCetakan!.idCetakan,
           idWarna: _selectedWarna!.idWarna,
           idFurnitureMaterial: idFurnitureMaterial,
-          hourMeter: hourMeter,
-          beratProdukHasilTimbang: beratProduk,
           hourStart: hourStartSql,
           hourEnd: hourEndSql,
         );
@@ -422,7 +453,8 @@ class _InjectProductionFormDialogState
         namaJenis: result.namaJenis ?? _selectedCetakan?.namaCetakan,
         namaCetakan: result.namaCetakan ?? _selectedCetakan?.namaCetakan,
         namaWarna: result.namaWarna ?? _selectedWarna?.warna,
-        namaFurnitureMaterial: result.namaFurnitureMaterial ??
+        namaFurnitureMaterial:
+            result.namaFurnitureMaterial ??
             (_selectedFurnitureMaterial?.idFurnitureMaterial == _noneFurnitureId
                 ? null
                 : _selectedFurnitureMaterial?.nama),
@@ -521,8 +553,7 @@ class _InjectProductionFormDialogState
                 ),
                 child: Icon(
                   isEdit ? Icons.edit : Icons.add,
-                  color:
-                      isEdit ? Colors.orange.shade700 : Colors.teal.shade700,
+                  color: isEdit ? Colors.orange.shade700 : Colors.teal.shade700,
                   size: 20,
                 ),
               ),
@@ -706,42 +737,11 @@ class _InjectProductionFormDialogState
             selectedWarna: _selectedWarna,
             selectedMaterial:
                 _selectedFurnitureMaterial?.idFurnitureMaterial ==
-                        _noneFurnitureId
-                    ? null
-                    : _selectedFurnitureMaterial,
+                    _noneFurnitureId
+                ? null
+                : _selectedFurnitureMaterial,
             isLoading: _loadingCetakanWarna,
             onTap: _openCetakanWarnaPicker,
-          ),
-
-          const SizedBox(height: 16),
-
-          // ── Baris 4: Hour Meter + Berat Produk (opsional) ────────
-          Row(
-            children: [
-              Expanded(
-                child: AppNumberField(
-                  controller: hourMeterCtrl,
-                  label: 'Hour Meter',
-                  icon: Icons.timer_sharp,
-                  allowDecimal: true,
-                  allowNegative: false,
-                  hintText: 'contoh: 3.5',
-                  validator: (_) => null,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: AppNumberField(
-                  controller: beratProdukCtrl,
-                  label: 'Berat Produk (kg)',
-                  icon: Icons.scale,
-                  allowDecimal: true,
-                  allowNegative: false,
-                  hintText: 'contoh: 12.5',
-                  validator: (_) => null,
-                ),
-              ),
-            ],
           ),
 
           const SizedBox(height: 8),
@@ -767,8 +767,9 @@ class _InjectProductionFormDialogState
         ElevatedButton(
           onPressed: (hasOverlap || isSaving) ? null : _submit,
           style: ElevatedButton.styleFrom(
-            backgroundColor:
-                isEdit ? const Color(0xFFF57C00) : const Color(0xFF00897B),
+            backgroundColor: isEdit
+                ? const Color(0xFFF57C00)
+                : const Color(0xFF00897B),
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
           ),

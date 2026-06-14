@@ -8,6 +8,9 @@ class InjectProduction {
   final int idMesin;
   final String namaMesin;
 
+  final int? idRegu;
+  final String? namaRegu;
+
   final int idOperator;
   final String namaOperator;
 
@@ -59,6 +62,8 @@ class InjectProduction {
     required this.tglProduksi,
     required this.idMesin,
     required this.namaMesin,
+    this.idRegu,
+    this.namaRegu,
     required this.idOperator,
     required this.namaOperator,
     required this.jam,
@@ -183,6 +188,8 @@ class InjectProduction {
       idMesin: _asInt(j['IdMesin']),
       namaMesin: _asString(j['NamaMesin']),
 
+      idRegu: (j['IdRegu'] as num?)?.toInt(),
+      namaRegu: j['NamaRegu']?.toString(),
       idOperator: _asInt(j['IdOperator']),
       namaOperator: _asString(j['NamaOperator']),
 

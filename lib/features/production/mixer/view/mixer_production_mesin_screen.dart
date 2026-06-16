@@ -156,6 +156,7 @@ class _MixerProductionMesinScreenState
       namaMesin: row.namaMesin,
       namaRegu: row.namaRegu,
       outputJenisNama: row.outputJenisNama,
+      noProduksi: row.noProduksi,
     );
   }
 

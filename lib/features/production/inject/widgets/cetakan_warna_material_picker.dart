@@ -424,11 +424,17 @@ Future<CetakanWarnaMaterialResult?> showCetakanWarnaMaterialPicker(
   MstCetakan? initialCetakan,
   MstWarna? initialWarna,
   FurnitureMaterialLookupResult? initialMaterial,
+  List<MstCetakan>? overrideCetakanList,
 }) async {
-  List<MstCetakan> cetakanList = [];
-  try {
-    cetakanList = await CetakanRepository().fetchAll();
-  } catch (_) {}
+  List<MstCetakan> cetakanList;
+  if (overrideCetakanList != null) {
+    cetakanList = overrideCetakanList;
+  } else {
+    cetakanList = [];
+    try {
+      cetakanList = await CetakanRepository().fetchAll();
+    } catch (_) {}
+  }
 
   if (!context.mounted) return null;
 

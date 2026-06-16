@@ -43,10 +43,7 @@ const _kMixerBorder = Color(0xFFE2E6EA);
 class MixerProductionInputScreen extends StatefulWidget {
   final String noProduksi;
 
-  const MixerProductionInputScreen({
-    super.key,
-    required this.noProduksi,
-  });
+  const MixerProductionInputScreen({super.key, required this.noProduksi});
 
   @override
   State<MixerProductionInputScreen> createState() =>
@@ -69,7 +66,7 @@ class _MixerProductionInputScreenState
 
   String get _breadcrumbLabel {
     final m = (_header?.namaMesin ?? '').trim();
-    return m.isNotEmpty ? m : widget.noProduksi;
+    return m.isNotEmpty ? '$m (${widget.noProduksi})' : widget.noProduksi;
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
@@ -580,9 +577,8 @@ class _MixerProductionInputScreenState
         final newProd = splitResult.prod;
         await Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (_) => MixerProductionInputScreen(
-              noProduksi: newProd.noProduksi,
-            ),
+            builder: (_) =>
+                MixerProductionInputScreen(noProduksi: newProd.noProduksi),
           ),
         );
       },
@@ -663,39 +659,42 @@ class _MixerProductionInputScreenState
                               children: [
                                 Expanded(
                                   child: LayoutBuilder(
-                                    builder: (ctx, c) => ProductionOutputCategoryContent(
-                                      footer: const SizedBox.shrink(),
-                                      child: outputs.isEmpty
-                                          ? const Center(
-                                              child: Text(
-                                                'Belum ada output mixer',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: Color(0xFF9CA3AF),
-                                                ),
-                                              ),
-                                            )
-                                          : GridView(
-                                              padding: const EdgeInsets.all(6),
-                                              gridDelegate:
-                                                  SliverGridDelegateWithFixedCrossAxisCount(
-                                                    crossAxisCount:
-                                                        c.maxWidth < 380
-                                                        ? 2
-                                                        : 3,
-                                                    crossAxisSpacing: 6,
-                                                    mainAxisSpacing: 6,
-                                                    mainAxisExtent: 78,
-                                                  ),
-                                              children: outputs
-                                                  .map(
-                                                    (o) => MixerOutputTile(
-                                                      output: o,
+                                    builder: (ctx, c) =>
+                                        ProductionOutputCategoryContent(
+                                          footer: const SizedBox.shrink(),
+                                          child: outputs.isEmpty
+                                              ? const Center(
+                                                  child: Text(
+                                                    'Belum ada output mixer',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Color(0xFF9CA3AF),
                                                     ),
-                                                  )
-                                                  .toList(),
-                                            ),
-                                    ),
+                                                  ),
+                                                )
+                                              : GridView(
+                                                  padding: const EdgeInsets.all(
+                                                    6,
+                                                  ),
+                                                  gridDelegate:
+                                                      SliverGridDelegateWithFixedCrossAxisCount(
+                                                        crossAxisCount:
+                                                            c.maxWidth < 380
+                                                            ? 2
+                                                            : 3,
+                                                        crossAxisSpacing: 6,
+                                                        mainAxisSpacing: 6,
+                                                        mainAxisExtent: 78,
+                                                      ),
+                                                  children: outputs
+                                                      .map(
+                                                        (o) => MixerOutputTile(
+                                                          output: o,
+                                                        ),
+                                                      )
+                                                      .toList(),
+                                                ),
+                                        ),
                                   ),
                                 ),
                                 const SizedBox(height: 10),
@@ -730,7 +729,9 @@ class _MixerProductionInputScreenState
                                       foregroundColor: Colors.white,
                                       onPressed: _header == null
                                           ? null
-                                          : () => _openAddOutputDialog(grandInputBerat),
+                                          : () => _openAddOutputDialog(
+                                              grandInputBerat,
+                                            ),
                                       child: const Icon(Icons.add),
                                     ),
                                   ],
@@ -1522,27 +1523,38 @@ class _MixerProductionInputScreenState
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(10),
-            border: Border(left: BorderSide(color: Colors.grey.shade300, width: 4)),
+            border: Border(
+              left: BorderSide(color: Colors.grey.shade300, width: 4),
+            ),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(children: [
-            _skeletonBox(w: 72, h: 20, r: 20),
-            const SizedBox(width: 16),
-            _skeletonBox(w: 140, h: 14, r: 4),
-            const SizedBox(width: 10),
-            _skeletonBox(w: 100, h: 14, r: 4),
-            const Spacer(),
-            _skeletonBox(w: 64, h: 24, r: 6),
-            const SizedBox(width: 6),
-            _skeletonBox(w: 64, h: 24, r: 6),
-          ]),
+          child: Row(
+            children: [
+              _skeletonBox(w: 72, h: 20, r: 20),
+              const SizedBox(width: 16),
+              _skeletonBox(w: 140, h: 14, r: 4),
+              const SizedBox(width: 10),
+              _skeletonBox(w: 100, h: 14, r: 4),
+              const Spacer(),
+              _skeletonBox(w: 64, h: 24, r: 6),
+              const SizedBox(width: 6),
+              _skeletonBox(w: 64, h: 24, r: 6),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _skeletonBox({required double w, required double h, double r = 4}) =>
-      Container(width: w, height: h, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(r)));
+      Container(
+        width: w,
+        height: h,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(r),
+        ),
+      );
 
   // ── Main build ─────────────────────────────────────────────────────────────
 
@@ -1575,7 +1587,6 @@ class _MixerProductionInputScreenState
                   _buildToolbarSkeleton()
                 else
                   ProductionWorkspaceToolbar(
-                    noProduksi: widget.noProduksi,
                     isLocked: locked,
                     idMesin: _header?.idMesin,
                     namaJenis: _header?.outputJenisNama,

@@ -16,6 +16,8 @@ class ProduksiRowData {
   final String? namaWarna;
   final String? namaFurnitureMaterial;
 
+  final String? noProduksi;
+
   const ProduksiRowData({
     required this.tglProduksi,
     required this.hourStart,
@@ -28,6 +30,7 @@ class ProduksiRowData {
     this.namaCetakan,
     this.namaWarna,
     this.namaFurnitureMaterial,
+    this.noProduksi,
   });
 }
 
@@ -264,6 +267,20 @@ class _ProduksiRow extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       _MetaSection(items: metaItems),
+                      if ((data.noProduksi ?? '').trim().isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            data.noProduksi!.trim(),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontStyle: FontStyle.italic,
+                              color: Colors.grey.shade400,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

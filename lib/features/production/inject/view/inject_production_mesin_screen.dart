@@ -251,6 +251,7 @@ class _InjectProductionMesinScreenState
       namaCetakan: row.namaCetakan,
       namaWarna: row.namaWarna,
       namaFurnitureMaterial: row.namaFurnitureMaterial,
+      noProduksi: row.noProduksi,
     );
   }
 

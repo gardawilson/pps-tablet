@@ -64,7 +64,7 @@ class _CrusherProductionInputScreenState
   String get _breadcrumbLabel {
     if (_header != null) {
       final name = _header!.namaMesin.trim();
-      return name.isNotEmpty ? name : widget.noCrusherProduksi;
+      return name.isNotEmpty ? '$name (${widget.noCrusherProduksi})' : widget.noCrusherProduksi;
     }
     return widget.noCrusherProduksi;
   }
@@ -1218,7 +1218,6 @@ class _CrusherProductionInputScreenState
                   _buildToolbarSkeleton()
                 else
                 CrusherWorkspaceToolbar(
-                  noProduksi: widget.noCrusherProduksi,
                   isLocked: locked,
                   idMesin: _header?.idMesin,
                   namaJenis: _header?.outputJenisNama,

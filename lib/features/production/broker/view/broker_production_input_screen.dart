@@ -71,10 +71,11 @@ class _BrokerProductionInputScreenState
   List<BreadcrumbSegment> _prevBreadcrumb = [];
   bool _isReplacing = false;
 
-  String get _breadcrumbLabel =>
-      (_header?.namaMesin ?? '').trim().isNotEmpty
-          ? _header!.namaMesin
-          : widget.noProduksi;
+  String get _breadcrumbLabel {
+    final mesin = (_header?.namaMesin ?? '').trim();
+    if (mesin.isNotEmpty) return '$mesin (${widget.noProduksi})';
+    return widget.noProduksi;
+  }
 
   @override
   void initState() {
@@ -1933,7 +1934,6 @@ class _BrokerProductionInputScreenState
                       _buildToolbarSkeleton()
                     else
                     BrokerWorkspaceToolbar(
-                      noProduksi: widget.noProduksi,
                       idMesin: _header?.idMesin,
                       shift: _header?.shift,
                       tglProduksi: _header?.tglProduksi,

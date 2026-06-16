@@ -1,4 +1,4 @@
-enum CellType { empty, aisle, lokasi }
+enum CellType { empty, aisle, lokasi, label, covered }
 
 class GridCell {
   final int row;
@@ -7,6 +7,11 @@ class GridCell {
   int? idLokasi;
   String? lokasiLabel;
   String? lokasiDescription;
+  String? labelText;
+  int rowSpan;
+  int colSpan;
+  int? originRow;
+  int? originCol;
 
   GridCell({
     required this.row,
@@ -15,27 +20,22 @@ class GridCell {
     this.idLokasi,
     this.lokasiLabel,
     this.lokasiDescription,
+    this.labelText,
+    this.rowSpan = 1,
+    this.colSpan = 1,
+    this.originRow,
+    this.originCol,
   });
-
-  GridCell copyWith({
-    CellType? type,
-    int? idLokasi,
-    String? lokasiLabel,
-    String? lokasiDescription,
-  }) =>
-      GridCell(
-        row: row,
-        col: col,
-        type: type ?? this.type,
-        idLokasi: idLokasi ?? this.idLokasi,
-        lokasiLabel: lokasiLabel ?? this.lokasiLabel,
-        lokasiDescription: lokasiDescription ?? this.lokasiDescription,
-      );
 
   void clear() {
     type = CellType.empty;
     idLokasi = null;
     lokasiLabel = null;
     lokasiDescription = null;
+    labelText = null;
+    rowSpan = 1;
+    colSpan = 1;
+    originRow = null;
+    originCol = null;
   }
 }

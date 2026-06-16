@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'marquee_text.dart';
+
 class ProductionWorkspaceToolbar extends StatelessWidget {
-  final String noProduksi;
+  final String? noProduksi;
   final bool isLocked;
   final int? idMesin;
   final int? shift;
@@ -13,6 +15,7 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
   final String? namaCetakan;
   final String? namaWarna;
   final String? namaFurnitureMaterial;
+  final List<String>? namaJenisList;
   final Color primaryColor;
 
   final bool showTimeInfo;
@@ -23,7 +26,7 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
 
   const ProductionWorkspaceToolbar({
     super.key,
-    required this.noProduksi,
+    this.noProduksi,
     required this.isLocked,
     required this.primaryColor,
     this.idMesin,
@@ -35,6 +38,7 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
     this.namaCetakan,
     this.namaWarna,
     this.namaFurnitureMaterial,
+    this.namaJenisList,
     this.showTimeInfo = true,
     this.onGanti,
     this.onRiwayat,
@@ -89,9 +93,12 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
     final hasJenis = (namaJenis ?? '').trim().isNotEmpty;
     final canGanti = idMesin != null && shift != null && tglProduksi != null;
 
-    final hasCetakanInfo = (namaCetakan ?? '').trim().isNotEmpty ||
-        (namaWarna ?? '').trim().isNotEmpty ||
-        (namaFurnitureMaterial ?? '').trim().isNotEmpty;
+    final hasJenisList =
+        namaJenisList != null && namaJenisList!.isNotEmpty;
+    final hasCetakanInfo = !hasJenisList &&
+        ((namaCetakan ?? '').trim().isNotEmpty ||
+            (namaWarna ?? '').trim().isNotEmpty ||
+            (namaFurnitureMaterial ?? '').trim().isNotEmpty);
 
     final accentColor = isLocked
         ? lockedAccent
@@ -184,7 +191,25 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
                 ),
               ),
               vline(),
-              if (hasCetakanInfo)
+              if (hasJenisList)
+                Flexible(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (int i = 0; i < namaJenisList!.length; i++) ...[
+                        if (i > 0) const SizedBox(width: 4),
+                        Flexible(
+                          child: _InfoChip(
+                            icon: Icons.inventory_2_outlined,
+                            label: namaJenisList![i].trim(),
+                            color: accentColor,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                )
+              else if (hasCetakanInfo)
                 Flexible(
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -309,16 +334,18 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
                 infoTag(Icons.schedule_outlined, jamText),
               ],
               const Spacer(),
-              Text(
-                noProduksi,
-                style: TextStyle(
-                  fontSize: 10,
-                  color: Colors.grey.shade400,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 0.4,
+              if ((noProduksi ?? '').isNotEmpty) ...[
+                Text(
+                  noProduksi!,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.grey.shade400,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.4,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 2),
+                const SizedBox(width: 2),
+              ],
               SizedBox(
                 width: 26,
                 height: 26,
@@ -368,9 +395,8 @@ class _InfoChip extends StatelessWidget {
           Icon(icon, size: 10, color: color),
           const SizedBox(width: 3),
           Flexible(
-            child: Text(
+            child: MarqueeText(
               label,
-              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,

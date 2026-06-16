@@ -61,7 +61,7 @@ class _GilinganProductionInputScreenState
 
   String get _breadcrumbLabel {
     final m = (_header?.namaMesin ?? '').trim();
-    return m.isNotEmpty ? m : widget.noProduksi;
+    return m.isNotEmpty ? '$m (${widget.noProduksi})' : widget.noProduksi;
   }
 
   @override
@@ -1438,7 +1438,6 @@ class _GilinganProductionInputScreenState
                   _buildToolbarSkeleton()
                 else
                   ProductionWorkspaceToolbar(
-                    noProduksi: widget.noProduksi,
                     isLocked: locked,
                     primaryColor: _kGilinganPrimary,
                     idMesin: _header?.idMesin,

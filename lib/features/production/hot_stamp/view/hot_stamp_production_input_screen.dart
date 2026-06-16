@@ -61,10 +61,11 @@ class _HotStampingProductionInputScreenState
   List<BreadcrumbSegment> _prevBreadcrumb = [];
   bool _isReplacing = false;
 
-  String get _breadcrumbLabel =>
-      (_header?.namaMesin ?? '').trim().isNotEmpty
-          ? _header!.namaMesin
-          : widget.noProduksi;
+  String get _breadcrumbLabel {
+    final mesin = (_header?.namaMesin ?? '').trim();
+    if (mesin.isNotEmpty) return '$mesin (${widget.noProduksi})';
+    return widget.noProduksi;
+  }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -1111,7 +1112,6 @@ class _HotStampingProductionInputScreenState
                   _buildToolbarSkeleton()
                 else
                 ProductionWorkspaceToolbar(
-                  noProduksi: widget.noProduksi,
                   isLocked: locked,
                   idMesin: _header?.idMesin,
                   namaJenis: _header?.outputJenisNama,

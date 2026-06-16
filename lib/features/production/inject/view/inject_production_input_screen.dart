@@ -30,6 +30,7 @@ import '../../../../core/network/endpoints.dart';
 import '../../../../core/network/api_client.dart';
 import '../widgets/inject_sak_picker_dialog.dart';
 import '../widgets/inject_split_time_dialog.dart';
+import '../../../label/packing/repository/packing_repository.dart';
 
 // ── Colour palette ─────────────────────────────────────────────────────────────
 const _kInjectPrimary = Color(0xFF0277BD); // biru — input
@@ -51,7 +52,6 @@ class _InjectProductionInputScreenState
     extends State<InjectProductionInputScreen> {
   String _selectedInputTab = 'fwip';
   String _selectedOutputTab = 'fwip';
-  bool _outputOnLeft = false;
 
   // ── Header (fetched from API) ─────────────────────────────────────────────
   final _prodRepo = InjectProductionRepository();
@@ -60,10 +60,11 @@ class _InjectProductionInputScreenState
   late String _cachedBreadcrumbLabel;
 
   List<BreadcrumbSegment> _prevBreadcrumb = [];
-  String get _breadcrumbLabel =>
-      (_header?.namaMesin ?? '').trim().isNotEmpty
-          ? _header!.namaMesin
-          : widget.noProduksi;
+  String get _breadcrumbLabel {
+    final mesin = (_header?.namaMesin ?? '').trim();
+    if (mesin.isNotEmpty) return '$mesin (${widget.noProduksi})';
+    return widget.noProduksi;
+  }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -264,6 +265,18 @@ class _InjectProductionInputScreenState
   Future<void> _openSplitTimeDialog() async {
     final h = _header;
     if (h == null || h.idMesin == 0 || h.tglProduksi == null) return;
+
+    // Tampilkan menu pilih mode ganti
+    final mode = await showDialog<_GantiMode>(
+      context: context,
+      builder: (ctx) => _GantiModeDialog(
+        currentCetakan: h.namaCetakan,
+        currentWarna: h.namaWarna,
+        currentMaterial: h.namaFurnitureMaterial,
+      ),
+    );
+    if (!mounted || mode == null) return;
+
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -274,6 +287,12 @@ class _InjectProductionInputScreenState
         currentCetakan: h.namaCetakan,
         currentWarna: h.namaWarna,
         currentMaterial: h.namaFurnitureMaterial,
+        lockedIdCetakan: mode == _GantiMode.warnaAndMaterial
+            ? h.idCetakan
+            : null,
+        lockedNamaCetakan: mode == _GantiMode.warnaAndMaterial
+            ? h.namaCetakan
+            : null,
       ),
     );
     if (!mounted) return;
@@ -1742,6 +1761,22 @@ class _InjectProductionInputScreenState
               pcs: o.pcs,
               isPrinted: o.isPrinted,
               accentColor: _kInjectOutput,
+              onTap: () => showDialog<void>(
+                context: context,
+                builder: (_) => ProductionOutputDetailDialog(
+                  labelCode: o.noBj,
+                  namaJenis: o.namaJenis,
+                  printCount: o.hasBeenPrinted,
+                  accentColor: _kInjectOutput,
+                  pdfUrl: ApiConstants.packingLabelPdf(o.noBj),
+                  feature: 'packing',
+                  markAsPrinted: () =>
+                      PackingRepository(api: ApiClient()).markAsPrinted(o.noBj),
+                  metrics: [
+                    (icon: Icons.inventory_2_outlined, text: '${o.pcs} pcs'),
+                  ],
+                ),
+              ),
             ),
           )
           .toList(),
@@ -1779,13 +1814,12 @@ class _InjectProductionInputScreenState
                   _buildToolbarSkeleton()
                 else
                   ProductionWorkspaceToolbar(
-                    noProduksi: widget.noProduksi,
                     isLocked: locked,
                     idMesin: _header?.idMesin,
                     namaJenis: _header?.namaJenis ?? _header?.namaMesin,
-                    namaCetakan: _header?.namaCetakan,
-                    namaWarna: _header?.namaWarna,
-                    namaFurnitureMaterial: _header?.namaFurnitureMaterial,
+                    namaJenisList: (_header?.outputs ?? [])
+                        .map((o) => o.namaJenis)
+                        .toList(),
                     tglProduksi: _header?.tglProduksi,
                     shift: _header?.shift,
                     hourStart: _header?.hourStart,
@@ -1871,22 +1905,6 @@ class _InjectProductionInputScreenState
                               'Formula',
                               style: TextStyle(fontSize: 11),
                             ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      SizedBox(
-                        width: 26,
-                        height: 26,
-                        child: IconButton(
-                          tooltip: 'Tukar posisi panel',
-                          padding: EdgeInsets.zero,
-                          onPressed: () =>
-                              setState(() => _outputOnLeft = !_outputOnLeft),
-                          icon: Icon(
-                            Icons.swap_horiz,
-                            size: 15,
-                            color: Colors.grey.shade400,
                           ),
                         ),
                       ),
@@ -2004,17 +2022,11 @@ class _InjectProductionInputScreenState
                         padding: const EdgeInsets.all(16),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: _outputOnLeft
-                              ? [
-                                  outputPanel,
-                                  const SizedBox(width: 16),
-                                  inputPanel,
-                                ]
-                              : [
-                                  inputPanel,
-                                  const SizedBox(width: 16),
-                                  outputPanel,
-                                ],
+                          children: [
+                            inputPanel,
+                            const SizedBox(width: 16),
+                            outputPanel,
+                          ],
                         ),
                       );
                     },
@@ -2025,6 +2037,168 @@ class _InjectProductionInputScreenState
           ),
         );
       },
+    );
+  }
+}
+
+// ── Ganti mode ────────────────────────────────────────────────────────────────
+
+enum _GantiMode { cetakan, warnaAndMaterial }
+
+class _GantiModeDialog extends StatelessWidget {
+  const _GantiModeDialog({
+    this.currentCetakan,
+    this.currentWarna,
+    this.currentMaterial,
+  });
+
+  final String? currentCetakan;
+  final String? currentWarna;
+  final String? currentMaterial;
+
+  @override
+  Widget build(BuildContext context) {
+    const accent = Color(0xFF0F766E);
+
+    Widget option({
+      required IconData icon,
+      required String title,
+      required String subtitle,
+      required VoidCallback onTap,
+    }) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 20, color: accent),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF111827),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF6B7280),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right,
+                size: 18,
+                color: Color(0xFF9CA3AF),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Dialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.swap_horiz_rounded,
+                      size: 18,
+                      color: accent,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'Pilih Jenis Ganti',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF111827),
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(
+                      Icons.close,
+                      size: 18,
+                      color: Color(0xFF9CA3AF),
+                    ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if ((currentCetakan ?? '').isNotEmpty) ...[
+                Text(
+                  'Produksi saat ini: ${currentCetakan ?? '-'}'
+                  '${(currentWarna ?? '').isNotEmpty ? ' · ${currentWarna}' : ''}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+              option(
+                icon: Icons.view_in_ar_rounded,
+                title: 'Ganti Cetakan',
+                subtitle: 'Pilih cetakan, warna & material baru dari awal',
+                onTap: () => Navigator.of(context).pop(_GantiMode.cetakan),
+              ),
+              const SizedBox(height: 10),
+              option(
+                icon: Icons.palette_outlined,
+                title: 'Ganti Warna & Material',
+                subtitle: 'Cetakan tetap sama, hanya ganti warna & material',
+                onTap: () =>
+                    Navigator.of(context).pop(_GantiMode.warnaAndMaterial),
+              ),
+              const SizedBox(height: 4),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

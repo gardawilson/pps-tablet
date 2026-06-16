@@ -5,7 +5,7 @@ import '../../shared/shared.dart';
 const _kBrokerPrimary = Color(0xFF1E6FD9);
 
 class BrokerWorkspaceToolbar extends StatelessWidget {
-  final String noProduksi;
+  final String? noProduksi;
   final int? idMesin;
   final int? shift;
   final DateTime? tglProduksi;
@@ -19,7 +19,7 @@ class BrokerWorkspaceToolbar extends StatelessWidget {
 
   const BrokerWorkspaceToolbar({
     super.key,
-    required this.noProduksi,
+    this.noProduksi,
     required this.isLocked,
     this.idMesin,
     this.shift,

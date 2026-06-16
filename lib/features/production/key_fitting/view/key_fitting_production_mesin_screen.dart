@@ -264,6 +264,7 @@ class _KeyFittingProductionMesinScreenState
       namaMesin: row.namaMesin,
       namaRegu: row.namaRegu,
       outputJenisNama: row.outputJenisNama,
+      noProduksi: row.noProduksi,
     );
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../cetakan/model/mst_cetakan_model.dart';
+import '../../../cetakan/repository/cetakan_repository.dart';
 import '../../../furniture_material/model/furniture_material_lookup_model.dart';
 import '../../../warna/model/warna_model.dart';
 import '../repository/inject_production_repository.dart';
@@ -15,6 +16,8 @@ class InjectSplitTimeDialog extends StatefulWidget {
     this.currentCetakan,
     this.currentWarna,
     this.currentMaterial,
+    this.lockedIdCetakan,
+    this.lockedNamaCetakan,
   });
 
   final int idMesin;
@@ -23,6 +26,9 @@ class InjectSplitTimeDialog extends StatefulWidget {
   final String? currentCetakan;
   final String? currentWarna;
   final String? currentMaterial;
+  // When set, cetakan column is locked to this value (mode: Ganti Warna & Material)
+  final int? lockedIdCetakan;
+  final String? lockedNamaCetakan;
 
   @override
   State<InjectSplitTimeDialog> createState() => _InjectSplitTimeDialogState();
@@ -46,6 +52,18 @@ class _InjectSplitTimeDialogState extends State<InjectSplitTimeDialog> {
     final hh = now.hour.toString().padLeft(2, '0');
     final mm = now.minute.toString().padLeft(2, '0');
     _hourCtrl.text = '$hh:$mm';
+    if (widget.lockedIdCetakan != null) _prefetchLockedCetakan();
+  }
+
+  Future<void> _prefetchLockedCetakan() async {
+    setState(() => _loadingCetakan = true);
+    try {
+      final all = await CetakanRepository().fetchAll();
+      if (!mounted) return;
+      final match = all.where((c) => c.idCetakan == widget.lockedIdCetakan).firstOrNull;
+      if (match != null) setState(() => _cetakan = match);
+    } catch (_) {}
+    if (mounted) setState(() => _loadingCetakan = false);
   }
 
   @override
@@ -59,11 +77,25 @@ class _InjectSplitTimeDialogState extends State<InjectSplitTimeDialog> {
 
   Future<void> _pickCetakan() async {
     setState(() => _loadingCetakan = true);
+
+    List<MstCetakan>? overrideList;
+    if (widget.lockedIdCetakan != null) {
+      try {
+        final all = await CetakanRepository().fetchAll();
+        overrideList = all.where((c) => c.idCetakan == widget.lockedIdCetakan).toList();
+        if (!mounted) return;
+        if (_cetakan == null && overrideList.isNotEmpty) {
+          setState(() => _cetakan = overrideList!.first);
+        }
+      } catch (_) {}
+    }
+
     final result = await showCetakanWarnaMaterialPicker(
       context,
       initialCetakan: _cetakan,
       initialWarna: _warna,
       initialMaterial: _material,
+      overrideCetakanList: overrideList,
     );
     if (!mounted) return;
     setState(() {
@@ -366,11 +398,11 @@ class _InjectSplitTimeDialogState extends State<InjectSplitTimeDialog> {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            const Text(
                               'Cetakan, Warna & Material',
                               style: TextStyle(
                                 fontSize: 10,
@@ -378,10 +410,12 @@ class _InjectSplitTimeDialogState extends State<InjectSplitTimeDialog> {
                                 color: Color(0xFF6B7280),
                               ),
                             ),
-                            SizedBox(height: 2),
+                            const SizedBox(height: 2),
                             Text(
-                              'Pilih cetakan untuk produksi baru',
-                              style: TextStyle(
+                              widget.lockedIdCetakan != null
+                                  ? 'Cetakan terkunci — pilih warna & material'
+                                  : 'Pilih cetakan untuk produksi baru',
+                              style: const TextStyle(
                                 fontSize: 11,
                                 color: Color(0xFF9CA3AF),
                               ),

@@ -158,6 +158,7 @@ class _CrusherProductionMesinScreenState
       namaMesin: row.namaMesin,
       namaRegu: row.namaRegu,
       outputJenisNama: row.outputJenisNama,
+      noProduksi: row.noCrusherProduksi,
     );
   }
 

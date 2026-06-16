@@ -160,6 +160,7 @@ class _PackingProductionMesinScreenState
       namaMesin: row.namaMesin,
       namaRegu: row.namaOperator,
       outputJenisNama: row.outputJenisNama,
+      noProduksi: row.noPacking,
     );
   }
 

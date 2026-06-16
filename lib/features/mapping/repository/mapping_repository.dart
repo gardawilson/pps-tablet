@@ -35,6 +35,16 @@ class MappingRepository {
         .toList();
   }
 
+  Future<Map<String, dynamic>?> fetchLayout(String blok) async {
+    final body = await api.getJson('/api/mapping/layout/$blok');
+    if (body['success'] != true) return null;
+    return body['data'] as Map<String, dynamic>?;
+  }
+
+  Future<void> saveLayout(String blok, Map<String, dynamic> payload) async {
+    await api.postJson('/api/mapping/layout/$blok', body: payload);
+  }
+
   Future<MappingLabelResult> fetchLabelByLokasi({
     required String blok,
     required int idLokasi,

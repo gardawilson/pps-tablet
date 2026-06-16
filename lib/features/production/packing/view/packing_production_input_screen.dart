@@ -47,10 +47,11 @@ class _PackingProductionInputScreenState
   String _selectedOutputTab = 'bj';
   List<BreadcrumbSegment> _prevBreadcrumb = [];
 
-  String get _breadcrumbLabel =>
-      (_header?.namaMesin ?? '').trim().isNotEmpty
-          ? _header!.namaMesin
-          : widget.noProduksi;
+  String get _breadcrumbLabel {
+    final mesin = (_header?.namaMesin ?? '').trim();
+    if (mesin.isNotEmpty) return '$mesin (${widget.noProduksi})';
+    return widget.noProduksi;
+  }
 
   @override
   void initState() {
@@ -939,7 +940,6 @@ class _PackingProductionInputScreenState
                   _buildToolbarSkeleton()
                 else
                   ProductionWorkspaceToolbar(
-                    noProduksi: widget.noProduksi,
                     isLocked: locked,
                     primaryColor: _kPrimary,
                     idMesin: _header?.idMesin,

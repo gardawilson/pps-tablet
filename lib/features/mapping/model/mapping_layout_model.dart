@@ -27,6 +27,20 @@ class GridCell {
     this.originCol,
   });
 
+  GridCell clone() => GridCell(
+        row: row,
+        col: col,
+        type: type,
+        idLokasi: idLokasi,
+        lokasiLabel: lokasiLabel,
+        lokasiDescription: lokasiDescription,
+        labelText: labelText,
+        rowSpan: rowSpan,
+        colSpan: colSpan,
+        originRow: originRow,
+        originCol: originCol,
+      );
+
   void clear() {
     type = CellType.empty;
     idLokasi = null;

@@ -3,12 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:pps_tablet/features/audit/view/audit_screen_with_prefilled.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/services/dialog_service.dart';
-import '../../../../common/widgets/interactive_popover.dart';
 import '../../../../core/services/label_print_sync_queue.dart';
 import '../view_model/broker_view_model.dart';
 import '../model/broker_header_model.dart';
 import '../model/broker_detail_model.dart';
-import '../widgets/broker_row_popover.dart';
+import '../widgets/broker_action_dialog.dart';
 import '../widgets/broker_action_bar.dart';
 import '../widgets/broker_header_table.dart';
 import '../widgets/broker_detail_table.dart';
@@ -158,8 +157,6 @@ class _BrokerScreenState extends State<BrokerScreen> {
     }
   }
 
-  // Popover animasi (custom)
-  final InteractivePopover _popover = InteractivePopover();
 
   @override
   void initState() {
@@ -177,7 +174,6 @@ class _BrokerScreenState extends State<BrokerScreen> {
   @override
   void dispose() {
     _syncQueue?.removeListener(_onSyncQueueChanged);
-    _popover.dispose(); // langsung bersih tanpa animasi
     _scrollController.dispose();
     _detailScrollController.dispose();
     searchCtrl.dispose();
@@ -203,11 +199,6 @@ class _BrokerScreenState extends State<BrokerScreen> {
   }
 
   void _onScroll() {
-    // Tutup popover saat scroll supaya tidak "mengambang"
-    if (_popover.isShown) {
-      _popover.hide();
-    }
-
     final vm = context.read<BrokerViewModel>();
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 100) {
@@ -270,61 +261,21 @@ class _BrokerScreenState extends State<BrokerScreen> {
     );
   }
 
-  // Tutup popover (tidak mengubah selection — biarkan tetap menandai item aktif)
-  void _closeContextMenu() {
-    _popover.hide();
-  }
-
-  /// Long-press handler: pindahkan highlight ke item & tampilkan popover.
   Future<void> _onItemLongPress(
     BrokerHeader header,
     Offset globalPosition,
   ) async {
-    final vm = context.read<BrokerViewModel>();
-    final screenHeight = MediaQuery.of(context).size.height;
-    final adaptiveMaxHeight = (screenHeight - 32)
-        .clamp(480.0, 820.0)
-        .toDouble();
+    context.read<BrokerViewModel>().setSelectedNoBroker(header.noBroker);
 
-    // Pindahkan highlight saat long-press
-    vm.setSelectedNoBroker(header.noBroker);
-
-    _popover.show(
+    await showDialog(
       context: context,
-      globalPosition: globalPosition,
-      child: BrokerRowPopover(
+      builder: (_) => BrokerActionDialog(
         header: header,
-        onClose: _closeContextMenu,
-        onEdit: () async {
-          _closeContextMenu();
-          await _onEditHeader(header);
-        },
-        onDelete: () async {
-          if (context.read<BrokerViewModel>().isLoading) return;
-          _closeContextMenu();
-          await _onDeleteHeader(header);
-        },
-        onPrint: () {
-          _closeContextMenu();
-          // TODO: print/preview
-        },
-        // 🎯 NEW: Audit History callback
-        onAuditHistory: () {
-          _closeContextMenu();
-          _navigateToAuditHistory(header);
-        },
-        onQc: () async {
-          _closeContextMenu();
-          await _onQcHeader(header);
-        },
+        onEdit: () => _onEditHeader(header),
+        onDelete: () => _onDeleteHeader(header),
+        onAuditHistory: () => _navigateToAuditHistory(header),
+        onQc: () => _onQcHeader(header),
       ),
-      preferAbove: true,
-      verticalGap: 8,
-      maxHeight: adaptiveMaxHeight,
-      backdropOpacity: 0.06,
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutBack,
-      startScale: 0.94,
     );
   }
 

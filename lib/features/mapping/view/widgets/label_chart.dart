@@ -378,8 +378,8 @@ class _CategoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final useBerat = items.first.uom != 'pcs';
-    final uom = useBerat ? 'kg' : items.first.uom;
+    final useBerat = items.first.uom.toUpperCase() != 'PCS';
+    final uom = useBerat ? 'kg' : 'pcs';
 
     // Group by NamaJenis
     final Map<String, double> byJenis = {};

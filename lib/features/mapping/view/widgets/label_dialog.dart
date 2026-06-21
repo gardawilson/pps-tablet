@@ -58,15 +58,19 @@ class _LabelDialogState extends State<LabelDialog> {
                     fontSize: 16,
                   ),
                 ),
-                Text(
-                  widget.lokasi.description.isEmpty
-                      ? '-'
-                      : widget.lokasi.description,
-                  style:
-                      const TextStyle(color: Colors.white70, fontSize: 11),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                if (widget.lokasi.namaJenis.isNotEmpty) ...[
+                  const SizedBox(height: 1),
+                  Text(
+                    widget.lokasi.namaJenis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ],
             ),
           ),
@@ -78,8 +82,7 @@ class _LabelDialogState extends State<LabelDialog> {
             Tooltip(
               message: _showChart ? 'Daftar Label' : 'Statistik',
               child: IconButton(
-                onPressed: () =>
-                    setState(() => _showChart = !_showChart),
+                onPressed: () => setState(() => _showChart = !_showChart),
                 icon: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 200),
                   child: Icon(
@@ -103,20 +106,20 @@ class _LabelDialogState extends State<LabelDialog> {
   }
 
   Widget _statChip(String text) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.2),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          text,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: 0.2),
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Text(
+      text,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+  );
 
   Widget _buildContent(MappingLabelViewModel vm) {
     if (vm.isLoading) {
@@ -153,8 +156,18 @@ class _LabelDialogState extends State<LabelDialog> {
   }
 
   Widget _buildLabelItem(MappingLabelItem item) {
+    final isKg = item.uom.toUpperCase() == 'KG';
+    final String valueText;
+    if (isKg) {
+      final b = item.berat ?? 0;
+      valueText =
+          '${b == b.truncateToDouble() ? b.toInt() : b.toStringAsFixed(1)} kg';
+    } else {
+      valueText = '${item.qty} ${item.uom}';
+    }
+
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
@@ -168,59 +181,56 @@ class _LabelDialogState extends State<LabelDialog> {
         ],
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            decoration: BoxDecoration(
-              color: _primary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(8),
-            ),
+          // Tanggal
+          SizedBox(
+            width: 78,
             child: Text(
-              item.labelCode,
-              style: const TextStyle(
-                color: _primary,
-                fontWeight: FontWeight.w700,
+              item.dateCreate,
+              style: TextStyle(
+                color: Colors.grey[600],
                 fontSize: 11,
+                height: 1.3,
               ),
             ),
           ),
           const SizedBox(width: 10),
+          // Nomor label + jenis
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.namaJenis,
+                  item.labelCode,
                   style: const TextStyle(
-                      fontWeight: FontWeight.w600, fontSize: 13),
+                    color: _primary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  item.dateCreate,
-                  style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                  item.namaJenis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 12,
+                    color: Colors.black87,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '${item.qty} ${item.uom}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                  color: _primary,
-                ),
-              ),
-              if (item.berat != null)
-                Text(
-                  '${item.berat!.toStringAsFixed(1)} kg',
-                  style: TextStyle(color: Colors.grey[500], fontSize: 11),
-                ),
-            ],
+          const SizedBox(width: 10),
+          // Nilai berdasarkan UOM
+          Text(
+            valueText,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+              color: Colors.black,
+            ),
           ),
         ],
       ),

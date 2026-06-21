@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:pps_tablet/core/network/api_client.dart';
+import 'package:pps_tablet/core/view/app_shell.dart';
 import 'package:pps_tablet/features/mapping/repository/mapping_repository.dart';
 import 'package:pps_tablet/features/mapping/view/mapping_lokasi_screen.dart';
 import 'package:pps_tablet/features/mapping/view_model/mapping_view_model.dart';
@@ -148,17 +149,30 @@ class _MappingView extends StatelessWidget {
 
   Widget _buildBlokCard(BuildContext context, blok) {
     return GestureDetector(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => MappingLokasiScreen(
-            blok: blok.blok,
-            namaWarehouse: blok.namaWarehouse,
+      onTap: () {
+        AppShell.breadcrumb.value = [
+          BreadcrumbSegment(
+            'Mapping',
+            onTap: () => Navigator.of(context).maybePop(),
           ),
-        ),
-      ),
+          BreadcrumbSegment("Layout ${blok.blok}"),
+        ];
+        Navigator.of(context)
+            .push(
+              MaterialPageRoute(
+                builder: (_) => MappingLokasiScreen(
+                  blok: blok.blok,
+                  namaWarehouse: blok.namaWarehouse,
+                ),
+              ),
+            )
+            .then((_) {
+              AppShell.breadcrumb.value = [const BreadcrumbSegment('Mapping')];
+            });
+      },
       child: Container(
         width: 80,
-        height: 72,
+        height: 88,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: Colors.white,
@@ -181,22 +195,45 @@ class _MappingView extends StatelessWidget {
               style: const TextStyle(
                 color: _primary,
                 fontWeight: FontWeight.w800,
-                fontSize: 12,
+                fontSize: 14,
                 height: 1,
               ),
             ),
             const SizedBox(height: 5),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: blok.totalLokasi > 0
+                    ? _primary.withValues(alpha: 0.10)
+                    : Colors.grey.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(4),
+              ),
               child: Text(
-                blok.namaWarehouse,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+                '${blok.totalLokasi} lokasi',
                 style: TextStyle(
-                  color: Colors.grey[600],
                   fontSize: 9,
-                  height: 1.2,
+                  fontWeight: FontWeight.w700,
+                  color: blok.totalLokasi > 0 ? _primary : Colors.grey,
+                ),
+              ),
+            ),
+            const SizedBox(height: 3),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: blok.totalJenis > 0
+                    ? const Color(0xFF2E7D32).withValues(alpha: 0.10)
+                    : Colors.grey.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                '${blok.totalJenis} jenis',
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  color: blok.totalJenis > 0
+                      ? const Color(0xFF2E7D32)
+                      : Colors.grey,
                 ),
               ),
             ),

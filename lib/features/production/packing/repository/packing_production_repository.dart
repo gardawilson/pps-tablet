@@ -244,6 +244,26 @@ class PackingProductionRepository {
   }
 
   // =========================
+  //  SPLIT TIME (GANTI PRODUKSI)
+  //  POST /api/packing/split-time/:idMesin/:tanggal
+  // =========================
+  Future<Map<String, dynamic>> splitTime({
+    required int idMesin,
+    required DateTime tanggal,
+    required String hourStart,
+    required int outputJenisId,
+  }) async {
+    final dateStr =
+        '${tanggal.year.toString().padLeft(4, '0')}-'
+        '${tanggal.month.toString().padLeft(2, '0')}-'
+        '${tanggal.day.toString().padLeft(2, '0')}';
+    return api.postJson(
+      '/api/production/packing/split-time/$idMesin/$dateStr',
+      body: {'hourStart': hourStart, 'outputJenisId': outputJenisId},
+    );
+  }
+
+  // =========================
   //  DELETE
   //  DELETE /api/production/packing/:noPacking
   // =========================

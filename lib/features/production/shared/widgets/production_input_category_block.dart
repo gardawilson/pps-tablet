@@ -16,6 +16,9 @@ class ProductionInputCategoryBlock extends StatelessWidget {
   final SectionSummary Function()? summaryBuilder;
   final Widget child;
 
+  final bool showBorder;
+  final EdgeInsetsGeometry? contentPadding;
+
   const ProductionInputCategoryBlock({
     super.key,
     required this.color,
@@ -23,6 +26,8 @@ class ProductionInputCategoryBlock extends StatelessWidget {
     this.isLoading = false,
     this.label,
     this.summaryBuilder,
+    this.showBorder = true,
+    this.contentPadding,
   });
 
   @override
@@ -30,14 +35,14 @@ class ProductionInputCategoryBlock extends StatelessWidget {
     final summary = summaryBuilder?.call();
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+      padding: contentPadding ?? const EdgeInsets.fromLTRB(8, 8, 8, 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(12),
           bottomRight: Radius.circular(12),
         ),
-        border: Border.all(color: color.withValues(alpha: 0.32), width: 1.1),
+        border: showBorder ? Border.all(color: color.withValues(alpha: 0.32), width: 1.1) : null,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.015),

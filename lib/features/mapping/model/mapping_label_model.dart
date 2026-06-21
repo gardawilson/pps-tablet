@@ -22,12 +22,20 @@ class MappingLabelItem {
   });
 
   factory MappingLabelItem.fromJson(Map<String, dynamic> json) {
+    // Format tanggal ISO → "dd/mm/yyyy"
+    String dateStr = (json['DateCreate'] ?? '').toString();
+    try {
+      final dt = DateTime.parse(dateStr);
+      dateStr =
+          '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+    } catch (_) {}
+
     return MappingLabelItem(
       labelCode: (json['LabelCode'] ?? '').toString(),
-      dateCreate: (json['DateCreate'] ?? '').toString(),
+      dateCreate: dateStr,
       namaJenis: (json['NamaJenis'] ?? '').toString(),
       kategori: (json['Kategori'] ?? '').toString(),
-      uom: (json['Uom'] ?? '').toString(),
+      uom: (json['NamaUOM'] ?? json['Uom'] ?? '').toString(),
       blok: (json['Blok'] ?? '').toString(),
       idLokasi: (json['IdLokasi'] as num?)?.toInt() ?? 0,
       qty: (json['Qty'] as num?)?.toInt() ?? 0,

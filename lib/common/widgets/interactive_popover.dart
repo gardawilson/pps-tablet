@@ -196,9 +196,14 @@ class _PopoverShellState extends State<_PopoverShell>
     final screen = widget.screenSize;
     final margin = widget.margin;
 
+    final availableWidth = screen.width - margin.left - margin.right;
+    final availableHeight = screen.height - margin.top - margin.bottom;
+    final effectiveWidth = size.width.clamp(0.0, availableWidth);
+    final effectiveHeight = size.height.clamp(0.0, availableHeight);
+
     final left = (widget.anchor.dx + widget.dxOffset).clamp(
       margin.left,
-      screen.width - margin.right - size.width,
+      margin.left + (availableWidth - effectiveWidth).clamp(0.0, double.infinity),
     );
 
     final spaceBelow =
@@ -206,14 +211,16 @@ class _PopoverShellState extends State<_PopoverShell>
     final spaceAbove = widget.anchor.dy - margin.top;
 
     final placeAbove = widget.preferAbove
-        ? size.height + widget.verticalGap <= spaceAbove ||
-              spaceBelow < size.height
-        : size.height > spaceBelow && spaceAbove >= size.height;
+        ? effectiveHeight + widget.verticalGap <= spaceAbove ||
+              spaceBelow < effectiveHeight
+        : effectiveHeight > spaceBelow && spaceAbove >= effectiveHeight;
 
+    final topMax = (screen.height - margin.bottom - effectiveHeight)
+        .clamp(margin.top, double.infinity);
     final top = (placeAbove
-            ? widget.anchor.dy - size.height - widget.verticalGap
+            ? widget.anchor.dy - effectiveHeight - widget.verticalGap
             : widget.anchor.dy + widget.dyOffset)
-        .clamp(margin.top, screen.height - margin.bottom - size.height);
+        .clamp(margin.top, topMax);
 
     setState(() {
       _showAbove = placeAbove;

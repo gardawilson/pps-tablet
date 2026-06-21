@@ -18,7 +18,10 @@ const Color _labelColor = Color(0xFFE8F5E9);
 // Cek apakah ada sel aisle (termasuk covered milik aisle) dalam rentang baris/kolom
 bool _hasAisleInRange(
   List<List<GridCell>> grid,
-  int r1, int r2, int c1, int c2,
+  int r1,
+  int r2,
+  int c1,
+  int c2,
 ) {
   for (int r = r1; r <= r2; r++) {
     for (int c = c1; c <= c2; c++) {
@@ -68,6 +71,28 @@ class _MappingLokasiView extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.white,
       body: _buildContent(context, vm),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final vm = context.read<MappingLokasiViewModel>();
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => MappingLayoutEditorScreen(
+                blok: blok,
+                namaWarehouse: namaWarehouse,
+                lokasiList: vm.lokasiList,
+              ),
+            ),
+          );
+          vm.loadLokasiByBlok(blok);
+        },
+        icon: const Icon(Icons.edit_rounded, size: 16),
+        label: const Text(
+          'Edit Layout',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        ),
+        backgroundColor: _primary,
+        foregroundColor: Colors.white,
+      ),
     );
   }
 
@@ -92,8 +117,6 @@ class _MappingLokasiView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSubheader(context, vm),
-        const Divider(height: 1),
         Expanded(
           child: vm.hasLayout
               ? _buildLayoutView(context, vm)
@@ -101,64 +124,6 @@ class _MappingLokasiView extends StatelessWidget {
         ),
         if (vm.hasLayout) _buildLegend(),
       ],
-    );
-  }
-
-  Widget _buildSubheader(BuildContext context, MappingLokasiViewModel vm) {
-    return Container(
-      width: double.infinity,
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-      child: Row(
-        children: [
-          Container(
-            width: 3,
-            height: 16,
-            decoration: BoxDecoration(
-              color: _primary,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            namaWarehouse,
-            style: const TextStyle(
-              color: _primary,
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            '${vm.lokasiList.length} lokasi',
-            style: TextStyle(color: Colors.grey[400], fontSize: 11),
-          ),
-          const Spacer(),
-          TextButton.icon(
-            onPressed: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => MappingLayoutEditorScreen(
-                    blok: blok,
-                    namaWarehouse: namaWarehouse,
-                    lokasiList: vm.lokasiList,
-                  ),
-                ),
-              );
-              vm.loadLokasiByBlok(blok);
-            },
-            icon: const Icon(Icons.edit_rounded, size: 15),
-            label: const Text('Edit Layout'),
-            style: TextButton.styleFrom(
-              foregroundColor: _primary,
-              textStyle: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -281,10 +246,12 @@ class _MappingLokasiView extends StatelessWidget {
       final g = vm.layoutGrid;
       final rows = vm.layoutRows;
       final cols = vm.layoutCols;
-      mergeTop    = r > 0       && _hasAisleInRange(g, r - 1,    r - 1,    c,      c + cs - 1);
-      mergeBottom = r + rs < rows && _hasAisleInRange(g, r + rs,  r + rs,   c,      c + cs - 1);
-      mergeLeft   = c > 0       && _hasAisleInRange(g, r,        r + rs - 1, c - 1, c - 1);
-      mergeRight  = c + cs < cols && _hasAisleInRange(g, r,       r + rs - 1, c + cs, c + cs);
+      mergeTop = r > 0 && _hasAisleInRange(g, r - 1, r - 1, c, c + cs - 1);
+      mergeBottom =
+          r + rs < rows && _hasAisleInRange(g, r + rs, r + rs, c, c + cs - 1);
+      mergeLeft = c > 0 && _hasAisleInRange(g, r, r + rs - 1, c - 1, c - 1);
+      mergeRight =
+          c + cs < cols && _hasAisleInRange(g, r, r + rs - 1, c + cs, c + cs);
     } else {
       mergeTop = mergeBottom = mergeLeft = mergeRight = false;
     }
@@ -293,21 +260,27 @@ class _MappingLokasiView extends StatelessWidget {
     final double width = isEmpty
         ? _slotW
         : isAisle
-        ? cell.colSpan * _slotW - 3 + (mergeLeft ? 1.5 : 0) + (mergeRight ? 1.5 : 0)
+        ? cell.colSpan * _slotW -
+              3 +
+              (mergeLeft ? 1.5 : 0) +
+              (mergeRight ? 1.5 : 0)
         : cell.colSpan * _slotW - 3;
     final double height = isEmpty
         ? _slotH
         : isAisle
-        ? cell.rowSpan * _slotH - 3 + (mergeTop ? 1.5 : 0) + (mergeBottom ? 1.5 : 0)
+        ? cell.rowSpan * _slotH -
+              3 +
+              (mergeTop ? 1.5 : 0) +
+              (mergeBottom ? 1.5 : 0)
         : cell.rowSpan * _slotH - 3;
 
     final EdgeInsets margin = isEmpty
         ? EdgeInsets.zero
         : isAisle
         ? EdgeInsets.only(
-            left:   mergeLeft   ? 0 : 1.5,
-            top:    mergeTop    ? 0 : 1.5,
-            right:  mergeRight  ? 0 : 1.5,
+            left: mergeLeft ? 0 : 1.5,
+            top: mergeTop ? 0 : 1.5,
+            right: mergeRight ? 0 : 1.5,
             bottom: mergeBottom ? 0 : 1.5,
           )
         : const EdgeInsets.all(1.5);
@@ -320,9 +293,9 @@ class _MappingLokasiView extends StatelessWidget {
     // Border & radius: hilangkan di sisi yang menyatu
     final BorderRadius borderRadius = isAisle
         ? BorderRadius.only(
-            topLeft:     Radius.circular(mergeTop    || mergeLeft  ? 0 : 6),
-            topRight:    Radius.circular(mergeTop    || mergeRight ? 0 : 6),
-            bottomLeft:  Radius.circular(mergeBottom || mergeLeft  ? 0 : 6),
+            topLeft: Radius.circular(mergeTop || mergeLeft ? 0 : 6),
+            topRight: Radius.circular(mergeTop || mergeRight ? 0 : 6),
+            bottomLeft: Radius.circular(mergeBottom || mergeLeft ? 0 : 6),
             bottomRight: Radius.circular(mergeBottom || mergeRight ? 0 : 6),
           )
         : BorderRadius.circular(isEmpty ? 0 : 6);
@@ -334,10 +307,10 @@ class _MappingLokasiView extends StatelessWidget {
         ? Border.all(color: _primary.withValues(alpha: 0.5), width: 1.5)
         : isAisle
         ? Border(
-            top:    mergeTop    ? BorderSide.none : aisleSide,
+            top: mergeTop ? BorderSide.none : aisleSide,
             bottom: mergeBottom ? BorderSide.none : aisleSide,
-            left:   mergeLeft   ? BorderSide.none : aisleSide,
-            right:  mergeRight  ? BorderSide.none : aisleSide,
+            left: mergeLeft ? BorderSide.none : aisleSide,
+            right: mergeRight ? BorderSide.none : aisleSide,
           )
         : isLabel
         ? Border.all(color: const Color(0xFF2E7D32).withValues(alpha: 0.5))
@@ -408,32 +381,160 @@ class _MappingLokasiView extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 9,
+                        fontSize: 18,
                         fontWeight: FontWeight.w800,
                         color: _primary,
                         height: 1,
                       ),
                     ),
-                    if (cell.lokasiDescription?.isNotEmpty == true) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        cell.lokasiDescription!,
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 7,
-                          color: Colors.grey[500],
-                          height: 1.2,
-                        ),
+                    const SizedBox(height: 2),
+                    Text(
+                      cell.lokasiDescription?.isNotEmpty == true
+                          ? cell.lokasiDescription!
+                          : '-',
+                      textAlign: TextAlign.center,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.black,
+                        height: 1.2,
                       ),
-                    ],
+                    ),
+                    const SizedBox(height: 2),
+                    _buildTotalLabelBadge(vm, cell),
                   ],
                 ),
               )
             : const SizedBox.shrink(),
       ),
     );
+  }
+
+  Widget _buildTotalLabelBadge(MappingLokasiViewModel vm, GridCell cell) {
+    final lokasi = vm.lokasiList
+        .where((l) => l.idLokasi == cell.idLokasi)
+        .firstOrNull;
+    if (lokasi == null) return const SizedBox.shrink();
+
+    final hasLabel = lokasi.totalLabel > 0;
+
+    String? uomText;
+    bool hasUom = false;
+    final uom = lokasi.namaUOM.toUpperCase();
+    if (uom == 'KG' || lokasi.totalBerat > 0) {
+      hasUom = lokasi.totalBerat > 0;
+      uomText = '${_formatNum(lokasi.totalBerat)} kg';
+    } else if (uom == 'PCS' || lokasi.totalQty > 0) {
+      hasUom = lokasi.totalQty > 0;
+      uomText = '${lokasi.totalQty} pcs';
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+          decoration: BoxDecoration(
+            color: hasLabel
+                ? _primary.withValues(alpha: 0.10)
+                : Colors.grey.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            '${lokasi.totalLabel} label',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: hasLabel ? _primary : Colors.grey,
+            ),
+          ),
+        ),
+        if (uomText != null) ...[
+          const SizedBox(height: 2),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+            decoration: BoxDecoration(
+              color: hasUom
+                  ? const Color(0xFF2E7D32).withValues(alpha: 0.10)
+                  : Colors.grey.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              uomText,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: hasUom ? const Color(0xFF2E7D32) : Colors.grey,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildStockBadge(MappingLokasi item) {
+    final hasLabel = item.totalLabel > 0;
+
+    final uom = item.namaUOM.toUpperCase();
+    String? uomText;
+    bool hasUom = false;
+    if (uom == 'KG' || item.totalBerat > 0) {
+      hasUom = item.totalBerat > 0;
+      uomText = '${_formatNum(item.totalBerat)} kg';
+    } else if (uom == 'PCS' || item.totalQty > 0) {
+      hasUom = item.totalQty > 0;
+      uomText = '${item.totalQty} pcs';
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: hasLabel
+                ? _primary.withValues(alpha: 0.10)
+                : Colors.grey.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            '${item.totalLabel} label',
+            style: TextStyle(
+              fontSize: 8,
+              fontWeight: FontWeight.w700,
+              color: hasLabel ? _primary : Colors.grey,
+            ),
+          ),
+        ),
+        if (uomText != null) ...[
+          const SizedBox(height: 3),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: hasUom
+                  ? const Color(0xFF2E7D32).withValues(alpha: 0.10)
+                  : Colors.grey.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              uomText,
+              style: TextStyle(
+                fontSize: 8,
+                fontWeight: FontWeight.w700,
+                color: hasUom ? const Color(0xFF2E7D32) : Colors.grey,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  String _formatNum(double val) {
+    if (val == val.truncateToDouble()) return val.toInt().toString();
+    return val.toStringAsFixed(1);
   }
 
   Widget _buildLegend() {
@@ -516,7 +617,7 @@ class _MappingLokasiView extends StatelessWidget {
       onTap: () => _showLabelDialog(context, item),
       child: Container(
         width: 80,
-        height: 72,
+        height: 100,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: Colors.white,
@@ -530,35 +631,37 @@ class _MappingLokasiView extends StatelessWidget {
             ),
           ],
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              item.label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: _primary,
-                fontWeight: FontWeight.w800,
-                fontSize: 12,
-                height: 1,
-              ),
-            ),
-            const SizedBox(height: 5),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Text(
-                item.description.isEmpty ? '-' : item.description,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                item.label,
                 textAlign: TextAlign.center,
-                maxLines: 2,
+                style: const TextStyle(
+                  color: _primary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                  height: 1,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                item.namaJenis.isNotEmpty ? item.namaJenis : 'N/A',
+                textAlign: TextAlign.center,
+                maxLines: 3,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Colors.grey[600],
+                style: const TextStyle(
+                  color: Colors.black,
                   fontSize: 9,
                   height: 1.2,
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              _buildStockBadge(item),
+            ],
+          ),
         ),
       ),
     );

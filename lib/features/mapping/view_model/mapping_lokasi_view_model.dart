@@ -76,7 +76,7 @@ class MappingLokasiViewModel extends ChangeNotifier {
                 .where((l) => l.idLokasi == cell.idLokasi)
                 .firstOrNull;
             cell.lokasiLabel = lokasi?.label;
-            cell.lokasiDescription = lokasi?.description;
+            cell.lokasiDescription = lokasi?.namaJenis;
           }
 
           if (cell.type == CellType.label) {

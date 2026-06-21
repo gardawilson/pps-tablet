@@ -6,6 +6,8 @@ import 'package:pps_tablet/features/mapping/model/mapping_layout_model.dart';
 import 'package:pps_tablet/features/mapping/model/mapping_lokasi_model.dart';
 import 'package:pps_tablet/features/mapping/repository/mapping_repository.dart';
 import 'package:pps_tablet/features/mapping/view_model/mapping_layout_view_model.dart';
+import 'package:pps_tablet/features/mapping/view/widgets/edit_lokasi_dialog.dart';
+import 'package:pps_tablet/features/mapping/view/widgets/add_lokasi_dialog.dart';
 
 // Data class untuk drag-drop antar sel grid
 class _CellMoveData {
@@ -153,6 +155,22 @@ class _EditorViewState extends State<_EditorView> {
             onIncrement: () => vm.setCols(vm.cols + 1),
           ),
           const Spacer(),
+          // Undo / Redo
+          IconButton(
+            tooltip: 'Undo',
+            onPressed: vm.canUndo ? () => vm.undo() : null,
+            icon: const Icon(Icons.undo_rounded, size: 18),
+            color: Colors.grey.shade700,
+            disabledColor: Colors.grey.shade300,
+          ),
+          IconButton(
+            tooltip: 'Redo',
+            onPressed: vm.canRedo ? () => vm.redo() : null,
+            icon: const Icon(Icons.redo_rounded, size: 18),
+            color: Colors.grey.shade700,
+            disabledColor: Colors.grey.shade300,
+          ),
+          const SizedBox(width: 4),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
@@ -306,7 +324,13 @@ class _EditorViewState extends State<_EditorView> {
                                     _grabDeltaCol = dc;
                                   },
                                   onDropLokasi: (lokasi) {
-                                    vm.placeLokasi(r, c, lokasi);
+                                    vm.placeLokasi(
+                                      r,
+                                      c,
+                                      lokasi,
+                                      rowSpan: 2,
+                                      colSpan: 2,
+                                    );
                                     _hoverNotifier.value = null;
                                   },
                                   onDropMove: (data) {
@@ -330,7 +354,10 @@ class _EditorViewState extends State<_EditorView> {
                                     int rs = 1, cs = 1;
                                     Color color = _primary;
                                     int deltaRow = 0, deltaCol = 0;
-                                    if (dragData is _CellMoveData) {
+                                    if (dragData is MappingLokasi) {
+                                      rs = 2;
+                                      cs = 2;
+                                    } else if (dragData is _CellMoveData) {
                                       final src =
                                           vm.grid[dragData.row][dragData.col];
                                       rs = src.rowSpan;
@@ -440,7 +467,7 @@ class _EditorViewState extends State<_EditorView> {
       child: ClipRect(
         child: _panelCollapsed
             ? _buildCollapsedPanel()
-            : _buildExpandedPanel(vm),
+            : _buildExpandedPanel(context, vm),
       ),
     );
   }
@@ -498,7 +525,7 @@ class _EditorViewState extends State<_EditorView> {
     );
   }
 
-  Widget _buildExpandedPanel(MappingLayoutViewModel vm) {
+  Widget _buildExpandedPanel(BuildContext context, MappingLayoutViewModel vm) {
     final available = vm.availableLokasi;
 
     return Column(
@@ -558,7 +585,7 @@ class _EditorViewState extends State<_EditorView> {
               const SizedBox(height: 4),
               _ToolButton(
                 icon: Icons.gesture_rounded,
-                label: 'Aisle',
+                label: 'Jalan',
                 description: 'Lukis jalur',
                 mode: EditorMode.aisle,
                 current: vm.mode,
@@ -587,7 +614,7 @@ class _EditorViewState extends State<_EditorView> {
             child: Row(
               children: [
                 Text(
-                  'Inventaris',
+                  'Lokasi',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
@@ -611,6 +638,44 @@ class _EditorViewState extends State<_EditorView> {
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
                       color: _primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Tooltip(
+                  message: 'Tambah lokasi',
+                  child: InkWell(
+                    onTap: () async {
+                      final added = await showDialog<bool>(
+                        context: context,
+                        builder: (_) => AddLokasiDialog(blok: widget.blok),
+                      );
+                      if (added ?? false) {
+                        await vm.refreshLokasi();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Lokasi berhasil ditambahkan'),
+                              backgroundColor: Colors.green,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: _primary,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(
+                        Icons.add,
+                        size: 14,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
@@ -775,7 +840,45 @@ class _EditorViewState extends State<_EditorView> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (cell.type == CellType.label)
+            if (cell.type == CellType.lokasi) ...[
+              ListTile(
+                leading: const Icon(Icons.edit_rounded, color: _primary),
+                title: const Text('Edit Lokasi'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final lokasi = vm.lokasiList
+                      .where((l) => l.idLokasi == cell.idLokasi)
+                      .firstOrNull;
+                  final updated = await showDialog<bool>(
+                    context: context,
+                    builder: (_) => EditLokasiDialog(
+                      blok: widget.blok,
+                      idLokasi: cell.idLokasi ?? 0,
+                      lokasiLabel: cell.lokasiLabel ?? '',
+                      initialIdKategori: lokasi?.idKategori ?? 0,
+                      initialIdJenis: lokasi?.idJenis ?? 0,
+                    ),
+                  );
+                  if ((updated ?? false) && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Data lokasi berhasil diperbarui'),
+                        backgroundColor: Colors.green,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.open_with_rounded, color: _primary),
+                title: const Text('Resize'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showResizeForCell(context, vm, row, col, cell);
+                },
+              ),
+            ] else if (cell.type == CellType.label) ...[
               ListTile(
                 leading: const Icon(
                   Icons.edit_rounded,
@@ -794,16 +897,34 @@ class _EditorViewState extends State<_EditorView> {
                     initColSpan: cell.colSpan,
                   );
                 },
-              )
-            else
+              ),
               ListTile(
-                leading: Icon(
+                leading: const Icon(
                   Icons.open_with_rounded,
-                  color: switch (cell.type) {
-                    CellType.lokasi => _primary,
-                    CellType.aisle => const Color(0xFFE65100),
-                    _ => Colors.grey,
-                  },
+                  color: Color(0xFF2E7D32),
+                ),
+                title: const Text('Resize'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showSpanPicker(
+                    context: context,
+                    title: 'Ukuran Label',
+                    activeColor: const Color(0xFF2E7D32),
+                    row: row,
+                    col: col,
+                    initRowSpan: cell.rowSpan,
+                    initColSpan: cell.colSpan,
+                    canPlace: (rs, cs) => vm.canPlaceLabel(row, col, rs, cs),
+                    onConfirm: (rs, cs) =>
+                        vm.placeLabel(row, col, cell.labelText ?? '', rs, cs),
+                  );
+                },
+              ),
+            ] else if (cell.type == CellType.aisle)
+              ListTile(
+                leading: const Icon(
+                  Icons.open_with_rounded,
+                  color: Color(0xFFE65100),
                 ),
                 title: const Text('Resize'),
                 onTap: () {
@@ -849,10 +970,19 @@ class _EditorViewState extends State<_EditorView> {
           activeColor: _primary,
           row: row,
           col: col,
-          initRowSpan: cell.rowSpan,
-          initColSpan: cell.colSpan,
-          canPlace: (rs, cs) =>
-              vm.canPlaceSpan(row, col, rs, cs, skipLokasiId: cell.idLokasi),
+          initRowSpan: cell.rowSpan < 2 ? 2 : cell.rowSpan,
+          initColSpan: cell.colSpan < 2 ? 2 : cell.colSpan,
+          minRowSpan: 2,
+          minColSpan: 2,
+          canPlace: (rs, cs) => vm.canPlaceSpan(
+            row,
+            col,
+            rs,
+            cs,
+            skipLokasiId: cell.idLokasi,
+            skipOriginRow: row,
+            skipOriginCol: col,
+          ),
           onConfirm: (rs, cs) => vm.resizeLokasi(row, col, rs, cs),
         );
       case CellType.aisle:
@@ -890,6 +1020,8 @@ class _EditorViewState extends State<_EditorView> {
     required void Function(int rs, int cs) onConfirm,
     int initRowSpan = 1,
     int initColSpan = 1,
+    int minRowSpan = 1,
+    int minColSpan = 1,
     int maxRowSpan = 60,
     int maxColSpan = 60,
   }) {
@@ -907,11 +1039,11 @@ class _EditorViewState extends State<_EditorView> {
             final rs = int.tryParse(rowCtrl.text);
             final cs = int.tryParse(colCtrl.text);
             setSt(() {
-              rowErr = rs == null || rs < 1 || rs > maxRowSpan
-                  ? 'Masukkan angka 1–$maxRowSpan'
+              rowErr = rs == null || rs < minRowSpan || rs > maxRowSpan
+                  ? 'Masukkan angka $minRowSpan–$maxRowSpan'
                   : null;
-              colErr = cs == null || cs < 1 || cs > maxColSpan
-                  ? 'Masukkan angka 1–$maxColSpan'
+              colErr = cs == null || cs < minColSpan || cs > maxColSpan
+                  ? 'Masukkan angka $minColSpan–$maxColSpan'
                   : null;
               if (rowErr == null && colErr == null && !canPlace(rs!, cs!)) {
                 colErr = 'Melebihi batas atau terhalang sel lain';
@@ -924,9 +1056,9 @@ class _EditorViewState extends State<_EditorView> {
             final cs = int.tryParse(colCtrl.text);
             return rs != null &&
                 cs != null &&
-                rs >= 1 &&
+                rs >= minRowSpan &&
                 rs <= maxRowSpan &&
-                cs >= 1 &&
+                cs >= minColSpan &&
                 cs <= maxColSpan &&
                 canPlace(rs, cs);
           };
@@ -950,7 +1082,7 @@ class _EditorViewState extends State<_EditorView> {
                         child: _spanTextField(
                           controller: rowCtrl,
                           label: 'Baris (tinggi)',
-                          hint: '1–$maxRowSpan',
+                          hint: '$minRowSpan–$maxRowSpan',
                           errorText: rowErr,
                           activeColor: activeColor,
                           onChanged: (_) => validate(),
@@ -971,7 +1103,7 @@ class _EditorViewState extends State<_EditorView> {
                         child: _spanTextField(
                           controller: colCtrl,
                           label: 'Kolom (lebar)',
-                          hint: '1–$maxColSpan',
+                          hint: '$minColSpan–$maxColSpan',
                           errorText: colErr,
                           activeColor: activeColor,
                           onChanged: (_) => validate(),
@@ -1269,7 +1401,7 @@ class _EditorViewState extends State<_EditorView> {
   void _confirmReset(BuildContext context, MappingLayoutViewModel vm) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Reset Grid?'),
         content: const Text(
@@ -1277,12 +1409,12 @@ class _EditorViewState extends State<_EditorView> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(ctx),
             child: const Text('Batal'),
           ),
           FilledButton(
             onPressed: () {
-              Navigator.pop(context);
+              Navigator.pop(ctx);
               vm.resetGrid();
             },
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
@@ -1374,25 +1506,17 @@ class _DraggableLokasi extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  lokasi.label,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: _primary,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (lokasi.description.isNotEmpty)
-                  Text(
-                    lokasi.description,
-                    style: TextStyle(fontSize: 9, color: Colors.grey[500]),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-              ],
+            child: Text(
+              lokasi.namaJenis.isNotEmpty ? lokasi.namaJenis : 'N/A',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: lokasi.namaJenis.isNotEmpty
+                    ? Colors.grey.shade700
+                    : Colors.grey.shade400,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
             ),
           ),
         ],
@@ -1547,23 +1671,24 @@ class _GridCell extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 9,
+                      fontSize: 20,
                       fontWeight: FontWeight.w800,
                       color: _primary,
                       height: 1,
                     ),
                   ),
-                  if (cell.lokasiDescription != null &&
-                      cell.lokasiDescription!.isNotEmpty) ...[
+                  ...[
                     const SizedBox(height: 2),
                     Text(
-                      cell.lokasiDescription!,
+                      cell.lokasiDescription?.isNotEmpty == true
+                          ? cell.lokasiDescription!
+                          : '-',
                       textAlign: TextAlign.center,
-                      maxLines: 2,
+                      maxLines: 3,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 7,
-                        color: Colors.grey[500],
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        color: Colors.black,
                         height: 1.2,
                       ),
                     ),

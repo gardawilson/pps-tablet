@@ -155,6 +155,12 @@ class ApiConstants {
     return 'http://$host:7500/api/labels/broker/$encoded/pdf/';
   }
 
+  static String brokerQcPdf(String noBroker) {
+    final host = Uri.parse(baseUrl).host;
+    final encoded = Uri.encodeComponent(noBroker);
+    return 'http://$host:7500/api/labels/broker/$encoded/qc/pdf';
+  }
+
   static String mixerLabelPdf(String noMixer) {
     final host = Uri.parse(baseUrl).host;
     final encoded = Uri.encodeComponent(noMixer);

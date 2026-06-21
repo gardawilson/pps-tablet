@@ -5,9 +5,16 @@ import 'package:pps_tablet/features/mapping/repository/mapping_repository.dart';
 
 enum EditorMode { lokasi, aisle, label }
 
+class _GridSnapshot {
+  final int rows;
+  final int cols;
+  final List<List<GridCell>> grid;
+  _GridSnapshot(this.rows, this.cols, this.grid);
+}
+
 class MappingLayoutViewModel extends ChangeNotifier {
   final String blok;
-  final List<MappingLokasi> lokasiList;
+  List<MappingLokasi> lokasiList;
   final MappingRepository repository;
 
   MappingLayoutViewModel({
@@ -34,6 +41,48 @@ class MappingLayoutViewModel extends ChangeNotifier {
   late List<List<GridCell>> _grid;
   List<List<GridCell>> get grid => _grid;
 
+  // ── Undo / Redo ────────────────────────────────────────────────────────────
+
+  static const int _maxHistory = 50;
+
+  bool _suppressSnapshot = false;
+
+  final _undoStack = <_GridSnapshot>[];
+  final _redoStack = <_GridSnapshot>[];
+
+  bool get canUndo => _undoStack.isNotEmpty;
+  bool get canRedo => _redoStack.isNotEmpty;
+
+  void _saveSnapshot() {
+    if (_suppressSnapshot) return;
+    _undoStack.add(_GridSnapshot(_rows, _cols, _cloneGrid(_grid)));
+    if (_undoStack.length > _maxHistory) _undoStack.removeAt(0);
+    _redoStack.clear();
+  }
+
+  List<List<GridCell>> _cloneGrid(List<List<GridCell>> src) =>
+      List.generate(src.length, (r) => List.generate(src[r].length, (c) => src[r][c].clone()));
+
+  void undo() {
+    if (_undoStack.isEmpty) return;
+    _redoStack.add(_GridSnapshot(_rows, _cols, _cloneGrid(_grid)));
+    final snap = _undoStack.removeLast();
+    _rows = snap.rows;
+    _cols = snap.cols;
+    _grid = snap.grid;
+    notifyListeners();
+  }
+
+  void redo() {
+    if (_redoStack.isEmpty) return;
+    _undoStack.add(_GridSnapshot(_rows, _cols, _cloneGrid(_grid)));
+    final snap = _redoStack.removeLast();
+    _rows = snap.rows;
+    _cols = snap.cols;
+    _grid = snap.grid;
+    notifyListeners();
+  }
+
   Set<int> get assignedLokasiIds => _grid
       .expand((row) => row)
       .where((c) => c.type == CellType.lokasi && c.idLokasi != null)
@@ -46,6 +95,13 @@ class MappingLayoutViewModel extends ChangeNotifier {
   bool get hasChanges => _grid.expand((r) => r).any(
         (c) => c.type != CellType.empty && c.type != CellType.covered,
       );
+
+  Future<void> refreshLokasi() async {
+    try {
+      lokasiList = await repository.fetchLokasiByBlok(blok);
+      notifyListeners();
+    } catch (_) {}
+  }
 
   // ── Grid construction ──────────────────────────────────────────────────────
 
@@ -67,6 +123,7 @@ class MappingLayoutViewModel extends ChangeNotifier {
 
   void setRows(int rows) {
     if (rows < 1 || rows > 60) return;
+    _saveSnapshot();
     _rows = rows;
     _grid = _buildGrid(_rows, _cols, _grid);
     notifyListeners();
@@ -74,6 +131,7 @@ class MappingLayoutViewModel extends ChangeNotifier {
 
   void setCols(int cols) {
     if (cols < 1 || cols > 60) return;
+    _saveSnapshot();
     _cols = cols;
     _grid = _buildGrid(_rows, _cols, _grid);
     notifyListeners();
@@ -107,7 +165,7 @@ class MappingLayoutViewModel extends ChangeNotifier {
           cell.type = CellType.lokasi;
           cell.idLokasi = selectedLokasi.idLokasi;
           cell.lokasiLabel = selectedLokasi.label;
-          cell.lokasiDescription = selectedLokasi.description;
+          cell.lokasiDescription = selectedLokasi.namaJenis;
         }
     }
     notifyListeners();
@@ -115,13 +173,29 @@ class MappingLayoutViewModel extends ChangeNotifier {
 
   // ── Place / resize lokasi ────────────────────────────────────────────────
 
-  bool canPlaceSpan(int row, int col, int rowSpan, int colSpan, {int? skipLokasiId}) {
+  bool canPlaceSpan(
+    int row,
+    int col,
+    int rowSpan,
+    int colSpan, {
+    int? skipLokasiId,
+    // Skip cells that belong to the existing span at this origin (for resize)
+    int? skipOriginRow,
+    int? skipOriginCol,
+  }) {
     if (row + rowSpan > _rows || col + colSpan > _cols) return false;
     for (int r = row; r < row + rowSpan; r++) {
       for (int c = col; c < col + colSpan; c++) {
-        final t = _grid[r][c].type;
-        if (t == CellType.lokasi && _grid[r][c].idLokasi != skipLokasiId) {
-          return false;
+        final cell = _grid[r][c];
+        final t = cell.type;
+        if (t == CellType.lokasi && cell.idLokasi != skipLokasiId) return false;
+        if (t == CellType.covered) {
+          final or_ = cell.originRow;
+          final oc = cell.originCol;
+          if (or_ != skipOriginRow || oc != skipOriginCol) return false;
+        }
+        if (t == CellType.aisle || t == CellType.label) {
+          if (r != skipOriginRow || c != skipOriginCol) return false;
         }
       }
     }
@@ -142,6 +216,7 @@ class MappingLayoutViewModel extends ChangeNotifier {
   void placeLokasi(int row, int col, MappingLokasi lokasi, {int rowSpan = 1, int colSpan = 1}) {
     final cell = _grid[row][col];
     if (cell.type == CellType.covered) return;
+    _saveSnapshot();
     _clearSpan(row, col);
     if (!canPlaceSpan(row, col, rowSpan, colSpan)) return;
     _clearArea(row, col, rowSpan, colSpan);
@@ -149,7 +224,7 @@ class MappingLayoutViewModel extends ChangeNotifier {
     origin.type = CellType.lokasi;
     origin.idLokasi = lokasi.idLokasi;
     origin.lokasiLabel = lokasi.label;
-    origin.lokasiDescription = lokasi.description;
+    origin.lokasiDescription = lokasi.namaJenis;
     origin.rowSpan = rowSpan;
     origin.colSpan = colSpan;
     _placeSpannedCell(row, col, rowSpan, colSpan);
@@ -162,7 +237,8 @@ class MappingLayoutViewModel extends ChangeNotifier {
     final idLokasi = cell.idLokasi;
     final label = cell.lokasiLabel;
     final desc = cell.lokasiDescription;
-    if (!canPlaceSpan(row, col, rowSpan, colSpan, skipLokasiId: idLokasi)) return;
+    if (!canPlaceSpan(row, col, rowSpan, colSpan, skipLokasiId: idLokasi, skipOriginRow: row, skipOriginCol: col)) return;
+    _saveSnapshot();
     _clearSpan(row, col);
     _clearArea(row, col, rowSpan, colSpan);
     final origin = _grid[row][col];
@@ -198,10 +274,13 @@ class MappingLayoutViewModel extends ChangeNotifier {
   // ── Place aisle (span support) ───────────────────────────────────────────
 
   bool canPlaceAisle(int row, int col, int rowSpan, int colSpan) =>
-      canPlaceSpan(row, col, rowSpan, colSpan);
+      canPlaceSpan(row, col, rowSpan, colSpan,
+          skipOriginRow: row, skipOriginCol: col);
 
   void placeAisle(int row, int col, int rowSpan, int colSpan) {
     if (!canPlaceAisle(row, col, rowSpan, colSpan)) return;
+    _saveSnapshot();
+    _clearSpan(row, col);
     _clearArea(row, col, rowSpan, colSpan);
     final origin = _grid[row][col];
     origin.type = CellType.aisle;
@@ -214,10 +293,13 @@ class MappingLayoutViewModel extends ChangeNotifier {
   // ── Place label (custom text, span support) ──────────────────────────────
 
   bool canPlaceLabel(int row, int col, int rowSpan, int colSpan) =>
-      canPlaceSpan(row, col, rowSpan, colSpan);
+      canPlaceSpan(row, col, rowSpan, colSpan,
+          skipOriginRow: row, skipOriginCol: col);
 
   void placeLabel(int row, int col, String text, int rowSpan, int colSpan) {
     if (!canPlaceLabel(row, col, rowSpan, colSpan)) return;
+    _saveSnapshot();
+    _clearSpan(row, col);
     _clearArea(row, col, rowSpan, colSpan);
     final origin = _grid[row][col];
     origin.type = CellType.label;
@@ -232,6 +314,7 @@ class MappingLayoutViewModel extends ChangeNotifier {
 
   void clearCell(int row, int col) {
     final cell = _grid[row][col];
+    _saveSnapshot();
 
     if (cell.type == CellType.covered) {
       final or_ = cell.originRow!;
@@ -250,6 +333,7 @@ class MappingLayoutViewModel extends ChangeNotifier {
     if (fromRow == toRow && fromCol == toCol) return;
     final src = _grid[fromRow][fromCol];
     if (src.type == CellType.empty || src.type == CellType.covered) return;
+    _saveSnapshot();
 
     final type = src.type;
     final idLokasi = src.idLokasi;
@@ -278,6 +362,7 @@ class MappingLayoutViewModel extends ChangeNotifier {
   }
 
   void resetGrid() {
+    _saveSnapshot();
     _grid = _buildGrid(_rows, _cols, []);
     notifyListeners();
   }
@@ -286,6 +371,7 @@ class MappingLayoutViewModel extends ChangeNotifier {
 
   Future<void> _loadLayout() async {
     isLoading = true;
+    _suppressSnapshot = true;
     error = '';
     notifyListeners();
 
@@ -319,7 +405,7 @@ class MappingLayoutViewModel extends ChangeNotifier {
                   .where((l) => l.idLokasi == cell.idLokasi)
                   .firstOrNull;
               cell.lokasiLabel = lokasi?.label;
-              cell.lokasiDescription = lokasi?.description;
+              cell.lokasiDescription = lokasi?.namaJenis;
             }
 
             if (cell.type == CellType.label) {
@@ -342,6 +428,9 @@ class MappingLayoutViewModel extends ChangeNotifier {
     } catch (e) {
       error = e.toString();
     } finally {
+      _suppressSnapshot = false;
+      _undoStack.clear();
+      _redoStack.clear();
       isLoading = false;
       notifyListeners();
     }

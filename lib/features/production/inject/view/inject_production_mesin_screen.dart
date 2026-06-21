@@ -15,7 +15,7 @@ import '../repository/inject_production_repository.dart';
 import '../view_model/inject_production_view_model.dart';
 import '../widgets/inject_production_delete_dialog.dart';
 import '../widgets/inject_production_form_dialog.dart';
-import 'inject_production_input_screen.dart';
+import 'inject_production_input_screen.dart' as legacy_input;
 
 class InjectProductionMesinScreen extends StatefulWidget {
   const InjectProductionMesinScreen({super.key});
@@ -127,6 +127,16 @@ class _InjectProductionMesinScreenState
     _loadProduksiPage();
   }
 
+  Future<void> _openInputScreenChooser(String noProduksi) async {
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            legacy_input.InjectProductionInputScreen(noProduksi: noProduksi),
+      ),
+    );
+  }
+
   Future<void> _openCreateDialog({
     required InjectMesinInfo mesin,
     bool isBackdate = false,
@@ -159,12 +169,7 @@ class _InjectProductionMesinScreenState
       );
       if (!mounted) return;
       if (created != null) {
-        await Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) =>
-                InjectProductionInputScreen(noProduksi: created.noProduksi),
-          ),
-        );
+        await _openInputScreenChooser(created.noProduksi);
         if (!mounted) return;
         _refreshAll();
       }
@@ -180,12 +185,7 @@ class _InjectProductionMesinScreenState
       return;
     }
     final item = mesin.produksiList.first;
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) =>
-            InjectProductionInputScreen(noProduksi: item.noProduksi),
-      ),
-    );
+    await _openInputScreenChooser(item.noProduksi);
     if (!mounted) return;
     _refreshAll();
   }
@@ -396,13 +396,7 @@ class _InjectProductionMesinScreenState
                             scrollController: _produksiScrollCtl,
                             showMesin: _filterIdMesin == null,
                             onTap: (row) async {
-                              await Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => InjectProductionInputScreen(
-                                    noProduksi: row.noProduksi,
-                                  ),
-                                ),
-                              );
+                              await _openInputScreenChooser(row.noProduksi);
                               if (mounted) _refreshAll();
                             },
                             onEdit: (row) async {
@@ -472,13 +466,7 @@ class _InjectProductionMesinScreenState
                               );
                             },
                             onInput: (row) async {
-                              await Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => InjectProductionInputScreen(
-                                    noProduksi: row.noProduksi,
-                                  ),
-                                ),
-                              );
+                              await _openInputScreenChooser(row.noProduksi);
                               if (mounted) _refreshAll();
                             },
                           ),

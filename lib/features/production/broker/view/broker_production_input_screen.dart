@@ -47,10 +47,7 @@ const _kBrokerOutput = Color(0xFF0A7349);
 class BrokerProductionInputScreen extends StatefulWidget {
   final String noProduksi;
 
-  const BrokerProductionInputScreen({
-    super.key,
-    required this.noProduksi,
-  });
+  const BrokerProductionInputScreen({super.key, required this.noProduksi});
 
   @override
   State<BrokerProductionInputScreen> createState() =>
@@ -112,10 +109,7 @@ class _BrokerProductionInputScreenState
     return Shimmer.fromColors(
       baseColor: Colors.grey[300]!,
       highlightColor: Colors.grey[100]!,
-      child: Container(
-        height: 56,
-        color: Colors.white,
-      ),
+      child: Container(height: 56, color: Colors.white),
     );
   }
 
@@ -1046,10 +1040,14 @@ class _BrokerProductionInputScreenState
                                     FloatingActionButton(
                                       heroTag: 'fab_add_broker_output',
                                       mini: true,
-                                      backgroundColor: _header == null ? Colors.grey.shade300 : _kBrokerOutput,
+                                      backgroundColor: _header == null
+                                          ? Colors.grey.shade300
+                                          : _kBrokerOutput,
                                       foregroundColor: Colors.white,
                                       tooltip: 'Tambah $activeOutputLabel',
-                                      onPressed: _header == null ? null : onAddOutput,
+                                      onPressed: _header == null
+                                          ? null
+                                          : onAddOutput,
                                       child: const Icon(Icons.add),
                                     ),
                                   ],
@@ -1933,24 +1931,24 @@ class _BrokerProductionInputScreenState
                     if (_header == null)
                       _buildToolbarSkeleton()
                     else
-                    BrokerWorkspaceToolbar(
-                      idMesin: _header?.idMesin,
-                      shift: _header?.shift,
-                      tglProduksi: _header?.tglProduksi,
-                      isLocked: locked,
-                      hourStart: _header?.hourStart,
-                      hourEnd: _header?.hourEnd,
-                      namaJenis: _header?.outputJenisNama,
-                      onGanti: _openSplitDialog,
-                      onTimeline: _openTimelineDialog,
-                      onRefresh: () {
-                        final vm = context
-                            .read<BrokerProductionInputViewModel>();
-                        vm.loadInputs(widget.noProduksi, force: true);
-                        vm.loadOutputs(widget.noProduksi);
-                        _showSnack('Data di-refresh');
-                      },
-                    ),
+                      BrokerWorkspaceToolbar(
+                        idMesin: _header?.idMesin,
+                        shift: _header?.shift,
+                        tglProduksi: _header?.tglProduksi,
+                        isLocked: locked,
+                        hourStart: _header?.hourStart,
+                        hourEnd: _header?.hourEnd,
+                        namaJenis: _header?.outputJenisNama,
+                        onGanti: _openSplitDialog,
+                        onTimeline: _openTimelineDialog,
+                        onRefresh: () {
+                          final vm = context
+                              .read<BrokerProductionInputViewModel>();
+                          vm.loadInputs(widget.noProduksi, force: true);
+                          vm.loadOutputs(widget.noProduksi);
+                          _showSnack('Data di-refresh');
+                        },
+                      ),
                     Expanded(
                       child: LayoutBuilder(
                         builder: (context, outerConstraints) {
@@ -2360,6 +2358,31 @@ class _BrokerOutputTile extends StatelessWidget {
             builder: (_) => _BrokerOutputDetailDialog(
               output: output,
               onPrint: () => _handlePrint(context),
+              onPrintQc: () async {
+                final noBroker = (output.noBroker ?? '').trim();
+                if (noBroker.isEmpty) return;
+                final rootCtx = Navigator.of(
+                  context,
+                  rootNavigator: true,
+                ).context;
+                try {
+                  // ignore: use_build_context_synchronously
+                  await PdfPrintService(defaultSystem: 'pps').previewFromUrl(
+                    context: rootCtx,
+                    pdfUrl: Uri.parse(ApiConstants.brokerQcPdf(noBroker)),
+                    title: '$noBroker – QC',
+                  );
+                } catch (e) {
+                  if (!rootCtx.mounted) return;
+                  ScaffoldMessenger.of(rootCtx).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        e.toString().replaceFirst('Exception: ', ''),
+                      ),
+                    ),
+                  );
+                }
+              },
             ),
           );
         },
@@ -2738,8 +2761,13 @@ class _BonggolanOutputSummaryTile extends StatelessWidget {
 class _BrokerOutputDetailDialog extends StatelessWidget {
   final BrokerOutput output;
   final VoidCallback? onPrint;
+  final VoidCallback? onPrintQc;
 
-  const _BrokerOutputDetailDialog({required this.output, this.onPrint});
+  const _BrokerOutputDetailDialog({
+    required this.output,
+    this.onPrint,
+    this.onPrintQc,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -2866,28 +2894,52 @@ class _BrokerOutputDetailDialog extends StatelessWidget {
                     ),
             ),
             const Divider(height: 1, color: _kBrokerBorder),
-            // Footer total
+            // Footer
             Padding(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
+                  if (onPrintQc != null)
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        onPrintQc!();
+                      },
+                      icon: const Icon(Icons.picture_as_pdf_outlined, size: 15),
+                      label: const Text('Print QC'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.deepPurple,
+                        side: BorderSide(color: Colors.deepPurple.shade200),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  if (onPrintQc != null) const SizedBox(width: 8),
                   if (onPrint != null)
-                    TextButton.icon(
+                    OutlinedButton.icon(
                       onPressed: () {
                         Navigator.of(context).pop();
                         onPrint!();
                       },
                       icon: const Icon(Icons.print_outlined, size: 15),
-                      label: const Text('Print'),
+                      label: const Text('Print Label'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF1565C0),
+                        side: const BorderSide(color: Color(0xFF90CAF9)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
                     ),
-                  const SizedBox(width: 8),
+                  if (onPrint != null) const SizedBox(width: 8),
                   OutlinedButton(
                     onPressed: () => Navigator.of(context).pop(),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: _kBrokerBorder),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                     ),
                     child: const Text('Tutup'),

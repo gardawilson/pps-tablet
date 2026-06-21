@@ -18,6 +18,8 @@ import '../repository/packing_production_repository.dart';
 import '../widgets/packing_production_output_form_dialog.dart';
 import 'package:pps_tablet/features/production/shared/shared.dart';
 import 'package:shimmer/shimmer.dart';
+import '../../../packing_type/model/packing_type_model.dart';
+import '../../../packing_type/widgets/packing_type_dropdown.dart';
 
 // ── Colour palette ──────────────────────────────────────────────────────────────
 const _kPrimary = Color(0xFF3730A3); // indigo — input
@@ -28,10 +30,7 @@ const _kBorder = Color(0xFFE2E6EA);
 class PackingProductionInputScreen extends StatefulWidget {
   final String noProduksi;
 
-  const PackingProductionInputScreen({
-    super.key,
-    required this.noProduksi,
-  });
+  const PackingProductionInputScreen({super.key, required this.noProduksi});
 
   @override
   State<PackingProductionInputScreen> createState() =>
@@ -46,6 +45,7 @@ class _PackingProductionInputScreenState
   String _selectedInputTab = 'fwip';
   String _selectedOutputTab = 'bj';
   List<BreadcrumbSegment> _prevBreadcrumb = [];
+  bool _isReplacing = false;
 
   String get _breadcrumbLabel {
     final mesin = (_header?.namaMesin ?? '').trim();
@@ -76,13 +76,15 @@ class _PackingProductionInputScreenState
 
   @override
   void dispose() {
-    final label = _cachedBreadcrumbLabel;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final current = AppShell.breadcrumb.value;
-      if (current.isNotEmpty && current.last.label == label) {
-        AppShell.breadcrumb.value = _prevBreadcrumb;
-      }
-    });
+    if (!_isReplacing) {
+      final label = _cachedBreadcrumbLabel;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final current = AppShell.breadcrumb.value;
+        if (current.isNotEmpty && current.last.label == label) {
+          AppShell.breadcrumb.value = _prevBreadcrumb;
+        }
+      });
+    }
     super.dispose();
   }
 
@@ -146,6 +148,77 @@ class _PackingProductionInputScreenState
       return true;
     }
     return false;
+  }
+
+  // ── Split / Ganti produksi ─────────────────────────────────────────────────
+
+  Future<void> _openSplitDialog() async {
+    if (!mounted) return;
+    await ProductionFlowHelpers.openSplitAndReplace<
+      ({PackingProduction prod, String namaJenis})
+    >(
+      context: context,
+      idMesin: _header?.idMesin,
+      tanggal: _header?.tglProduksi,
+      onMissingContext: () => _showSnack(
+        'Data mesin/tanggal tidak tersedia',
+        backgroundColor: Colors.orange,
+      ),
+      showSplitDialog: (idMesin, tgl) {
+        return showDialog<({PackingProduction prod, String namaJenis})>(
+          context: context,
+          barrierDismissible: true,
+          builder: (_) =>
+              ProductionGantiProduksiDialog<
+                ({PackingProduction prod, String namaJenis}),
+                PackingType
+              >(
+                tanggal: tgl,
+                shift: _header?.shift ?? 1,
+                primaryColor: _kPrimary,
+                borderColor: _kBorder,
+                jenisRequiredMessage: 'Pilih jenis barang jadi terlebih dahulu',
+                submitLabel: 'Ganti Produksi',
+                dropdownBuilder: (selected, onChanged) => PackingTypeDropdown(
+                  preselectId: selected?.idBj,
+                  onChanged: onChanged,
+                ),
+                jenisNameOf: (j) => j.namaBj,
+                onSubmit: (hourStart, jenis) async {
+                  final body = await _prodRepo.splitTime(
+                    idMesin: idMesin,
+                    tanggal: tgl,
+                    hourStart: '${hourStart.trim()}:00',
+                    outputJenisId: jenis.idBj,
+                  );
+                  final data = body['data'];
+                  final headerMap = data is Map && data['header'] is Map
+                      ? data['header'] as Map<String, dynamic>
+                      : (data is Map<String, dynamic>
+                            ? data
+                            : <String, dynamic>{});
+                  return (
+                    prod: PackingProduction.fromJson(headerMap),
+                    namaJenis: jenis.namaBj,
+                  );
+                },
+              ),
+        );
+      },
+      beforeReplace: () {
+        _isReplacing = true;
+        AppShell.breadcrumb.value = _prevBreadcrumb;
+      },
+      replaceToResult: (result) async {
+        if (!mounted) return;
+        await Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) =>
+                PackingProductionInputScreen(noProduksi: result.prod.noPacking),
+          ),
+        );
+      },
+    );
   }
 
   // ── Snack ─────────────────────────────────────────────────────────────────
@@ -948,6 +1021,7 @@ class _PackingProductionInputScreenState
                     hourStart: _header?.hourStart,
                     hourEnd: _header?.hourEnd,
                     namaJenis: _header?.outputJenisNama,
+                    onGanti: locked ? null : _openSplitDialog,
                     onRefresh: () {
                       _loadHeader();
                       vm.loadInputs(widget.noProduksi, force: true);

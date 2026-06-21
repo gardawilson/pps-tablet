@@ -92,238 +92,270 @@ class _BrokerRowPopoverState extends State<BrokerRowPopover> {
   @override
   Widget build(BuildContext context) {
     const atlasBlue = Color(0xFF0C66E4);
-    const atlasBlueSubtle = Color(0xFFE9F2FF);
-    const atlasSurface = Color(0xFFF7F8F9);
     const atlasBorder = Color(0xFFDCDFE4);
-    const atlasText = Color(0xFF172B4D);
-    const atlasSubtleText = Color(0xFF44546F);
-
-    final divider = const Divider(
-      height: 0,
-      thickness: 0.8,
-      color: atlasBorder,
-    );
 
     final perm = context.watch<PermissionViewModel>();
     final canEdit = perm.can('label_broker:update');
     final canDelete = perm.can('label_broker:delete');
     final canQC = perm.can('qc_label:update');
 
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 240, maxWidth: 320),
-      child: Material(
-        color: Colors.white,
-        elevation: 10,
-        shadowColor: const Color(0xFF091E42).withOpacity(0.18),
-        borderRadius: BorderRadius.circular(12),
-        clipBehavior: Clip.antiAlias,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                decoration: const BoxDecoration(
-                  color: atlasBlueSubtle,
-                  border: Border(bottom: BorderSide(color: atlasBorder)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: atlasBlue.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: atlasBlue.withOpacity(0.24)),
-                      ),
-                      child: const Icon(
-                        Icons.label,
-                        color: atlasBlue,
-                        size: 20,
-                      ),
+    final divider = const Divider(height: 0, thickness: 0.8, color: atlasBorder);
+
+    return Material(
+      color: Colors.white,
+      elevation: 10,
+      shadowColor: const Color(0xFF091E42).withValues(alpha: 0.18),
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.antiAlias,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // ── Kolom kiri: header + QC data ──
+            Container(
+              width: 250,
+              decoration: const BoxDecoration(
+                color: Color(0xFFF7F8F9),
+                border: Border(right: BorderSide(color: atlasBorder)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header label
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE9F2FF),
+                      border: Border(bottom: BorderSide(color: atlasBorder)),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.header.noBroker,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: atlasText,
-                              height: 1.2,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: atlasBlue.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(9),
+                            border: Border.all(color: atlasBlue.withValues(alpha: 0.24)),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            widget.header.namaJenisPlastik,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: atlasSubtleText,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Salin',
-                      onPressed: _copyOnly,
-                      icon: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 180),
-                        transitionBuilder: (child, animation) =>
-                            ScaleTransition(scale: animation, child: child),
-                        child: Icon(
-                          _copied ? Icons.check_rounded : Icons.copy_rounded,
-                          key: ValueKey(_copied),
-                          color: atlasBlue,
-                          size: 18,
+                          child: const Icon(Icons.label, color: atlasBlue, size: 18),
                         ),
-                      ),
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        side: const BorderSide(color: atlasBorder),
-                      ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.header.noBroker,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF172B4D),
+                                  height: 1.2,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 1),
+                              Text(
+                                widget.header.namaJenisPlastik,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF44546F),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Salin',
+                          onPressed: _copyOnly,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                          icon: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 180),
+                            transitionBuilder: (child, animation) =>
+                                ScaleTransition(scale: animation, child: child),
+                            child: Icon(
+                              _copied ? Icons.check_rounded : Icons.copy_rounded,
+                              key: ValueKey(_copied),
+                              color: atlasBlue,
+                              size: 16,
+                            ),
+                          ),
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            side: const BorderSide(color: atlasBorder),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  // QC data
+                  Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: _buildQCDataCard(),
+                  ),
+                ],
               ),
-              Container(
-                width: double.infinity,
-                color: atlasSurface,
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [_buildQCDataCard()],
-                ),
-              ),
-              divider,
-              LabelPopoverMenuTile(
-                icon: Icons.history_rounded,
-                label: 'History',
-                enabled: true,
-                onTap: () => _runAndClose(widget.onAuditHistory),
-              ),
-              divider,
-              LabelPopoverMenuTile(
-                icon: Icons.edit_outlined,
-                label: 'Edit',
-                enabled: canEdit,
-                tooltipWhenDisabled: 'Tidak punya izin edit',
-                onTap: _handleEdit,
-              ),
-              divider,
-              LabelPopoverMenuTile(
-                icon: Icons.science_outlined,
-                label: 'Input QC',
-                enabled: canQC,
-                tooltipWhenDisabled: 'Tidak punya izin update QC',
-                onTap: () => _runAndClose(widget.onQc),
-              ),
-              divider,
-              LabelPopoverMenuTile(
-                icon: Icons.print_outlined,
-                label: 'Print',
-                enabled: true,
-                onTap: () => _runAndClose(() async {
-                  final rootCtx = Navigator.of(
-                    context,
-                    rootNavigator: true,
-                  ).context;
+            ),
 
-                  final noBroker = widget.header.noBroker;
-                  final lockApi = LabelPrintLockApi();
-                  final repo = BrokerRepository(api: ApiClient());
-                  final lockVm = context.read<LabelPrintLockSocketManager>();
-                  final queue = context.read<LabelPrintSyncQueue>();
-                  var isLockAcquired = false;
-                  var isPrinted = false;
+            // ── Kolom kanan: menu ──
+            SizedBox(
+              width: 170,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  LabelPopoverMenuTile(
+                    icon: Icons.history_rounded,
+                    label: 'History',
+                    enabled: true,
+                    onTap: () => _runAndClose(widget.onAuditHistory),
+                  ),
+                  divider,
+                  LabelPopoverMenuTile(
+                    icon: Icons.edit_outlined,
+                    label: 'Edit',
+                    enabled: canEdit,
+                    tooltipWhenDisabled: 'Tidak punya izin edit',
+                    onTap: _handleEdit,
+                  ),
+                  divider,
+                  LabelPopoverMenuTile(
+                    icon: Icons.science_outlined,
+                    label: 'Input QC',
+                    enabled: canQC,
+                    tooltipWhenDisabled: 'Tidak punya izin update QC',
+                    onTap: () => _runAndClose(widget.onQc),
+                  ),
+                  divider,
+                  LabelPopoverMenuTile(
+                    icon: Icons.print_outlined,
+                    label: 'Print',
+                    enabled: true,
+                    onTap: () => _runAndClose(() async {
+                      // ignore: use_build_context_synchronously
+                      final rootCtx = Navigator.of(
+                        context,
+                        rootNavigator: true,
+                      ).context;
 
-                  try {
-                    await lockApi.acquire(noBroker);
-                    isLockAcquired = true;
+                      final noBroker = widget.header.noBroker;
+                      final lockApi = LabelPrintLockApi();
+                      final repo = BrokerRepository(api: ApiClient());
+                      // ignore: use_build_context_synchronously
+                      final lockVm = context.read<LabelPrintLockSocketManager>();
+                      // ignore: use_build_context_synchronously
+                      final queue = context.read<LabelPrintSyncQueue>();
+                      var isLockAcquired = false;
+                      var isPrinted = false;
 
-                    await PdfPrintService(defaultSystem: 'pps').previewFromUrl(
-                      context: rootCtx,
-                      pdfUrl: Uri.parse(ApiConstants.brokerLabelPdf(noBroker)),
-                      title: noBroker,
-                      onPrinted: () {
-                        isPrinted = true;
-                        () async {
-                          var needsIncrement = false;
-                          var needsRelease = false;
+                      try {
+                        await lockApi.acquire(noBroker);
+                        isLockAcquired = true;
 
-                          try {
-                            final count = await repo.markAsPrinted(noBroker);
-                            if (count != null) {
-                              lockVm.setPrintCount(noBroker, count);
+                        await PdfPrintService(defaultSystem: 'pps').previewFromUrl(
+                          context: rootCtx,
+                          pdfUrl: Uri.parse(ApiConstants.brokerLabelPdf(noBroker)),
+                          title: noBroker,
+                          onPrinted: () {
+                            isPrinted = true;
+                            () async {
+                              var needsIncrement = false;
+                              var needsRelease = false;
+
+                              try {
+                                final count = await repo.markAsPrinted(noBroker);
+                                if (count != null) {
+                                  lockVm.setPrintCount(noBroker, count);
+                                }
+                              } catch (_) {
+                                needsIncrement = true;
+                              }
+
+                              try {
+                                await lockApi.release(noBroker);
+                              } catch (_) {
+                                needsRelease = true;
+                              }
+
+                              if (needsIncrement || needsRelease) {
+                                await queue.enqueue(
+                                  feature: 'broker',
+                                  noLabel: noBroker,
+                                  needsIncrement: needsIncrement,
+                                  needsReleaseLock: needsRelease,
+                                );
+                              }
+                            }().ignore();
+                          },
+                        );
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        final msg = e.toString().replaceFirst('Exception: ', '');
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+                      } finally {
+                        if (isLockAcquired && !isPrinted) {
+                          () async {
+                            try {
+                              await lockApi.release(noBroker);
+                            } catch (_) {
+                              await queue.enqueue(
+                                feature: 'broker',
+                                noLabel: noBroker,
+                                needsReleaseLock: true,
+                              );
                             }
-                          } catch (_) {
-                            needsIncrement = true;
-                          }
-
-                          try {
-                            await lockApi.release(noBroker);
-                          } catch (_) {
-                            needsRelease = true;
-                          }
-
-                          if (needsIncrement || needsRelease) {
-                            await queue.enqueue(
-                              feature: 'broker',
-                              noLabel: noBroker,
-                              needsIncrement: needsIncrement,
-                              needsReleaseLock: needsRelease,
-                            );
-                          }
-                        }().ignore();
-                      },
-                    );
-                  } catch (e) {
-                    if (!context.mounted) return;
-                    final msg = e.toString().replaceFirst('Exception: ', '');
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(SnackBar(content: Text(msg)));
-                  } finally {
-                    if (isLockAcquired && !isPrinted) {
-                      () async {
-                        try {
-                          await lockApi.release(noBroker);
-                        } catch (_) {
-                          await queue.enqueue(
-                            feature: 'broker',
-                            noLabel: noBroker,
-                            needsReleaseLock: true,
-                          );
+                          }().ignore();
                         }
-                      }().ignore();
-                    }
-                  }
-                }),
+                      }
+                    }),
+                  ),
+                  divider,
+                  LabelPopoverMenuTile(
+                    icon: Icons.picture_as_pdf_outlined,
+                    label: 'Print QC',
+                    enabled: true,
+                    onTap: () => _runAndClose(() async {
+                      final rootCtx = Navigator.of(
+                        context,
+                        rootNavigator: true,
+                      ).context;
+
+                      final noBroker = widget.header.noBroker;
+
+                      try {
+                        await PdfPrintService(defaultSystem: 'pps').previewFromUrl(
+                          context: rootCtx,
+                          pdfUrl: Uri.parse(ApiConstants.brokerQcPdf(noBroker)),
+                          title: '$noBroker - QC',
+                        );
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        final msg = e.toString().replaceFirst('Exception: ', '');
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+                      }
+                    }),
+                  ),
+                  divider,
+                  LabelPopoverMenuTile(
+                    icon: Icons.delete_outline,
+                    label: 'Delete',
+                    enabled: canDelete,
+                    tooltipWhenDisabled: 'Tidak punya izin hapus',
+                    iconColor: const Color(0xFFC9372C),
+                    textStyle: const TextStyle(
+                      color: Color(0xFFC9372C),
+                      fontWeight: FontWeight.w600,
+                    ),
+                    onTap: () => _runAndClose(widget.onDelete),
+                  ),
+                ],
               ),
-              divider,
-              LabelPopoverMenuTile(
-                icon: Icons.delete_outline,
-                label: 'Delete',
-                enabled: canDelete,
-                tooltipWhenDisabled: 'Tidak punya izin hapus',
-                iconColor: const Color(0xFFC9372C),
-                textStyle: const TextStyle(
-                  color: Color(0xFFC9372C),
-                  fontWeight: FontWeight.w600,
-                ),
-                onTap: () => _runAndClose(widget.onDelete),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

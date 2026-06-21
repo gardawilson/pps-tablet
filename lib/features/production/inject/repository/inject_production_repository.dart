@@ -11,6 +11,7 @@ import 'package:pps_tablet/core/utils/date_formatter.dart';
 import '../model/inject_production_model.dart';
 import '../model/furniture_wip_by_inject_production_model.dart';
 import '../model/packing_by_inject_production_model.dart';
+import '../model/inject_batch_model.dart';
 
 class InjectProductionRepository {
   final ApiClient api;
@@ -220,6 +221,56 @@ class InjectProductionRepository {
   }
 
   /* =============================
+   * BY MESIN + TANGGAL + SHIFT
+   * GET /api/production/inject?idMesin=&tanggal=&shift=
+   * ============================= */
+
+  Future<List<InjectProduction>> fetchByMesinTanggalShift({
+    required int idMesin,
+    required DateTime tanggal,
+    required int shift,
+  }) async {
+    final token = await TokenStorage.getToken();
+    final apiBaseUri = Uri.parse(ApiConstants.baseUrl);
+    final url = Uri(
+      scheme: apiBaseUri.scheme.isEmpty ? 'http' : apiBaseUri.scheme,
+      host: apiBaseUri.host,
+      port: 7500,
+      path: '/api/production/inject',
+      queryParameters: {
+        'idMesin': '$idMesin',
+        'tanggal': toDbDateString(tanggal),
+        'shift': '$shift',
+      },
+    );
+
+    late http.Response res;
+    try {
+      res = await http
+          .get(url, headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          })
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout mengambil data produksi shift');
+    } catch (e) {
+      rethrow;
+    }
+
+    if (res.statusCode != 200) {
+      throw Exception('Gagal mengambil data produksi shift (${res.statusCode})');
+    }
+
+    final body = json.decode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    final data = body['data'] as List<dynamic>? ?? [];
+    return data
+        .whereType<Map>()
+        .map((e) => InjectProduction.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  /* =============================
    * GET SINGLE
    * GET /api/production/inject/:noProduksi
    * ============================= */
@@ -373,6 +424,68 @@ class InjectProductionRepository {
       final parsed = _tryDecodeMap(e.responseBody);
       final msg = (parsed['message'] as String?) ??
           'Gagal split time (HTTP ${e.statusCode})';
+      throw Exception(msg);
+    }
+  }
+
+  /* =============================
+   * BATCH - PCS PER LABEL
+   * GET /api/production/inject/pcs-per-label/:noProduksi
+   * ============================= */
+
+  Future<InjectPcsPerLabelResult> fetchPcsPerLabel(String noProduksi) async {
+    final encoded = Uri.encodeComponent(noProduksi.trim());
+    final body = await api.getJson(
+      '/api/production/inject/pcs-per-label/$encoded',
+    );
+    return InjectPcsPerLabelResult.fromJson(
+      body['data'] as Map<String, dynamic>? ?? {},
+    );
+  }
+
+  /* =============================
+   * BATCH - LIST
+   * GET /api/production/inject/batch/:noProduksi
+   * ============================= */
+
+  Future<List<InjectBatchItem>> fetchBatch(String noProduksi) async {
+    final encoded = Uri.encodeComponent(noProduksi.trim());
+    try {
+      final body = await api.getJson(
+        '/api/production/inject/batch/$encoded',
+      );
+      final data = (body['data'] as List<dynamic>?) ?? [];
+      return data
+          .whereType<Map>()
+          .map((e) => InjectBatchItem.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    } on ApiException catch (e) {
+      if (e.statusCode == 404) return [];
+      rethrow;
+    }
+  }
+
+  /* =============================
+   * BATCH - SUBMIT
+   * POST /api/production/inject/batch
+   * ============================= */
+
+  Future<InjectBatchSubmitResult> submitBatch(
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      final body = await api.postJson(
+        '/api/production/inject/batch',
+        body: payload,
+      );
+      return InjectBatchSubmitResult.fromJson(
+        body['data'] as Map<String, dynamic>? ?? {},
+      );
+    } on ApiException catch (e) {
+      final parsed = _tryDecodeMap(e.responseBody);
+      final msg =
+          (parsed['message'] as String?) ??
+          'Gagal submit batch (HTTP ${e.statusCode})';
       throw Exception(msg);
     }
   }

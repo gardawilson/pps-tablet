@@ -5,6 +5,7 @@ class InjectBonggolanOutputItem {
   final String namaBonggolan;
   final double berat;
   final int hasBeenPrinted;
+  final DateTime? dateTimeCreate;
 
   const InjectBonggolanOutputItem({
     required this.noProduksi,
@@ -13,6 +14,7 @@ class InjectBonggolanOutputItem {
     required this.namaBonggolan,
     required this.berat,
     required this.hasBeenPrinted,
+    this.dateTimeCreate,
   });
 
   bool get isPrinted => hasBeenPrinted > 0;
@@ -39,6 +41,9 @@ class InjectBonggolanOutputItem {
       namaBonggolan: j['NamaBonggolan']?.toString() ?? '',
       berat: asDouble(j['Berat']),
       hasBeenPrinted: asInt(j['HasBeenPrinted']),
+      dateTimeCreate: DateTime.tryParse(
+        j['DateTimeCreate']?.toString() ?? '',
+      )?.toLocal(),
     );
   }
 }
@@ -51,6 +56,7 @@ class InjectRejectOutputItem {
   final int hasBeenPrinted;
   final double berat;
   final int? pcs;
+  final DateTime? dateTimeCreate;
 
   const InjectRejectOutputItem({
     required this.noProduksi,
@@ -60,6 +66,7 @@ class InjectRejectOutputItem {
     required this.hasBeenPrinted,
     required this.berat,
     this.pcs,
+    this.dateTimeCreate,
   });
 
   bool get isPrinted => hasBeenPrinted > 0;
@@ -94,6 +101,9 @@ class InjectRejectOutputItem {
       hasBeenPrinted: asInt(j['HasBeenPrinted']),
       berat: asDouble(j['Berat']),
       pcs: asNullableInt(j['Pcs']),
+      dateTimeCreate: DateTime.tryParse(
+        j['DateTimeCreate']?.toString() ?? '',
+      )?.toLocal(),
     );
   }
 }
@@ -105,6 +115,7 @@ class InjectBjOutputItem {
   final String namaJenis;
   final int hasBeenPrinted;
   final int pcs;
+  final DateTime? dateTimeCreate;
 
   const InjectBjOutputItem({
     required this.noProduksi,
@@ -113,6 +124,7 @@ class InjectBjOutputItem {
     required this.namaJenis,
     required this.hasBeenPrinted,
     required this.pcs,
+    this.dateTimeCreate,
   });
 
   bool get isPrinted => hasBeenPrinted > 0;
@@ -132,6 +144,9 @@ class InjectBjOutputItem {
       namaJenis: j['NamaJenis']?.toString() ?? '',
       hasBeenPrinted: asInt(j['HasBeenPrinted']),
       pcs: asInt(j['Pcs']),
+      dateTimeCreate: DateTime.tryParse(
+        j['DateTimeCreate']?.toString() ?? '',
+      )?.toLocal(),
     );
   }
 }
@@ -144,6 +159,7 @@ class InjectOutputItem {
   final int hasBeenPrinted;
   final double berat;
   final int pcs;
+  final DateTime? dateTimeCreate;
 
   const InjectOutputItem({
     required this.noProduksi,
@@ -153,6 +169,7 @@ class InjectOutputItem {
     required this.hasBeenPrinted,
     required this.berat,
     required this.pcs,
+    this.dateTimeCreate,
   });
 
   bool get isPrinted => hasBeenPrinted > 0;
@@ -180,6 +197,9 @@ class InjectOutputItem {
       hasBeenPrinted: asInt(j['HasBeenPrinted']),
       berat: asDouble(j['Berat']),
       pcs: asInt(j['Pcs']),
+      dateTimeCreate: DateTime.tryParse(
+        j['DateTimeCreate']?.toString() ?? '',
+      )?.toLocal(),
     );
   }
 }

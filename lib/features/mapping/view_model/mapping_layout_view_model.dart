@@ -122,7 +122,7 @@ class MappingLayoutViewModel extends ChangeNotifier {
   // ── Dimension controls ─────────────────────────────────────────────────────
 
   void setRows(int rows) {
-    if (rows < 1 || rows > 60) return;
+    if (rows < 1 || rows > 150) return;
     _saveSnapshot();
     _rows = rows;
     _grid = _buildGrid(_rows, _cols, _grid);
@@ -130,7 +130,7 @@ class MappingLayoutViewModel extends ChangeNotifier {
   }
 
   void setCols(int cols) {
-    if (cols < 1 || cols > 60) return;
+    if (cols < 1 || cols > 150) return;
     _saveSnapshot();
     _cols = cols;
     _grid = _buildGrid(_rows, _cols, _grid);

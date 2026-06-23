@@ -84,6 +84,9 @@ class _EditorViewState extends State<_EditorView> {
   // ValueNotifier so hover updates only rebuild the overlay, not the full grid
   final _hoverNotifier = ValueNotifier<_HoverState?>(null);
 
+  // Key to convert global drag coordinates to local grid coordinates
+  final _gridBodyKey = GlobalKey();
+
   // Grab-point offset in cell units (set when drag starts)
   int _grabDeltaRow = 0;
   int _grabDeltaCol = 0;
@@ -145,6 +148,7 @@ class _EditorViewState extends State<_EditorView> {
             value: vm.rows,
             onDecrement: () => vm.setRows(vm.rows - 1),
             onIncrement: () => vm.setRows(vm.rows + 1),
+            onTyped: (v) => vm.setRows(v),
           ),
           const SizedBox(width: 12),
           _DimControl(
@@ -153,6 +157,7 @@ class _EditorViewState extends State<_EditorView> {
             value: vm.cols,
             onDecrement: () => vm.setCols(vm.cols - 1),
             onIncrement: () => vm.setCols(vm.cols + 1),
+            onTyped: (v) => vm.setCols(v),
           ),
           const Spacer(),
           // Undo / Redo
@@ -286,6 +291,21 @@ class _EditorViewState extends State<_EditorView> {
                 ),
                 const SizedBox(height: 4),
                 GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTapUp: vm.mode != EditorMode.aisle
+                      ? (d) {
+                          final col =
+                              (d.localPosition.dx / _slotW).floor();
+                          final row =
+                              (d.localPosition.dy / _slotH).floor();
+                          if (row >= 0 &&
+                              row < vm.rows &&
+                              col >= 0 &&
+                              col < vm.cols) {
+                            _onCellTap(context, vm, row, col);
+                          }
+                        }
+                      : null,
                   onPanStart: vm.mode == EditorMode.aisle
                       ? (d) => _onAislePaint(d.localPosition, vm)
                       : null,
@@ -298,131 +318,144 @@ class _EditorViewState extends State<_EditorView> {
                           _lastPaintCol = -1;
                         }
                       : null,
-                  child: SizedBox(
-                    width: gridW,
-                    height: gridH,
-                    child: Stack(
-                      children: [
-                        for (int r = 0; r < vm.rows; r++)
-                          for (int c = 0; c < vm.cols; c++)
-                            if (vm.grid[r][c].type != CellType.covered)
-                              Positioned(
-                                left: c * _slotW,
-                                top: r * _slotH,
-                                child: _GridCell(
-                                  cell: vm.grid[r][c],
-                                  mode: vm.mode,
-                                  width: vm.grid[r][c].type == CellType.empty
-                                      ? _slotW
-                                      : vm.grid[r][c].colSpan * _slotW - 3,
-                                  height: vm.grid[r][c].type == CellType.empty
-                                      ? _slotH
-                                      : vm.grid[r][c].rowSpan * _slotH - 3,
-                                  onTap: () => _onCellTap(context, vm, r, c),
-                                  onGrabDelta: (dr, dc) {
-                                    _grabDeltaRow = dr;
-                                    _grabDeltaCol = dc;
-                                  },
-                                  onDropLokasi: (lokasi) {
-                                    vm.placeLokasi(
-                                      r,
-                                      c,
-                                      lokasi,
-                                      rowSpan: 2,
-                                      colSpan: 2,
-                                    );
-                                    _hoverNotifier.value = null;
-                                  },
-                                  onDropMove: (data) {
-                                    final destRow = (r - _grabDeltaRow).clamp(
-                                      0,
-                                      vm.rows - 1,
-                                    );
-                                    final destCol = (c - _grabDeltaCol).clamp(
-                                      0,
-                                      vm.cols - 1,
-                                    );
-                                    vm.moveCell(
-                                      data.row,
-                                      data.col,
-                                      destRow,
-                                      destCol,
-                                    );
-                                    _hoverNotifier.value = null;
-                                  },
-                                  onHoverUpdate: (dragData) {
-                                    int rs = 1, cs = 1;
-                                    Color color = _primary;
-                                    int deltaRow = 0, deltaCol = 0;
-                                    if (dragData is MappingLokasi) {
-                                      rs = 2;
-                                      cs = 2;
-                                    } else if (dragData is _CellMoveData) {
-                                      final src =
-                                          vm.grid[dragData.row][dragData.col];
-                                      rs = src.rowSpan;
-                                      cs = src.colSpan;
-                                      color = switch (src.type) {
-                                        CellType.aisle => const Color(
-                                          0xFFE65100,
-                                        ),
-                                        CellType.label => const Color(
-                                          0xFF2E7D32,
-                                        ),
-                                        _ => _primary,
-                                      };
-                                      deltaRow = _grabDeltaRow;
-                                      deltaCol = _grabDeltaCol;
-                                    }
-                                    final hoverRow = (r - deltaRow).clamp(
-                                      0,
-                                      vm.rows - 1,
-                                    );
-                                    final hoverCol = (c - deltaCol).clamp(
-                                      0,
-                                      vm.cols - 1,
-                                    );
-                                    _hoverNotifier.value = _HoverState(
-                                      row: hoverRow,
-                                      col: hoverCol,
-                                      rowSpan: rs,
-                                      colSpan: cs,
-                                      color: color,
-                                    );
-                                  },
-                                  onHoverLeave: () {
-                                    _hoverNotifier.value = null;
-                                  },
+                  child: DragTarget<Object>(
+                    onWillAcceptWithDetails: (_) => true,
+                    onAcceptWithDetails: (details) {
+                      final box = _gridBodyKey.currentContext
+                          ?.findRenderObject() as RenderBox?;
+                      if (box == null) return;
+                      final local = box.globalToLocal(details.offset);
+                      final col = (local.dx / _slotW)
+                          .floor()
+                          .clamp(0, vm.cols - 1);
+                      final row = (local.dy / _slotH)
+                          .floor()
+                          .clamp(0, vm.rows - 1);
+                      if (details.data is MappingLokasi) {
+                        vm.placeLokasi(
+                          row,
+                          col,
+                          details.data as MappingLokasi,
+                          rowSpan: 2,
+                          colSpan: 2,
+                        );
+                      } else if (details.data is _CellMoveData) {
+                        final d = details.data as _CellMoveData;
+                        final destRow =
+                            (row - _grabDeltaRow).clamp(0, vm.rows - 1);
+                        final destCol =
+                            (col - _grabDeltaCol).clamp(0, vm.cols - 1);
+                        vm.moveCell(d.row, d.col, destRow, destCol);
+                      }
+                      _hoverNotifier.value = null;
+                    },
+                    onMove: (details) {
+                      final box = _gridBodyKey.currentContext
+                          ?.findRenderObject() as RenderBox?;
+                      if (box == null) return;
+                      final local = box.globalToLocal(details.offset);
+                      final col = (local.dx / _slotW)
+                          .floor()
+                          .clamp(0, vm.cols - 1);
+                      final row = (local.dy / _slotH)
+                          .floor()
+                          .clamp(0, vm.rows - 1);
+                      int rs = 1, cs = 1;
+                      Color color = _primary;
+                      if (details.data is MappingLokasi) {
+                        rs = 2;
+                        cs = 2;
+                      } else if (details.data is _CellMoveData) {
+                        final d = details.data as _CellMoveData;
+                        final src = vm.grid[d.row][d.col];
+                        rs = src.rowSpan;
+                        cs = src.colSpan;
+                        color = switch (src.type) {
+                          CellType.aisle => const Color(0xFFE65100),
+                          CellType.label => const Color(0xFF2E7D32),
+                          _ => _primary,
+                        };
+                      }
+                      final hoverRow =
+                          (row - _grabDeltaRow).clamp(0, vm.rows - 1);
+                      final hoverCol =
+                          (col - _grabDeltaCol).clamp(0, vm.cols - 1);
+                      _hoverNotifier.value = _HoverState(
+                        row: hoverRow,
+                        col: hoverCol,
+                        rowSpan: rs,
+                        colSpan: cs,
+                        color: color,
+                      );
+                    },
+                    onLeave: (_) => _hoverNotifier.value = null,
+                    builder: (ctx, _, __) {
+                      return SizedBox(
+                        key: _gridBodyKey,
+                        width: gridW,
+                        height: gridH,
+                        child: Stack(
+                          children: [
+                            // Grid background drawn with CustomPainter — 1 widget instead of rows×cols
+                            RepaintBoundary(
+                              child: CustomPaint(
+                                size: Size(gridW, gridH),
+                                painter: _GridPainter(
+                                  rows: vm.rows,
+                                  cols: vm.cols,
                                 ),
                               ),
-                        // Hover preview overlay — only this rebuilds on hover change
-                        ValueListenableBuilder<_HoverState?>(
-                          valueListenable: _hoverNotifier,
-                          builder: (_, hover, __) {
-                            if (hover == null) return const SizedBox.shrink();
-                            return Positioned(
-                              left: hover.col * _slotW,
-                              top: hover.row * _slotH,
-                              child: IgnorePointer(
-                                child: Container(
-                                  width: hover.colSpan * _slotW - 3,
-                                  height: hover.rowSpan * _slotH - 3,
-                                  margin: const EdgeInsets.all(1.5),
-                                  decoration: BoxDecoration(
-                                    color: hover.color.withValues(alpha: 0.18),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(
-                                      color: hover.color,
-                                      width: 2,
+                            ),
+                            // Only non-empty cells get Flutter widgets
+                            for (int r = 0; r < vm.rows; r++)
+                              for (int c = 0; c < vm.cols; c++)
+                                if (vm.grid[r][c].type != CellType.covered &&
+                                    vm.grid[r][c].type != CellType.empty)
+                                  Positioned(
+                                    left: c * _slotW,
+                                    top: r * _slotH,
+                                    child: _GridCell(
+                                      cell: vm.grid[r][c],
+                                      width: vm.grid[r][c].colSpan * _slotW -
+                                          3,
+                                      height: vm.grid[r][c].rowSpan * _slotH -
+                                          3,
                                     ),
                                   ),
-                                ),
-                              ),
-                            );
-                          },
+                            // Hover preview overlay
+                            ValueListenableBuilder<_HoverState?>(
+                              valueListenable: _hoverNotifier,
+                              builder: (_, hover, __) {
+                                if (hover == null) {
+                                  return const SizedBox.shrink();
+                                }
+                                return Positioned(
+                                  left: hover.col * _slotW,
+                                  top: hover.row * _slotH,
+                                  child: IgnorePointer(
+                                    child: Container(
+                                      width: hover.colSpan * _slotW - 3,
+                                      height: hover.rowSpan * _slotH - 3,
+                                      margin: const EdgeInsets.all(1.5),
+                                      decoration: BoxDecoration(
+                                        color: hover.color
+                                            .withValues(alpha: 0.18),
+                                        borderRadius:
+                                            BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: hover.color,
+                                          width: 2,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
                 ), // GestureDetector
               ],
@@ -1529,57 +1562,18 @@ class _DraggableLokasi extends StatelessWidget {
 
 class _GridCell extends StatelessWidget {
   final GridCell cell;
-  final EditorMode mode;
   final double width;
   final double height;
-  final VoidCallback onTap;
-  final ValueChanged<MappingLokasi> onDropLokasi;
-  final ValueChanged<_CellMoveData> onDropMove;
-  final ValueChanged<Object> onHoverUpdate;
-  final VoidCallback onHoverLeave;
-  final void Function(int grabRow, int grabCol) onGrabDelta;
 
   const _GridCell({
     required this.cell,
-    required this.mode,
     required this.width,
     required this.height,
-    required this.onTap,
-    required this.onDropLokasi,
-    required this.onDropMove,
-    required this.onHoverUpdate,
-    required this.onHoverLeave,
-    required this.onGrabDelta,
   });
-
-  bool get _isDraggable => cell.type != CellType.empty;
 
   @override
   Widget build(BuildContext context) {
-    final target = DragTarget<Object>(
-      onWillAcceptWithDetails: (details) {
-        if (details.data is _CellMoveData) {
-          final d = details.data as _CellMoveData;
-          return d.row != cell.row || d.col != cell.col;
-        }
-        return cell.type != CellType.lokasi;
-      },
-      onAcceptWithDetails: (details) {
-        if (details.data is MappingLokasi) {
-          onDropLokasi(details.data as MappingLokasi);
-        } else if (details.data is _CellMoveData) {
-          onDropMove(details.data as _CellMoveData);
-        }
-      },
-      onMove: (details) => onHoverUpdate(details.data),
-      onLeave: (_) => onHoverLeave(),
-      builder: (context, _, __) {
-        return GestureDetector(onTap: onTap, child: _buildCell());
-      },
-    );
-
-    if (!_isDraggable) return target;
-
+    final display = _buildCell();
     return LongPressDraggable<_CellMoveData>(
       data: _CellMoveData(cell.row, cell.col),
       delay: const Duration(milliseconds: 300),
@@ -1588,8 +1582,8 @@ class _GridCell extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         child: Opacity(opacity: 0.9, child: _buildCell()),
       ),
-      childWhenDragging: Opacity(opacity: 0.25, child: target),
-      child: target,
+      childWhenDragging: Opacity(opacity: 0.25, child: display),
+      child: display,
     );
   }
 
@@ -1606,23 +1600,21 @@ class _GridCell extends StatelessWidget {
         ? _labelColor
         : _emptyColor;
 
-    final isEmpty = !isAisle && !isLokasi && !isLabel;
-
     return AnimatedContainer(
       duration: const Duration(milliseconds: 120),
       width: width,
       height: height,
-      margin: isEmpty ? EdgeInsets.zero : const EdgeInsets.all(1.5),
+      margin: const EdgeInsets.all(1.5),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(isEmpty ? 0 : 6),
+        borderRadius: BorderRadius.circular(6),
         border: isLokasi
             ? Border.all(color: _primary.withValues(alpha: 0.5), width: 1.5)
             : isAisle
             ? Border.all(color: Colors.orange.shade700.withValues(alpha: 0.5))
             : isLabel
             ? Border.all(color: const Color(0xFF2E7D32).withValues(alpha: 0.5))
-            : Border.all(color: const Color(0xFFDEE2E6), width: 0.5),
+            : null,
         boxShadow: isLokasi
             ? [
                 BoxShadow(
@@ -1701,14 +1693,45 @@ class _GridCell extends StatelessWidget {
   }
 }
 
+// ── Grid Painter ──────────────────────────────────────────────────────────────
+
+class _GridPainter extends CustomPainter {
+  final int rows;
+  final int cols;
+
+  const _GridPainter({required this.rows, required this.cols});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFDEE2E6)
+      ..strokeWidth = 0.5
+      ..style = PaintingStyle.stroke;
+
+    for (int r = 0; r < rows; r++) {
+      for (int c = 0; c < cols; c++) {
+        canvas.drawRect(
+          Rect.fromLTWH(c * _slotW, r * _slotH, _slotW, _slotH),
+          paint,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_GridPainter old) =>
+      old.rows != rows || old.cols != cols;
+}
+
 // ── Dimension Control ─────────────────────────────────────────────────────────
 
-class _DimControl extends StatelessWidget {
+class _DimControl extends StatefulWidget {
   final IconData icon;
   final String label;
   final int value;
   final VoidCallback onDecrement;
   final VoidCallback onIncrement;
+  final ValueChanged<int> onTyped;
 
   const _DimControl({
     required this.icon,
@@ -1716,26 +1739,85 @@ class _DimControl extends StatelessWidget {
     required this.value,
     required this.onDecrement,
     required this.onIncrement,
+    required this.onTyped,
   });
+
+  @override
+  State<_DimControl> createState() => _DimControlState();
+}
+
+class _DimControlState extends State<_DimControl> {
+  late final TextEditingController _ctrl;
+  bool _editing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: '${widget.value}');
+  }
+
+  @override
+  void didUpdateWidget(_DimControl old) {
+    super.didUpdateWidget(old);
+    if (!_editing && old.value != widget.value) {
+      _ctrl.text = '${widget.value}';
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _commit() {
+    final v = int.tryParse(_ctrl.text);
+    if (v != null && v >= 1 && v <= 150) {
+      widget.onTyped(v);
+    } else {
+      _ctrl.text = '${widget.value}';
+    }
+    setState(() => _editing = false);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 14, color: Colors.grey[600]),
+        Icon(widget.icon, size: 14, color: Colors.grey[600]),
         const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+        Text(
+          widget.label,
+          style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+        ),
         const SizedBox(width: 4),
-        _iconBtn(Icons.remove, onDecrement),
-        Container(
-          width: 32,
-          alignment: Alignment.center,
-          child: Text(
-            '$value',
+        _iconBtn(Icons.remove, widget.onDecrement),
+        SizedBox(
+          width: 44,
+          height: 28,
+          child: TextField(
+            controller: _ctrl,
+            textAlign: TextAlign.center,
+            keyboardType: TextInputType.number,
             style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+            decoration: InputDecoration(
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(vertical: 5),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(4),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(4),
+                borderSide: const BorderSide(color: _primary),
+              ),
+            ),
+            onTap: () => setState(() => _editing = true),
+            onSubmitted: (_) => _commit(),
+            onEditingComplete: _commit,
           ),
         ),
-        _iconBtn(Icons.add, onIncrement),
+        _iconBtn(Icons.add, widget.onIncrement),
       ],
     );
   }

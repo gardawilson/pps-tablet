@@ -115,7 +115,7 @@ import 'package:pps_tablet/features/production/washing/repository/washing_produc
 import 'package:pps_tablet/features/production/washing/view/washing_production_mesin_screen.dart';
 import 'package:pps_tablet/features/production/washing/view_model/washing_production_input_view_model.dart';
 import 'package:pps_tablet/features/reject_type/repository/reject_type_repository.dart';
-import 'package:pps_tablet/features/reject_type/view_model/packing_type_view_model.dart';
+import 'package:pps_tablet/features/reject_type/view_model/reject_type_view_model.dart';
 import 'package:pps_tablet/features/production/broker/repository/broker_production_repository.dart';
 import 'package:pps_tablet/features/production/broker/view_model/broker_production_view_model.dart';
 import 'package:pps_tablet/features/shared/lokasi/lokasi_repository.dart';

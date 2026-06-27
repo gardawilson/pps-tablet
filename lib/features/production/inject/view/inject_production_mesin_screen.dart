@@ -15,7 +15,9 @@ import '../repository/inject_production_repository.dart';
 import '../view_model/inject_production_view_model.dart';
 import '../widgets/inject_production_delete_dialog.dart';
 import '../widgets/inject_production_form_dialog.dart';
+import '../widgets/inject_qc_dialog.dart';
 import 'inject_production_input_screen.dart' as legacy_input;
+import 'inject_production_input_screen_v3.dart' as v3_input;
 
 class InjectProductionMesinScreen extends StatefulWidget {
   const InjectProductionMesinScreen({super.key});
@@ -127,12 +129,16 @@ class _InjectProductionMesinScreenState
     _loadProduksiPage();
   }
 
-  Future<void> _openInputScreenChooser(String noProduksi) async {
+  Future<void> _openInputScreenChooser(
+    String noProduksi, {
+    required bool isRealtime,
+  }) async {
     if (!mounted) return;
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) =>
-            legacy_input.InjectProductionInputScreen(noProduksi: noProduksi),
+        builder: (_) => isRealtime
+            ? v3_input.InjectProductionInputScreen(noProduksi: noProduksi)
+            : legacy_input.InjectProductionInputScreen(noProduksi: noProduksi),
       ),
     );
   }
@@ -169,7 +175,12 @@ class _InjectProductionMesinScreenState
       );
       if (!mounted) return;
       if (created != null) {
-        await _openInputScreenChooser(created.noProduksi);
+        final detail = await _prodRepo.fetchOneByNoProduksi(created.noProduksi);
+        if (!mounted) return;
+        await _openInputScreenChooser(
+          created.noProduksi,
+          isRealtime: detail?.isRealtime ?? false,
+        );
         if (!mounted) return;
         _refreshAll();
       }
@@ -180,14 +191,23 @@ class _InjectProductionMesinScreenState
 
   Future<void> _onMesinTap(InjectMesinInfo mesin) async {
     if (!mounted) return;
-    if (!mesin.isActive) {
+    if (!mesin.hasProduction) {
       await _openCreateDialog(mesin: mesin);
       return;
     }
-    final item = mesin.produksiList.first;
-    await _openInputScreenChooser(item.noProduksi);
+    final noProduksi = mesin.produksiList.first.noProduksi;
+    final detail = await _prodRepo.fetchOneByNoProduksi(noProduksi);
     if (!mounted) return;
-    _refreshAll();
+    await _openInputScreenChooser(
+      noProduksi,
+      isRealtime: detail?.isRealtime ?? false,
+    );
+    if (mounted) _refreshAll();
+  }
+
+  Future<void> _onMesinLongPress(InjectMesinInfo mesin) async {
+    if (!mounted || !mesin.hasProduction) return;
+    await _openQcDialog(mesin);
   }
 
   // ── helpers ──────────────────────────────────────────────────────
@@ -219,8 +239,11 @@ class _InjectProductionMesinScreenState
     return mesin.produksiList.isNotEmpty ? mesin.produksiList.first : null;
   }
 
-  static MesinCardData _toMesinCardData(InjectMesinInfo mesin) {
-    final current = mesin.isActive ? _currentItem(mesin) : null;
+  static MesinCardData _toMesinCardData(
+    InjectMesinInfo mesin, {
+    VoidCallback? onQcTap,
+  }) {
+    final current = mesin.hasProduction ? _currentItem(mesin) : null;
     String? shiftTimeText;
     if (current != null) {
       final parts = <String>[];
@@ -233,10 +256,45 @@ class _InjectProductionMesinScreenState
     return MesinCardData(
       namaMesin: mesin.namaMesin,
       isActive: mesin.isActive,
+      machineStatus: mesin.machineStatus,
       shiftTimeText: shiftTimeText,
-      namaCetakan: current?.namaCetakan,
-      namaWarna: current?.warna,
-      namaFurnitureMaterial: current?.namaFurnitureMaterial,
+      namaRegu: current?.namaRegu,
+      outputJenisNama: current?.outputs.isNotEmpty == true
+          ? current!.outputs.map((o) => o.namaJenis).join(', ')
+          : null,
+      onQcTap: onQcTap,
+    );
+  }
+
+  Future<void> _openQcDialog(InjectMesinInfo mesin) async {
+    if (!mounted) return;
+    final item = mesin.produksiList.isNotEmpty
+        ? mesin.produksiList.first
+        : null;
+    if (item == null || item.hourStart == null || item.hourEnd == null) return;
+
+    String trimHour(String? s) {
+      final v = (s ?? '').trim();
+      return v.length >= 5 ? v.substring(0, 5) : v;
+    }
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => InjectQcDialog(
+        noProduksi: item.noProduksi,
+        shift: item.shift,
+        namaMesin: mesin.namaMesin,
+        outputJenisList: item.outputs.isNotEmpty
+            ? item.outputs.map((output) => output.namaJenis).toList()
+            : [
+                if ((item.outputCategory ?? '').trim().isNotEmpty)
+                  item.outputCategory!.trim(),
+              ],
+        hourStart: trimHour(item.hourStart),
+        hourEnd: trimHour(item.hourEnd),
+        tglProduksi: item.tglProduksi,
+      ),
     );
   }
 
@@ -274,10 +332,16 @@ class _InjectProductionMesinScreenState
                       final activeCount = allMesin
                           .where((m) => m.isActive)
                           .length;
-                      final inactiveCount = allMesin.length - activeCount;
+                      final pendingCount = allMesin
+                          .where((m) => m.isPending)
+                          .length;
+                      final inactiveCount = allMesin
+                          .where((m) => !m.hasProduction)
+                          .length;
                       return MesinSectionHeader(
                         title: 'Status Mesin Inject',
                         activeCount: activeCount,
+                        pendingCount: pendingCount,
                         inactiveCount: inactiveCount,
                         isLoading:
                             snapshot.connectionState == ConnectionState.waiting,
@@ -330,6 +394,9 @@ class _InjectProductionMesinScreenState
                                 return ProductionMesinCard(
                                   data: _toMesinCardData(mesin),
                                   onTap: () => _onMesinTap(mesin),
+                                  onLongPress: mesin.hasProduction
+                                      ? () => _onMesinLongPress(mesin)
+                                      : null,
                                 );
                               },
                             );
@@ -396,7 +463,10 @@ class _InjectProductionMesinScreenState
                             scrollController: _produksiScrollCtl,
                             showMesin: _filterIdMesin == null,
                             onTap: (row) async {
-                              await _openInputScreenChooser(row.noProduksi);
+                              await _openInputScreenChooser(
+                                row.noProduksi,
+                                isRealtime: row.isRealtime,
+                              );
                               if (mounted) _refreshAll();
                             },
                             onEdit: (row) async {
@@ -466,7 +536,10 @@ class _InjectProductionMesinScreenState
                               );
                             },
                             onInput: (row) async {
-                              await _openInputScreenChooser(row.noProduksi);
+                              await _openInputScreenChooser(
+                                row.noProduksi,
+                                isRealtime: row.isRealtime,
+                              );
                               if (mounted) _refreshAll();
                             },
                           ),

@@ -20,6 +20,11 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
 
   final bool showTimeInfo;
   final VoidCallback? onGanti;
+  // Jika diset, tombol Ganti tetap tampil tapi disabled; pesan muncul saat long-press
+  final String? gantiDisabledReason;
+  final VoidCallback? onTerminate;
+  // Jika diset, tombol Terminate tetap tampil tapi disabled; pesan muncul saat long-press
+  final String? terminateDisabledReason;
   final VoidCallback? onRiwayat;
   final VoidCallback? onRefresh;
   final List<Widget>? trailingActions;
@@ -41,6 +46,9 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
     this.namaJenisList,
     this.showTimeInfo = true,
     this.onGanti,
+    this.gantiDisabledReason,
+    this.onTerminate,
+    this.terminateDisabledReason,
     this.onRiwayat,
     this.onRefresh,
     this.trailingActions,
@@ -259,36 +267,123 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
                 ),
               if (canGanti) ...[
                 const SizedBox(width: 4),
-                Material(
-                  color: accentColor,
-                  borderRadius: BorderRadius.circular(6),
-                  child: InkWell(
-                    onTap: onGanti,
+                if (gantiDisabledReason != null)
+                  Tooltip(
+                    message: gantiDisabledReason!,
+                    triggerMode: TooltipTriggerMode.longPress,
+                    showDuration: const Duration(seconds: 3),
+                    child: Material(
+                      color: const Color(0xFFD1D5DB),
+                      borderRadius: BorderRadius.circular(6),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.swap_horiz_rounded, size: 13, color: Color(0xFF9CA3AF)),
+                            SizedBox(width: 4),
+                            Text(
+                              'Ganti',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF9CA3AF),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  Material(
+                    color: accentColor,
                     borderRadius: BorderRadius.circular(6),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.swap_horiz_rounded,
-                            size: 13,
-                            color: Colors.white,
-                          ),
-                          SizedBox(width: 4),
-                          Text(
-                            'Ganti',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
+                    child: InkWell(
+                      onTap: onGanti,
+                      borderRadius: BorderRadius.circular(6),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.swap_horiz_rounded,
+                              size: 13,
                               color: Colors.white,
                             ),
-                          ),
-                        ],
+                            SizedBox(width: 4),
+                            Text(
+                              'Ganti',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
+                if (onTerminate != null || terminateDisabledReason != null) ...[
+                  const SizedBox(width: 4),
+                  if (terminateDisabledReason != null)
+                    Tooltip(
+                      message: terminateDisabledReason!,
+                      triggerMode: TooltipTriggerMode.longPress,
+                      showDuration: const Duration(seconds: 3),
+                      child: Material(
+                        color: const Color(0xFFD1D5DB),
+                        borderRadius: BorderRadius.circular(6),
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.stop_circle_outlined, size: 13, color: Color(0xFF9CA3AF)),
+                              SizedBox(width: 4),
+                              Text(
+                                'Terminate',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF9CA3AF),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Material(
+                      color: const Color(0xFFDC2626),
+                      borderRadius: BorderRadius.circular(6),
+                      child: InkWell(
+                        onTap: onTerminate,
+                        borderRadius: BorderRadius.circular(6),
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.stop_circle_outlined, size: 13, color: Colors.white),
+                              SizedBox(width: 4),
+                              Text(
+                                'Terminate',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ],
               const SizedBox(width: 6),
               Material(

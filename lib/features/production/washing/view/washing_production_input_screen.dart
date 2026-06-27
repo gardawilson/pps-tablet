@@ -15,6 +15,7 @@ import '../../shared/models/production_label_lookup_result.dart';
 import '../../shared/widgets/partial_mode_not_supported_dialog.dart';
 import '../../shared/widgets/weight_input_dialog.dart';
 import '../model/washing_inputs_model.dart';
+import '../model/washing_formula_model.dart';
 import '../repository/washing_production_input_repository.dart';
 import '../widgets/washing_output_tile.dart';
 import '../widgets/washing_production_output_form_dialog.dart';
@@ -41,10 +42,7 @@ const _kWashingBorder = Color(0xFFE2E6EA);
 class WashingProductionInputScreen extends StatefulWidget {
   final String noProduksi;
 
-  const WashingProductionInputScreen({
-    super.key,
-    required this.noProduksi,
-  });
+  const WashingProductionInputScreen({super.key, required this.noProduksi});
 
   @override
   State<WashingProductionInputScreen> createState() =>
@@ -63,6 +61,10 @@ class _WashingProductionInputScreenState
   String _selectedInputTab = 'bb';
   String _selectedOutputTab = 'washing';
 
+  // null = belum dimuat; non-null = sudah dimuat
+  Set<String>? _allowedInputKategori;
+  List<WashingFormulaOutput> _formulaOutputs = [];
+
   List<BreadcrumbSegment> _prevBreadcrumb = [];
   bool _isReplacing = false;
 
@@ -77,6 +79,7 @@ class _WashingProductionInputScreenState
     super.initState();
     _cachedBreadcrumbLabel = widget.noProduksi;
     _loadHeader();
+    _loadFormulaInputs();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
@@ -104,6 +107,77 @@ class _WashingProductionInputScreenState
       });
       _updateBreadcrumb();
     } catch (_) {}
+  }
+
+  Future<void> _loadFormulaInputs() async {
+    try {
+      final result = await _repo.fetchAllowedInputKategori(widget.noProduksi);
+      if (!mounted) return;
+      setState(() {
+        _allowedInputKategori = result.kodes;
+        _formulaOutputs = result.outputs;
+        if (!_isTabAllowed(_selectedInputTab)) {
+          final first = _firstAllowedTab(result.kodes);
+          if (first != null) _selectedInputTab = first;
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _allowedInputKategori = {'broker', 'bb', 'washing', 'gilingan'};
+        _formulaOutputs = [];
+      });
+    }
+  }
+
+  // ── Formula validation helpers ─────────────────────────────────────────────
+
+  /// Cek apakah prefix label (2 karakter pertama, e.g. "V.") diizinkan oleh formula.
+  bool _isPrefixAllowed(String code) {
+    if (_formulaOutputs.isEmpty) return true;
+    final prefix = code.trim().length >= 2 ? code.trim().substring(0, 2).toUpperCase() : '';
+    return _formulaOutputs.any(
+      (o) => o.formulas.any((f) => f.prefixLabel.toUpperCase() == prefix),
+    );
+  }
+
+  /// Cek apakah idJenis item cocok dengan salah satu InputId di formula.
+  bool _isItemIdAllowed(int? idJenis) {
+    if (_formulaOutputs.isEmpty || idJenis == null) return true;
+    return _formulaOutputs.any(
+      (o) => o.formulas.any((f) => f.inputId == idJenis),
+    );
+  }
+
+  /// Nama formula yang cocok untuk ditampilkan di pesan error (prefix-level).
+  String _allowedPrefixesLabel() {
+    final prefixes = <String>{};
+    for (final o in _formulaOutputs) {
+      for (final f in o.formulas) {
+        if (f.prefixLabel.isNotEmpty) prefixes.add(f.prefixLabel);
+      }
+    }
+    return prefixes.join(', ');
+  }
+
+  static const _kategoriToTab = {
+    'bb': 'bb',
+    'washing': 'washing',
+    'gilingan': 'gilingan',
+    'broker': 'broker',
+  };
+
+  bool _isTabAllowed(String tab) {
+    final kodes = _allowedInputKategori;
+    if (kodes == null) return true; // belum dimuat → tampilkan semua
+    return kodes.any((k) => _kategoriToTab[k] == tab);
+  }
+
+  String? _firstAllowedTab(Set<String> kodes) {
+    for (final tab in ['broker', 'bb', 'washing', 'gilingan']) {
+      if (kodes.any((k) => _kategoriToTab[k] == tab)) return tab;
+    }
+    return null;
   }
 
   void _updateBreadcrumb() {
@@ -395,17 +469,53 @@ class _WashingProductionInputScreenState
     }
   }
 
+  /// Bangun acceptedLabels dari data formula secara dinamis.
+  List<({String prefix, String label})> _buildAcceptedLabels() {
+    // Fallback bila formula belum dimuat
+    if (_formulaOutputs.isEmpty) {
+      return const [
+        (prefix: 'A', label: 'Bahan Baku'),
+        (prefix: 'B', label: 'Washing'),
+        (prefix: 'V', label: 'Gilingan'),
+      ];
+    }
+
+    // Kumpulkan prefix unik dari formula, petakan ke label yg sudah dikenal
+    const prefixToLabel = {
+      'A.': 'Bahan Baku',
+      'B.': 'Washing',
+      'V.': 'Gilingan',
+      'D.': 'Broker',
+    };
+
+    final seen = <String>{};
+    final result = <({String prefix, String label})>[];
+
+    for (final o in _formulaOutputs) {
+      for (final f in o.formulas) {
+        final raw = f.prefixLabel.trim().toUpperCase();
+        if (raw.isEmpty || seen.contains(raw)) continue;
+        seen.add(raw);
+        // prefix untuk ScanLabelDialog tanpa titik, e.g. "A." → "A"
+        final short = raw.endsWith('.') ? raw.substring(0, raw.length - 1) : raw;
+        final label = prefixToLabel[raw] ?? f.kategoriNama;
+        result.add((prefix: short, label: label));
+      }
+    }
+
+    return result.isEmpty
+        ? const [(prefix: 'A', label: 'Bahan Baku')]
+        : result;
+  }
+
   Future<void> _openScanDialog() async {
+    final accepted = _buildAcceptedLabels();
     await showDialog<void>(
       context: context,
       builder: (_) => ScanLabelDialog(
         manualHint: 'X.XXXXXXXXXX',
         headerSubtitle: _modeLabel(_selectedMode),
-        acceptedLabels: const [
-          (prefix: 'A', label: 'Bahan Baku'),
-          (prefix: 'B', label: 'Washing'),
-          (prefix: 'V', label: 'Gilingan'),
-        ],
+        acceptedLabels: accepted,
         onLookup: (code) async => _onCodeReady(code),
       ),
     );
@@ -430,15 +540,45 @@ class _WashingProductionInputScreenState
       }
     }
 
+    // ── Validasi 1: prefix label harus cocok dengan formula ─────────────
+    if (!_isPrefixAllowed(code)) {
+      final allowed = _allowedPrefixesLabel();
+      return 'Label tidak sesuai formula. Prefix yang diizinkan: $allowed';
+    }
+
     final res = await vm.lookupLabel(code, force: true);
     if (!mounted) return 'Halaman sudah tidak aktif';
 
     if (vm.lookupError != null) {
+      // Prefix sudah lolos validasi formula → 500 kemungkinan besar berarti
+      // endpoint validate-label belum mendukung kategori ini (misal: Broker D.).
+      final prefix = code.trim().length >= 2
+          ? code.trim().substring(0, 2).toUpperCase()
+          : '';
+      final isKnownPrefix = _formulaOutputs.isNotEmpty &&
+          _formulaOutputs.any(
+            (o) => o.formulas.any((f) => f.prefixLabel.toUpperCase() == prefix),
+          );
+      if (isKnownPrefix) {
+        return 'Label $prefix belum didukung oleh endpoint validasi. '
+            'Hubungi administrator untuk mengaktifkan kategori ini.';
+      }
       return 'Gagal ambil data: ${vm.lookupError}';
     }
 
     if (res == null || res.found == false || res.data.isEmpty) {
       return 'Label "$code" tidak memiliki data yang tersedia.';
+    }
+
+    // ── Validasi 2: idJenis item harus cocok dengan InputId di formula ──
+    final firstItem = res.typedItems.isNotEmpty ? res.typedItems.first : null;
+    int? idJenis;
+    if (firstItem is BbItem) { idJenis = firstItem.idJenis; }
+    else if (firstItem is WashingItem) { idJenis = firstItem.idJenis; }
+    else if (firstItem is GilinganItem) { idJenis = firstItem.idJenis; }
+
+    if (!_isItemIdAllowed(idJenis)) {
+      return 'Jenis material tidak termasuk dalam formula produksi ini.';
     }
 
     // Auto-switch ke tab sesuai tipe label
@@ -660,6 +800,148 @@ class _WashingProductionInputScreenState
     }
   }
 
+  void _showFormulaDialog() {
+    if (_formulaOutputs.isEmpty) return;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480, maxHeight: 520),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ── Header dialog ────────────────────────────────────────
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+                decoration: BoxDecoration(
+                  color: _kWashingPrimary,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.science_outlined, color: Colors.white, size: 18),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Formula Input',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      icon: const Icon(Icons.close, color: Colors.white, size: 18),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              // ── Body dialog ──────────────────────────────────────────
+              Flexible(
+                child: ListView.separated(
+                  padding: const EdgeInsets.all(12),
+                  shrinkWrap: true,
+                  itemCount: _formulaOutputs.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (_, i) {
+                    final output = _formulaOutputs[i];
+                    // Group formulas by kategori
+                    final grouped = <String, List<WashingFormulaItem>>{};
+                    for (final f in output.formulas) {
+                      grouped.putIfAbsent(f.kategoriNama, () => []).add(f);
+                    }
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Output jenis label
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: _kWashingPrimary.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: _kWashingPrimary.withValues(alpha: 0.2)),
+                          ),
+                          child: Text(
+                            output.namaJenis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                              color: _kWashingPrimary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // Per kategori
+                        ...grouped.entries.map((e) => Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blueGrey.shade50,
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: Colors.blueGrey.shade200),
+                                    ),
+                                    child: Text(
+                                      e.key,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.blueGrey.shade700,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    e.value.first.prefixLabel,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.grey.shade500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              ...e.value.map((f) => Padding(
+                                padding: const EdgeInsets.only(left: 8, bottom: 2),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.chevron_right, size: 12, color: Colors.grey.shade400),
+                                    const SizedBox(width: 2),
+                                    Expanded(
+                                      child: Text(
+                                        f.inputNama,
+                                        style: const TextStyle(fontSize: 11),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )),
+                            ],
+                          ),
+                        )),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildToolbarSkeleton() {
     return Shimmer.fromColors(
       baseColor: Colors.grey.shade300,
@@ -727,6 +1009,18 @@ class _WashingProductionInputScreenState
                 ),
                 const Spacer(),
 
+                // Formula info
+                if (_formulaOutputs.isNotEmpty)
+                  IconButton(
+                    tooltip: 'Lihat Formula Input',
+                    onPressed: _showFormulaDialog,
+                    icon: Icon(
+                      Icons.science_outlined,
+                      size: 20,
+                      color: _kWashingPrimary,
+                    ),
+                  ),
+
                 // Save badge
                 SaveButtonWithBadge(
                   count: vm.totalTempCount,
@@ -763,16 +1057,25 @@ class _WashingProductionInputScreenState
                     selectedValue: _selectedInputTab,
                     accentColor: _kWashingPrimary,
                     tabs: [
+                      if (_isTabAllowed('broker'))
+                      ProductionTabItem(
+                        value: 'broker',
+                        label: 'Broker',
+                        count: bbGroups.length,
+                      ),
+                      if (_isTabAllowed('bb'))
                       ProductionTabItem(
                         value: 'bb',
                         label: 'Bahan Baku',
                         count: bbGroups.length,
                       ),
+                      if (_isTabAllowed('washing'))
                       ProductionTabItem(
                         value: 'washing',
                         label: 'Washing',
                         count: washingGroups.length,
                       ),
+                      if (_isTabAllowed('gilingan'))
                       ProductionTabItem(
                         value: 'gilingan',
                         label: 'Gilingan',
@@ -1068,7 +1371,9 @@ class _WashingProductionInputScreenState
                                           ? Colors.grey.shade300
                                           : _kWashingOutput,
                                       foregroundColor: Colors.white,
-                                      onPressed: _header == null ? null : onAddWashing,
+                                      onPressed: _header == null
+                                          ? null
+                                          : onAddWashing,
                                       child: const Icon(Icons.add),
                                     ),
                                   ],
@@ -1097,6 +1402,13 @@ class _WashingProductionInputScreenState
     bool showFooter = true,
   }) {
     switch (_selectedInputTab) {
+      case 'broker':
+        return _buildBbTab(
+          vm: vm,
+          canDelete: canDelete,
+          bbGroups: bbGroups,
+          showFooter: showFooter,
+        );
       case 'bb':
         return _buildBbTab(
           vm: vm,
@@ -1442,6 +1754,7 @@ class _WashingProductionInputScreenState
     required Map<String, List<GilinganItem>> gilinganGroups,
   }) {
     switch (_selectedInputTab) {
+      case 'broker':
       case 'bb':
         int totalSak = 0;
         double totalBerat = 0.0;

@@ -53,6 +53,8 @@ class InjectProduction {
   final DateTime? lastClosedDate;
 
   final bool isLocked;
+  final bool isComplete;
+  final bool isRealtime;
 
   final String? outputCategory;
   final List<InjectOutputJenis> outputs;
@@ -91,6 +93,8 @@ class InjectProduction {
     this.hourEnd,
     this.lastClosedDate,
     required this.isLocked,
+    this.isComplete = false,
+    this.isRealtime = false,
     this.outputCategory,
     this.outputs = const [],
   });
@@ -235,6 +239,8 @@ class InjectProduction {
 
       lastClosedDate: _asDateTime(j['LastClosedDate']),
       isLocked: _asBool(j['IsLocked'], fallback: false),
+      isComplete: _asBool(j['IsComplete'], fallback: false),
+      isRealtime: _asBool(j['IsRealtime'], fallback: false),
       outputCategory: j['OutputCategory']?.toString(),
       outputs: (j['Outputs'] as List<dynamic>? ?? [])
           .map((e) => InjectOutputJenis.fromJson(e as Map<String, dynamic>))
@@ -342,13 +348,19 @@ class InjectProduction {
 class InjectOutputJenis {
   final int idJenis;
   final String namaJenis;
+  final String outputCategory;
 
-  const InjectOutputJenis({required this.idJenis, required this.namaJenis});
+  const InjectOutputJenis({
+    required this.idJenis,
+    required this.namaJenis,
+    this.outputCategory = 'furniturewip',
+  });
 
   factory InjectOutputJenis.fromJson(Map<String, dynamic> j) =>
       InjectOutputJenis(
         idJenis: (j['idJenis'] as num?)?.toInt() ?? 0,
         namaJenis: j['namaJenis']?.toString() ?? '',
+        outputCategory: j['outputCategory']?.toString() ?? 'furniturewip',
       );
 }
 
@@ -370,6 +382,8 @@ class InjectProduksiItem {
   final String? hourEnd;
   final String? outputCategory;
   final List<InjectOutputJenis> outputs;
+  final bool isLocked;
+  final bool isRealtime;
 
   const InjectProduksiItem({
     required this.noProduksi,
@@ -389,6 +403,8 @@ class InjectProduksiItem {
     this.hourEnd,
     this.outputCategory,
     this.outputs = const [],
+    this.isLocked = false,
+    this.isRealtime = false,
   });
 
   int? get idOperator => idOperators.isNotEmpty ? idOperators.first : null;
@@ -439,17 +455,24 @@ class InjectProduksiItem {
       outputs: (j['Outputs'] as List<dynamic>? ?? [])
           .map((e) => InjectOutputJenis.fromJson(e as Map<String, dynamic>))
           .toList(),
+      isLocked: j['IsLocked'] == true || j['IsLocked'] == 1,
+      isRealtime: j['IsRealtime'] == true || j['IsRealtime'] == 1,
     );
   }
 }
+
+enum MachineStatus { active, pending, inactive }
 
 class InjectMesinInfo {
   final int idMesin;
   final String namaMesin;
   final String bagian;
   final List<InjectProduksiItem> produksiList;
+  final MachineStatus machineStatus;
 
-  bool get isActive => produksiList.isNotEmpty;
+  bool get isActive => machineStatus == MachineStatus.active;
+  bool get isPending => machineStatus == MachineStatus.pending;
+  bool get hasProduction => produksiList.isNotEmpty;
 
   String? get noProduksi =>
       produksiList.isNotEmpty ? produksiList.first.noProduksi : null;
@@ -472,6 +495,7 @@ class InjectMesinInfo {
     required this.namaMesin,
     required this.bagian,
     this.produksiList = const [],
+    this.machineStatus = MachineStatus.inactive,
   });
 
   factory InjectMesinInfo.fromJson(Map<String, dynamic> j) {
@@ -481,6 +505,16 @@ class InjectMesinInfo {
       if (v == null) return null;
       if (v is num) return v.toInt();
       return int.tryParse(v.toString());
+    }
+
+    MachineStatus parseStatus(dynamic v) {
+      switch (v?.toString()) {
+        case 'active':
+        case 'aktif':
+          return MachineStatus.active;
+        case 'pending': return MachineStatus.pending;
+        default: return MachineStatus.inactive;
+      }
     }
 
     final List<InjectProduksiItem> items = [];
@@ -493,6 +527,7 @@ class InjectMesinInfo {
       namaMesin: s(j['NamaMesin']) ?? '',
       bagian: s(j['Bagian']) ?? '',
       produksiList: items,
+      machineStatus: parseStatus(j['machineStatus']),
     );
   }
 }

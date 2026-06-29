@@ -177,7 +177,8 @@ class ProductionMesinCard extends StatelessWidget {
                     icon: Icons.inventory_2_outlined,
                     text: data.outputJenisNama!.trim(),
                     color: const Color(0xFF374151),
-                    maxLines: 2,
+                    maxLines: 3,
+                    bold: true,
                   ),
                 ],
               ] else

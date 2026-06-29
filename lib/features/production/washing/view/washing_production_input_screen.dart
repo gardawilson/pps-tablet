@@ -6,7 +6,8 @@ import 'package:shimmer/shimmer.dart';
 import 'package:pps_tablet/core/view/app_shell.dart';
 import 'package:pps_tablet/features/production/washing/view_model/washing_production_input_view_model.dart';
 import '../../../../common/widgets/error_status_dialog.dart';
-import '../../../../common/widgets/scan_label_dialog.dart';
+import '../../shared/models/production_formula_model.dart';
+import '../../shared/widgets/production_scan_label_dialog.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../../shared/widgets/confirm_save_temp_dialog.dart';
 import '../../shared/widgets/save_button_with_badge.dart';
@@ -135,7 +136,9 @@ class _WashingProductionInputScreenState
   /// Cek apakah prefix label (2 karakter pertama, e.g. "V.") diizinkan oleh formula.
   bool _isPrefixAllowed(String code) {
     if (_formulaOutputs.isEmpty) return true;
-    final prefix = code.trim().length >= 2 ? code.trim().substring(0, 2).toUpperCase() : '';
+    final prefix = code.trim().length >= 2
+        ? code.trim().substring(0, 2).toUpperCase()
+        : '';
     return _formulaOutputs.any(
       (o) => o.formulas.any((f) => f.prefixLabel.toUpperCase() == prefix),
     );
@@ -161,6 +164,7 @@ class _WashingProductionInputScreenState
   }
 
   static const _kategoriToTab = {
+    'bahanbaku': 'bb',
     'bb': 'bb',
     'washing': 'washing',
     'gilingan': 'gilingan',
@@ -469,53 +473,31 @@ class _WashingProductionInputScreenState
     }
   }
 
-  /// Bangun acceptedLabels dari data formula secara dinamis.
-  List<({String prefix, String label})> _buildAcceptedLabels() {
-    // Fallback bila formula belum dimuat
-    if (_formulaOutputs.isEmpty) {
-      return const [
-        (prefix: 'A', label: 'Bahan Baku'),
-        (prefix: 'B', label: 'Washing'),
-        (prefix: 'V', label: 'Gilingan'),
-      ];
-    }
-
-    // Kumpulkan prefix unik dari formula, petakan ke label yg sudah dikenal
-    const prefixToLabel = {
-      'A.': 'Bahan Baku',
-      'B.': 'Washing',
-      'V.': 'Gilingan',
-      'D.': 'Broker',
-    };
-
-    final seen = <String>{};
-    final result = <({String prefix, String label})>[];
-
-    for (final o in _formulaOutputs) {
-      for (final f in o.formulas) {
-        final raw = f.prefixLabel.trim().toUpperCase();
-        if (raw.isEmpty || seen.contains(raw)) continue;
-        seen.add(raw);
-        // prefix untuk ScanLabelDialog tanpa titik, e.g. "A." → "A"
-        final short = raw.endsWith('.') ? raw.substring(0, raw.length - 1) : raw;
-        final label = prefixToLabel[raw] ?? f.kategoriNama;
-        result.add((prefix: short, label: label));
-      }
-    }
-
-    return result.isEmpty
-        ? const [(prefix: 'A', label: 'Bahan Baku')]
-        : result;
-  }
-
   Future<void> _openScanDialog() async {
-    final accepted = _buildAcceptedLabels();
     await showDialog<void>(
       context: context,
-      builder: (_) => ScanLabelDialog(
+      builder: (_) => ProductionScanLabelDialog(
         manualHint: 'X.XXXXXXXXXX',
         headerSubtitle: _modeLabel(_selectedMode),
-        acceptedLabels: accepted,
+        primaryColor: const Color(0xFF0277BD),
+        formulaOutputs: _formulaOutputs
+            .map(
+              (o) => ProductionFormulaOutput(
+                idJenis: o.idJenis,
+                namaJenis: o.namaJenis,
+                formulas: o.formulas
+                    .map(
+                      (f) => ProductionFormulaItem(
+                        inputId: f.inputId,
+                        inputNama: f.inputNama,
+                        kategoriNama: f.kategoriNama,
+                        prefixLabel: f.prefixLabel,
+                      ),
+                    )
+                    .toList(),
+              ),
+            )
+            .toList(),
         onLookup: (code) async => _onCodeReady(code),
       ),
     );
@@ -555,7 +537,8 @@ class _WashingProductionInputScreenState
       final prefix = code.trim().length >= 2
           ? code.trim().substring(0, 2).toUpperCase()
           : '';
-      final isKnownPrefix = _formulaOutputs.isNotEmpty &&
+      final isKnownPrefix =
+          _formulaOutputs.isNotEmpty &&
           _formulaOutputs.any(
             (o) => o.formulas.any((f) => f.prefixLabel.toUpperCase() == prefix),
           );
@@ -573,9 +556,13 @@ class _WashingProductionInputScreenState
     // ── Validasi 2: idJenis item harus cocok dengan InputId di formula ──
     final firstItem = res.typedItems.isNotEmpty ? res.typedItems.first : null;
     int? idJenis;
-    if (firstItem is BbItem) { idJenis = firstItem.idJenis; }
-    else if (firstItem is WashingItem) { idJenis = firstItem.idJenis; }
-    else if (firstItem is GilinganItem) { idJenis = firstItem.idJenis; }
+    if (firstItem is BbItem) {
+      idJenis = firstItem.idJenis;
+    } else if (firstItem is WashingItem) {
+      idJenis = firstItem.idJenis;
+    } else if (firstItem is GilinganItem) {
+      idJenis = firstItem.idJenis;
+    }
 
     if (!_isItemIdAllowed(idJenis)) {
       return 'Jenis material tidak termasuk dalam formula produksi ini.';
@@ -817,11 +804,17 @@ class _WashingProductionInputScreenState
                 padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
                 decoration: BoxDecoration(
                   color: _kWashingPrimary,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(12),
+                  ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.science_outlined, color: Colors.white, size: 18),
+                    const Icon(
+                      Icons.science_outlined,
+                      color: Colors.white,
+                      size: 18,
+                    ),
                     const SizedBox(width: 8),
                     const Expanded(
                       child: Text(
@@ -836,7 +829,11 @@ class _WashingProductionInputScreenState
                     IconButton(
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
-                      icon: const Icon(Icons.close, color: Colors.white, size: 18),
+                      icon: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 18,
+                      ),
                       onPressed: () => Navigator.of(ctx).pop(),
                     ),
                   ],
@@ -861,11 +858,16 @@ class _WashingProductionInputScreenState
                       children: [
                         // Output jenis label
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
                             color: _kWashingPrimary.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: _kWashingPrimary.withValues(alpha: 0.2)),
+                            border: Border.all(
+                              color: _kWashingPrimary.withValues(alpha: 0.2),
+                            ),
                           ),
                           child: Text(
                             output.namaJenis,
@@ -878,58 +880,76 @@ class _WashingProductionInputScreenState
                         ),
                         const SizedBox(height: 8),
                         // Per kategori
-                        ...grouped.entries.map((e) => Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.blueGrey.shade50,
-                                      borderRadius: BorderRadius.circular(4),
-                                      border: Border.all(color: Colors.blueGrey.shade200),
-                                    ),
-                                    child: Text(
-                                      e.key,
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.blueGrey.shade700,
+                        ...grouped.entries.map(
+                          (e) => Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.blueGrey.shade50,
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                          color: Colors.blueGrey.shade200,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        e.key,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.blueGrey.shade700,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    e.value.first.prefixLabel,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.grey.shade500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              ...e.value.map((f) => Padding(
-                                padding: const EdgeInsets.only(left: 8, bottom: 2),
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.chevron_right, size: 12, color: Colors.grey.shade400),
-                                    const SizedBox(width: 2),
-                                    Expanded(
-                                      child: Text(
-                                        f.inputNama,
-                                        style: const TextStyle(fontSize: 11),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      e.value.first.prefixLabel,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey.shade500,
                                       ),
                                     ),
                                   ],
                                 ),
-                              )),
-                            ],
+                                const SizedBox(height: 4),
+                                ...e.value.map(
+                                  (f) => Padding(
+                                    padding: const EdgeInsets.only(
+                                      left: 8,
+                                      bottom: 2,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.chevron_right,
+                                          size: 12,
+                                          color: Colors.grey.shade400,
+                                        ),
+                                        const SizedBox(width: 2),
+                                        Expanded(
+                                          child: Text(
+                                            f.inputNama,
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        )),
+                        ),
                       ],
                     );
                   },
@@ -1058,29 +1078,29 @@ class _WashingProductionInputScreenState
                     accentColor: _kWashingPrimary,
                     tabs: [
                       if (_isTabAllowed('broker'))
-                      ProductionTabItem(
-                        value: 'broker',
-                        label: 'Broker',
-                        count: bbGroups.length,
-                      ),
+                        ProductionTabItem(
+                          value: 'broker',
+                          label: 'Broker',
+                          count: bbGroups.length,
+                        ),
                       if (_isTabAllowed('bb'))
-                      ProductionTabItem(
-                        value: 'bb',
-                        label: 'Bahan Baku',
-                        count: bbGroups.length,
-                      ),
+                        ProductionTabItem(
+                          value: 'bb',
+                          label: 'Bahan Baku',
+                          count: bbGroups.length,
+                        ),
                       if (_isTabAllowed('washing'))
-                      ProductionTabItem(
-                        value: 'washing',
-                        label: 'Washing',
-                        count: washingGroups.length,
-                      ),
+                        ProductionTabItem(
+                          value: 'washing',
+                          label: 'Washing',
+                          count: washingGroups.length,
+                        ),
                       if (_isTabAllowed('gilingan'))
-                      ProductionTabItem(
-                        value: 'gilingan',
-                        label: 'Gilingan',
-                        count: gilinganGroups.length,
-                      ),
+                        ProductionTabItem(
+                          value: 'gilingan',
+                          label: 'Gilingan',
+                          count: gilinganGroups.length,
+                        ),
                     ],
                     onChanged: (value) {
                       if (_selectedInputTab == value) return;

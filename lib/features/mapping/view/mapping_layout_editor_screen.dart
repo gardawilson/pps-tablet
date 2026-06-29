@@ -294,10 +294,8 @@ class _EditorViewState extends State<_EditorView> {
                   behavior: HitTestBehavior.translucent,
                   onTapUp: vm.mode != EditorMode.aisle
                       ? (d) {
-                          final col =
-                              (d.localPosition.dx / _slotW).floor();
-                          final row =
-                              (d.localPosition.dy / _slotH).floor();
+                          final col = (d.localPosition.dx / _slotW).floor();
+                          final row = (d.localPosition.dy / _slotH).floor();
                           if (row >= 0 &&
                               row < vm.rows &&
                               col >= 0 &&
@@ -321,16 +319,19 @@ class _EditorViewState extends State<_EditorView> {
                   child: DragTarget<Object>(
                     onWillAcceptWithDetails: (_) => true,
                     onAcceptWithDetails: (details) {
-                      final box = _gridBodyKey.currentContext
-                          ?.findRenderObject() as RenderBox?;
+                      final box =
+                          _gridBodyKey.currentContext?.findRenderObject()
+                              as RenderBox?;
                       if (box == null) return;
                       final local = box.globalToLocal(details.offset);
-                      final col = (local.dx / _slotW)
-                          .floor()
-                          .clamp(0, vm.cols - 1);
-                      final row = (local.dy / _slotH)
-                          .floor()
-                          .clamp(0, vm.rows - 1);
+                      final col = (local.dx / _slotW).floor().clamp(
+                        0,
+                        vm.cols - 1,
+                      );
+                      final row = (local.dy / _slotH).floor().clamp(
+                        0,
+                        vm.rows - 1,
+                      );
                       if (details.data is MappingLokasi) {
                         vm.placeLokasi(
                           row,
@@ -341,25 +342,32 @@ class _EditorViewState extends State<_EditorView> {
                         );
                       } else if (details.data is _CellMoveData) {
                         final d = details.data as _CellMoveData;
-                        final destRow =
-                            (row - _grabDeltaRow).clamp(0, vm.rows - 1);
-                        final destCol =
-                            (col - _grabDeltaCol).clamp(0, vm.cols - 1);
+                        final destRow = (row - _grabDeltaRow).clamp(
+                          0,
+                          vm.rows - 1,
+                        );
+                        final destCol = (col - _grabDeltaCol).clamp(
+                          0,
+                          vm.cols - 1,
+                        );
                         vm.moveCell(d.row, d.col, destRow, destCol);
                       }
                       _hoverNotifier.value = null;
                     },
                     onMove: (details) {
-                      final box = _gridBodyKey.currentContext
-                          ?.findRenderObject() as RenderBox?;
+                      final box =
+                          _gridBodyKey.currentContext?.findRenderObject()
+                              as RenderBox?;
                       if (box == null) return;
                       final local = box.globalToLocal(details.offset);
-                      final col = (local.dx / _slotW)
-                          .floor()
-                          .clamp(0, vm.cols - 1);
-                      final row = (local.dy / _slotH)
-                          .floor()
-                          .clamp(0, vm.rows - 1);
+                      final col = (local.dx / _slotW).floor().clamp(
+                        0,
+                        vm.cols - 1,
+                      );
+                      final row = (local.dy / _slotH).floor().clamp(
+                        0,
+                        vm.rows - 1,
+                      );
                       int rs = 1, cs = 1;
                       Color color = _primary;
                       if (details.data is MappingLokasi) {
@@ -376,10 +384,14 @@ class _EditorViewState extends State<_EditorView> {
                           _ => _primary,
                         };
                       }
-                      final hoverRow =
-                          (row - _grabDeltaRow).clamp(0, vm.rows - 1);
-                      final hoverCol =
-                          (col - _grabDeltaCol).clamp(0, vm.cols - 1);
+                      final hoverRow = (row - _grabDeltaRow).clamp(
+                        0,
+                        vm.rows - 1,
+                      );
+                      final hoverCol = (col - _grabDeltaCol).clamp(
+                        0,
+                        vm.cols - 1,
+                      );
                       _hoverNotifier.value = _HoverState(
                         row: hoverRow,
                         col: hoverCol,
@@ -416,10 +428,9 @@ class _EditorViewState extends State<_EditorView> {
                                     top: r * _slotH,
                                     child: _GridCell(
                                       cell: vm.grid[r][c],
-                                      width: vm.grid[r][c].colSpan * _slotW -
-                                          3,
-                                      height: vm.grid[r][c].rowSpan * _slotH -
-                                          3,
+                                      width: vm.grid[r][c].colSpan * _slotW - 3,
+                                      height:
+                                          vm.grid[r][c].rowSpan * _slotH - 3,
                                     ),
                                   ),
                             // Hover preview overlay
@@ -438,10 +449,10 @@ class _EditorViewState extends State<_EditorView> {
                                       height: hover.rowSpan * _slotH - 3,
                                       margin: const EdgeInsets.all(1.5),
                                       decoration: BoxDecoration(
-                                        color: hover.color
-                                            .withValues(alpha: 0.18),
-                                        borderRadius:
-                                            BorderRadius.circular(6),
+                                        color: hover.color.withValues(
+                                          alpha: 0.18,
+                                        ),
+                                        borderRadius: BorderRadius.circular(6),
                                         border: Border.all(
                                           color: hover.color,
                                           width: 2,
@@ -1719,8 +1730,7 @@ class _GridPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_GridPainter old) =>
-      old.rows != rows || old.cols != cols;
+  bool shouldRepaint(_GridPainter old) => old.rows != rows || old.cols != cols;
 }
 
 // ── Dimension Control ─────────────────────────────────────────────────────────

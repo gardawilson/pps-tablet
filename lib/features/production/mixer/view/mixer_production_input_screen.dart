@@ -301,7 +301,7 @@ class _MixerProductionInputScreenState
         manualHint: 'X.XXXXXXXXXX',
         headerSubtitle: _modeLabel(_selectedMode),
         acceptedLabels: const [
-          (prefix: 'A', label: 'Bahan Baku'),
+          (prefix: 'A / AB', label: 'Bahan Baku'),
           (prefix: 'B', label: 'Washing'),
           (prefix: 'D', label: 'Broker'),
           (prefix: 'V', label: 'Gilingan'),

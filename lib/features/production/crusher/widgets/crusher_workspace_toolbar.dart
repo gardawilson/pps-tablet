@@ -16,6 +16,7 @@ class CrusherWorkspaceToolbar extends StatelessWidget {
   final VoidCallback? onRefresh;
   final VoidCallback? onGanti;
   final VoidCallback? onRiwayat;
+  final bool showGantiRiwayat;
 
   const CrusherWorkspaceToolbar({
     super.key,
@@ -30,6 +31,7 @@ class CrusherWorkspaceToolbar extends StatelessWidget {
     this.onRefresh,
     this.onGanti,
     this.onRiwayat,
+    this.showGantiRiwayat = true,
   });
 
   @override
@@ -47,6 +49,7 @@ class CrusherWorkspaceToolbar extends StatelessWidget {
       onGanti: onGanti,
       onRiwayat: onRiwayat,
       onRefresh: onRefresh,
+      showGantiRiwayat: showGantiRiwayat,
     );
   }
 }

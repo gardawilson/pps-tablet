@@ -13,6 +13,7 @@ class ProductionFwipOutputTile extends StatelessWidget {
     required this.printCount,
     this.accentColor = const Color(0xFF00695C),
     this.onTap,
+    this.onDelete,
   });
 
   final String labelCode;
@@ -22,6 +23,7 @@ class ProductionFwipOutputTile extends StatelessWidget {
   final int printCount;
   final Color accentColor;
   final VoidCallback? onTap;
+  final VoidCallback? onDelete;
 
   bool get _isPrinted => printCount > 0;
 
@@ -69,6 +71,17 @@ class ProductionFwipOutputTile extends StatelessWidget {
                     size: 11,
                     color: _isPrinted ? accentColor : Colors.grey.shade400,
                   ),
+                  if (onDelete != null) ...[
+                    const SizedBox(width: 4),
+                    GestureDetector(
+                      onTap: onDelete,
+                      child: Icon(
+                        Icons.delete_outline,
+                        size: 13,
+                        color: Colors.red.shade400,
+                      ),
+                    ),
+                  ],
                 ],
               ),
               const SizedBox(height: 1),

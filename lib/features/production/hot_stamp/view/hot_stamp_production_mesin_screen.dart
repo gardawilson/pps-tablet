@@ -505,17 +505,6 @@ class _HotStampProductionMesinScreenState
                                 ),
                               );
                             },
-                            onInput: (row) async {
-                              await Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      HotStampingProductionInputScreen(
-                                        noProduksi: row.noProduksi,
-                                      ),
-                                ),
-                              );
-                              if (mounted) _refreshAll();
-                            },
                           ),
                         ),
                         if (_selectedMesinInfo != null)

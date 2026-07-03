@@ -474,16 +474,6 @@ class _MixerProductionMesinScreenState
                                 ),
                               );
                             },
-                            onInput: (row) async {
-                              await Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => MixerProductionInputScreen(
-                                    noProduksi: row.noProduksi,
-                                  ),
-                                ),
-                              );
-                              if (mounted) _refreshAll();
-                            },
                           ),
                         ),
                         if (_selectedMesinInfo != null)

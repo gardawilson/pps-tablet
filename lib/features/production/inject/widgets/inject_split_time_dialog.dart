@@ -11,6 +11,7 @@ import '../../../jenis_bonggolan/view_model/jenis_bonggolan_view_model.dart';
 import '../../../reject_type/model/reject_type_model.dart';
 import '../../../reject_type/view_model/reject_type_view_model.dart';
 import '../../../warna/model/warna_model.dart';
+import '../model/inject_batch_model.dart' show InjectBatchSubmitResult;
 import '../model/inject_production_model.dart' show InjectOutputJenis;
 import '../repository/inject_production_repository.dart';
 import 'cetakan_warna_material_picker.dart';
@@ -379,7 +380,7 @@ class _InjectSplitTimeDialogState extends State<InjectSplitTimeDialog> {
         };
       }
 
-      await repo.splitTime(
+      final raw = await repo.splitTime(
         idMesin: widget.idMesin,
         tglProduksi: widget.tglProduksi,
         hourStart: newHourStart,
@@ -389,7 +390,7 @@ class _InjectSplitTimeDialogState extends State<InjectSplitTimeDialog> {
         batch: batchPayload,
       );
       if (!mounted) return;
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop(InjectBatchSubmitResult.fromJson(raw));
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -405,11 +406,11 @@ class _InjectSplitTimeDialogState extends State<InjectSplitTimeDialog> {
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 60),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
       child: Container(
-        width: 480,
+        width: 860,
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.85,
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
         ),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -425,9 +426,9 @@ class _InjectSplitTimeDialogState extends State<InjectSplitTimeDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header
+            // ── Header ──────────────────────────────────────────────────
             Container(
-              height: 56,
+              height: 52,
               padding: const EdgeInsets.symmetric(horizontal: 20),
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
@@ -438,15 +439,15 @@ class _InjectSplitTimeDialogState extends State<InjectSplitTimeDialog> {
               child: Row(
                 children: [
                   Container(
-                    width: 32,
-                    height: 32,
+                    width: 30,
+                    height: 30,
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Icon(
                       Icons.swap_horiz_rounded,
-                      size: 18,
+                      size: 16,
                       color: Colors.white,
                     ),
                   ),
@@ -454,7 +455,7 @@ class _InjectSplitTimeDialogState extends State<InjectSplitTimeDialog> {
                   const Text(
                     'Ganti Produksi (Split Time)',
                     style: TextStyle(
-                      fontSize: 15,
+                      fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: Colors.white,
                     ),
@@ -466,15 +467,15 @@ class _InjectSplitTimeDialogState extends State<InjectSplitTimeDialog> {
                         : () => Navigator.of(context).pop(null),
                     borderRadius: BorderRadius.circular(20),
                     child: Container(
-                      width: 28,
-                      height: 28,
+                      width: 26,
+                      height: 26,
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.2),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
                         Icons.close,
-                        size: 16,
+                        size: 14,
                         color: Colors.white,
                       ),
                     ),
@@ -483,396 +484,378 @@ class _InjectSplitTimeDialogState extends State<InjectSplitTimeDialog> {
               ),
             ),
 
-            // Body
+            // ── Body: two-column layout ──────────────────────────────────
             Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-                child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ── PRODUKSI SAAT INI ──────────────────────────────────
-                  _SectionLabel(label: 'PRODUKSI SAAT INI'),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // ── LEFT: Produksi Saat Ini ────────────────────────────
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(20, 18, 16, 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Section header
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF64748B).withValues(alpha: 0.10),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Icon(Icons.history_rounded, size: 13, color: Color(0xFF64748B)),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'PRODUKSI SAAT INI',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF64748B),
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+
+                            // Chips cetakan/warna/material
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: (widget.currentCetakan ?? '').isNotEmpty ||
+                                      (widget.currentWarna ?? '').isNotEmpty ||
+                                      (widget.currentMaterial ?? '').isNotEmpty
+                                  ? Wrap(
+                                      spacing: 6,
+                                      runSpacing: 6,
+                                      children: [
+                                        if ((widget.currentCetakan ?? '').isNotEmpty)
+                                          _CurrentInfoChip(icon: Icons.view_in_ar_rounded, label: widget.currentCetakan!),
+                                        if ((widget.currentWarna ?? '').isNotEmpty)
+                                          _CurrentInfoChip(icon: Icons.palette_outlined, label: widget.currentWarna!),
+                                        if ((widget.currentMaterial ?? '').isNotEmpty)
+                                          _CurrentInfoChip(icon: Icons.category_outlined, label: widget.currentMaterial!),
+                                      ],
+                                    )
+                                  : const Text(
+                                      'Tidak ada informasi produksi',
+                                      style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+                                    ),
+                            ),
+
+                            const SizedBox(height: 14),
+                            const _SubSectionLabel(label: 'INPUT JAM AKHIR'),
+                            const SizedBox(height: 8),
+
+                            // Carry masuk + pcs input + carry sesudah
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Expanded(
+                                  child: _readonlyChip(
+                                    label: 'Carry Masuk',
+                                    value: '${widget.carryOverIn} / ${widget.pcsPerLabel}',
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: _BeratField(
+                                    label: 'Item Bagus (pcs)',
+                                    ctrl: _pcsCtrl,
+                                    hint: '0',
+                                    decimal: false,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Builder(builder: (_) {
+                                    final ppl = widget.pcsPerLabel.clamp(1, 999999);
+                                    final pcsTyped = int.tryParse(_pcsCtrl.text.trim()) ?? 0;
+                                    final carryOut = (widget.carryOverIn + pcsTyped) % ppl;
+                                    return _readonlyChip(
+                                      label: 'Carry Sesudah',
+                                      value: '$carryOut pcs',
+                                      muted: true,
+                                    );
+                                  }),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Berat + Cycle + Counter
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Expanded(
+                                  child: _BeratField(
+                                    label: 'Berat (gr)',
+                                    ctrl: _beratCtrl,
+                                    hint: '0.0',
+                                    decimal: true,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: _BeratField(
+                                    label: 'Cycle Time (sec)',
+                                    ctrl: _cycleCtrl,
+                                    hint: '0.0',
+                                    decimal: true,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(child: _buildCounterField()),
+                              ],
+                            ),
+
+                            const SizedBox(height: 14),
+                            const _SubSectionLabel(label: 'SISA AKHIR SHIFT (OPSIONAL)'),
+                            const SizedBox(height: 8),
+
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Expanded(
+                                  flex: 3,
+                                  child: _JenisPicker(
+                                    label: 'Jenis Bonggolan',
+                                    selectedName: _bonggolanJenis?.namaBonggolan,
+                                    onTap: () async {
+                                      final picked = await _showBonggolanPicker();
+                                      if (picked != null && mounted) setState(() => _bonggolanJenis = picked);
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  flex: 2,
+                                  child: _BeratField(
+                                    label: 'Berat (kg)',
+                                    ctrl: _beratBonggolanCtrl,
+                                    enabled: _bonggolanJenis != null,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Expanded(
+                                  flex: 3,
+                                  child: _JenisPicker(
+                                    label: 'Jenis Reject',
+                                    selectedName: _rejectJenis?.namaReject,
+                                    onTap: () async {
+                                      final picked = await _showRejectPicker();
+                                      if (picked != null && mounted) setState(() => _rejectJenis = picked);
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  flex: 2,
+                                  child: _BeratField(
+                                    label: 'Berat (kg)',
+                                    ctrl: _beratRejectCtrl,
+                                    enabled: _rejectJenis != null,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+
+                    // ── Vertical divider with arrow ────────────────────────
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Chips cetakan/warna/material
-                        if ((widget.currentCetakan ?? '').isNotEmpty ||
-                            (widget.currentWarna ?? '').isNotEmpty ||
-                            (widget.currentMaterial ?? '').isNotEmpty)
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children: [
-                              if ((widget.currentCetakan ?? '').isNotEmpty)
-                                _CurrentInfoChip(
-                                  icon: Icons.view_in_ar_rounded,
-                                  label: widget.currentCetakan!,
-                                ),
-                              if ((widget.currentWarna ?? '').isNotEmpty)
-                                _CurrentInfoChip(
-                                  icon: Icons.palette_outlined,
-                                  label: widget.currentWarna!,
-                                ),
-                              if ((widget.currentMaterial ?? '').isNotEmpty)
-                                _CurrentInfoChip(
-                                  icon: Icons.category_outlined,
-                                  label: widget.currentMaterial!,
-                                ),
-                            ],
-                          )
-                        else
-                          const Text(
-                            'Tidak ada informasi produksi',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF9CA3AF),
-                            ),
+                        Container(
+                          width: 1,
+                          height: double.infinity,
+                          constraints: const BoxConstraints(maxHeight: 60),
+                          color: const Color(0xFFE5E7EB),
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: accent.withValues(alpha: 0.08),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: accent.withValues(alpha: 0.20)),
                           ),
-
-                        // ── Input jam akhir ────────────────────────────────
-                        const SizedBox(height: 10),
-                        const Divider(height: 1, color: Color(0xFFE2E8F0)),
-                        const SizedBox(height: 10),
-                        const Text(
-                          'INPUT JAM AKHIR',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF6B7280),
-                            letterSpacing: 1.0,
-                          ),
+                          child: Icon(Icons.arrow_forward_rounded, size: 14, color: accent.withValues(alpha: 0.6)),
                         ),
-                        const SizedBox(height: 8),
-                        // Carry masuk + pcs input + carry sesudah
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Expanded(
-                              child: _readonlyChip(
-                                label: 'Carry-over Masuk',
-                                value: '${widget.carryOverIn} / ${widget.pcsPerLabel} pcs',
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: _BeratField(
-                                label: 'Jumlah Item Bagus (pcs)',
-                                ctrl: _pcsCtrl,
-                                hint: '0',
-                                decimal: false,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Builder(builder: (_) {
-                                final ppl = widget.pcsPerLabel.clamp(1, 999999);
-                                final pcsTyped = int.tryParse(_pcsCtrl.text.trim()) ?? 0;
-                                final carryOut = (widget.carryOverIn + pcsTyped) % ppl;
-                                return _readonlyChip(
-                                  label: 'Carry-over Sesudah',
-                                  value: '$carryOut pcs',
-                                  muted: true,
-                                );
-                              }),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        // Berat + Cycle + Counter
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Expanded(
-                              child: _BeratField(
-                                label: 'Berat (gr)',
-                                ctrl: _beratCtrl,
-                                hint: '0.0',
-                                decimal: true,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: _BeratField(
-                                label: 'Cycle Time (sec)',
-                                ctrl: _cycleCtrl,
-                                hint: '0.0',
-                                decimal: true,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(child: _buildCounterField()),
-                          ],
-                        ),
-
-                        // ── Sisa akhir shift ───────────────────────────────
-                        const SizedBox(height: 10),
-                        const Divider(height: 1, color: Color(0xFFE2E8F0)),
-                        const SizedBox(height: 10),
-                        const Text(
-                          'SISA AKHIR SHIFT (OPSIONAL)',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF6B7280),
-                            letterSpacing: 1.0,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Expanded(
-                              flex: 3,
-                              child: _JenisPicker(
-                                label: 'Jenis Bonggolan',
-                                selectedName: _bonggolanJenis?.namaBonggolan,
-                                onTap: () async {
-                                  final picked = await _showBonggolanPicker();
-                                  if (picked != null && mounted) {
-                                    setState(() => _bonggolanJenis = picked);
-                                  }
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              flex: 2,
-                              child: _BeratField(
-                                label: 'Berat (kg)',
-                                ctrl: _beratBonggolanCtrl,
-                                enabled: _bonggolanJenis != null,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Expanded(
-                              flex: 3,
-                              child: _JenisPicker(
-                                label: 'Jenis Reject',
-                                selectedName: _rejectJenis?.namaReject,
-                                onTap: () async {
-                                  final picked = await _showRejectPicker();
-                                  if (picked != null && mounted) {
-                                    setState(() => _rejectJenis = picked);
-                                  }
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              flex: 2,
-                              child: _BeratField(
-                                label: 'Berat (kg)',
-                                ctrl: _beratRejectCtrl,
-                                enabled: _rejectJenis != null,
-                              ),
-                            ),
-                          ],
+                        const SizedBox(height: 6),
+                        Container(
+                          width: 1,
+                          height: double.infinity,
+                          constraints: const BoxConstraints(maxHeight: 60),
+                          color: const Color(0xFFE5E7EB),
                         ),
                       ],
                     ),
-                  ),
 
-                  // ── Panah transisi ─────────────────────────────────────
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Column(
-                        children: [
-                          Icon(
-                            Icons.arrow_downward_rounded,
-                            size: 20,
-                            color: accent.withValues(alpha: 0.5),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // ── PRODUKSI BARU ──────────────────────────────────────
-                  _SectionLabel(label: 'PRODUKSI BARU'),
-                  const SizedBox(height: 10),
-
-                  // Jam mulai
-                  Row(
-                    children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: accent.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          Icons.access_time_rounded,
-                          size: 18,
-                          color: accent,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
+                    // ── RIGHT: Produksi Baru ──────────────────────────────
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(16, 18, 20, 16),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Jam Mulai',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF6B7280),
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            GestureDetector(
-                              onTap: _pickTime,
-                              child: Text(
-                                _hourCtrl.text.isNotEmpty
-                                    ? _hourCtrl.text
-                                    : '--:--',
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w800,
-                                  color: _hourCtrl.text.isNotEmpty
-                                      ? accent
-                                      : const Color(0xFFD1D5DB),
-                                  letterSpacing: 1,
+                            // Section header
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(5),
+                                  decoration: BoxDecoration(
+                                    color: accent.withValues(alpha: 0.10),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Icon(Icons.fiber_new_rounded, size: 13, color: accent),
                                 ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'PRODUKSI BARU',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: accent,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+
+                            // Jam mulai
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: accent.withValues(alpha: 0.04),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: accent.withValues(alpha: 0.15)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 32,
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      color: accent.withValues(alpha: 0.10),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(Icons.access_time_rounded, size: 16, color: accent),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Jam Mulai',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                            color: accent.withValues(alpha: 0.7),
+                                          ),
+                                        ),
+                                        GestureDetector(
+                                          onTap: _pickTime,
+                                          child: Text(
+                                            _hourCtrl.text.isNotEmpty ? _hourCtrl.text : '--:--',
+                                            style: TextStyle(
+                                              fontSize: 24,
+                                              fontWeight: FontWeight.w800,
+                                              color: _hourCtrl.text.isNotEmpty ? accent : const Color(0xFFD1D5DB),
+                                              letterSpacing: 1.5,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  TextButton.icon(
+                                    onPressed: _pickTime,
+                                    icon: const Icon(Icons.edit_outlined, size: 13),
+                                    label: const Text('Ubah', style: TextStyle(fontSize: 12)),
+                                    style: TextButton.styleFrom(foregroundColor: accent),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                      TextButton.icon(
-                        onPressed: _pickTime,
-                        icon: const Icon(Icons.edit_outlined, size: 14),
-                        label: const Text(
-                          'Ubah',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                        style: TextButton.styleFrom(foregroundColor: accent),
-                      ),
-                    ],
-                  ),
 
-                  const SizedBox(height: 14),
-                  const Divider(height: 1, color: Color(0xFFE5E7EB)),
-                  const SizedBox(height: 14),
-
-                  // Cetakan warna material
-                  Row(
-                    children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: accent.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          Icons.view_in_ar_rounded,
-                          size: 18,
-                          color: accent,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Cetakan, Warna & Material',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF6B7280),
-                              ),
-                            ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: 14),
+                            const _SubSectionLabel(label: 'CETAKAN, WARNA & MATERIAL'),
+                            const SizedBox(height: 4),
                             Text(
                               widget.lockedIdCetakan != null
                                   ? 'Cetakan terkunci — pilih warna & material'
                                   : 'Pilih cetakan untuk produksi baru',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF9CA3AF),
-                              ),
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
                             ),
+                            const SizedBox(height: 8),
+                            CetakanWarnaMaterialPickerField(
+                              selectedCetakan: _cetakan,
+                              selectedWarna: _warna,
+                              selectedMaterial: _material,
+                              isLoading: _loadingCetakan,
+                              onTap: _pickCetakan,
+                            ),
+
+                            // Error
+                            if (_error != null) ...[
+                              const SizedBox(height: 12),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEF2F2),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: const Color(0xFFFECACA)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.error_outline, size: 14, color: Color(0xFFDC2626)),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        _error!,
+                                        style: const TextStyle(fontSize: 12, color: Color(0xFFDC2626)),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  CetakanWarnaMaterialPickerField(
-                    selectedCetakan: _cetakan,
-                    selectedWarna: _warna,
-                    selectedMaterial: _material,
-                    isLoading: _loadingCetakan,
-                    onTap: _pickCetakan,
-                  ),
-
-                  // Error
-                  if (_error != null) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFEF2F2),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFFECACA)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.error_outline,
-                            size: 14,
-                            color: Color(0xFFDC2626),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _error!,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFFDC2626),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
                     ),
                   ],
-                ],
+                ),
               ),
             ),
-          ),
 
-          // Footer
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-            decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
-            ),
-            child: Row(
+            // ── Footer ──────────────────────────────────────────────────
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+              ),
+              child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 OutlinedButton(
@@ -914,8 +897,8 @@ class _InjectSplitTimeDialogState extends State<InjectSplitTimeDialog> {
   }
 }
 
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel({required this.label});
+class _SubSectionLabel extends StatelessWidget {
+  const _SubSectionLabel({required this.label});
   final String label;
 
   @override

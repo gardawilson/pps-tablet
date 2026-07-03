@@ -421,16 +421,6 @@ class _SpannerProductionMesinScreenState
                                 ),
                               );
                             },
-                            onInput: (row) async {
-                              await Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => SpannerProductionInputScreen(
-                                    noProduksi: row.noProduksi,
-                                  ),
-                                ),
-                              );
-                              if (mounted) _refreshAll();
-                            },
                           ),
                         ),
                         if (_selectedMesinInfo != null)

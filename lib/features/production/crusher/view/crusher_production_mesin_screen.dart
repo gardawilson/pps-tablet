@@ -469,16 +469,6 @@ class _CrusherProductionMesinScreenState
                                 ),
                               );
                             },
-                            onInput: (row) async {
-                              await Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => CrusherProductionInputScreen(
-                                    noCrusherProduksi: row.noCrusherProduksi,
-                                  ),
-                                ),
-                              );
-                              if (mounted) _refreshAll();
-                            },
                           ),
                         ),
                         if (_selectedMesinInfo != null)

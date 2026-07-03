@@ -18,6 +18,7 @@ class InjectQcDialog extends StatefulWidget {
     required this.hourEnd,
     this.shift,
     this.namaMesin,
+    this.idMesin,
     this.outputJenisList = const [],
     this.tglProduksi,
   });
@@ -27,6 +28,7 @@ class InjectQcDialog extends StatefulWidget {
   final String hourEnd;
   final int? shift;
   final String? namaMesin;
+  final int? idMesin;
   final List<String> outputJenisList;
   final DateTime? tglProduksi;
 
@@ -44,6 +46,7 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
   final Map<String, DateTime> _bucketEndTimes = {};
   final Map<String, InjectQcItem?> _submitted = {};
   bool _isLoadingHistory = true;
+  int? _counterCurrent;
   Timer? _statusTimer;
 
   @override
@@ -154,6 +157,12 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
   Future<void> _loadHistory() async {
     setState(() => _isLoadingHistory = true);
     try {
+      // Ambil odometer/counter mesin sebagai default & batas minimum counter QC.
+      if (widget.idMesin != null) {
+        try {
+          _counterCurrent = await _repo.fetchQcCounter(widget.idMesin!);
+        } catch (_) {}
+      }
       final items = await _repo.fetchQc(widget.noProduksi);
       if (!mounted) return;
       final map = <String, InjectQcItem?>{};
@@ -221,6 +230,7 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
                           submittedItem: _submitted[label],
                           status: _statusFor(label),
                           canEdit: _canEditBucket(label),
+                          counterCurrent: _counterCurrent,
                           onSubmitted: (item) => _onSubmitted(label, item),
                         );
                       },
@@ -358,6 +368,7 @@ class _QcBucketRow extends StatefulWidget {
     required this.canEdit,
     required this.onSubmitted,
     this.submittedItem,
+    this.counterCurrent,
   });
 
   final String label;
@@ -366,6 +377,7 @@ class _QcBucketRow extends StatefulWidget {
   final _QcBucketStatus status;
   final bool canEdit;
   final InjectQcItem? submittedItem;
+  final int? counterCurrent;
   final ValueChanged<InjectQcItem> onSubmitted;
 
   @override
@@ -381,6 +393,13 @@ class _QcBucketRowState extends State<_QcBucketRow> {
   bool _isSubmitting = false;
   bool _isEditing = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    // Default counter mengikuti odometer mesin saat ini (batas minimum wajib).
+    _counterValue = widget.counterCurrent ?? 0;
+  }
 
   @override
   void dispose() {
@@ -405,6 +424,11 @@ class _QcBucketRowState extends State<_QcBucketRow> {
     final jumlahBS = int.tryParse(_jumlahBsCtrl.text.trim());
     if (jumlahBS == null || jumlahBS <= 0) {
       setState(() => _error = 'Jumlah BS wajib diisi');
+      return;
+    }
+    final minCounter = widget.counterCurrent;
+    if (minCounter != null && _counterValue < minCounter) {
+      setState(() => _error = 'Counter minimal $minCounter');
       return;
     }
     setState(() {
@@ -893,8 +917,10 @@ class _QcBucketRowState extends State<_QcBucketRow> {
               : () async {
                   final picked = await showDialog<int>(
                     context: context,
-                    builder: (_) =>
-                        CounterPickerDialog(initialValue: _counterValue),
+                    builder: (_) => CounterPickerDialog(
+                      initialValue: _counterValue,
+                      minValue: widget.counterCurrent,
+                    ),
                   );
                   if (picked != null && mounted)
                     setState(() => _counterValue = picked);

@@ -1307,6 +1307,11 @@ class _CrusherProductionInputScreenState
                     },
                     onGanti: locked ? null : _openSplitDialog,
                     onRiwayat: _openTimelineDialog,
+                    showGantiRiwayat:
+                        _header?.tanggal != null &&
+                        _header!.tanggal!.year == DateTime.now().year &&
+                        _header!.tanggal!.month == DateTime.now().month &&
+                        _header!.tanggal!.day == DateTime.now().day,
                   ),
                 Expanded(
                   child: Builder(

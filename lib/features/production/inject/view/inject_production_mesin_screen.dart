@@ -16,7 +16,7 @@ import '../view_model/inject_production_view_model.dart';
 import '../widgets/inject_production_delete_dialog.dart';
 import '../widgets/inject_production_form_dialog.dart';
 import '../widgets/inject_qc_dialog.dart';
-import 'inject_production_input_screen.dart' as legacy_input;
+import 'inject_production_input_screen.dart' as v1_input;
 import 'inject_production_input_screen_v3.dart' as v3_input;
 
 class InjectProductionMesinScreen extends StatefulWidget {
@@ -129,23 +129,23 @@ class _InjectProductionMesinScreenState
     _loadProduksiPage();
   }
 
-  Future<void> _openInputScreenChooser(
+  Future<void> _openInputScreen(
     String noProduksi, {
-    required bool isRealtime,
+    bool isRealtime = false,
   }) async {
     if (!mounted) return;
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => isRealtime
             ? v3_input.InjectProductionInputScreen(noProduksi: noProduksi)
-            : legacy_input.InjectProductionInputScreen(noProduksi: noProduksi),
+            : v1_input.InjectProductionInputScreen(noProduksi: noProduksi),
       ),
     );
   }
 
   Future<void> _openCreateDialog({
     required InjectMesinInfo mesin,
-    bool isBackdate = false,
+    bool isBackdateInput = false,
   }) async {
     if (!mounted) return;
     final defaultShift = await ShiftRepository.fetchCurrentShift();
@@ -169,17 +169,15 @@ class _InjectProductionMesinScreenState
             initialShift: defaultShift?.shift,
             initialHourStart: defaultShift?.hourStart,
             initialHourEnd: defaultShift?.hourEnd,
-            isBackdateInput: isBackdate,
+            isBackdateInput: isBackdateInput,
           ),
         ),
       );
       if (!mounted) return;
       if (created != null) {
-        final detail = await _prodRepo.fetchOneByNoProduksi(created.noProduksi);
-        if (!mounted) return;
-        await _openInputScreenChooser(
+        await _openInputScreen(
           created.noProduksi,
-          isRealtime: detail?.isRealtime ?? false,
+          isRealtime: created.isRealtime,
         );
         if (!mounted) return;
         _refreshAll();
@@ -196,12 +194,7 @@ class _InjectProductionMesinScreenState
       return;
     }
     final noProduksi = mesin.produksiList.first.noProduksi;
-    final detail = await _prodRepo.fetchOneByNoProduksi(noProduksi);
-    if (!mounted) return;
-    await _openInputScreenChooser(
-      noProduksi,
-      isRealtime: detail?.isRealtime ?? false,
-    );
+    await _openInputScreen(noProduksi, isRealtime: true);
     if (mounted) _refreshAll();
   }
 
@@ -285,6 +278,7 @@ class _InjectProductionMesinScreenState
         noProduksi: item.noProduksi,
         shift: item.shift,
         namaMesin: mesin.namaMesin,
+        idMesin: mesin.idMesin,
         outputJenisList: item.outputs.isNotEmpty
             ? item.outputs.map((output) => output.namaJenis).toList()
             : [
@@ -310,6 +304,7 @@ class _InjectProductionMesinScreenState
       namaWarna: row.namaWarna,
       namaFurnitureMaterial: row.namaFurnitureMaterial,
       noProduksi: row.noProduksi,
+      produksiStatus: row.produksiStatus,
     );
   }
 
@@ -463,7 +458,7 @@ class _InjectProductionMesinScreenState
                             scrollController: _produksiScrollCtl,
                             showMesin: _filterIdMesin == null,
                             onTap: (row) async {
-                              await _openInputScreenChooser(
+                              await _openInputScreen(
                                 row.noProduksi,
                                 isRealtime: row.isRealtime,
                               );
@@ -473,6 +468,8 @@ class _InjectProductionMesinScreenState
                               final vm = InjectProductionViewModel(
                                 repository: _prodRepo,
                               );
+                              InjectProduction? savedResult;
+                              String? saveError;
                               try {
                                 await showDialog<void>(
                                   context: context,
@@ -484,11 +481,34 @@ class _InjectProductionMesinScreenState
                                         value: vm,
                                         child: InjectProductionFormDialog(
                                           header: row,
+                                          onSave: (r) => savedResult = r,
                                         ),
                                       ),
                                 );
+                                saveError = vm.saveError;
                               } finally {
                                 vm.dispose();
+                              }
+                              if (!mounted) return;
+                              if (savedResult != null) {
+                                // ignore: use_build_context_synchronously
+                                await showDialog<void>(
+                                  context: context,
+                                  builder: (_) => SuccessStatusDialog(
+                                    title: 'Berhasil Diperbarui',
+                                    message:
+                                        'No. Produksi ${row.noProduksi} berhasil diperbarui.',
+                                  ),
+                                );
+                              } else if (saveError != null) {
+                                // ignore: use_build_context_synchronously
+                                await showDialog<void>(
+                                  context: context,
+                                  builder: (_) => ErrorStatusDialog(
+                                    title: 'Gagal Memperbarui',
+                                    message: saveError!,
+                                  ),
+                                );
                               }
                               if (mounted) _refreshAll();
                             },
@@ -535,13 +555,6 @@ class _InjectProductionMesinScreenState
                                 ),
                               );
                             },
-                            onInput: (row) async {
-                              await _openInputScreenChooser(
-                                row.noProduksi,
-                                isRealtime: row.isRealtime,
-                              );
-                              if (mounted) _refreshAll();
-                            },
                           ),
                         ),
                         if (_selectedMesinInfo != null)
@@ -552,11 +565,11 @@ class _InjectProductionMesinScreenState
                               heroTag: 'fab_backdate_inject',
                               onPressed: () => _openCreateDialog(
                                 mesin: _selectedMesinInfo!,
-                                isBackdate: true,
+                                isBackdateInput: true,
                               ),
                               backgroundColor: const Color(0xFF1D4ED8),
                               foregroundColor: Colors.white,
-                              tooltip: 'Tambah Backdate',
+                              tooltip: 'Tambah Produksi',
                               child: const Icon(Icons.add),
                             ),
                           ),

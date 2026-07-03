@@ -28,6 +28,8 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
   final VoidCallback? onRiwayat;
   final VoidCallback? onRefresh;
   final List<Widget>? trailingActions;
+  final bool showGantiRiwayat;
+  final String? produksiStatus;
 
   const ProductionWorkspaceToolbar({
     super.key,
@@ -52,6 +54,8 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
     this.onRiwayat,
     this.onRefresh,
     this.trailingActions,
+    this.showGantiRiwayat = true,
+    this.produksiStatus,
   });
 
   bool _isWithinTimeRange() {
@@ -99,7 +103,7 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
     final hEnd = (hourEnd ?? '').trim();
     final isActive = !isLocked && _isWithinTimeRange();
     final hasJenis = (namaJenis ?? '').trim().isNotEmpty;
-    final canGanti = idMesin != null && shift != null && tglProduksi != null;
+    final canGanti = isActive && idMesin != null && shift != null && tglProduksi != null;
 
     final hasJenisList =
         namaJenisList != null && namaJenisList!.isNotEmpty;
@@ -110,13 +114,26 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
 
     final accentColor = isLocked
         ? lockedAccent
-        : (isActive ? activeAccent : pastAccent);
+        : switch (produksiStatus) {
+            'current' => activeAccent,
+            'complete' => const Color(0xFF059669),
+            _ => isActive ? activeAccent : pastAccent,
+          };
     final statusLabel = isLocked
         ? 'Locked'
-        : (isActive ? 'Real-Time' : 'Backdate');
+        : switch (produksiStatus) {
+            'current' => 'Real-Time',
+            'pending' => 'Pending',
+            'complete' => 'Complete',
+            _ => isActive ? 'Real-Time' : 'Pending',
+          };
     final statusIcon = isLocked
         ? Icons.lock_outline
-        : (isActive ? Icons.play_circle_outline : Icons.history_rounded);
+        : switch (produksiStatus) {
+            'current' => Icons.play_circle_outline,
+            'complete' => Icons.check_circle_outline,
+            _ => isActive ? Icons.play_circle_outline : Icons.history_rounded,
+          };
     final jamText = (hStart.isNotEmpty || hEnd.isNotEmpty)
         ? '${hStart.isNotEmpty ? hStart : "--:--"} – ${hEnd.isNotEmpty ? hEnd : "--:--"}'
         : '-- : --';
@@ -265,7 +282,7 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              if (canGanti) ...[
+              if (showGantiRiwayat && canGanti) ...[
                 const SizedBox(width: 4),
                 if (gantiDisabledReason != null)
                   Tooltip(
@@ -385,37 +402,39 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
                     ),
                 ],
               ],
-              const SizedBox(width: 6),
-              Material(
-                color: primaryColor,
-                borderRadius: BorderRadius.circular(6),
-                child: InkWell(
-                  onTap: onRiwayat,
+              if (showGantiRiwayat && canGanti) ...[
+                const SizedBox(width: 6),
+                Material(
+                  color: primaryColor,
                   borderRadius: BorderRadius.circular(6),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.timeline_rounded,
-                          size: 13,
-                          color: Colors.white,
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          'Riwayat',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
+                  child: InkWell(
+                    onTap: onRiwayat,
+                    borderRadius: BorderRadius.circular(6),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.timeline_rounded,
+                            size: 13,
                             color: Colors.white,
                           ),
-                        ),
-                      ],
+                          SizedBox(width: 4),
+                          Text(
+                            'Riwayat',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
+              ],
               if (showTimeInfo) ...[
                 vline(),
                 if (tglText != null) ...[

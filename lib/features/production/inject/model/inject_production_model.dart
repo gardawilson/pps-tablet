@@ -55,6 +55,7 @@ class InjectProduction {
   final bool isLocked;
   final bool isComplete;
   final bool isRealtime;
+  final String? produksiStatus;
 
   final String? outputCategory;
   final List<InjectOutputJenis> outputs;
@@ -95,6 +96,7 @@ class InjectProduction {
     required this.isLocked,
     this.isComplete = false,
     this.isRealtime = false,
+    this.produksiStatus,
     this.outputCategory,
     this.outputs = const [],
   });
@@ -239,8 +241,12 @@ class InjectProduction {
 
       lastClosedDate: _asDateTime(j['LastClosedDate']),
       isLocked: _asBool(j['IsLocked'], fallback: false),
-      isComplete: _asBool(j['IsComplete'], fallback: false),
-      isRealtime: _asBool(j['IsRealtime'], fallback: false),
+      isComplete: _asBool(j['IsComplete'], fallback: false) ||
+          j['status']?.toString() == 'complete',
+      isRealtime: j['status']?.toString() == 'current' ||
+          j['status']?.toString() == 'pending' ||
+          _asBool(j['IsRealtime'], fallback: false),
+      produksiStatus: j['status']?.toString(),
       outputCategory: j['OutputCategory']?.toString(),
       outputs: (j['Outputs'] as List<dynamic>? ?? [])
           .map((e) => InjectOutputJenis.fromJson(e as Map<String, dynamic>))
@@ -456,7 +462,9 @@ class InjectProduksiItem {
           .map((e) => InjectOutputJenis.fromJson(e as Map<String, dynamic>))
           .toList(),
       isLocked: j['IsLocked'] == true || j['IsLocked'] == 1,
-      isRealtime: j['IsRealtime'] == true || j['IsRealtime'] == 1,
+      isRealtime: j['status']?.toString() == 'current' ||
+          j['IsRealtime'] == true ||
+          j['IsRealtime'] == 1,
     );
   }
 }
@@ -509,6 +517,7 @@ class InjectMesinInfo {
 
     MachineStatus parseStatus(dynamic v) {
       switch (v?.toString()) {
+        case 'current':
         case 'active':
         case 'aktif':
           return MachineStatus.active;
@@ -527,7 +536,7 @@ class InjectMesinInfo {
       namaMesin: s(j['NamaMesin']) ?? '',
       bagian: s(j['Bagian']) ?? '',
       produksiList: items,
-      machineStatus: parseStatus(j['machineStatus']),
+      machineStatus: parseStatus(j['status'] ?? j['machineStatus']),
     );
   }
 }

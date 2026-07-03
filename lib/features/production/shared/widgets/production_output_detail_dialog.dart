@@ -17,6 +17,7 @@ class ProductionOutputDetailDialog extends StatefulWidget {
     required this.pdfUrl,
     required this.feature,
     this.markAsPrinted,
+    this.onDelete,
   });
 
   final String labelCode;
@@ -35,6 +36,9 @@ class ProductionOutputDetailDialog extends StatefulWidget {
 
   /// Called after print confirmed — returns new print count from server, or null on failure.
   final Future<int?> Function()? markAsPrinted;
+
+  /// When provided, a delete button is shown. Caller is responsible for confirm dialog + API call.
+  final VoidCallback? onDelete;
 
   @override
   State<ProductionOutputDetailDialog> createState() =>
@@ -246,7 +250,7 @@ class _ProductionOutputDetailDialogState
 
             // ── Print button ────────────────────────────────────────
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+              padding: EdgeInsets.fromLTRB(16, 14, 16, widget.onDelete != null ? 8 : 16),
               child: FilledButton.icon(
                 onPressed: _isPrinting ? null : _handlePrint,
                 style: FilledButton.styleFrom(
@@ -281,6 +285,32 @@ class _ProductionOutputDetailDialogState
                 ),
               ),
             ),
+            // ── Delete button ───────────────────────────────────────
+            if (widget.onDelete != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: OutlinedButton.icon(
+                  onPressed: _isPrinting
+                      ? null
+                      : () {
+                          Navigator.of(context).pop();
+                          widget.onDelete!();
+                        },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red.shade600,
+                    side: BorderSide(color: Colors.red.shade300),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  icon: const Icon(Icons.delete_outline, size: 16),
+                  label: const Text(
+                    'Hapus Label',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

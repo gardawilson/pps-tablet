@@ -1871,6 +1871,10 @@ class _WashingProductionInputScreenState
                     },
                     onGanti: _openSplitDialog,
                     onRiwayat: _openTimelineDialog,
+                    showGantiRiwayat: _header!.tglProduksi != null &&
+                        _header!.tglProduksi!.year == DateTime.now().year &&
+                        _header!.tglProduksi!.month == DateTime.now().month &&
+                        _header!.tglProduksi!.day == DateTime.now().day,
                   ),
 
                 // ── Body ────────────────────────────────────────────────

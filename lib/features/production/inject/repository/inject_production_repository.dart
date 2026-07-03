@@ -583,6 +583,27 @@ class InjectProductionRepository {
     }
   }
 
+  /// GET :7500/api/production/inject/qc/counter/:idMesin
+  ///
+  /// Mengambil nilai odometer/counter mesin saat ini. Dipakai sebagai
+  /// nilai default sekaligus batas minimum wajib pada field counter QC.
+  Future<int?> fetchQcCounter(int idMesin) async {
+    try {
+      final body = await api.getJson(
+        '/api/production/inject/qc/counter/$idMesin',
+      );
+      final data = body['data'] as Map<String, dynamic>?;
+      final raw = data?['counterCurrent'];
+      if (raw == null) return null;
+      if (raw is int) return raw;
+      if (raw is num) return raw.toInt();
+      return int.tryParse(raw.toString());
+    } on ApiException catch (e) {
+      if (e.statusCode == 404) return null;
+      rethrow;
+    }
+  }
+
   Future<InjectQcItem> updateQc(int id, Map<String, dynamic> payload) async {
     try {
       final body = await api.putJson(

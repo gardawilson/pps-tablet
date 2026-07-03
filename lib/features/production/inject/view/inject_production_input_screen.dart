@@ -5,6 +5,7 @@ import 'package:shimmer/shimmer.dart';
 import 'package:pps_tablet/core/view/app_shell.dart';
 import 'package:pps_tablet/features/production/shared/shared.dart';
 
+import '../../../../common/widgets/confirm_dialog.dart';
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/scan_label_dialog.dart';
 import '../../../../core/view_model/permission_view_model.dart';
@@ -21,7 +22,6 @@ import '../repository/inject_production_repository.dart';
 import '../view_model/inject_production_input_view_model.dart';
 
 import '../view_model/inject_formula_view_model.dart';
-import '../widgets/inject_formula_dialog.dart';
 import '../../shared/widgets/production_output_detail_dialog.dart';
 import '../../../label/bonggolan/repository/bonggolan_repository.dart';
 import '../../../label/furniture_wip/repository/furniture_wip_repository.dart';
@@ -52,6 +52,14 @@ class _InjectProductionInputScreenState
     extends State<InjectProductionInputScreen> {
   String _selectedInputTab = 'fwip';
   String _selectedOutputTab = 'fwip';
+
+  // ── Multi-select state (input) ────────────────────────────────────────────
+  bool _isSelecting = false;
+  final Map<String, List<dynamic>> _selectedGroups = {};
+
+  // ── Multi-select state (output) ───────────────────────────────────────────
+  bool _isSelectingOutput = false;
+  final Map<String, dynamic> _selectedOutputItems = {};
 
   // ── Header (fetched from API) ─────────────────────────────────────────────
   final _prodRepo = InjectProductionRepository();
@@ -228,36 +236,21 @@ class _InjectProductionInputScreenState
     }
   }
 
-  void _confirmClearTemp() {
+  Future<void> _confirmClearTemp() async {
     final vm = context.read<InjectProductionInputViewModel>();
     if (vm.totalTempCount == 0) return;
-    showDialog<void>(
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Hapus Semua Temp?'),
-        content: Text(
-          'Apakah Anda yakin ingin menghapus ${vm.totalTempCount} item temp?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () {
-              vm.clearAllTempItems();
-              Navigator.of(ctx).pop();
-              _showSnack('Semua temp items dihapus');
-            },
-            child: const Text('Hapus'),
-          ),
-        ],
+      builder: (_) => ConfirmDialog(
+        title: 'Hapus Semua Temp?',
+        message: 'Apakah Anda yakin ingin menghapus ${vm.totalTempCount} item temp?',
+        confirmLabel: 'Hapus',
+        confirmIcon: Icons.delete_sweep,
       ),
     );
+    if (confirmed != true || !mounted) return;
+    vm.clearAllTempItems();
+    _showSnack('Semua temp items dihapus');
   }
 
   // ── Split Time (Ganti) ────────────────────────────────────────────────────
@@ -442,20 +435,11 @@ class _InjectProductionInputScreenState
     final name = item.Nama ?? 'Material';
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Hapus Material?'),
-        content: Text('Yakin ingin menghapus $name?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Batal'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Hapus'),
-          ),
-        ],
+      builder: (_) => ConfirmDialog(
+        title: 'Hapus Material?',
+        message: 'Yakin ingin menghapus $name?',
+        confirmLabel: 'Hapus',
+        confirmIcon: Icons.delete_outline,
       ),
     );
     if (confirmed != true || !mounted) return;
@@ -465,6 +449,252 @@ class _InjectProductionInputScreenState
       success ? '✅ Material berhasil dihapus' : (vm.deleteError ?? 'Gagal'),
       backgroundColor: success ? Colors.green : Colors.red,
     );
+  }
+
+  // ── Multi-select helpers ───────────────────────────────────────────────────
+
+  void _startSelecting(String key, List<dynamic> items) {
+    setState(() {
+      _isSelecting = true;
+      _selectedGroups[key] = items;
+    });
+  }
+
+  void _toggleSelection(String key, List<dynamic> items) {
+    setState(() {
+      if (_selectedGroups.containsKey(key)) {
+        _selectedGroups.remove(key);
+        if (_selectedGroups.isEmpty) _isSelecting = false;
+      } else {
+        _selectedGroups[key] = items;
+      }
+    });
+  }
+
+  void _cancelSelection() {
+    setState(() {
+      _isSelecting = false;
+      _selectedGroups.clear();
+    });
+  }
+
+  Future<void> _deleteSelected(InjectProductionInputViewModel vm) async {
+    if (_selectedGroups.isEmpty) return;
+    final count = _selectedGroups.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => ConfirmDialog(
+        title: 'Keluarkan Label Input?',
+        message: 'Yakin ingin mengeluarkan $count label dari proses ini?\n'
+            'Label tidak akan dihapus, hanya dilepas dari proses.',
+        confirmLabel: 'Keluarkan',
+        confirmIcon: Icons.logout,
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final allItems = _selectedGroups.values.expand((l) => l).toList();
+    final success = await vm.deleteItems(widget.noProduksi, allItems);
+    if (!mounted) return;
+    _cancelSelection();
+    _showSnack(
+      success ? '✅ $count label berhasil dikeluarkan dari proses' : (vm.deleteError ?? 'Gagal'),
+      backgroundColor: success ? Colors.green : Colors.red,
+    );
+  }
+
+  // ── Multi-select output helpers ────────────────────────────────────────────
+
+  void _startSelectingOutput(String labelCode, dynamic item) {
+    setState(() {
+      _isSelectingOutput = true;
+      _selectedOutputItems[labelCode] = item;
+    });
+  }
+
+  void _toggleOutputSelection(String labelCode, dynamic item) {
+    setState(() {
+      if (_selectedOutputItems.containsKey(labelCode)) {
+        _selectedOutputItems.remove(labelCode);
+        if (_selectedOutputItems.isEmpty) _isSelectingOutput = false;
+      } else {
+        _selectedOutputItems[labelCode] = item;
+      }
+    });
+  }
+
+  void _cancelOutputSelection() {
+    setState(() {
+      _isSelectingOutput = false;
+      _selectedOutputItems.clear();
+    });
+  }
+
+  Future<void> _deleteSelectedOutputs(VoidCallback onRefresh) async {
+    if (_selectedOutputItems.isEmpty) return;
+    final count = _selectedOutputItems.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => ConfirmDialog(
+        title: 'Hapus Label Output?',
+        message: 'Yakin ingin menghapus $count label yang dipilih?\n'
+            'Aksi ini tidak dapat dibatalkan.',
+        confirmLabel: 'Hapus',
+        confirmIcon: Icons.delete_outline,
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    int deleted = 0;
+    int failed = 0;
+    for (final item in _selectedOutputItems.values) {
+      try {
+        if (item is InjectOutputItem) {
+          await FurnitureWipRepository().deleteFurnitureWip(
+            item.noFurnitureWip,
+          );
+        } else if (item is InjectBjOutputItem) {
+          await PackingRepository(api: ApiClient()).deletePacking(item.noBj);
+        } else if (item is InjectRejectOutputItem) {
+          await RejectRepository(api: ApiClient()).deleteReject(item.noReject);
+        } else if (item is InjectBonggolanOutputItem) {
+          await BonggolanRepository().deleteBonggolan(item.noBonggolan);
+        }
+        deleted++;
+      } catch (_) {
+        failed++;
+      }
+    }
+    if (!mounted) return;
+    _cancelOutputSelection();
+    onRefresh();
+    _showSnack(
+      failed == 0
+          ? '✅ $deleted label output berhasil dihapus'
+          : '$deleted berhasil dihapus, $failed gagal',
+      backgroundColor: failed == 0 ? Colors.green : Colors.orange,
+    );
+  }
+
+  Widget _buildOutputSelectionBar(VoidCallback onRefresh) {
+    final count = _selectedOutputItems.length;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: _kInjectOutput,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.check_circle,
+            size: 16,
+            color: Colors.white.withValues(alpha: 0.9),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '$count label dipilih',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: _cancelOutputSelection,
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.white70,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text('Batal', style: TextStyle(fontSize: 12)),
+          ),
+          const SizedBox(width: 4),
+          FilledButton.icon(
+            onPressed: () => _deleteSelectedOutputs(onRefresh),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red.shade600,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            icon: const Icon(Icons.delete_outline, size: 14),
+            label: const Text(
+              'Hapus',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _wrapOutputTile({
+    required String labelCode,
+    required dynamic item,
+    required Widget Function(VoidCallback? overrideTap) builder,
+  }) {
+    final isSelected = _selectedOutputItems.containsKey(labelCode);
+    final tile = builder(
+      _isSelectingOutput ? () => _toggleOutputSelection(labelCode, item) : null,
+    );
+    return GestureDetector(
+      onLongPress: _isSelectingOutput
+          ? null
+          : () => _startSelectingOutput(labelCode, item),
+      child: Stack(
+        children: [
+          tile,
+          if (isSelected)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: const Color(0xFF1565C0),
+                      width: 2,
+                    ),
+                    color: const Color(0xFFE3F2FD).withValues(alpha: 0.45),
+                  ),
+                ),
+              ),
+            ),
+          if (isSelected)
+            Positioned(
+              top: 4,
+              right: 4,
+              child: IgnorePointer(
+                child: Container(
+                  width: 16,
+                  height: 16,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF1565C0),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.check, size: 11, color: Colors.white),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ── Delete input group (single, legacy — tidak dipakai langsung) ───────────
+
+  Future<void> _deleteInputGroup(
+    InjectProductionInputViewModel vm,
+    String labelKey,
+    List<dynamic> items,
+  ) async {
+    _startSelecting(labelKey, items);
   }
 
   // ── Title keys ─────────────────────────────────────────────────────────────
@@ -668,7 +898,11 @@ class _InjectProductionInputScreenState
                     ],
                     onChanged: (v) {
                       if (_selectedInputTab != v) {
-                        setState(() => _selectedInputTab = v);
+                        setState(() {
+                          _selectedInputTab = v;
+                          _isSelecting = false;
+                          _selectedGroups.clear();
+                        });
                       }
                     },
                   ),
@@ -699,76 +933,79 @@ class _InjectProductionInputScreenState
                             ),
                           ),
                           const SizedBox(height: 6),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    ProductionCategorySummaryTile(
-                                      summary: activeTabSummary(),
-                                      accentColor: _kInjectPrimary,
-                                      sakLabel:
-                                          (_selectedInputTab == 'fwip' ||
-                                              _selectedInputTab == 'material')
-                                          ? 'Qty'
-                                          : 'Sak',
-                                      showBerat:
-                                          _selectedInputTab != 'fwip' &&
-                                          _selectedInputTab != 'material',
-                                      showLabel:
-                                          _selectedInputTab != 'material',
-                                    ),
-                                    const SizedBox(height: 6),
-                                    ProductionInputGrandTotalBar(
-                                      totalLabel: grandLabel,
-                                      totalSak: grandSak,
-                                      totalBerat: grandBerat,
-                                      color: _kInjectPrimary,
-                                      sakLabel: 'Qty',
-                                    ),
-                                  ],
+                          if (_isSelecting)
+                            _buildSelectionBar(vm)
+                          else
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      ProductionCategorySummaryTile(
+                                        summary: activeTabSummary(),
+                                        accentColor: _kInjectPrimary,
+                                        sakLabel:
+                                            (_selectedInputTab == 'fwip' ||
+                                                _selectedInputTab == 'material')
+                                            ? 'Qty'
+                                            : 'Sak',
+                                        showBerat:
+                                            _selectedInputTab != 'fwip' &&
+                                            _selectedInputTab != 'material',
+                                        showLabel:
+                                            _selectedInputTab != 'material',
+                                      ),
+                                      const SizedBox(height: 6),
+                                      ProductionInputGrandTotalBar(
+                                        totalLabel: grandLabel,
+                                        totalSak: grandSak,
+                                        totalBerat: grandBerat,
+                                        color: _kInjectPrimary,
+                                        sakLabel: 'Qty',
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 10),
-                              if (_selectedInputTab == 'material')
-                                FloatingActionButton(
-                                  heroTag: 'fab_add_inject_material',
-                                  mini: true,
-                                  backgroundColor: locked
-                                      ? Colors.grey.shade300
-                                      : _kInjectPrimary,
-                                  foregroundColor: Colors.white,
-                                  onPressed: locked
-                                      ? null
-                                      : () => _openAddMaterialDialog(vm),
-                                  child: const Icon(Icons.add),
-                                )
-                              else
-                                FloatingActionButton(
-                                  heroTag: 'fab_scan_inject_input',
-                                  mini: true,
-                                  backgroundColor: locked
-                                      ? Colors.grey.shade300
-                                      : _kInjectPrimary,
-                                  foregroundColor: Colors.white,
-                                  onPressed: locked || vm.isLookupLoading
-                                      ? null
-                                      : _openScanDialog,
-                                  child: vm.isLookupLoading
-                                      ? const SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Colors.white,
-                                          ),
-                                        )
-                                      : const Icon(Icons.qr_code_scanner),
-                                ),
-                            ],
-                          ),
+                                const SizedBox(width: 10),
+                                if (_selectedInputTab == 'material')
+                                  FloatingActionButton(
+                                    heroTag: 'fab_add_inject_material',
+                                    mini: true,
+                                    backgroundColor: locked
+                                        ? Colors.grey.shade300
+                                        : _kInjectPrimary,
+                                    foregroundColor: Colors.white,
+                                    onPressed: locked
+                                        ? null
+                                        : () => _openAddMaterialDialog(vm),
+                                    child: const Icon(Icons.add),
+                                  )
+                                else
+                                  FloatingActionButton(
+                                    heroTag: 'fab_scan_inject_input',
+                                    mini: true,
+                                    backgroundColor: locked
+                                        ? Colors.grey.shade300
+                                        : _kInjectPrimary,
+                                    foregroundColor: Colors.white,
+                                    onPressed: locked || vm.isLookupLoading
+                                        ? null
+                                        : _openScanDialog,
+                                    child: vm.isLookupLoading
+                                        ? const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : const Icon(Icons.qr_code_scanner),
+                                  ),
+                              ],
+                            ),
                         ],
                       ),
                     ),
@@ -817,11 +1054,17 @@ class _InjectProductionInputScreenState
               ),
             ],
             color: _kInjectPrimary,
-            isTemp: vm.hasTemporaryDataForLabel(key),
-            expandable: true,
+            isTemp: items.any(
+              (x) =>
+                  vm.tempBroker.contains(x) || vm.tempBrokerPartial.contains(x),
+            ),
             isPartialGroup: items.any((x) => x.isPartialRow),
-            detailsBuilder: () => [],
-            chipItemsBuilder: () => items.map((item) {
+            isSelected: _selectedGroups.containsKey(key),
+            onTap: _isSelecting ? () => _toggleSelection(key, items) : null,
+            onLongPress: _isSelecting
+                ? null
+                : () => _deleteInputGroup(vm, key, items),
+            chipItemsBuilder: () => items.map<ProductionSakChip>((item) {
               final isTemp =
                   vm.tempBroker.contains(item) ||
                   vm.tempBrokerPartial.contains(item);
@@ -851,11 +1094,17 @@ class _InjectProductionInputScreenState
               ),
             ],
             color: _kInjectPrimary,
-            isTemp: vm.hasTemporaryDataForLabel(key),
-            expandable: true,
+            isTemp: items.any(
+              (x) =>
+                  vm.tempMixer.contains(x) || vm.tempMixerPartial.contains(x),
+            ),
             isPartialGroup: items.any((x) => x.isPartialRow),
-            detailsBuilder: () => [],
-            chipItemsBuilder: () => items.map((item) {
+            isSelected: _selectedGroups.containsKey(key),
+            onTap: _isSelecting ? () => _toggleSelection(key, items) : null,
+            onLongPress: _isSelecting
+                ? null
+                : () => _deleteInputGroup(vm, key, items),
+            chipItemsBuilder: () => items.map<ProductionSakChip>((item) {
               final isTemp =
                   vm.tempMixer.contains(item) ||
                   vm.tempMixerPartial.contains(item);
@@ -885,11 +1134,18 @@ class _InjectProductionInputScreenState
               ),
             ],
             color: _kInjectPrimary,
-            isTemp: vm.hasTemporaryDataForLabel(key),
-            expandable: true,
+            isTemp: items.any(
+              (x) =>
+                  vm.tempGilingan.contains(x) ||
+                  vm.tempGilinganPartial.contains(x),
+            ),
             isPartialGroup: items.any((x) => x.isPartialRow),
-            detailsBuilder: () => [],
-            chipItemsBuilder: () => items.map((item) {
+            isSelected: _selectedGroups.containsKey(key),
+            onTap: _isSelecting ? () => _toggleSelection(key, items) : null,
+            onLongPress: _isSelecting
+                ? null
+                : () => _deleteInputGroup(vm, key, items),
+            chipItemsBuilder: () => items.map<ProductionSakChip>((item) {
               final isTemp =
                   vm.tempGilingan.contains(item) ||
                   vm.tempGilinganPartial.contains(item);
@@ -951,16 +1207,26 @@ class _InjectProductionInputScreenState
                     ),
                   ],
                   color: _kInjectPrimary,
-                  isTemp: vm.hasTemporaryDataForLabel(entry.key),
+                  isTemp: entry.value.any(
+                    (x) =>
+                        vm.tempFurnitureWip.contains(x) ||
+                        vm.tempFurnitureWipPartial.contains(x),
+                  ),
                   expandable: !hasPartial,
                   isPartialGroup: hasPartial,
+                  isSelected: _selectedGroups.containsKey(entry.key),
+                  onTap: _isSelecting
+                      ? () => _toggleSelection(entry.key, entry.value)
+                      : null,
+                  onLongPress: _isSelecting
+                      ? null
+                      : () => _deleteInputGroup(vm, entry.key, entry.value),
                   partialReference: hasPartial
                       ? (entry.value
                                 .firstWhere((x) => x.isPartialRow)
                                 .noFurnitureWIP ??
                             '-')
                       : null,
-                  detailsBuilder: () => [],
                   chipItemsBuilder: () {
                     final dbItems =
                         vm
@@ -995,6 +1261,75 @@ class _InjectProductionInputScreenState
                 );
               }).toList(),
             ),
+    );
+  }
+
+  Widget _buildSelectionBar(InjectProductionInputViewModel vm) {
+    final count = _selectedGroups.length;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1565C0),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.check_circle,
+            size: 16,
+            color: Colors.white.withValues(alpha: 0.9),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '$count label dipilih',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: _cancelSelection,
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.white70,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text('Batal', style: TextStyle(fontSize: 12)),
+          ),
+          const SizedBox(width: 4),
+          FilledButton.icon(
+            onPressed: vm.isDeleting ? null : () => _deleteSelected(vm),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red.shade600,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            icon: vm.isDeleting
+                ? const SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.logout, size: 14),
+            label: Text(
+              vm.isDeleting ? 'Memproses...' : 'Keluarkan',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1318,6 +1653,122 @@ class _InjectProductionInputScreenState
     if (result != null && result != false) onRefresh();
   }
 
+  Future<void> _deleteRejectOutput(
+    InjectRejectOutputItem item,
+    VoidCallback onRefresh,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => ConfirmDialog(
+        title: 'Hapus Label Reject?',
+        message: 'Yakin ingin menghapus ${item.noReject}?\nAksi ini tidak dapat dibatalkan.',
+        confirmLabel: 'Hapus',
+        confirmIcon: Icons.delete_outline,
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await RejectRepository(api: ApiClient()).deleteReject(item.noReject);
+      if (!mounted) return;
+      _showSnack(
+        '✅ ${item.noReject} berhasil dihapus',
+        backgroundColor: Colors.green,
+      );
+      onRefresh();
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack('Gagal menghapus: $e', backgroundColor: Colors.red);
+    }
+  }
+
+  Future<void> _deleteBjOutput(
+    InjectBjOutputItem item,
+    VoidCallback onRefresh,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => ConfirmDialog(
+        title: 'Hapus Label Barang Jadi?',
+        message: 'Yakin ingin menghapus ${item.noBj}?\nAksi ini tidak dapat dibatalkan.',
+        confirmLabel: 'Hapus',
+        confirmIcon: Icons.delete_outline,
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await PackingRepository(api: ApiClient()).deletePacking(item.noBj);
+      if (!mounted) return;
+      _showSnack(
+        '✅ ${item.noBj} berhasil dihapus',
+        backgroundColor: Colors.green,
+      );
+      onRefresh();
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack('Gagal menghapus: $e', backgroundColor: Colors.red);
+    }
+  }
+
+  Future<void> _deleteFwipOutput(
+    InjectOutputItem item,
+    VoidCallback onRefresh,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => ConfirmDialog(
+        title: 'Hapus Label Furniture WIP?',
+        message: 'Yakin ingin menghapus ${item.noFurnitureWip}?\nAksi ini tidak dapat dibatalkan.',
+        confirmLabel: 'Hapus',
+        confirmIcon: Icons.delete_outline,
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await FurnitureWipRepository().deleteFurnitureWip(item.noFurnitureWip);
+      if (!mounted) return;
+      _showSnack(
+        '✅ ${item.noFurnitureWip} berhasil dihapus',
+        backgroundColor: Colors.green,
+      );
+      onRefresh();
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack('Gagal menghapus: $e', backgroundColor: Colors.red);
+    }
+  }
+
+  Future<void> _deleteBonggolanOutput(
+    InjectBonggolanOutputItem item,
+    VoidCallback onRefresh,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => ConfirmDialog(
+        title: 'Hapus Label Bonggolan?',
+        message: 'Yakin ingin menghapus ${item.noBonggolan}?\nAksi ini tidak dapat dibatalkan.',
+        confirmLabel: 'Hapus',
+        confirmIcon: Icons.delete_outline,
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await BonggolanRepository().deleteBonggolan(item.noBonggolan);
+      if (!mounted) return;
+      _showSnack(
+        '✅ ${item.noBonggolan} berhasil dihapus',
+        backgroundColor: Colors.green,
+      );
+      onRefresh();
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack('Gagal menghapus: $e', backgroundColor: Colors.red);
+    }
+  }
+
   Future<void> _openAddBonggolanOutputDialog(VoidCallback onRefresh) async {
     final result = await showDialog<bool>(
       context: context,
@@ -1444,7 +1895,11 @@ class _InjectProductionInputScreenState
                     ],
                     onChanged: (v) {
                       if (_selectedOutputTab == v) return;
-                      setState(() => _selectedOutputTab = v);
+                      setState(() {
+                        _selectedOutputTab = v;
+                        _isSelectingOutput = false;
+                        _selectedOutputItems.clear();
+                      });
                     },
                   ),
                   Expanded(
@@ -1463,106 +1918,121 @@ class _InjectProductionInputScreenState
                                         ? _buildBonggolanOutputGrid(
                                             bonggolanOutputs,
                                             c,
+                                            onRefresh,
                                           )
                                         : isReject
                                         ? _buildRejectOutputGrid(
                                             rejectOutputs,
                                             c,
+                                            onRefresh,
                                           )
                                         : isBj
-                                        ? _buildBjOutputGrid(bjOutputs, c)
-                                        : _buildFwipOutputGrid(fwipOutputs, c),
+                                        ? _buildBjOutputGrid(
+                                            bjOutputs,
+                                            c,
+                                            onRefresh,
+                                          )
+                                        : _buildFwipOutputGrid(
+                                            fwipOutputs,
+                                            c,
+                                            onRefresh,
+                                          ),
                                   ),
                             ),
                           ),
                           const SizedBox(height: 6),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    ProductionCategorySummaryTile(
-                                      summary: SectionSummary(
-                                        totalData: isBonggolan
-                                            ? bonggolanOutputs.length
-                                            : isReject
-                                            ? rejectOutputs.length
-                                            : isBj
-                                            ? bjOutputs.length
-                                            : fwipOutputs.length,
-                                        totalSak: isBj
-                                            ? bjPcs
-                                            : (!isBonggolan && !isReject)
-                                            ? fwipPcs
-                                            : 0,
-                                        totalBerat: isBonggolan
-                                            ? bonggolanBerat
-                                            : isReject
-                                            ? rejectBerat
-                                            : fwipBerat,
+                          if (_isSelectingOutput)
+                            _buildOutputSelectionBar(onRefresh)
+                          else
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      ProductionCategorySummaryTile(
+                                        summary: SectionSummary(
+                                          totalData: isBonggolan
+                                              ? bonggolanOutputs.length
+                                              : isReject
+                                              ? rejectOutputs.length
+                                              : isBj
+                                              ? bjOutputs.length
+                                              : fwipOutputs.length,
+                                          totalSak: isBj
+                                              ? bjPcs
+                                              : (!isBonggolan && !isReject)
+                                              ? fwipPcs
+                                              : 0,
+                                          totalBerat: isBonggolan
+                                              ? bonggolanBerat
+                                              : isReject
+                                              ? rejectBerat
+                                              : fwipBerat,
+                                        ),
+                                        accentColor: _kInjectOutput,
+                                        sakLabel: 'Qty',
                                       ),
-                                      accentColor: _kInjectOutput,
-                                      sakLabel: 'Qty',
-                                    ),
-                                    const SizedBox(height: 6),
-                                    ProductionInputGrandTotalBar(
-                                      totalLabel:
-                                          fwipOutputs.length +
-                                          bjOutputs.length +
-                                          rejectOutputs.length +
-                                          bonggolanOutputs.length,
-                                      totalSak: fwipPcs + bjPcs,
-                                      totalBerat:
-                                          fwipBerat +
-                                          rejectBerat +
-                                          bonggolanBerat,
-                                      color: _kInjectOutput,
-                                      sakLabel: 'Qty',
-                                    ),
-                                  ],
+                                      const SizedBox(height: 6),
+                                      ProductionInputGrandTotalBar(
+                                        totalLabel:
+                                            fwipOutputs.length +
+                                            bjOutputs.length +
+                                            rejectOutputs.length +
+                                            bonggolanOutputs.length,
+                                        totalSak: fwipPcs + bjPcs,
+                                        totalBerat:
+                                            fwipBerat +
+                                            rejectBerat +
+                                            bonggolanBerat,
+                                        color: _kInjectOutput,
+                                        sakLabel: 'Qty',
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 10),
-                              if (_isFabVisible(
-                                isBj: isBj,
-                                isReject: isReject,
-                                isBonggolan: isBonggolan,
-                              ))
-                                FloatingActionButton(
-                                  heroTag:
-                                      'fab_add_inject_output_$_selectedOutputTab',
-                                  mini: true,
-                                  backgroundColor:
-                                      (_header == null || _header!.isLocked)
-                                      ? Colors.grey.shade300
-                                      : _kInjectOutput,
-                                  foregroundColor: Colors.white,
-                                  onPressed:
-                                      (_header == null || _header!.isLocked)
-                                      ? null
-                                      : () {
-                                          if (isBonggolan) {
-                                            _openAddBonggolanOutputDialog(
-                                              onRefresh,
-                                            );
-                                          } else if (isReject) {
-                                            _openAddRejectOutputDialog(
-                                              onRefresh,
-                                            );
-                                          } else if (isBj) {
-                                            _openAddBjOutputDialog(onRefresh);
-                                          } else {
-                                            _openAddFwipOutputDialog(onRefresh);
-                                          }
-                                        },
-                                  child: const Icon(Icons.add),
-                                )
-                              else
-                                const SizedBox(width: 40),
-                            ],
-                          ),
+                                const SizedBox(width: 10),
+                                if (_isFabVisible(
+                                  isBj: isBj,
+                                  isReject: isReject,
+                                  isBonggolan: isBonggolan,
+                                ))
+                                  FloatingActionButton(
+                                    heroTag:
+                                        'fab_add_inject_output_$_selectedOutputTab',
+                                    mini: true,
+                                    backgroundColor:
+                                        (_header == null || _header!.isLocked)
+                                        ? Colors.grey.shade300
+                                        : _kInjectOutput,
+                                    foregroundColor: Colors.white,
+                                    onPressed:
+                                        (_header == null || _header!.isLocked)
+                                        ? null
+                                        : () {
+                                            if (isBonggolan) {
+                                              _openAddBonggolanOutputDialog(
+                                                onRefresh,
+                                              );
+                                            } else if (isReject) {
+                                              _openAddRejectOutputDialog(
+                                                onRefresh,
+                                              );
+                                            } else if (isBj) {
+                                              _openAddBjOutputDialog(onRefresh);
+                                            } else {
+                                              _openAddFwipOutputDialog(
+                                                onRefresh,
+                                              );
+                                            }
+                                          },
+                                    child: const Icon(Icons.add),
+                                  )
+                                else
+                                  const SizedBox(width: 40),
+                              ],
+                            ),
                         ],
                       ),
                     ),
@@ -1579,6 +2049,7 @@ class _InjectProductionInputScreenState
   Widget _buildFwipOutputGrid(
     List<InjectOutputItem> outputs,
     BoxConstraints c,
+    VoidCallback onRefresh,
   ) {
     if (outputs.isEmpty) {
       return const Center(
@@ -1598,30 +2069,44 @@ class _InjectProductionInputScreenState
       ),
       children: outputs
           .map(
-            (o) => ProductionFwipOutputTile(
+            (o) => _wrapOutputTile(
               labelCode: o.noFurnitureWip,
-              namaJenis: o.namaJenis,
-              pcs: o.pcs,
-              berat: o.berat,
-              printCount: o.hasBeenPrinted,
-              accentColor: _kInjectOutput,
-              onTap: () => showDialog<void>(
-                context: context,
-                builder: (_) => ProductionOutputDetailDialog(
-                  labelCode: o.noFurnitureWip,
-                  namaJenis: o.namaJenis,
-                  printCount: o.hasBeenPrinted,
-                  accentColor: _kInjectOutput,
-                  pdfUrl: ApiConstants.furnitureWipLabelPdf(o.noFurnitureWip),
-                  feature: 'furniture_wip',
-                  markAsPrinted: () =>
-                      FurnitureWipRepository().markAsPrinted(o.noFurnitureWip),
-                  metrics: [
-                    (icon: Icons.inventory_2_outlined, text: '${o.pcs} pcs'),
-                    if (o.berat > 0)
-                      (icon: Icons.scale_outlined, text: '${o.berat} kg'),
-                  ],
-                ),
+              item: o,
+              builder: (overrideTap) => ProductionFwipOutputTile(
+                labelCode: o.noFurnitureWip,
+                namaJenis: o.namaJenis,
+                pcs: o.pcs,
+                berat: o.berat,
+                printCount: o.hasBeenPrinted,
+                accentColor: _kInjectOutput,
+                onTap:
+                    overrideTap ??
+                    () => showDialog<void>(
+                      context: context,
+                      builder: (_) => ProductionOutputDetailDialog(
+                        labelCode: o.noFurnitureWip,
+                        namaJenis: o.namaJenis,
+                        printCount: o.hasBeenPrinted,
+                        accentColor: _kInjectOutput,
+                        pdfUrl: ApiConstants.furnitureWipLabelPdf(
+                          o.noFurnitureWip,
+                        ),
+                        feature: 'furniture_wip',
+                        markAsPrinted: () => FurnitureWipRepository()
+                            .markAsPrinted(o.noFurnitureWip),
+                        onDelete: (_header == null || _header!.isLocked)
+                            ? null
+                            : () => _deleteFwipOutput(o, onRefresh),
+                        metrics: [
+                          (
+                            icon: Icons.inventory_2_outlined,
+                            text: '${o.pcs} pcs',
+                          ),
+                          if (o.berat > 0)
+                            (icon: Icons.scale_outlined, text: '${o.berat} kg'),
+                        ],
+                      ),
+                    ),
               ),
             ),
           )
@@ -1632,6 +2117,7 @@ class _InjectProductionInputScreenState
   Widget _buildBonggolanOutputGrid(
     List<InjectBonggolanOutputItem> outputs,
     BoxConstraints c,
+    VoidCallback onRefresh,
   ) {
     if (outputs.isEmpty) {
       return const Center(
@@ -1651,27 +2137,36 @@ class _InjectProductionInputScreenState
       ),
       children: outputs
           .map(
-            (o) => ProductionBonggolanOutputTile(
+            (o) => _wrapOutputTile(
               labelCode: o.noBonggolan,
-              namaJenis: o.namaBonggolan,
-              berat: o.berat,
-              printCount: o.hasBeenPrinted,
-              accentColor: _kInjectOutput,
-              onTap: () => showDialog<void>(
-                context: context,
-                builder: (_) => ProductionOutputDetailDialog(
-                  labelCode: o.noBonggolan,
-                  namaJenis: o.namaBonggolan,
-                  printCount: o.hasBeenPrinted,
-                  accentColor: _kInjectOutput,
-                  pdfUrl: ApiConstants.bonggolanLabelPdf(o.noBonggolan),
-                  feature: 'bonggolan',
-                  markAsPrinted: () =>
-                      BonggolanRepository().markAsPrinted(o.noBonggolan),
-                  metrics: [
-                    (icon: Icons.scale_outlined, text: '${o.berat} kg'),
-                  ],
-                ),
+              item: o,
+              builder: (overrideTap) => ProductionBonggolanOutputTile(
+                labelCode: o.noBonggolan,
+                namaJenis: o.namaBonggolan,
+                berat: o.berat,
+                printCount: o.hasBeenPrinted,
+                accentColor: _kInjectOutput,
+                onTap:
+                    overrideTap ??
+                    () => showDialog<void>(
+                      context: context,
+                      builder: (_) => ProductionOutputDetailDialog(
+                        labelCode: o.noBonggolan,
+                        namaJenis: o.namaBonggolan,
+                        printCount: o.hasBeenPrinted,
+                        accentColor: _kInjectOutput,
+                        pdfUrl: ApiConstants.bonggolanLabelPdf(o.noBonggolan),
+                        feature: 'bonggolan',
+                        markAsPrinted: () =>
+                            BonggolanRepository().markAsPrinted(o.noBonggolan),
+                        onDelete: (_header == null || _header!.isLocked)
+                            ? null
+                            : () => _deleteBonggolanOutput(o, onRefresh),
+                        metrics: [
+                          (icon: Icons.scale_outlined, text: '${o.berat} kg'),
+                        ],
+                      ),
+                    ),
               ),
             ),
           )
@@ -1682,6 +2177,7 @@ class _InjectProductionInputScreenState
   Widget _buildRejectOutputGrid(
     List<InjectRejectOutputItem> outputs,
     BoxConstraints c,
+    VoidCallback onRefresh,
   ) {
     if (outputs.isEmpty) {
       return const Center(
@@ -1701,31 +2197,43 @@ class _InjectProductionInputScreenState
       ),
       children: outputs
           .map(
-            (o) => ProductionRejectOutputTile(
+            (o) => _wrapOutputTile(
               labelCode: o.noReject,
-              namaJenis: o.namaJenis,
-              berat: o.berat,
-              printCount: o.hasBeenPrinted,
-              pcs: o.pcs,
-              accentColor: _kInjectOutput,
-              onTap: () => showDialog<void>(
-                context: context,
-                builder: (_) => ProductionOutputDetailDialog(
-                  labelCode: o.noReject,
-                  namaJenis: o.namaJenis,
-                  printCount: o.hasBeenPrinted,
-                  accentColor: _kInjectOutput,
-                  pdfUrl: ApiConstants.rejectLabelPdf(o.noReject),
-                  feature: 'reject',
-                  markAsPrinted: () => RejectRepository(
-                    api: ApiClient(),
-                  ).markAsPrinted(o.noReject),
-                  metrics: [
-                    (icon: Icons.scale_outlined, text: '${o.berat} kg'),
-                    if (o.pcs != null)
-                      (icon: Icons.inventory_2_outlined, text: '${o.pcs} pcs'),
-                  ],
-                ),
+              item: o,
+              builder: (overrideTap) => ProductionRejectOutputTile(
+                labelCode: o.noReject,
+                namaJenis: o.namaJenis,
+                berat: o.berat,
+                printCount: o.hasBeenPrinted,
+                pcs: o.pcs,
+                accentColor: _kInjectOutput,
+                onTap:
+                    overrideTap ??
+                    () => showDialog<void>(
+                      context: context,
+                      builder: (_) => ProductionOutputDetailDialog(
+                        labelCode: o.noReject,
+                        namaJenis: o.namaJenis,
+                        printCount: o.hasBeenPrinted,
+                        accentColor: _kInjectOutput,
+                        pdfUrl: ApiConstants.rejectLabelPdf(o.noReject),
+                        feature: 'reject',
+                        markAsPrinted: () => RejectRepository(
+                          api: ApiClient(),
+                        ).markAsPrinted(o.noReject),
+                        onDelete: (_header == null || _header!.isLocked)
+                            ? null
+                            : () => _deleteRejectOutput(o, onRefresh),
+                        metrics: [
+                          (icon: Icons.scale_outlined, text: '${o.berat} kg'),
+                          if (o.pcs != null)
+                            (
+                              icon: Icons.inventory_2_outlined,
+                              text: '${o.pcs} pcs',
+                            ),
+                        ],
+                      ),
+                    ),
               ),
             ),
           )
@@ -1736,6 +2244,7 @@ class _InjectProductionInputScreenState
   Widget _buildBjOutputGrid(
     List<InjectBjOutputItem> outputs,
     BoxConstraints c,
+    VoidCallback onRefresh,
   ) {
     if (outputs.isEmpty) {
       return const Center(
@@ -1755,27 +2264,40 @@ class _InjectProductionInputScreenState
       ),
       children: outputs
           .map(
-            (o) => ProductionBjOutputTile(
+            (o) => _wrapOutputTile(
               labelCode: o.noBj,
-              namaJenis: o.namaJenis,
-              pcs: o.pcs,
-              isPrinted: o.isPrinted,
-              accentColor: _kInjectOutput,
-              onTap: () => showDialog<void>(
-                context: context,
-                builder: (_) => ProductionOutputDetailDialog(
-                  labelCode: o.noBj,
-                  namaJenis: o.namaJenis,
-                  printCount: o.hasBeenPrinted,
-                  accentColor: _kInjectOutput,
-                  pdfUrl: ApiConstants.packingLabelPdf(o.noBj),
-                  feature: 'packing',
-                  markAsPrinted: () =>
-                      PackingRepository(api: ApiClient()).markAsPrinted(o.noBj),
-                  metrics: [
-                    (icon: Icons.inventory_2_outlined, text: '${o.pcs} pcs'),
-                  ],
-                ),
+              item: o,
+              builder: (overrideTap) => ProductionBjOutputTile(
+                labelCode: o.noBj,
+                namaJenis: o.namaJenis,
+                pcs: o.pcs,
+                isPrinted: o.isPrinted,
+                accentColor: _kInjectOutput,
+                onTap:
+                    overrideTap ??
+                    () => showDialog<void>(
+                      context: context,
+                      builder: (_) => ProductionOutputDetailDialog(
+                        labelCode: o.noBj,
+                        namaJenis: o.namaJenis,
+                        printCount: o.hasBeenPrinted,
+                        accentColor: _kInjectOutput,
+                        pdfUrl: ApiConstants.packingLabelPdf(o.noBj),
+                        feature: 'packing',
+                        markAsPrinted: () => PackingRepository(
+                          api: ApiClient(),
+                        ).markAsPrinted(o.noBj),
+                        onDelete: (_header == null || _header!.isLocked)
+                            ? null
+                            : () => _deleteBjOutput(o, onRefresh),
+                        metrics: [
+                          (
+                            icon: Icons.inventory_2_outlined,
+                            text: '${o.pcs} pcs',
+                          ),
+                        ],
+                      ),
+                    ),
               ),
             ),
           )
@@ -1826,6 +2348,7 @@ class _InjectProductionInputScreenState
                     hourEnd: _header?.hourEnd,
                     showTimeInfo: false,
                     primaryColor: _kInjectPrimary,
+                    produksiStatus: _header?.produksiStatus,
                     onGanti: _openSplitTimeDialog,
                     onRefresh: () {
                       vm.loadInputs(widget.noProduksi, force: true);
@@ -1835,80 +2358,6 @@ class _InjectProductionInputScreenState
                       vm.loadBonggolanOutputs(widget.noProduksi, force: true);
                       _showSnack('Data di-refresh');
                     },
-                    trailingActions: [
-                      const SizedBox(width: 4),
-                      SizedBox(
-                        height: 26,
-                        child: TextButton.icon(
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 0,
-                            ),
-                            foregroundColor: _kInjectPrimary,
-                            backgroundColor: _kInjectPrimary.withValues(
-                              alpha: 0.07,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            visualDensity: VisualDensity.compact,
-                          ),
-                          onPressed: null,
-                          icon: const Icon(Icons.timer_outlined, size: 13),
-                          label: const Text(
-                            'Cycle Time',
-                            style: TextStyle(fontSize: 11),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Consumer<InjectFormulaViewModel>(
-                        builder: (_, fvm, __) => SizedBox(
-                          height: 26,
-                          child: TextButton.icon(
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 0,
-                              ),
-                              foregroundColor: _kInjectPrimary,
-                              backgroundColor: _kInjectPrimary.withValues(
-                                alpha: 0.07,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              visualDensity: VisualDensity.compact,
-                            ),
-                            onPressed: fvm.isLoading
-                                ? null
-                                : () {
-                                    final data = fvm.data;
-                                    if (data == null) return;
-                                    showDialog<void>(
-                                      context: context,
-                                      builder: (_) =>
-                                          InjectFormulaDialog(data: data),
-                                    );
-                                  },
-                            icon: fvm.isLoading
-                                ? const SizedBox(
-                                    width: 11,
-                                    height: 11,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 1.5,
-                                    ),
-                                  )
-                                : const Icon(Icons.science_outlined, size: 13),
-                            label: const Text(
-                              'Formula',
-                              style: TextStyle(fontSize: 11),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
                   ),
                 Expanded(
                   child: Builder(

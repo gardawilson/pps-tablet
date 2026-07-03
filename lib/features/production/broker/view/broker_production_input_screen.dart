@@ -2045,6 +2045,10 @@ class _BrokerProductionInputScreenState
                           vm.loadOutputs(widget.noProduksi);
                           _showSnack('Data di-refresh');
                         },
+                        showGantiRiwayat: _header?.tglProduksi != null &&
+                            _header!.tglProduksi!.year == DateTime.now().year &&
+                            _header!.tglProduksi!.month == DateTime.now().month &&
+                            _header!.tglProduksi!.day == DateTime.now().day,
                       ),
                     Expanded(
                       child: LayoutBuilder(

@@ -7,6 +7,7 @@ import 'package:shimmer/shimmer.dart';
 import 'package:pps_tablet/core/view/app_shell.dart';
 import 'package:pps_tablet/features/production/shared/shared.dart';
 
+import '../../../../common/widgets/confirm_dialog.dart';
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/scan_label_dialog.dart';
 import '../../../../core/view_model/permission_view_model.dart';
@@ -23,7 +24,6 @@ import '../repository/inject_production_repository.dart';
 import '../view_model/inject_production_input_view_model.dart';
 
 import '../view_model/inject_formula_view_model.dart';
-import '../widgets/inject_formula_dialog_v2.dart';
 import '../widgets/inject_shift_timeline_dialog.dart';
 import '../widgets/counter_picker_dialog.dart';
 import '../widgets/inject_sak_picker_dialog.dart';
@@ -188,6 +188,12 @@ class _InjectProductionInputScreenState
         }
       }
 
+      final bonggolanLabel = batch.labels.bonggolan.isNotEmpty
+          ? batch.labels.bonggolan.first
+          : null;
+      final rejectLabel = batch.labels.reject.isNotEmpty
+          ? batch.labels.reject.first
+          : null;
       _bucketStates[bucketLabel] = _HourlyBucketData(
         status: _HourlyBucketStatus.submitted,
         carryOverIn: batch.carryOverIn,
@@ -200,6 +206,15 @@ class _InjectProductionInputScreenState
         berat: batch.berat,
         cycleTime: batch.cycleTime,
         counter: batch.counter,
+        beratBonggolan: bonggolanLabel?.berat,
+        namaBonggolan:
+            bonggolanLabel != null && bonggolanLabel.namaJenis.isNotEmpty
+            ? bonggolanLabel.namaJenis
+            : null,
+        beratReject: rejectLabel?.berat,
+        namaReject: rejectLabel != null && rejectLabel.namaJenis.isNotEmpty
+            ? rejectLabel.namaJenis
+            : null,
         labelsFwip: batch.labels.furnitureWip,
         labelsBarangJadi: batch.labels.barangJadi,
         labelsBonggolan: batch.labels.bonggolan,
@@ -330,6 +345,8 @@ class _InjectProductionInputScreenState
     double? beratReject,
     int? idRejectBonggolan,
     int? idRejectReject, {
+    String? namaBonggolan,
+    String? namaReject,
     bool isLastBucket = false,
   }) async {
     if (_bucketStates[label] == null) return;
@@ -412,8 +429,14 @@ class _InjectProductionInputScreenState
         berat: berat,
         cycleTime: cycleTime,
         counter: counter,
-        beratBonggolan: beratBonggolan,
-        beratReject: beratReject,
+        beratBonggolan: result.bonggolan?.berat ?? beratBonggolan,
+        namaBonggolan: (result.bonggolan?.namaJenis.isNotEmpty == true)
+            ? result.bonggolan!.namaJenis
+            : namaBonggolan,
+        beratReject: result.reject?.berat ?? beratReject,
+        namaReject: (result.reject?.namaJenis.isNotEmpty == true)
+            ? result.reject!.namaJenis
+            : namaReject,
         labelsFwip: result.furnitureWIP,
         labelsBarangJadi: result.barangJadi,
         labelsBonggolan: result.bonggolan != null ? [result.bonggolan!] : [],
@@ -545,36 +568,23 @@ class _InjectProductionInputScreenState
     }
   }
 
-  void _confirmClearTemp() {
+  Future<void> _confirmClearTemp() async {
     final vm = context.read<InjectProductionInputViewModel>();
     if (vm.totalTempCount == 0) return;
-    showDialog<void>(
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Hapus Semua Temp?'),
-        content: Text(
-          'Apakah Anda yakin ingin menghapus ${vm.totalTempCount} item temp?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () {
-              vm.clearAllTempItems();
-              Navigator.of(ctx).pop();
-              _showSnack('Semua temp items dihapus');
-            },
-            child: const Text('Hapus'),
-          ),
-        ],
+      builder: (_) => ConfirmDialog(
+        title: 'Hapus Semua Temp?',
+        message:
+            'Yakin ingin menghapus ${vm.totalTempCount} item temp?\n'
+            'Data yang belum disimpan akan hilang.',
+        confirmLabel: 'Hapus',
+        confirmIcon: Icons.delete_sweep,
       ),
     );
+    if (confirmed != true || !mounted) return;
+    vm.clearAllTempItems();
+    _showSnack('Semua temp items dihapus');
   }
 
   // ── Riwayat (Timeline) ───────────────────────────────────────────────────
@@ -712,7 +722,7 @@ class _InjectProductionInputScreenState
         ? lastAvailable.split(' - ').first.trim()
         : null;
 
-    final result = await showDialog<bool>(
+    final result = await showDialog<InjectBatchSubmitResult>(
       context: context,
       barrierDismissible: false,
       builder: (_) => InjectSplitTimeDialog(
@@ -739,8 +749,32 @@ class _InjectProductionInputScreenState
       ),
     );
     if (!mounted) return;
-    if (result == true) {
+    if (result != null) {
       _showSnack('✅ Produksi berhasil diganti', backgroundColor: Colors.green);
+      // Fetch ulang batch untuk mendapatkan label terbaru dari bucket yang di-split
+      if (lastBucketHourStart != null && mounted) {
+        try {
+          final batches = await _prodRepo.fetchBatch(widget.noProduksi);
+          if (!mounted) return;
+          final matchedBatch = batches.cast<InjectBatchItem?>().firstWhere(
+            (b) => b?.hourStart == lastBucketHourStart,
+            orElse: () => null,
+          );
+          if (matchedBatch != null) {
+            final printEntries = _buildPrintableEntriesFromBatch(matchedBatch);
+            if (printEntries.isNotEmpty && mounted) {
+              await showDialog<void>(
+                context: context,
+                builder: (_) => _BucketPrintDialog(
+                  hourLabel: lastBucketHourStart,
+                  entries: printEntries,
+                  onPrint: (selected) => _printLabelsBatch(selected),
+                ),
+              );
+            }
+          }
+        } catch (_) {}
+      }
       if (mounted) Navigator.of(context).pop();
     }
   }
@@ -885,20 +919,11 @@ class _InjectProductionInputScreenState
     final name = item.Nama ?? 'Material';
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Hapus Material?'),
-        content: Text('Yakin ingin menghapus $name?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Batal'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Hapus'),
-          ),
-        ],
+      builder: (_) => ConfirmDialog(
+        title: 'Hapus Material?',
+        message: 'Yakin ingin menghapus $name?',
+        confirmLabel: 'Hapus',
+        confirmIcon: Icons.delete_outline,
       ),
     );
     if (confirmed != true || !mounted) return;
@@ -1629,6 +1654,77 @@ class _InjectProductionInputScreenState
     return entries;
   }
 
+  List<_PrintableLabelEntry> _buildPrintableEntriesFromBatch(
+    InjectBatchItem batch,
+  ) {
+    final outputs = _header?.outputs ?? const [];
+    final singleOutputJenis = outputs.length == 1
+        ? outputs.first.namaJenis
+        : '';
+    String resolveJenis(String fromLabel) =>
+        fromLabel.isNotEmpty ? fromLabel : singleOutputJenis;
+    final entries = <_PrintableLabelEntry>[];
+    for (final c in batch.labels.furnitureWip) {
+      entries.add(
+        _PrintableLabelEntry(
+          code: c.code,
+          namaJenis: resolveJenis(c.namaJenis),
+          category: 'Furniture WIP',
+          pdfUrl: ApiConstants.furnitureWipLabelPdf(c.code),
+          feature: 'furniture_wip',
+          markAsPrinted: () => FurnitureWipRepository().markAsPrinted(c.code),
+          pcs: c.pcs,
+          hasBeenPrinted: c.hasBeenPrinted,
+        ),
+      );
+    }
+    for (final c in batch.labels.barangJadi) {
+      entries.add(
+        _PrintableLabelEntry(
+          code: c.code,
+          namaJenis: c.namaJenis,
+          category: 'Barang Jadi',
+          pdfUrl: ApiConstants.packingLabelPdf(c.code),
+          feature: 'packing',
+          markAsPrinted: () =>
+              PackingRepository(api: ApiClient()).markAsPrinted(c.code),
+          pcs: c.pcs,
+          hasBeenPrinted: c.hasBeenPrinted,
+        ),
+      );
+    }
+    for (final c in batch.labels.bonggolan) {
+      entries.add(
+        _PrintableLabelEntry(
+          code: c.code,
+          namaJenis: c.namaJenis,
+          category: 'Bonggolan',
+          pdfUrl: ApiConstants.bonggolanLabelPdf(c.code),
+          feature: 'bonggolan',
+          markAsPrinted: () => BonggolanRepository().markAsPrinted(c.code),
+          berat: c.berat,
+          hasBeenPrinted: c.hasBeenPrinted,
+        ),
+      );
+    }
+    for (final c in batch.labels.reject) {
+      entries.add(
+        _PrintableLabelEntry(
+          code: c.code,
+          namaJenis: c.namaJenis,
+          category: 'Reject',
+          pdfUrl: ApiConstants.rejectLabelPdf(c.code),
+          feature: 'reject',
+          markAsPrinted: () =>
+              RejectRepository(api: ApiClient()).markAsPrinted(c.code),
+          berat: c.berat,
+          hasBeenPrinted: c.hasBeenPrinted,
+        ),
+      );
+    }
+    return entries;
+  }
+
   void _openBucketPrintDialog(BuildContext ctx, String label) {
     final entries = _buildPrintableEntries(label);
     if (entries.isEmpty) return;
@@ -1739,12 +1835,17 @@ class _InjectProductionInputScreenState
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 1, 1, 1),
-            child: productionSectionHeader(
-              Icons.output_rounded,
-              'Label Output',
-              iconColor: _kInjectOutput,
-              primaryColor: _kInjectPrimary,
+            padding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
+            child: Row(
+              children: [
+                productionSectionHeader(
+                  Icons.output_rounded,
+                  'Label Output',
+                  iconColor: _kInjectOutput,
+                  primaryColor: _kInjectPrimary,
+                ),
+                const Spacer(),
+              ],
             ),
           ),
           const Divider(height: 1, color: _kInjectBorder),
@@ -1815,6 +1916,8 @@ class _InjectProductionInputScreenState
                 beratReject,
                 idRejectBonggolan,
                 idRejectReject,
+                namaBonggolan,
+                namaReject,
               ) => _onBucketSubmit(
                 label,
                 jenisItems,
@@ -1825,6 +1928,8 @@ class _InjectProductionInputScreenState
                 beratReject,
                 idRejectBonggolan,
                 idRejectReject,
+                namaBonggolan: namaBonggolan,
+                namaReject: namaReject,
                 isLastBucket: isLastBucket,
               ),
           onPrint: (ctx) => _openBucketPrintDialog(ctx, label),
@@ -1897,6 +2002,7 @@ class _InjectProductionInputScreenState
                     hourEnd: _header?.hourEnd,
                     showTimeInfo: false,
                     primaryColor: _kInjectPrimary,
+                    produksiStatus: _header?.produksiStatus,
                     onGanti: _canTerminate ? _openSplitTimeDialog : null,
                     gantiDisabledReason: _canTerminate
                         ? null
@@ -1910,54 +2016,7 @@ class _InjectProductionInputScreenState
                       vm.loadInputs(widget.noProduksi, force: true);
                       _showSnack('Data di-refresh');
                     },
-                    trailingActions: [
-                      const SizedBox(width: 4),
-                      Consumer<InjectFormulaViewModel>(
-                        builder: (_, fvm, __) => SizedBox(
-                          height: 26,
-                          child: TextButton.icon(
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 0,
-                              ),
-                              foregroundColor: _kInjectPrimary,
-                              backgroundColor: _kInjectPrimary.withValues(
-                                alpha: 0.07,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              visualDensity: VisualDensity.compact,
-                            ),
-                            onPressed: fvm.isLoading
-                                ? null
-                                : () {
-                                    final data = fvm.data;
-                                    if (data == null) return;
-                                    showDialog<void>(
-                                      context: context,
-                                      builder: (_) =>
-                                          InjectFormulaDialogV2(data: data),
-                                    );
-                                  },
-                            icon: fvm.isLoading
-                                ? const SizedBox(
-                                    width: 11,
-                                    height: 11,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 1.5,
-                                    ),
-                                  )
-                                : const Icon(Icons.science_outlined, size: 13),
-                            label: const Text(
-                              'Formula',
-                              style: TextStyle(fontSize: 11),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    trailingActions: const [],
                   ),
                 Expanded(
                   child: Builder(
@@ -2619,7 +2678,9 @@ class _HourlyBucketData {
     this.cycleTime,
     this.counter,
     this.beratBonggolan,
+    this.namaBonggolan,
     this.beratReject,
+    this.namaReject,
     this.carryOverInByJenis = const {},
     this.pcsInputByJenis = const {},
     this.carryOverOutByJenis = const {},
@@ -2640,7 +2701,9 @@ class _HourlyBucketData {
   final double? cycleTime;
   final int? counter;
   final double? beratBonggolan;
+  final String? namaBonggolan;
   final double? beratReject;
+  final String? namaReject;
   final Map<int, int> carryOverInByJenis;
   final Map<int, int> pcsInputByJenis;
   final Map<int, int> carryOverOutByJenis;
@@ -2693,6 +2756,8 @@ class _HourlyPcsSection extends StatefulWidget {
     double? beratReject,
     int? idRejectBonggolan,
     int? idRejectReject,
+    String? namaBonggolan,
+    String? namaReject,
   )
   onSubmit;
 
@@ -2888,6 +2953,8 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
         beratReject,
         idRejectBonggolan,
         idRejectReject,
+        _bonggolanJenis?.namaBonggolan,
+        _rejectJenis?.namaReject,
       );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -3482,6 +3549,58 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
     );
   }
 
+  Widget _buildJenisPickerDisabled({
+    required String label,
+    required String? namaJenis,
+  }) {
+    const accent = Color(0xFF92400E);
+    final hasValue = namaJenis != null && namaJenis.isNotEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF9CA3AF),
+          ),
+        ),
+        const SizedBox(height: 3),
+        Container(
+          height: 30,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF3F4F6),
+            borderRadius: BorderRadius.circular(5),
+            border: Border.all(
+              color: hasValue
+                  ? accent.withValues(alpha: 0.30)
+                  : const Color(0xFFE5E7EB),
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  hasValue ? namaJenis : '-',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: hasValue ? FontWeight.w600 : FontWeight.w400,
+                    color: hasValue ? accent : Colors.grey.shade400,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Icon(Icons.expand_more, size: 14, color: Colors.grey.shade400),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildJenisPicker({
     required String label,
     required String? selectedName,
@@ -3545,7 +3664,6 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
     final data = widget.data;
     final hasLabels = data.labelsCreated > 0;
     const greenAccent = Color(0xFF15803D);
-    const mutedColor = Color(0xFF6B7280);
     final outputs = widget.headerOutputs;
     final multiJenis = outputs.length > 1;
 
@@ -3692,24 +3810,6 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
                   color: hasLabels ? greenAccent : Colors.grey.shade600,
                 ),
               ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: hasLabels
-                      ? greenAccent.withValues(alpha: 0.10)
-                      : const Color(0xFFF3F4F6),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  '${data.labelsCreated} label · ${data.carryOverOut} pcs sisa',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    color: hasLabels ? greenAccent : mutedColor,
-                  ),
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -3718,48 +3818,62 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
             if (i > 0) const SizedBox(height: 10),
             buildJenisRowDisabled(outputs[i]),
           ],
-          // Sisa Akhir Shift
-          if (data.beratBonggolan != null || data.beratReject != null) ...[
-            const SizedBox(height: 8),
-            const Divider(height: 1, color: Color(0xFFD1FAE5)),
-            const SizedBox(height: 6),
+          // Sisa Akhir Shift — same layout as _buildAvailable but disabled
+          if (widget.isLastBucket) ...[
+            const SizedBox(height: 10),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                const Icon(
-                  Icons.recycling_outlined,
-                  size: 10,
-                  color: Color(0xFF6B7280),
+                Expanded(
+                  flex: 3,
+                  child: _buildJenisPickerDisabled(
+                    label: 'Jenis Bonggolan',
+                    namaJenis: data.namaBonggolan,
+                  ),
                 ),
-                const SizedBox(width: 4),
-                const Text(
-                  'Sisa Akhir Shift',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF6B7280),
+                const SizedBox(width: 6),
+                Expanded(
+                  flex: 2,
+                  child: _qcField(
+                    label: 'Berat Bonggolan (kg)',
+                    ctrl: TextEditingController(
+                      text: data.beratBonggolan != null
+                          ? data.beratBonggolan!.toStringAsFixed(1)
+                          : '',
+                    ),
+                    hint: '-',
+                    decimal: true,
+                    enabled: false,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                if (data.beratBonggolan != null)
-                  Expanded(
-                    child: _PcsInfoRow(
-                      label: 'Bonggolan',
-                      value: '${data.beratBonggolan!.toStringAsFixed(1)} kg',
-                      color: mutedColor,
-                    ),
+                Expanded(
+                  flex: 3,
+                  child: _buildJenisPickerDisabled(
+                    label: 'Jenis Reject',
+                    namaJenis: data.namaReject,
                   ),
-                if (data.beratReject != null)
-                  Expanded(
-                    child: _PcsInfoRow(
-                      label: 'Reject',
-                      value: '${data.beratReject!.toStringAsFixed(1)} kg',
-                      color: mutedColor,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  flex: 2,
+                  child: _qcField(
+                    label: 'Berat Reject (kg)',
+                    ctrl: TextEditingController(
+                      text: data.beratReject != null
+                          ? data.beratReject!.toStringAsFixed(1)
+                          : '',
                     ),
+                    hint: '-',
+                    decimal: true,
+                    enabled: false,
                   ),
+                ),
               ],
             ),
           ],
@@ -3815,7 +3929,7 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
                 ),
                 icon: const Icon(Icons.print_outlined, size: 15),
                 label: Text(
-                  'Cetak ${data.labelsCreated} Label',
+                  'Cetak Label',
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
@@ -3859,42 +3973,6 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
               fontWeight: FontWeight.w700,
               color: counter != null ? accent : Colors.grey.shade400,
             ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _PcsInfoRow extends StatelessWidget {
-  const _PcsInfoRow({
-    required this.label,
-    required this.value,
-    required this.color,
-    this.bold = false,
-  });
-
-  final String label;
-  final String value;
-  final Color color;
-  final bool bold;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
-            color: color,
           ),
         ),
       ],

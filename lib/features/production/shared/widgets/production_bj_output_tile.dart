@@ -11,6 +11,7 @@ class ProductionBjOutputTile extends StatelessWidget {
     required this.isPrinted,
     this.accentColor = const Color(0xFF00695C),
     this.onTap,
+    this.onDelete,
   });
 
   final String labelCode;
@@ -19,6 +20,7 @@ class ProductionBjOutputTile extends StatelessWidget {
   final bool isPrinted;
   final Color accentColor;
   final VoidCallback? onTap;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -55,6 +57,17 @@ class ProductionBjOutputTile extends StatelessWidget {
                     size: 11,
                     color: isPrinted ? accentColor : Colors.grey.shade400,
                   ),
+                  if (onDelete != null) ...[
+                    const SizedBox(width: 4),
+                    GestureDetector(
+                      onTap: onDelete,
+                      child: Icon(
+                        Icons.delete_outline,
+                        size: 13,
+                        color: Colors.red.shade400,
+                      ),
+                    ),
+                  ],
                 ],
               ),
               const SizedBox(height: 1),

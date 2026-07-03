@@ -462,12 +462,7 @@ class _InjectProductionFormDialogState
       widget.onSave?.call(result);
       Navigator.of(context).pop(result);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(prodVm.saveError ?? 'Gagal menyimpan data'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      Navigator.of(context).pop();
     }
   }
 

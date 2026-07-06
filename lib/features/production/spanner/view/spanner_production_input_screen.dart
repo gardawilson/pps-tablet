@@ -700,12 +700,12 @@ class _SpannerProductionInputScreenState
                 children: fwipGroups.entries.map((entry) {
                   final hasPartial = entry.value.any((x) => x.isPartialRow);
                   return ProductionInputGroupTile(
-                    title: entry.key,
-                    headerSubtitle:
+                    title:
                         (entry.value.isNotEmpty
                             ? entry.value.first.namaJenis
                             : '-') ??
                         '-',
+                    headerSubtitle: entry.key,
                     tileMetrics: [
                       (
                         Icons.inventory_2_outlined,
@@ -1250,7 +1250,9 @@ class _SpannerOutputTile extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      output.labelCode,
+                      output.namaJenis.isNotEmpty
+                          ? output.namaJenis
+                          : output.labelCode,
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
@@ -1271,7 +1273,7 @@ class _SpannerOutputTile extends StatelessWidget {
               ),
               const SizedBox(height: 1),
               Text(
-                output.namaJenis,
+                output.labelCode,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(fontSize: 10, color: Colors.grey.shade600),

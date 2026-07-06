@@ -7,7 +7,6 @@ import 'package:pps_tablet/features/production/shared/shared.dart';
 
 import '../../../../common/widgets/confirm_dialog.dart';
 import '../../../../common/widgets/error_status_dialog.dart';
-import '../../../../common/widgets/scan_label_dialog.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../../shared/models/production_label_lookup_result.dart';
 import '../../shared/widgets/add_cabinet_material_dialog.dart';
@@ -16,6 +15,7 @@ import '../../shared/widgets/save_button_with_badge.dart';
 import '../../shared/widgets/unsaved_temp_warning_dialog.dart';
 import '../model/inject_output_model.dart';
 import '../model/inject_production_inputs_model.dart';
+import '../model/inject_formula_model.dart';
 import '../model/inject_production_model.dart'
     show InjectOutputJenis, InjectProduction;
 import '../repository/inject_production_repository.dart';
@@ -28,7 +28,8 @@ import '../../../label/furniture_wip/repository/furniture_wip_repository.dart';
 import '../../../label/reject/repository/reject_repository.dart';
 import '../../../../core/network/endpoints.dart';
 import '../../../../core/network/api_client.dart';
-import '../widgets/inject_sak_picker_dialog.dart';
+import '../widgets/inject_lookup_label_dialog.dart';
+import '../widgets/inject_lookup_label_partial_dialog.dart';
 import '../widgets/inject_split_time_dialog.dart';
 import '../../../label/packing/repository/packing_repository.dart';
 
@@ -52,6 +53,9 @@ class _InjectProductionInputScreenState
     extends State<InjectProductionInputScreen> {
   String _selectedInputTab = 'fwip';
   String _selectedOutputTab = 'fwip';
+
+  // ── Scan mode (full = auto-add semua item baru, partial/select = dialog manual) ──
+  String _selectedMode = 'full';
 
   // ── Multi-select state (input) ────────────────────────────────────────────
   bool _isSelecting = false;
@@ -243,7 +247,8 @@ class _InjectProductionInputScreenState
       context: context,
       builder: (_) => ConfirmDialog(
         title: 'Hapus Semua Temp?',
-        message: 'Apakah Anda yakin ingin menghapus ${vm.totalTempCount} item temp?',
+        message:
+            'Apakah Anda yakin ingin menghapus ${vm.totalTempCount} item temp?',
         confirmLabel: 'Hapus',
         confirmIcon: Icons.delete_sweep,
       ),
@@ -295,25 +300,138 @@ class _InjectProductionInputScreenState
     }
   }
 
+  // ── Complete (Selesaikan produksi) ─────────────────────────────────────────
+
+  Future<void> _handleComplete() async {
+    final vm = context.read<InjectProductionInputViewModel>();
+    if (vm.totalTempCount > 0) {
+      _showSnack(
+        'Masih ada ${vm.totalTempCount} data temp yang belum disimpan. '
+        'Simpan atau hapus dulu sebelum menyelesaikan.',
+        backgroundColor: Colors.orange,
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => ConfirmDialog(
+        title: 'Selesaikan Produksi?',
+        message:
+            'Yakin ingin menyelesaikan produksi ${widget.noProduksi}?\n'
+            'Setelah selesai, produksi akan dikunci dan tidak dapat diubah.',
+        confirmLabel: 'Selesaikan',
+        confirmIcon: Icons.check_circle_outline,
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await _prodRepo.completeProduksi(widget.noProduksi);
+      if (!mounted) return;
+      _showSnack(
+        '✅ Produksi berhasil diselesaikan',
+        backgroundColor: Colors.green,
+      );
+      await _loadHeader();
+    } catch (e) {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (_) => ErrorStatusDialog(
+          title: 'Gagal Menyelesaikan',
+          message: e.toString().replaceFirst('Exception: ', ''),
+        ),
+      );
+    }
+  }
+
   // ── Scan / Lookup ──────────────────────────────────────────────────────────
 
   Future<void> _openScanDialog() async {
+    // Formula inputs (material yang diterima) untuk panel kiri dialog scan —
+    // pola yang sama seperti Washing production input screen.
+    final formulaData = context.read<InjectFormulaViewModel>().data;
+
+    // Master Input/Output belum diset: formula termuat & ada output, tapi tidak
+    // ada satu pun input formula → scan label tidak dapat dilakukan.
+    final outputs = formulaData?.outputs ?? const [];
+    final hasAnyFormula = outputs.any((o) => o.formulas.isNotEmpty);
+    if (formulaData != null && outputs.isNotEmpty && !hasAnyFormula) {
+      final jenis = outputs
+          .map((o) => o.namaJenis.trim())
+          .where((n) => n.isNotEmpty)
+          .join(', ');
+      await showDialog<void>(
+        context: context,
+        builder: (_) => ErrorStatusDialog(
+          title: 'Master Input Output Belum Diset',
+          message:
+              'Isi data output "$jenis" ke dalam Master Input Output '
+              'terlebih dahulu untuk dapat melakukan proses scan label.',
+        ),
+      );
+      return;
+    }
+
+    final formulaOutputs = outputs
+        .map(
+          (o) => ProductionFormulaOutput(
+            idJenis: o.idJenis,
+            namaJenis: o.namaJenis,
+            formulas: o.formulas
+                .map(
+                  (f) => ProductionFormulaItem(
+                    inputId: f.inputId,
+                    inputNama: f.inputNama ?? '',
+                    kategoriNama: f.inputKategoriNama,
+                    prefixLabel: f.inputKategoriKode,
+                  ),
+                )
+                .toList(),
+          ),
+        )
+        .toList();
+
     await showDialog<void>(
       context: context,
-      builder: (_) => ScanLabelDialog(
+      builder: (_) => ProductionScanLabelDialog(
         manualHint: 'BB. / D. / H. / V.',
-        acceptedLabels: const [
-          (prefix: 'BB', label: 'Furniture WIP'),
-          (prefix: 'D', label: 'Broker'),
-          (prefix: 'H', label: 'Mixer'),
-          (prefix: 'V', label: 'Gilingan'),
-        ],
+        headerSubtitle: _modeLabel(_selectedMode),
+        primaryColor: _kInjectPrimary,
+        formulaOutputs: formulaOutputs,
         onLookup: _onCodeReady,
       ),
     );
   }
 
+  String _modeLabel(String mode) {
+    switch (mode) {
+      case 'full':
+        return 'FULL PALLET';
+      case 'partial':
+        return 'PARTIAL';
+      default:
+        return mode.toUpperCase();
+    }
+  }
+
+  // Prefix label yang valid untuk proses Inject (sesuai validasi server).
+  static const List<String> _validInjectPrefixes = ['BB.', 'D.', 'H.', 'V.'];
+
   Future<String?> _onCodeReady(String code) async {
+    // Validasi prefix di sisi klien agar pesan jelas (server balas 500 untuk
+    // prefix tak dikenal: "Invalid prefix ...").
+    final normalized = code.trim().toUpperCase();
+    if (!_validInjectPrefixes.any((p) => normalized.startsWith(p))) {
+      final prefix = normalized.contains('.')
+          ? normalized.substring(0, normalized.indexOf('.') + 1)
+          : normalized;
+      return 'Prefix "$prefix" tidak diizinkan. '
+          'Label valid: BB. (Furniture WIP), D. (Broker), H. (Mixer), V. (Gilingan).';
+    }
+
     final vm = context.read<InjectProductionInputViewModel>();
     final res = await vm.lookupLabel(code, force: true);
     if (!mounted) return 'Halaman sudah tidak aktif';
@@ -322,37 +440,166 @@ class _InjectProductionInputScreenState
       return 'Label "$code" tidak memiliki data yang tersedia.';
     }
 
-    // TODO: re-enable prefix validation setelah formula siap
-    // const allowedPrefixes = {
-    //   PrefixType.furnitureWip,
-    //   PrefixType.broker,
-    //   PrefixType.mixer,
-    //   PrefixType.gilingan,
-    // };
-    // if (!allowedPrefixes.contains(res.prefixType)) {
-    //   if (mounted) {
-    //     await showDialog<void>(
-    //       context: context,
-    //       builder: (_) => ErrorStatusDialog(
-    //         title: 'Label Tidak Diizinkan',
-    //         message:
-    //             'Label "${res.prefix}" tidak dapat digunakan di proses Inject.\n\n'
-    //             'Prefix yang diperbolehkan: BB (Furniture WIP), D (Broker), H (Mixer), V (Gilingan).',
-    //       ),
-    //     );
-    //   }
-    //   return 'Prefix ${res.prefix} tidak diperbolehkan untuk proses Inject';
-    // }
+    // Validasi kategori + jenis terhadap formula hasil fetch API (jika sudah dimuat)
+    final formulaData = context.read<InjectFormulaViewModel>().data;
+    if (formulaData != null && formulaData.outputs.isNotEmpty) {
+      final allowedTabs = _computeAllowedTabs(formulaData);
+      final tab = _tabForPrefixType(res.prefixType);
+
+      if (allowedTabs.isNotEmpty && tab != null && !allowedTabs.contains(tab)) {
+        return 'Kategori label "${code.trim()}" tidak sesuai dengan formula produksi ini.';
+      }
+
+      if (tab != null) {
+        final allowedInputIds = _computeAllowedInputIdsByTab(formulaData)[tab] ?? const <int>{};
+        if (allowedInputIds.isNotEmpty) {
+          final firstRow = res.data.first;
+          final rawIdJenis = firstRow['idJenis'] ?? firstRow['IdJenis'];
+          if (rawIdJenis != null) {
+            final idJenis = (rawIdJenis as num).toInt();
+            if (!allowedInputIds.contains(idJenis)) {
+              final namaJenis =
+                  firstRow['namaJenis'] ?? firstRow['NamaJenis'] ?? firstRow['Jenis'] ?? 'tidak diketahui';
+              return 'Jenis "$namaJenis" tidak terdaftar dalam formula produksi ini.';
+            }
+          }
+        }
+      }
+    }
 
     if (res.prefixType == PrefixType.furnitureWip) {
       await _handleFwipPcsFlow(vm, res);
-    } else {
+    } else if (_selectedMode == 'partial') {
       await showDialog<void>(
         context: context,
         barrierDismissible: true,
-        builder: (_) => InjectSakPickerDialog(noProduksi: widget.noProduksi),
+        builder: (_) => InjectLookupLabelPartialDialog(
+          noProduksi: widget.noProduksi,
+          selectedMode: _selectedMode,
+        ),
       );
+    } else if (_selectedMode == 'select') {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => InjectLookupLabelDialog(
+          noProduksi: widget.noProduksi,
+          selectedMode: _selectedMode,
+        ),
+      );
+    } else {
+      await _handleFullMode(vm, res);
     }
+    return null;
+  }
+
+  /// Set tab yang boleh ditampilkan berdasarkan kategori input pada formula.
+  /// Kosong = formula belum termuat / tak dikenali → tampilkan semua tab.
+  Set<String> _computeAllowedTabs(InjectFormulaData? data) {
+    if (data == null || data.outputs.isEmpty) return const {};
+    final tabs = <String>{};
+    for (final o in data.outputs) {
+      for (final f in o.formulas) {
+        final k = '${f.inputKategoriKode} ${f.inputKategoriNama}'.toLowerCase();
+        if (k.contains('furniture') ||
+            k.contains('fwip') ||
+            k.contains('wip')) {
+          tabs.add('fwip');
+        }
+        if (k.contains('broker')) tabs.add('broker');
+        if (k.contains('mixer')) tabs.add('mixer');
+        if (k.contains('gilingan')) tabs.add('gilingan');
+        if (k.contains('material') ||
+            k.contains('kabinet') ||
+            k.contains('cabinet')) {
+          tabs.add('material');
+        }
+      }
+    }
+    return tabs;
+  }
+
+  /// InputId formula yang diizinkan per tab, berdasarkan kategori input pada
+  /// formula (hasil fetch API). Dipakai untuk validasi jenis label saat scan.
+  Map<String, Set<int>> _computeAllowedInputIdsByTab(InjectFormulaData? data) {
+    final map = <String, Set<int>>{};
+    if (data == null) return map;
+    for (final o in data.outputs) {
+      for (final f in o.formulas) {
+        final k = '${f.inputKategoriKode} ${f.inputKategoriNama}'.toLowerCase();
+        String? tab;
+        if (k.contains('furniture') || k.contains('fwip') || k.contains('wip')) {
+          tab = 'fwip';
+        } else if (k.contains('broker')) {
+          tab = 'broker';
+        } else if (k.contains('mixer')) {
+          tab = 'mixer';
+        } else if (k.contains('gilingan')) {
+          tab = 'gilingan';
+        }
+        if (tab != null) {
+          (map[tab] ??= <int>{}).add(f.inputId);
+        }
+      }
+    }
+    return map;
+  }
+
+  String? _tabForPrefixType(PrefixType type) {
+    switch (type) {
+      case PrefixType.furnitureWip:
+        return 'fwip';
+      case PrefixType.broker:
+        return 'broker';
+      case PrefixType.mixer:
+        return 'mixer';
+      case PrefixType.gilingan:
+        return 'gilingan';
+      default:
+        return null;
+    }
+  }
+
+  /// MODE FULL: auto-tambahkan semua item baru dari hasil scan tanpa dialog
+  /// pemilihan manual — sama seperti Washing production input screen.
+  Future<void> _handleFullMode(
+    InjectProductionInputViewModel vm,
+    ProductionLabelLookupResult res,
+  ) async {
+    final freshCount = vm.countNewRowsInLastLookup(widget.noProduksi);
+    if (freshCount == 0) {
+      final labelCode = _labelCodeOfFirst(res);
+      final hasTemp =
+          labelCode != null && vm.hasTemporaryDataForLabel(labelCode);
+      final suffix = hasTemp
+          ? ' • ${vm.getTemporaryDataSummary(labelCode)}'
+          : '';
+      _showSnack(
+        'Semua item untuk ${labelCode ?? "label ini"} sudah ada.$suffix',
+      );
+      return;
+    }
+
+    vm.clearPicks();
+    vm.pickAllNew(widget.noProduksi);
+    final result = vm.commitPickedToTemp(noProduksi: widget.noProduksi);
+
+    final msg = result.added > 0
+        ? '✅ Auto-added ${result.added} item${result.skipped > 0 ? ' • Duplikat terlewati ${result.skipped}' : ''}'
+        : 'Tidak ada item baru ditambahkan';
+    _showSnack(
+      msg,
+      backgroundColor: result.added > 0 ? Colors.green : Colors.orange,
+    );
+  }
+
+  String? _labelCodeOfFirst(ProductionLabelLookupResult res) {
+    if (res.typedItems.isEmpty) return null;
+    final item = res.typedItems.first;
+    if (item is BrokerItem) return _brokerTitleKey(item);
+    if (item is MixerItem) return _mixerTitleKey(item);
+    if (item is GilinganItem) return _gilinganTitleKey(item);
+    if (item is FurnitureWipItem) return _fwipTitleKey(item);
     return null;
   }
 
@@ -485,7 +732,8 @@ class _InjectProductionInputScreenState
       context: context,
       builder: (_) => ConfirmDialog(
         title: 'Keluarkan Label Input?',
-        message: 'Yakin ingin mengeluarkan $count label dari proses ini?\n'
+        message:
+            'Yakin ingin mengeluarkan $count label dari proses ini?\n'
             'Label tidak akan dihapus, hanya dilepas dari proses.',
         confirmLabel: 'Keluarkan',
         confirmIcon: Icons.logout,
@@ -497,7 +745,9 @@ class _InjectProductionInputScreenState
     if (!mounted) return;
     _cancelSelection();
     _showSnack(
-      success ? '✅ $count label berhasil dikeluarkan dari proses' : (vm.deleteError ?? 'Gagal'),
+      success
+          ? '✅ $count label berhasil dikeluarkan dari proses'
+          : (vm.deleteError ?? 'Gagal'),
       backgroundColor: success ? Colors.green : Colors.red,
     );
   }
@@ -536,7 +786,8 @@ class _InjectProductionInputScreenState
       context: context,
       builder: (_) => ConfirmDialog(
         title: 'Hapus Label Output?',
-        message: 'Yakin ingin menghapus $count label yang dipilih?\n'
+        message:
+            'Yakin ingin menghapus $count label yang dipilih?\n'
             'Aksi ini tidak dapat dibatalkan.',
         confirmLabel: 'Hapus',
         confirmIcon: Icons.delete_outline,
@@ -1044,9 +1295,8 @@ class _InjectProductionInputScreenState
           emptyMessage: 'Belum ada label Broker',
           constraints: constraints,
           tileBuilder: (key, items) => ProductionInputGroupTile(
-            title: key,
-            headerSubtitle:
-                (items.isNotEmpty ? items.first.namaJenis : '-') ?? '-',
+            title: (items.isNotEmpty ? items.first.namaJenis : '-') ?? '-',
+            headerSubtitle: key,
             tileMetrics: [
               (
                 Icons.scale_outlined,
@@ -1084,9 +1334,8 @@ class _InjectProductionInputScreenState
           emptyMessage: 'Belum ada label Mixer',
           constraints: constraints,
           tileBuilder: (key, items) => ProductionInputGroupTile(
-            title: key,
-            headerSubtitle:
-                (items.isNotEmpty ? items.first.namaJenis : '-') ?? '-',
+            title: (items.isNotEmpty ? items.first.namaJenis : '-') ?? '-',
+            headerSubtitle: key,
             tileMetrics: [
               (
                 Icons.scale_outlined,
@@ -1124,9 +1373,8 @@ class _InjectProductionInputScreenState
           emptyMessage: 'Belum ada label Gilingan',
           constraints: constraints,
           tileBuilder: (key, items) => ProductionInputGroupTile(
-            title: key,
-            headerSubtitle:
-                (items.isNotEmpty ? items.first.namaJenis : '-') ?? '-',
+            title: (items.isNotEmpty ? items.first.namaJenis : '-') ?? '-',
+            headerSubtitle: key,
             tileMetrics: [
               (
                 Icons.scale_outlined,
@@ -1194,12 +1442,12 @@ class _InjectProductionInputScreenState
               children: fwipGroups.entries.map((entry) {
                 final hasPartial = entry.value.any((x) => x.isPartialRow);
                 return ProductionInputGroupTile(
-                  title: entry.key,
-                  headerSubtitle:
+                  title:
                       (entry.value.isNotEmpty
                           ? entry.value.first.namaJenis
                           : '-') ??
                       '-',
+                  headerSubtitle: entry.key,
                   tileMetrics: [
                     (
                       Icons.inventory_2_outlined,
@@ -1661,7 +1909,8 @@ class _InjectProductionInputScreenState
       context: context,
       builder: (_) => ConfirmDialog(
         title: 'Hapus Label Reject?',
-        message: 'Yakin ingin menghapus ${item.noReject}?\nAksi ini tidak dapat dibatalkan.',
+        message:
+            'Yakin ingin menghapus ${item.noReject}?\nAksi ini tidak dapat dibatalkan.',
         confirmLabel: 'Hapus',
         confirmIcon: Icons.delete_outline,
       ),
@@ -1690,7 +1939,8 @@ class _InjectProductionInputScreenState
       context: context,
       builder: (_) => ConfirmDialog(
         title: 'Hapus Label Barang Jadi?',
-        message: 'Yakin ingin menghapus ${item.noBj}?\nAksi ini tidak dapat dibatalkan.',
+        message:
+            'Yakin ingin menghapus ${item.noBj}?\nAksi ini tidak dapat dibatalkan.',
         confirmLabel: 'Hapus',
         confirmIcon: Icons.delete_outline,
       ),
@@ -1719,7 +1969,8 @@ class _InjectProductionInputScreenState
       context: context,
       builder: (_) => ConfirmDialog(
         title: 'Hapus Label Furniture WIP?',
-        message: 'Yakin ingin menghapus ${item.noFurnitureWip}?\nAksi ini tidak dapat dibatalkan.',
+        message:
+            'Yakin ingin menghapus ${item.noFurnitureWip}?\nAksi ini tidak dapat dibatalkan.',
         confirmLabel: 'Hapus',
         confirmIcon: Icons.delete_outline,
       ),
@@ -1748,7 +1999,8 @@ class _InjectProductionInputScreenState
       context: context,
       builder: (_) => ConfirmDialog(
         title: 'Hapus Label Bonggolan?',
-        message: 'Yakin ingin menghapus ${item.noBonggolan}?\nAksi ini tidak dapat dibatalkan.',
+        message:
+            'Yakin ingin menghapus ${item.noBonggolan}?\nAksi ini tidak dapat dibatalkan.',
         confirmLabel: 'Hapus',
         confirmIcon: Icons.delete_outline,
       ),
@@ -2349,6 +2601,12 @@ class _InjectProductionInputScreenState
                     showTimeInfo: false,
                     primaryColor: _kInjectPrimary,
                     produksiStatus: _header?.produksiStatus,
+                    onComplete: (_header?.isComplete == true)
+                        ? null
+                        : _handleComplete,
+                    completeDisabledReason: (_header?.isComplete == true)
+                        ? 'Produksi sudah selesai'
+                        : null,
                     onGanti: _openSplitTimeDialog,
                     onRefresh: () {
                       vm.loadInputs(widget.noProduksi, force: true);

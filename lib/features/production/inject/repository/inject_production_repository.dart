@@ -499,6 +499,24 @@ class InjectProductionRepository {
   }
 
   /* =============================
+   * COMPLETE
+   * PATCH /api/production/inject/:noProduksi/complete
+   * Tidak ada body; menandai produksi sebagai selesai (IsComplete = 1).
+   * ============================= */
+
+  Future<void> completeProduksi(String noProduksi) async {
+    final encoded = Uri.encodeComponent(noProduksi.trim());
+    try {
+      await api.patchJson('/api/production/inject/$encoded/complete');
+    } on ApiException catch (e) {
+      final parsed = _tryDecodeMap(e.responseBody);
+      final msg = (parsed['message'] as String?) ??
+          'Gagal menyelesaikan produksi (HTTP ${e.statusCode})';
+      throw Exception(msg);
+    }
+  }
+
+  /* =============================
    * BATCH - LIST
    * GET /api/production/inject/batch/:noProduksi
    * ============================= */

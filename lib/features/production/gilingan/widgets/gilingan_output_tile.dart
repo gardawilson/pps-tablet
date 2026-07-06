@@ -47,7 +47,9 @@ class GilinganOutputTile extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      output.noGilingan,
+                      output.namaJenis.isNotEmpty
+                          ? output.namaJenis
+                          : output.noGilingan,
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
@@ -79,7 +81,7 @@ class GilinganOutputTile extends StatelessWidget {
               ),
               const SizedBox(height: 1),
               Text(
-                output.namaJenis,
+                output.noGilingan,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(fontSize: 10, color: Colors.grey.shade600),

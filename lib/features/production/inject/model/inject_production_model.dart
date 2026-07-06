@@ -57,6 +57,12 @@ class InjectProduction {
   final bool isRealtime;
   final String? produksiStatus;
 
+  /// Asal pembuatan produksi (persisted di backend, di-set saat create):
+  /// - "realtime" -> input via kartu mesin  -> layar v3
+  /// - "backdate" -> input via FAB riwayat  -> layar v1
+  /// - null/kosong (data lama) -> default v1
+  final String? inputMode;
+
   final String? outputCategory;
   final List<InjectOutputJenis> outputs;
 
@@ -97,9 +103,16 @@ class InjectProduction {
     this.isComplete = false,
     this.isRealtime = false,
     this.produksiStatus,
+    this.inputMode,
     this.outputCategory,
     this.outputs = const [],
   });
+
+  /// True bila produksi ini dibuat via kartu mesin (input realtime/batch).
+  /// Menentukan layar input: realtime -> v3, selain itu (termasuk data lama
+  /// tanpa [inputMode]) -> v1.
+  bool get isRealtimeInput =>
+      inputMode?.toLowerCase().trim() == 'realtime';
 
   // -------------------- tolerant parsers --------------------
 
@@ -247,6 +260,7 @@ class InjectProduction {
           j['status']?.toString() == 'pending' ||
           _asBool(j['IsRealtime'], fallback: false),
       produksiStatus: j['status']?.toString(),
+      inputMode: j['InputMode']?.toString(),
       outputCategory: j['OutputCategory']?.toString(),
       outputs: (j['Outputs'] as List<dynamic>? ?? [])
           .map((e) => InjectOutputJenis.fromJson(e as Map<String, dynamic>))

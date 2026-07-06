@@ -45,7 +45,7 @@ class ProductionBonggolanOutputTile extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      labelCode,
+                      namaJenis.isNotEmpty ? namaJenis : labelCode,
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
@@ -84,7 +84,7 @@ class ProductionBonggolanOutputTile extends StatelessWidget {
               ),
               const SizedBox(height: 1),
               Text(
-                namaJenis,
+                labelCode,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(fontSize: 10, color: Colors.grey.shade600),

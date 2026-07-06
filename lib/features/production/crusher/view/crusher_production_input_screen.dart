@@ -763,12 +763,12 @@ class _CrusherProductionInputScreenState
               children: bbGroups.entries.map((entry) {
                 final hasPartial = entry.value.any((x) => x.isPartialRow);
                 return ProductionInputGroupTile(
-                  title: entry.key,
-                  headerSubtitle:
+                  title:
                       (entry.value.isNotEmpty
                           ? entry.value.first.namaJenis
                           : '-') ??
                       '-',
+                  headerSubtitle: entry.key,
                   tileMetrics: [
                     (Icons.inventory_2_outlined, '${entry.value.length} sak'),
                     (

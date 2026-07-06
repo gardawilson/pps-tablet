@@ -1241,12 +1241,12 @@ class _BrokerProductionInputScreenState
                 children: brokerGroups.entries.map((entry) {
                   final hasPartial = entry.value.any((x) => x.isPartialRow);
                   return ProductionInputGroupTile(
-                    title: entry.key,
-                    headerSubtitle:
+                    title:
                         (entry.value.isNotEmpty
                             ? entry.value.first.namaJenis
                             : '-') ??
                         '-',
+                    headerSubtitle: entry.key,
                     tileMetrics: [
                       (Icons.inventory_2_outlined, '${entry.value.length} sak'),
                       (
@@ -1336,12 +1336,12 @@ class _BrokerProductionInputScreenState
                 children: bbGroups.entries.map((entry) {
                   final hasPartial = entry.value.any((x) => x.isPartialRow);
                   return ProductionInputGroupTile(
-                    title: entry.key,
-                    headerSubtitle:
+                    title:
                         (entry.value.isNotEmpty
                             ? entry.value.first.namaJenis
                             : '-') ??
                         '-',
+                    headerSubtitle: entry.key,
                     tileMetrics: [
                       (Icons.inventory_2_outlined, '${entry.value.length} sak'),
                       (
@@ -1424,12 +1424,12 @@ class _BrokerProductionInputScreenState
                 ),
                 children: washingGroups.entries.map((entry) {
                   return ProductionInputGroupTile(
-                    title: entry.key,
-                    headerSubtitle:
+                    title:
                         (entry.value.isNotEmpty
                             ? entry.value.first.namaJenis
                             : '-') ??
                         '-',
+                    headerSubtitle: entry.key,
                     tileMetrics: [
                       (Icons.inventory_2_outlined, '${entry.value.length} sak'),
                       (
@@ -1497,12 +1497,12 @@ class _BrokerProductionInputScreenState
                 ),
                 children: crusherGroups.entries.map((entry) {
                   return ProductionInputGroupTile(
-                    title: entry.key,
-                    headerSubtitle:
+                    title:
                         (entry.value.isNotEmpty
                             ? entry.value.first.namaJenis
                             : '-') ??
                         '-',
+                    headerSubtitle: entry.key,
                     tileMetrics: [
                       (
                         Icons.scale_outlined,
@@ -1572,12 +1572,12 @@ class _BrokerProductionInputScreenState
                 children: gilinganGroups.entries.map((entry) {
                   final hasPartial = entry.value.any((x) => x.isPartialRow);
                   return ProductionInputGroupTile(
-                    title: entry.key,
-                    headerSubtitle:
+                    title:
                         (entry.value.isNotEmpty
                             ? entry.value.first.namaJenis
                             : '-') ??
                         '-',
+                    headerSubtitle: entry.key,
                     tileMetrics: [
                       (
                         Icons.scale_outlined,
@@ -1668,12 +1668,12 @@ class _BrokerProductionInputScreenState
                 children: mixerGroups.entries.map((entry) {
                   final hasPartial = entry.value.any((x) => x.isPartialRow);
                   return ProductionInputGroupTile(
-                    title: entry.key,
-                    headerSubtitle:
+                    title:
                         (entry.value.isNotEmpty
                             ? entry.value.first.namaJenis
                             : '-') ??
                         '-',
+                    headerSubtitle: entry.key,
                     tileMetrics: [
                       (Icons.inventory_2_outlined, '${entry.value.length} sak'),
                       (
@@ -1757,12 +1757,12 @@ class _BrokerProductionInputScreenState
                 children: rejectGroups.entries.map((entry) {
                   final hasPartial = entry.value.any((x) => x.isPartialRow);
                   return ProductionInputGroupTile(
-                    title: entry.key,
-                    headerSubtitle:
+                    title:
                         (entry.value.isNotEmpty
                             ? entry.value.first.namaJenis
                             : '-') ??
                         '-',
+                    headerSubtitle: entry.key,
                     tileMetrics: [
                       (
                         Icons.scale_outlined,
@@ -2505,7 +2505,9 @@ class _BrokerOutputTile extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      output.noBroker ?? '-',
+                      (output.namaJenis ?? '').isNotEmpty
+                          ? output.namaJenis!
+                          : (output.noBroker ?? '-'),
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
@@ -2537,7 +2539,7 @@ class _BrokerOutputTile extends StatelessWidget {
               ),
               const SizedBox(height: 1),
               Text(
-                output.namaJenis ?? '-',
+                output.noBroker ?? '-',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
@@ -2673,7 +2675,9 @@ class _BonggolanOutputTile extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      output.noBonggolan ?? '-',
+                      (output.namaBonggolan ?? '').isNotEmpty
+                          ? output.namaBonggolan!
+                          : (output.noBonggolan ?? '-'),
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
@@ -2705,7 +2709,7 @@ class _BonggolanOutputTile extends StatelessWidget {
               ),
               const SizedBox(height: 1),
               Text(
-                output.namaBonggolan ?? '-',
+                output.noBonggolan ?? '-',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(fontSize: 10, color: Colors.grey.shade600),

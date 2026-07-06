@@ -9,7 +9,6 @@ import 'package:pps_tablet/features/production/shared/shared.dart';
 
 import '../../../../common/widgets/confirm_dialog.dart';
 import '../../../../common/widgets/error_status_dialog.dart';
-import '../../../../common/widgets/scan_label_dialog.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../../shared/models/production_label_lookup_result.dart';
 import '../../shared/widgets/add_cabinet_material_dialog.dart';
@@ -23,10 +22,12 @@ import '../model/inject_production_model.dart'
 import '../repository/inject_production_repository.dart';
 import '../view_model/inject_production_input_view_model.dart';
 
+import '../model/inject_formula_model.dart';
 import '../view_model/inject_formula_view_model.dart';
 import '../widgets/inject_shift_timeline_dialog.dart';
 import '../widgets/counter_picker_dialog.dart';
-import '../widgets/inject_sak_picker_dialog.dart';
+import '../widgets/inject_lookup_label_dialog.dart';
+import '../widgets/inject_lookup_label_partial_dialog.dart';
 import '../widgets/inject_split_time_dialog.dart';
 import '../widgets/inject_terminate_dialog.dart';
 import '../../../../features/reject_type/model/reject_type_model.dart';
@@ -63,6 +64,13 @@ class InjectProductionInputScreen extends StatefulWidget {
 class _InjectProductionInputScreenState
     extends State<InjectProductionInputScreen> {
   String _selectedInputTab = 'fwip';
+
+  // ── Scan mode (full = auto-add semua item baru, partial/select = dialog manual) ──
+  String _selectedMode = 'full';
+
+  // ── Multi-select state (input) ────────────────────────────────────────────
+  bool _isSelecting = false;
+  final Map<String, List<dynamic>> _selectedGroups = {};
 
   // ── Header (fetched from API) ─────────────────────────────────────────────
   final _prodRepo = InjectProductionRepository();
@@ -782,22 +790,88 @@ class _InjectProductionInputScreenState
   // ── Scan / Lookup ──────────────────────────────────────────────────────────
 
   Future<void> _openScanDialog() async {
+    // Formula inputs (material yang diterima) untuk panel kiri dialog scan —
+    // pola yang sama seperti Washing production input screen.
+    final formulaData = context.read<InjectFormulaViewModel>().data;
+
+    // Master Input/Output belum diset: formula termuat & ada output, tapi tidak
+    // ada satu pun input formula → scan label tidak dapat dilakukan.
+    final outputs = formulaData?.outputs ?? const [];
+    final hasAnyFormula = outputs.any((o) => o.formulas.isNotEmpty);
+    if (formulaData != null && outputs.isNotEmpty && !hasAnyFormula) {
+      final jenis = outputs
+          .map((o) => o.namaJenis.trim())
+          .where((n) => n.isNotEmpty)
+          .join(', ');
+      await showDialog<void>(
+        context: context,
+        builder: (_) => ErrorStatusDialog(
+          title: 'Master Input Output Belum Diset',
+          message:
+              'Isi data output "$jenis" ke dalam Master Input Output '
+              'terlebih dahulu untuk dapat melakukan proses scan label.',
+        ),
+      );
+      return;
+    }
+
+    final formulaOutputs = outputs
+        .map(
+          (o) => ProductionFormulaOutput(
+            idJenis: o.idJenis,
+            namaJenis: o.namaJenis,
+            formulas: o.formulas
+                .map(
+                  (f) => ProductionFormulaItem(
+                    inputId: f.inputId,
+                    inputNama: f.inputNama ?? '',
+                    kategoriNama: f.inputKategoriNama,
+                    prefixLabel: f.inputKategoriKode,
+                  ),
+                )
+                .toList(),
+          ),
+        )
+        .toList();
+
     await showDialog<void>(
       context: context,
-      builder: (_) => ScanLabelDialog(
+      builder: (_) => ProductionScanLabelDialog(
         manualHint: 'BB. / D. / H. / V.',
-        acceptedLabels: const [
-          (prefix: 'BB', label: 'Furniture WIP'),
-          (prefix: 'D', label: 'Broker'),
-          (prefix: 'H', label: 'Mixer'),
-          (prefix: 'V', label: 'Gilingan'),
-        ],
+        headerSubtitle: _modeLabel(_selectedMode),
+        primaryColor: _kInjectPrimary,
+        formulaOutputs: formulaOutputs,
         onLookup: _onCodeReady,
       ),
     );
   }
 
+  String _modeLabel(String mode) {
+    switch (mode) {
+      case 'full':
+        return 'FULL PALLET';
+      case 'partial':
+        return 'PARTIAL';
+      default:
+        return mode.toUpperCase();
+    }
+  }
+
+  // Prefix label yang valid untuk proses Inject (sesuai validasi server).
+  static const List<String> _validInjectPrefixes = ['BB.', 'D.', 'H.', 'V.'];
+
   Future<String?> _onCodeReady(String code) async {
+    // Validasi prefix di sisi klien agar pesan jelas (server balas 500 untuk
+    // prefix tak dikenal: "Invalid prefix ...").
+    final normalized = code.trim().toUpperCase();
+    if (!_validInjectPrefixes.any((p) => normalized.startsWith(p))) {
+      final prefix = normalized.contains('.')
+          ? normalized.substring(0, normalized.indexOf('.') + 1)
+          : normalized;
+      return 'Prefix "$prefix" tidak diizinkan. '
+          'Label valid: BB. (Furniture WIP), D. (Broker), H. (Mixer), V. (Gilingan).';
+    }
+
     final vm = context.read<InjectProductionInputViewModel>();
     final res = await vm.lookupLabel(code, force: true);
     if (!mounted) return 'Halaman sudah tidak aktif';
@@ -806,37 +880,99 @@ class _InjectProductionInputScreenState
       return 'Label "$code" tidak memiliki data yang tersedia.';
     }
 
-    // TODO: re-enable prefix validation setelah formula siap
-    // const allowedPrefixes = {
-    //   PrefixType.furnitureWip,
-    //   PrefixType.broker,
-    //   PrefixType.mixer,
-    //   PrefixType.gilingan,
-    // };
-    // if (!allowedPrefixes.contains(res.prefixType)) {
-    //   if (mounted) {
-    //     await showDialog<void>(
-    //       context: context,
-    //       builder: (_) => ErrorStatusDialog(
-    //         title: 'Label Tidak Diizinkan',
-    //         message:
-    //             'Label "${res.prefix}" tidak dapat digunakan di proses Inject.\n\n'
-    //             'Prefix yang diperbolehkan: BB (Furniture WIP), D (Broker), H (Mixer), V (Gilingan).',
-    //       ),
-    //     );
-    //   }
-    //   return 'Prefix ${res.prefix} tidak diperbolehkan untuk proses Inject';
-    // }
+    // Validasi kategori + jenis terhadap formula hasil fetch API (jika sudah dimuat)
+    final formulaData = context.read<InjectFormulaViewModel>().data;
+    if (formulaData != null && formulaData.outputs.isNotEmpty) {
+      final allowedTabs = _computeAllowedTabs(formulaData);
+      final tab = _tabForPrefixType(res.prefixType);
+
+      if (allowedTabs.isNotEmpty && tab != null && !allowedTabs.contains(tab)) {
+        return 'Kategori label "${code.trim()}" tidak sesuai dengan formula produksi ini.';
+      }
+
+      if (tab != null) {
+        final allowedInputIds = _computeAllowedInputIdsByTab(formulaData)[tab] ?? const <int>{};
+        if (allowedInputIds.isNotEmpty) {
+          final firstRow = res.data.first;
+          final rawIdJenis = firstRow['idJenis'] ?? firstRow['IdJenis'];
+          if (rawIdJenis != null) {
+            final idJenis = (rawIdJenis as num).toInt();
+            if (!allowedInputIds.contains(idJenis)) {
+              final namaJenis =
+                  firstRow['namaJenis'] ?? firstRow['NamaJenis'] ?? firstRow['Jenis'] ?? 'tidak diketahui';
+              return 'Jenis "$namaJenis" tidak terdaftar dalam formula produksi ini.';
+            }
+          }
+        }
+      }
+    }
 
     if (res.prefixType == PrefixType.furnitureWip) {
       await _handleFwipPcsFlow(vm, res);
-    } else {
+    } else if (_selectedMode == 'partial') {
       await showDialog<void>(
         context: context,
         barrierDismissible: true,
-        builder: (_) => InjectSakPickerDialog(noProduksi: widget.noProduksi),
+        builder: (_) => InjectLookupLabelPartialDialog(
+          noProduksi: widget.noProduksi,
+          selectedMode: _selectedMode,
+        ),
       );
+    } else if (_selectedMode == 'select') {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => InjectLookupLabelDialog(
+          noProduksi: widget.noProduksi,
+          selectedMode: _selectedMode,
+        ),
+      );
+    } else {
+      await _handleFullMode(vm, res);
     }
+    return null;
+  }
+
+  /// MODE FULL: auto-tambahkan semua item baru dari hasil scan tanpa dialog
+  /// pemilihan manual — sama seperti Washing production input screen.
+  Future<void> _handleFullMode(
+    InjectProductionInputViewModel vm,
+    ProductionLabelLookupResult res,
+  ) async {
+    final freshCount = vm.countNewRowsInLastLookup(widget.noProduksi);
+    if (freshCount == 0) {
+      final labelCode = _labelCodeOfFirst(res);
+      final hasTemp =
+          labelCode != null && vm.hasTemporaryDataForLabel(labelCode);
+      final suffix = hasTemp
+          ? ' • ${vm.getTemporaryDataSummary(labelCode)}'
+          : '';
+      _showSnack(
+        'Semua item untuk ${labelCode ?? "label ini"} sudah ada.$suffix',
+      );
+      return;
+    }
+
+    vm.clearPicks();
+    vm.pickAllNew(widget.noProduksi);
+    final result = vm.commitPickedToTemp(noProduksi: widget.noProduksi);
+
+    final msg = result.added > 0
+        ? '✅ Auto-added ${result.added} item${result.skipped > 0 ? ' • Duplikat terlewati ${result.skipped}' : ''}'
+        : 'Tidak ada item baru ditambahkan';
+    _showSnack(
+      msg,
+      backgroundColor: result.added > 0 ? Colors.green : Colors.orange,
+    );
+  }
+
+  String? _labelCodeOfFirst(ProductionLabelLookupResult res) {
+    if (res.typedItems.isEmpty) return null;
+    final item = res.typedItems.first;
+    if (item is BrokerItem) return _brokerTitleKey(item);
+    if (item is MixerItem) return _mixerTitleKey(item);
+    if (item is GilinganItem) return _gilinganTitleKey(item);
+    if (item is FurnitureWipItem) return _fwipTitleKey(item);
     return null;
   }
 
@@ -957,6 +1093,215 @@ class _InjectProductionInputScreenState
     return part.isNotEmpty ? part : (e.noGilingan ?? '-');
   }
 
+  // ── Multi-select input (keluarkan label dari proses) ───────────────────────
+
+  void _startSelecting(String key, List<dynamic> items) {
+    setState(() {
+      _isSelecting = true;
+      _selectedGroups[key] = items;
+    });
+  }
+
+  void _toggleSelection(String key, List<dynamic> items) {
+    setState(() {
+      if (_selectedGroups.containsKey(key)) {
+        _selectedGroups.remove(key);
+        if (_selectedGroups.isEmpty) _isSelecting = false;
+      } else {
+        _selectedGroups[key] = items;
+      }
+    });
+  }
+
+  void _cancelSelection() {
+    setState(() {
+      _isSelecting = false;
+      _selectedGroups.clear();
+    });
+  }
+
+  // Long-press pada tile masuk mode multi-select dengan tile itu terpilih.
+  void _deleteInputGroup(
+    InjectProductionInputViewModel vm,
+    String labelKey,
+    List<dynamic> items,
+  ) {
+    _startSelecting(labelKey, items);
+  }
+
+  Future<void> _deleteSelected(InjectProductionInputViewModel vm) async {
+    if (_selectedGroups.isEmpty) return;
+    final count = _selectedGroups.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => ConfirmDialog(
+        title: 'Keluarkan Label Input?',
+        message:
+            'Yakin ingin mengeluarkan $count label dari proses ini?\n'
+            'Label tidak akan dihapus, hanya dilepas dari proses.',
+        confirmLabel: 'Keluarkan',
+        confirmIcon: Icons.logout,
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final allItems = _selectedGroups.values.expand((l) => l).toList();
+    final success = await vm.deleteItems(widget.noProduksi, allItems);
+    if (!mounted) return;
+    _cancelSelection();
+    _showSnack(
+      success
+          ? '✅ $count label berhasil dikeluarkan dari proses'
+          : (vm.deleteError ?? 'Gagal'),
+      backgroundColor: success ? Colors.green : Colors.red,
+    );
+  }
+
+  Widget _buildSelectionBar(InjectProductionInputViewModel vm) {
+    final count = _selectedGroups.length;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1565C0),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.check_circle,
+            size: 16,
+            color: Colors.white.withValues(alpha: 0.9),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '$count label dipilih',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: _cancelSelection,
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.white70,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text('Batal', style: TextStyle(fontSize: 12)),
+          ),
+          const SizedBox(width: 4),
+          FilledButton.icon(
+            onPressed: vm.isDeleting ? null : () => _deleteSelected(vm),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red.shade600,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            icon: vm.isDeleting
+                ? const SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.logout, size: 14),
+            label: Text(
+              vm.isDeleting ? 'Memproses...' : 'Keluarkan',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Formula → tab input yang diizinkan ──────────────────────────────────────
+
+  static const List<String> _inputTabOrder = [
+    'fwip',
+    'broker',
+    'mixer',
+    'gilingan',
+    'material',
+  ];
+
+  /// Set tab yang boleh ditampilkan berdasarkan kategori input pada formula.
+  /// Kosong = formula belum termuat / tak dikenali → tampilkan semua tab.
+  Set<String> _computeAllowedTabs(InjectFormulaData? data) {
+    if (data == null || data.outputs.isEmpty) return const {};
+    final tabs = <String>{};
+    for (final o in data.outputs) {
+      for (final f in o.formulas) {
+        final k = '${f.inputKategoriKode} ${f.inputKategoriNama}'.toLowerCase();
+        if (k.contains('furniture') ||
+            k.contains('fwip') ||
+            k.contains('wip')) {
+          tabs.add('fwip');
+        }
+        if (k.contains('broker')) tabs.add('broker');
+        if (k.contains('mixer')) tabs.add('mixer');
+        if (k.contains('gilingan')) tabs.add('gilingan');
+        if (k.contains('material') ||
+            k.contains('kabinet') ||
+            k.contains('cabinet')) {
+          tabs.add('material');
+        }
+      }
+    }
+    return tabs;
+  }
+
+  /// InputId formula yang diizinkan per tab, berdasarkan kategori input pada
+  /// formula (hasil fetch API). Dipakai untuk validasi jenis label saat scan.
+  Map<String, Set<int>> _computeAllowedInputIdsByTab(InjectFormulaData? data) {
+    final map = <String, Set<int>>{};
+    if (data == null) return map;
+    for (final o in data.outputs) {
+      for (final f in o.formulas) {
+        final k = '${f.inputKategoriKode} ${f.inputKategoriNama}'.toLowerCase();
+        String? tab;
+        if (k.contains('furniture') || k.contains('fwip') || k.contains('wip')) {
+          tab = 'fwip';
+        } else if (k.contains('broker')) {
+          tab = 'broker';
+        } else if (k.contains('mixer')) {
+          tab = 'mixer';
+        } else if (k.contains('gilingan')) {
+          tab = 'gilingan';
+        }
+        if (tab != null) {
+          (map[tab] ??= <int>{}).add(f.inputId);
+        }
+      }
+    }
+    return map;
+  }
+
+  String? _tabForPrefixType(PrefixType type) {
+    switch (type) {
+      case PrefixType.furnitureWip:
+        return 'fwip';
+      case PrefixType.broker:
+        return 'broker';
+      case PrefixType.mixer:
+        return 'mixer';
+      case PrefixType.gilingan:
+        return 'gilingan';
+      default:
+        return null;
+    }
+  }
+
   // ── Input panel ────────────────────────────────────────────────────────────
 
   Widget _buildInputPanel({
@@ -964,6 +1309,7 @@ class _InjectProductionInputScreenState
     required bool locked,
     required bool loading,
     required bool canDelete,
+    required Set<String> allowedTabs,
     required Map<String, List<FurnitureWipItem>> fwipGroups,
     required Map<String, List<BrokerItem>> brokerGroups,
     required Map<String, List<MixerItem>> mixerGroups,
@@ -971,6 +1317,8 @@ class _InjectProductionInputScreenState
     required List<CabinetMaterialItem> materialAll,
     required Set<int> tempMaterialIds,
   }) {
+    bool tabVisible(String key) =>
+        allowedTabs.isEmpty || allowedTabs.contains(key);
     // ── per-tab metrics ────────────────────────────────────────────
     double fwipBerat = 0;
     int fwipPcs = 0;
@@ -1108,35 +1456,44 @@ class _InjectProductionInputScreenState
                     selectedValue: _selectedInputTab,
                     accentColor: _kInjectPrimary,
                     tabs: [
-                      ProductionTabItem(
-                        value: 'fwip',
-                        label: 'Furniture WIP',
-                        count: tabCounts['fwip'] ?? 0,
-                      ),
-                      ProductionTabItem(
-                        value: 'broker',
-                        label: 'Broker',
-                        count: tabCounts['broker'] ?? 0,
-                      ),
-                      ProductionTabItem(
-                        value: 'mixer',
-                        label: 'Mixer',
-                        count: tabCounts['mixer'] ?? 0,
-                      ),
-                      ProductionTabItem(
-                        value: 'gilingan',
-                        label: 'Gilingan',
-                        count: tabCounts['gilingan'] ?? 0,
-                      ),
-                      ProductionTabItem(
-                        value: 'material',
-                        label: 'Material',
-                        count: tabCounts['material'] ?? 0,
-                      ),
+                      if (tabVisible('fwip'))
+                        ProductionTabItem(
+                          value: 'fwip',
+                          label: 'Furniture WIP',
+                          count: tabCounts['fwip'] ?? 0,
+                        ),
+                      if (tabVisible('broker'))
+                        ProductionTabItem(
+                          value: 'broker',
+                          label: 'Broker',
+                          count: tabCounts['broker'] ?? 0,
+                        ),
+                      if (tabVisible('mixer'))
+                        ProductionTabItem(
+                          value: 'mixer',
+                          label: 'Mixer',
+                          count: tabCounts['mixer'] ?? 0,
+                        ),
+                      if (tabVisible('gilingan'))
+                        ProductionTabItem(
+                          value: 'gilingan',
+                          label: 'Gilingan',
+                          count: tabCounts['gilingan'] ?? 0,
+                        ),
+                      if (tabVisible('material'))
+                        ProductionTabItem(
+                          value: 'material',
+                          label: 'Material',
+                          count: tabCounts['material'] ?? 0,
+                        ),
                     ],
                     onChanged: (v) {
                       if (_selectedInputTab != v) {
-                        setState(() => _selectedInputTab = v);
+                        setState(() {
+                          _selectedInputTab = v;
+                          _isSelecting = false;
+                          _selectedGroups.clear();
+                        });
                       }
                     },
                   ),
@@ -1167,76 +1524,79 @@ class _InjectProductionInputScreenState
                             ),
                           ),
                           const SizedBox(height: 6),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    ProductionCategorySummaryTile(
-                                      summary: activeTabSummary(),
-                                      accentColor: _kInjectPrimary,
-                                      sakLabel:
-                                          (_selectedInputTab == 'fwip' ||
-                                              _selectedInputTab == 'material')
-                                          ? 'Qty'
-                                          : 'Sak',
-                                      showBerat:
-                                          _selectedInputTab != 'fwip' &&
-                                          _selectedInputTab != 'material',
-                                      showLabel:
-                                          _selectedInputTab != 'material',
-                                    ),
-                                    const SizedBox(height: 6),
-                                    ProductionInputGrandTotalBar(
-                                      totalLabel: grandLabel,
-                                      totalSak: grandSak,
-                                      totalBerat: grandBerat,
-                                      color: _kInjectPrimary,
-                                      sakLabel: 'Qty',
-                                    ),
-                                  ],
+                          if (_isSelecting)
+                            _buildSelectionBar(vm)
+                          else
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      ProductionCategorySummaryTile(
+                                        summary: activeTabSummary(),
+                                        accentColor: _kInjectPrimary,
+                                        sakLabel:
+                                            (_selectedInputTab == 'fwip' ||
+                                                _selectedInputTab == 'material')
+                                            ? 'Qty'
+                                            : 'Sak',
+                                        showBerat:
+                                            _selectedInputTab != 'fwip' &&
+                                            _selectedInputTab != 'material',
+                                        showLabel:
+                                            _selectedInputTab != 'material',
+                                      ),
+                                      const SizedBox(height: 6),
+                                      ProductionInputGrandTotalBar(
+                                        totalLabel: grandLabel,
+                                        totalSak: grandSak,
+                                        totalBerat: grandBerat,
+                                        color: _kInjectPrimary,
+                                        sakLabel: 'Qty',
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 10),
-                              if (_selectedInputTab == 'material')
-                                FloatingActionButton(
-                                  heroTag: 'fab_add_inject_material',
-                                  mini: true,
-                                  backgroundColor: locked
-                                      ? Colors.grey.shade300
-                                      : _kInjectPrimary,
-                                  foregroundColor: Colors.white,
-                                  onPressed: locked
-                                      ? null
-                                      : () => _openAddMaterialDialog(vm),
-                                  child: const Icon(Icons.add),
-                                )
-                              else
-                                FloatingActionButton(
-                                  heroTag: 'fab_scan_inject_input',
-                                  mini: true,
-                                  backgroundColor: locked
-                                      ? Colors.grey.shade300
-                                      : _kInjectPrimary,
-                                  foregroundColor: Colors.white,
-                                  onPressed: locked || vm.isLookupLoading
-                                      ? null
-                                      : _openScanDialog,
-                                  child: vm.isLookupLoading
-                                      ? const SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Colors.white,
-                                          ),
-                                        )
-                                      : const Icon(Icons.qr_code_scanner),
-                                ),
-                            ],
-                          ),
+                                const SizedBox(width: 10),
+                                if (_selectedInputTab == 'material')
+                                  FloatingActionButton(
+                                    heroTag: 'fab_add_inject_material',
+                                    mini: true,
+                                    backgroundColor: locked
+                                        ? Colors.grey.shade300
+                                        : _kInjectPrimary,
+                                    foregroundColor: Colors.white,
+                                    onPressed: locked
+                                        ? null
+                                        : () => _openAddMaterialDialog(vm),
+                                    child: const Icon(Icons.add),
+                                  )
+                                else
+                                  FloatingActionButton(
+                                    heroTag: 'fab_scan_inject_input',
+                                    mini: true,
+                                    backgroundColor: locked
+                                        ? Colors.grey.shade300
+                                        : _kInjectPrimary,
+                                    foregroundColor: Colors.white,
+                                    onPressed: locked || vm.isLookupLoading
+                                        ? null
+                                        : _openScanDialog,
+                                    child: vm.isLookupLoading
+                                        ? const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : const Icon(Icons.qr_code_scanner),
+                                  ),
+                              ],
+                            ),
                         ],
                       ),
                     ),
@@ -1275,9 +1635,8 @@ class _InjectProductionInputScreenState
           emptyMessage: 'Belum ada label Broker',
           constraints: constraints,
           tileBuilder: (key, items) => ProductionInputGroupTile(
-            title: key,
-            headerSubtitle:
-                (items.isNotEmpty ? items.first.namaJenis : '-') ?? '-',
+            title: (items.isNotEmpty ? items.first.namaJenis : '-') ?? '-',
+            headerSubtitle: key,
             tileMetrics: [
               (
                 Icons.scale_outlined,
@@ -1288,6 +1647,11 @@ class _InjectProductionInputScreenState
             isTemp: vm.hasTemporaryDataForLabel(key),
             expandable: true,
             isPartialGroup: items.any((x) => x.isPartialRow),
+            isSelected: _selectedGroups.containsKey(key),
+            onTap: _isSelecting ? () => _toggleSelection(key, items) : null,
+            onLongPress: _isSelecting
+                ? null
+                : () => _deleteInputGroup(vm, key, items),
             detailsBuilder: () => [],
             chipItemsBuilder: () => items.map((item) {
               final isTemp =
@@ -1309,9 +1673,8 @@ class _InjectProductionInputScreenState
           emptyMessage: 'Belum ada label Mixer',
           constraints: constraints,
           tileBuilder: (key, items) => ProductionInputGroupTile(
-            title: key,
-            headerSubtitle:
-                (items.isNotEmpty ? items.first.namaJenis : '-') ?? '-',
+            title: (items.isNotEmpty ? items.first.namaJenis : '-') ?? '-',
+            headerSubtitle: key,
             tileMetrics: [
               (
                 Icons.scale_outlined,
@@ -1322,6 +1685,11 @@ class _InjectProductionInputScreenState
             isTemp: vm.hasTemporaryDataForLabel(key),
             expandable: true,
             isPartialGroup: items.any((x) => x.isPartialRow),
+            isSelected: _selectedGroups.containsKey(key),
+            onTap: _isSelecting ? () => _toggleSelection(key, items) : null,
+            onLongPress: _isSelecting
+                ? null
+                : () => _deleteInputGroup(vm, key, items),
             detailsBuilder: () => [],
             chipItemsBuilder: () => items.map((item) {
               final isTemp =
@@ -1343,9 +1711,8 @@ class _InjectProductionInputScreenState
           emptyMessage: 'Belum ada label Gilingan',
           constraints: constraints,
           tileBuilder: (key, items) => ProductionInputGroupTile(
-            title: key,
-            headerSubtitle:
-                (items.isNotEmpty ? items.first.namaJenis : '-') ?? '-',
+            title: (items.isNotEmpty ? items.first.namaJenis : '-') ?? '-',
+            headerSubtitle: key,
             tileMetrics: [
               (
                 Icons.scale_outlined,
@@ -1356,6 +1723,11 @@ class _InjectProductionInputScreenState
             isTemp: vm.hasTemporaryDataForLabel(key),
             expandable: true,
             isPartialGroup: items.any((x) => x.isPartialRow),
+            isSelected: _selectedGroups.containsKey(key),
+            onTap: _isSelecting ? () => _toggleSelection(key, items) : null,
+            onLongPress: _isSelecting
+                ? null
+                : () => _deleteInputGroup(vm, key, items),
             detailsBuilder: () => [],
             chipItemsBuilder: () => items.map((item) {
               final isTemp =
@@ -1406,12 +1778,12 @@ class _InjectProductionInputScreenState
               children: fwipGroups.entries.map((entry) {
                 final hasPartial = entry.value.any((x) => x.isPartialRow);
                 return ProductionInputGroupTile(
-                  title: entry.key,
-                  headerSubtitle:
+                  title:
                       (entry.value.isNotEmpty
                           ? entry.value.first.namaJenis
                           : '-') ??
                       '-',
+                  headerSubtitle: entry.key,
                   tileMetrics: [
                     (
                       Icons.inventory_2_outlined,
@@ -1428,6 +1800,13 @@ class _InjectProductionInputScreenState
                                 .noFurnitureWIP ??
                             '-')
                       : null,
+                  isSelected: _selectedGroups.containsKey(entry.key),
+                  onTap: _isSelecting
+                      ? () => _toggleSelection(entry.key, entry.value)
+                      : null,
+                  onLongPress: _isSelecting
+                      ? null
+                      : () => _deleteInputGroup(vm, entry.key, entry.value),
                   detailsBuilder: () => [],
                   chipItemsBuilder: () {
                     final dbItems =
@@ -1972,6 +2351,25 @@ class _InjectProductionInputScreenState
         final locked = _header?.isLocked == true;
         final canDelete = perm.can('label_crusher:delete') && !locked;
 
+        // Tab input dibatasi oleh kategori pada formula produksi.
+        final allowedTabs = _computeAllowedTabs(
+          context.watch<InjectFormulaViewModel>().data,
+        );
+        if (allowedTabs.isNotEmpty &&
+            !allowedTabs.contains(_selectedInputTab)) {
+          final target = _inputTabOrder.firstWhere(
+            allowedTabs.contains,
+            orElse: () => _selectedInputTab,
+          );
+          if (target != _selectedInputTab) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted && !allowedTabs.contains(_selectedInputTab)) {
+                setState(() => _selectedInputTab = target);
+              }
+            });
+          }
+        }
+
         return PopScope(
           canPop: false,
           onPopInvokedWithResult: (didPop, _) async {
@@ -2083,6 +2481,7 @@ class _InjectProductionInputScreenState
                           locked: locked,
                           loading: loading,
                           canDelete: canDelete,
+                          allowedTabs: allowedTabs,
                           fwipGroups: fwipGroups,
                           brokerGroups: brokerGroups,
                           mixerGroups: mixerGroups,
@@ -4527,7 +4926,7 @@ class _LabelCheckTile extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    entry.code,
+                    entry.namaJenis.isNotEmpty ? entry.namaJenis : entry.code,
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -4538,7 +4937,7 @@ class _LabelCheckTile extends StatelessWidget {
                   ),
                   if (entry.namaJenis.isNotEmpty)
                     Text(
-                      entry.namaJenis,
+                      entry.code,
                       style: const TextStyle(
                         fontSize: 9,
                         color: Color(0xFF9CA3AF),

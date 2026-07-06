@@ -1032,12 +1032,12 @@ class _MixerProductionInputScreenState
                 children: bbGroups.entries.map((entry) {
                   final hasPartial = entry.value.any((x) => x.isPartialRow);
                   return ProductionInputGroupTile(
-                    title: entry.key,
-                    headerSubtitle:
+                    title:
                         (entry.value.isNotEmpty
                             ? entry.value.first.namaJenis
                             : '-') ??
                         '-',
+                    headerSubtitle: entry.key,
                     tileMetrics: [
                       (Icons.inventory_2_outlined, '${entry.value.length} sak'),
                       (
@@ -1119,12 +1119,12 @@ class _MixerProductionInputScreenState
                       ? entry.value.firstWhere((x) => x.isPartialRow)
                       : null;
                   return ProductionInputGroupTile(
-                    title: entry.key,
-                    headerSubtitle:
+                    title:
                         (entry.value.isNotEmpty
                             ? entry.value.first.namaJenis
                             : '-') ??
                         '-',
+                    headerSubtitle: entry.key,
                     tileMetrics: [
                       (Icons.inventory_2_outlined, '${entry.value.length} sak'),
                       (
@@ -1203,12 +1203,12 @@ class _MixerProductionInputScreenState
                 ),
                 children: washingGroups.entries.map((entry) {
                   return ProductionInputGroupTile(
-                    title: entry.key,
-                    headerSubtitle:
+                    title:
                         (entry.value.isNotEmpty
                             ? entry.value.first.namaJenis
                             : '-') ??
                         '-',
+                    headerSubtitle: entry.key,
                     tileMetrics: [
                       (Icons.inventory_2_outlined, '${entry.value.length} sak'),
                       (
@@ -1277,12 +1277,12 @@ class _MixerProductionInputScreenState
                 children: gilinganGroups.entries.map((entry) {
                   final hasPartial = entry.value.any((x) => x.isPartialRow);
                   return ProductionInputGroupTile(
-                    title: entry.key,
-                    headerSubtitle:
+                    title:
                         (entry.value.isNotEmpty
                             ? entry.value.first.namaJenis
                             : '-') ??
                         '-',
+                    headerSubtitle: entry.key,
                     tileMetrics: [
                       (
                         Icons.scale_outlined,
@@ -1375,12 +1375,12 @@ class _MixerProductionInputScreenState
                       ? entry.value.firstWhere((x) => x.isPartialRow)
                       : null;
                   return ProductionInputGroupTile(
-                    title: entry.key,
-                    headerSubtitle:
+                    title:
                         (entry.value.isNotEmpty
                             ? entry.value.first.namaJenis
                             : '-') ??
                         '-',
+                    headerSubtitle: entry.key,
                     tileMetrics: [
                       (Icons.inventory_2_outlined, '${entry.value.length} sak'),
                       (

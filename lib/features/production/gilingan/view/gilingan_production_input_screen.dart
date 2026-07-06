@@ -749,12 +749,12 @@ class _GilinganProductionInputScreenState
             children: groups.entries.map((entry) {
               final hasPartial = entry.value.any((x) => x.isPartialRow);
               return ProductionInputGroupTile(
-                title: entry.key,
-                headerSubtitle:
+                title:
                     (entry.value.isNotEmpty
                         ? entry.value.first.namaJenis
                         : '-') ??
                     '-',
+                headerSubtitle: entry.key,
                 tileMetrics: [
                   (Icons.inventory_2_outlined, '${entry.value.length} sak'),
                   (
@@ -894,12 +894,12 @@ class _GilinganProductionInputScreenState
             ),
             children: groups.entries.map((entry) {
               return ProductionInputGroupTile(
-                title: entry.key,
-                headerSubtitle:
+                title:
                     (entry.value.isNotEmpty
                         ? entry.value.first.namaJenis
                         : '-') ??
                     '-',
+                headerSubtitle: entry.key,
                 tileMetrics: [
                   (Icons.category_outlined, '${entry.value.length} item'),
                   (
@@ -966,12 +966,12 @@ class _GilinganProductionInputScreenState
             children: groups.entries.map((entry) {
               final hasPartial = entry.value.any((x) => x.isPartialRow);
               return ProductionInputGroupTile(
-                title: entry.key,
-                headerSubtitle:
+                title:
                     (entry.value.isNotEmpty
                         ? entry.value.first.namaJenis
                         : '-') ??
                     '-',
+                headerSubtitle: entry.key,
                 tileMetrics: [
                   (Icons.inventory_2_outlined, '${entry.value.length} item'),
                   (

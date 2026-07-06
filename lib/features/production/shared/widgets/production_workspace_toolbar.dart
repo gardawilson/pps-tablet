@@ -25,6 +25,9 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
   final VoidCallback? onTerminate;
   // Jika diset, tombol Terminate tetap tampil tapi disabled; pesan muncul saat long-press
   final String? terminateDisabledReason;
+  final VoidCallback? onComplete;
+  // Jika diset, tombol Selesai tetap tampil tapi disabled; pesan muncul saat long-press
+  final String? completeDisabledReason;
   final VoidCallback? onRiwayat;
   final VoidCallback? onRefresh;
   final List<Widget>? trailingActions;
@@ -51,6 +54,8 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
     this.gantiDisabledReason,
     this.onTerminate,
     this.terminateDisabledReason,
+    this.onComplete,
+    this.completeDisabledReason,
     this.onRiwayat,
     this.onRefresh,
     this.trailingActions,
@@ -115,8 +120,9 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
     final accentColor = isLocked
         ? lockedAccent
         : switch (produksiStatus) {
-            'current' => activeAccent,
-            'complete' => const Color(0xFF059669),
+            'current' => const Color(0xFF2563EB), // realtime → biru
+            'complete' => const Color(0xFF059669), // complete → hijau
+            'pending' => const Color(0xFFF59E0B), // pending → kuning
             _ => isActive ? activeAccent : pastAccent,
           };
     final statusLabel = isLocked
@@ -434,6 +440,64 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
                     ),
                   ),
                 ),
+              ],
+              if (onComplete != null || completeDisabledReason != null) ...[
+                const SizedBox(width: 6),
+                if (completeDisabledReason != null)
+                  Tooltip(
+                    message: completeDisabledReason!,
+                    triggerMode: TooltipTriggerMode.longPress,
+                    showDuration: const Duration(seconds: 3),
+                    child: Material(
+                      color: const Color(0xFFD1D5DB),
+                      borderRadius: BorderRadius.circular(6),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check_circle_outline, size: 13, color: Color(0xFF9CA3AF)),
+                            SizedBox(width: 4),
+                            Text(
+                              'Selesai',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF9CA3AF),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  Material(
+                    color: const Color(0xFF059669),
+                    borderRadius: BorderRadius.circular(6),
+                    child: InkWell(
+                      onTap: onComplete,
+                      borderRadius: BorderRadius.circular(6),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check_circle_outline, size: 13, color: Colors.white),
+                            SizedBox(width: 4),
+                            Text(
+                              'Selesai',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
               ],
               if (showTimeInfo) ...[
                 vline(),

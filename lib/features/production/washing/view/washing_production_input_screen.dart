@@ -1495,12 +1495,12 @@ class _WashingProductionInputScreenState
               children: bbGroups.entries.map((entry) {
                 final hasPartial = entry.value.any((x) => x.isPartialRow);
                 return ProductionInputGroupTile(
-                  title: entry.key,
-                  headerSubtitle:
+                  title:
                       (entry.value.isNotEmpty
                           ? entry.value.first.namaJenis
                           : '-') ??
                       '-',
+                  headerSubtitle: entry.key,
                   tileMetrics: [
                     (Icons.inventory_2_outlined, '${entry.value.length} sak'),
                     (
@@ -1602,12 +1602,12 @@ class _WashingProductionInputScreenState
               ),
               children: washingGroups.entries.map((entry) {
                 return ProductionInputGroupTile(
-                  title: entry.key,
-                  headerSubtitle:
+                  title:
                       (entry.value.isNotEmpty
                           ? entry.value.first.namaJenis
                           : '-') ??
                       '-',
+                  headerSubtitle: entry.key,
                   tileMetrics: [
                     (Icons.inventory_2_outlined, '${entry.value.length} sak'),
                     (
@@ -1695,12 +1695,12 @@ class _WashingProductionInputScreenState
               children: gilinganGroups.entries.map((entry) {
                 final hasPartial = entry.value.any((x) => x.isPartialRow);
                 return ProductionInputGroupTile(
-                  title: entry.key,
-                  headerSubtitle:
+                  title:
                       (entry.value.isNotEmpty
                           ? entry.value.first.namaJenis
                           : '-') ??
                       '-',
+                  headerSubtitle: entry.key,
                   tileMetrics: [
                     (
                       Icons.scale_outlined,

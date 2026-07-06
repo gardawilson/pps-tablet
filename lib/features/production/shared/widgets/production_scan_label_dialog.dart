@@ -211,7 +211,11 @@ class _ProductionScanLabelDialogState extends State<ProductionScanLabelDialog>
               color: Colors.white.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.qr_code_scanner, color: Colors.white, size: 18),
+            child: const Icon(
+              Icons.qr_code_scanner,
+              color: Colors.white,
+              size: 18,
+            ),
           ),
           const SizedBox(width: 10),
           const Text(
@@ -273,7 +277,7 @@ class _ProductionScanLabelDialogState extends State<ProductionScanLabelDialog>
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  'Material Diterima',
+                  'Jenis Yang Diterima',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
@@ -322,7 +326,10 @@ class _ProductionScanLabelDialogState extends State<ProductionScanLabelDialog>
     ];
   }
 
-  Widget _buildKategoriBlock(String kategori, List<ProductionFormulaItem> items) {
+  Widget _buildKategoriBlock(
+    String kategori,
+    List<ProductionFormulaItem> items,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -339,42 +346,49 @@ class _ProductionScanLabelDialogState extends State<ProductionScanLabelDialog>
         Container(
           decoration: BoxDecoration(
             border: Border(
-              left: BorderSide(color: _primary.withValues(alpha: 0.35), width: 2),
+              left: BorderSide(
+                color: _primary.withValues(alpha: 0.35),
+                width: 2,
+              ),
             ),
           ),
           padding: const EdgeInsets.only(left: 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: items.map((f) => Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Container(
-                      width: 4,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: _primary.withValues(alpha: 0.45),
-                        shape: BoxShape.circle,
-                      ),
+            children: items
+                .map(
+                  (f) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Container(
+                            width: 4,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: _primary.withValues(alpha: 0.45),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 7),
+                        Expanded(
+                          child: Text(
+                            f.inputNama,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF374151),
+                              height: 1.35,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 7),
-                  Expanded(
-                    child: Text(
-                      f.inputNama,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF374151),
-                        height: 1.35,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            )).toList(),
+                )
+                .toList(),
           ),
         ),
       ],
@@ -480,7 +494,10 @@ class _ProductionScanLabelDialogState extends State<ProductionScanLabelDialog>
             child: ColoredBox(
               color: Color(0x55000000),
               child: Center(
-                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 3,
+                ),
               ),
             ),
           ),
@@ -497,7 +514,11 @@ class _ProductionScanLabelDialogState extends State<ProductionScanLabelDialog>
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.error_outline_rounded, color: Colors.white, size: 16),
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    color: Colors.white,
+                    size: 16,
+                  ),
                   const SizedBox(width: 8),
                   Flexible(
                     child: Text(
@@ -525,7 +546,11 @@ class _ProductionScanLabelDialogState extends State<ProductionScanLabelDialog>
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
               ),
-              child: const Icon(Icons.screen_rotation_rounded, color: Colors.white, size: 16),
+              child: const Icon(
+                Icons.screen_rotation_rounded,
+                color: Colors.white,
+                size: 16,
+              ),
             ),
           ),
         ),
@@ -579,7 +604,10 @@ class _ProductionScanLabelDialogState extends State<ProductionScanLabelDialog>
               filled: true,
               fillColor: _kSurface,
               isDense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
               suffixIcon: _ctl.text.isNotEmpty
                   ? IconButton(
                       icon: const Icon(Icons.clear, size: 16),
@@ -612,7 +640,11 @@ class _ProductionScanLabelDialogState extends State<ProductionScanLabelDialog>
                       : const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.add_circle_outline_rounded, color: Colors.white, size: 18),
+                            Icon(
+                              Icons.add_circle_outline_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
                             SizedBox(width: 8),
                             Text(
                               'Tambah Label',
@@ -669,21 +701,77 @@ class _ScanFramePainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
-    canvas.drawArc(Rect.fromLTWH(left, top, r * 2, r * 2), math.pi, math.pi / 2, false, p);
-    canvas.drawLine(Offset(left + r, top), Offset(left + r + cornerLen, top), p);
-    canvas.drawLine(Offset(left, top + r), Offset(left, top + r + cornerLen), p);
+    canvas.drawArc(
+      Rect.fromLTWH(left, top, r * 2, r * 2),
+      math.pi,
+      math.pi / 2,
+      false,
+      p,
+    );
+    canvas.drawLine(
+      Offset(left + r, top),
+      Offset(left + r + cornerLen, top),
+      p,
+    );
+    canvas.drawLine(
+      Offset(left, top + r),
+      Offset(left, top + r + cornerLen),
+      p,
+    );
 
-    canvas.drawArc(Rect.fromLTWH(right - r * 2, top, r * 2, r * 2), 3 * math.pi / 2, math.pi / 2, false, p);
-    canvas.drawLine(Offset(right - r, top), Offset(right - r - cornerLen, top), p);
-    canvas.drawLine(Offset(right, top + r), Offset(right, top + r + cornerLen), p);
+    canvas.drawArc(
+      Rect.fromLTWH(right - r * 2, top, r * 2, r * 2),
+      3 * math.pi / 2,
+      math.pi / 2,
+      false,
+      p,
+    );
+    canvas.drawLine(
+      Offset(right - r, top),
+      Offset(right - r - cornerLen, top),
+      p,
+    );
+    canvas.drawLine(
+      Offset(right, top + r),
+      Offset(right, top + r + cornerLen),
+      p,
+    );
 
-    canvas.drawArc(Rect.fromLTWH(left, bottom - r * 2, r * 2, r * 2), math.pi / 2, math.pi / 2, false, p);
-    canvas.drawLine(Offset(left, bottom - r), Offset(left, bottom - r - cornerLen), p);
-    canvas.drawLine(Offset(left + r, bottom), Offset(left + r + cornerLen, bottom), p);
+    canvas.drawArc(
+      Rect.fromLTWH(left, bottom - r * 2, r * 2, r * 2),
+      math.pi / 2,
+      math.pi / 2,
+      false,
+      p,
+    );
+    canvas.drawLine(
+      Offset(left, bottom - r),
+      Offset(left, bottom - r - cornerLen),
+      p,
+    );
+    canvas.drawLine(
+      Offset(left + r, bottom),
+      Offset(left + r + cornerLen, bottom),
+      p,
+    );
 
-    canvas.drawArc(Rect.fromLTWH(right - r * 2, bottom - r * 2, r * 2, r * 2), 0, math.pi / 2, false, p);
-    canvas.drawLine(Offset(right, bottom - r), Offset(right, bottom - r - cornerLen), p);
-    canvas.drawLine(Offset(right - r, bottom), Offset(right - r - cornerLen, bottom), p);
+    canvas.drawArc(
+      Rect.fromLTWH(right - r * 2, bottom - r * 2, r * 2, r * 2),
+      0,
+      math.pi / 2,
+      false,
+      p,
+    );
+    canvas.drawLine(
+      Offset(right, bottom - r),
+      Offset(right, bottom - r - cornerLen),
+      p,
+    );
+    canvas.drawLine(
+      Offset(right - r, bottom),
+      Offset(right - r - cornerLen, bottom),
+      p,
+    );
   }
 
   @override

@@ -16,8 +16,7 @@ import '../view_model/inject_production_view_model.dart';
 import '../widgets/inject_production_delete_dialog.dart';
 import '../widgets/inject_production_form_dialog.dart';
 import '../widgets/inject_qc_dialog.dart';
-import 'inject_production_input_screen.dart' as v1_input;
-import 'inject_production_input_screen_v3.dart' as v3_input;
+import 'inject_production_input_router.dart';
 
 class InjectProductionMesinScreen extends StatefulWidget {
   const InjectProductionMesinScreen({super.key});
@@ -136,9 +135,10 @@ class _InjectProductionMesinScreenState
     if (!mounted) return;
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => isRealtime
-            ? v3_input.InjectProductionInputScreen(noProduksi: noProduksi)
-            : v1_input.InjectProductionInputScreen(noProduksi: noProduksi),
+        builder: (_) => InjectProductionInputRouter(
+          noProduksi: noProduksi,
+          isRealtimeHint: isRealtime,
+        ),
       ),
     );
   }
@@ -177,7 +177,9 @@ class _InjectProductionMesinScreenState
       if (created != null) {
         await _openInputScreen(
           created.noProduksi,
-          isRealtime: created.isRealtime,
+          // Asal create menentukan layar: mesin card -> realtime (v3),
+          // FAB riwayat (backdate) -> v1. Hint ini fallback bila header gagal.
+          isRealtime: !isBackdateInput,
         );
         if (!mounted) return;
         _refreshAll();
@@ -460,7 +462,7 @@ class _InjectProductionMesinScreenState
                             onTap: (row) async {
                               await _openInputScreen(
                                 row.noProduksi,
-                                isRealtime: row.isRealtime,
+                                isRealtime: row.isRealtimeInput,
                               );
                               if (mounted) _refreshAll();
                             },

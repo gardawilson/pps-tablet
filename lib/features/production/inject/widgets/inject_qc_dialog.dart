@@ -194,6 +194,7 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildHeader(),
+            _buildMetaStrip(),
             const Divider(height: 1, color: Color(0xFFE2E6EA)),
             Flexible(
               child: _isLoadingHistory
@@ -243,115 +244,175 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
     );
   }
 
+  // Header: judul + data berlabel (Tanggal · Shift · Jam) dalam panel accent.
   Widget _buildHeader() {
+    final machineName = (widget.namaMesin ?? '').trim();
     final tgl = widget.tglProduksi;
     final tglStr = tgl != null
         ? DateFormat('dd MMM yyyy', 'id_ID').format(tgl)
-        : null;
-    final dialogTitle = (widget.namaMesin ?? '').trim().isNotEmpty
-        ? widget.namaMesin!.trim()
-        : 'Input QC';
-    final outputJenisList = widget.outputJenisList
-        .map((item) => item.trim())
-        .where((item) => item.isNotEmpty)
-        .toSet()
-        .toList();
+        : '-';
 
-    final metaParts = <String>[
-      if (tglStr != null) tglStr,
-      if (widget.shift != null) 'Shift ${widget.shift}',
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-      child: Row(
+    return Container(
+      decoration: const BoxDecoration(
+        color: _accent,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 12, 12, 14),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: _accent.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.checklist_outlined,
-              size: 16,
-              color: _accent,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  dialogTitle,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1F2937),
-                  ),
-                ),
-                if (outputJenisList.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: outputJenisList
-                        .map(
-                          (jenis) => Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _accent.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(
-                                color: _accent.withValues(alpha: 0.18),
-                              ),
-                            ),
-                            child: Text(
-                              jenis,
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: _accent,
-                              ),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisSize: MainAxisSize.min,
+          // ── Judul ─────────────────────────────────────────────
+          Row(
             children: [
-              Text(
-                metaParts.join('\n'),
-                textAlign: TextAlign.right,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFF6B7280),
-                  height: 1.35,
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(9),
                 ),
+                child: const Icon(
+                  Icons.fact_check_outlined,
+                  size: 18,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'INPUT QC',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.4,
+                        color: Colors.white.withValues(alpha: 0.85),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      machineName.isNotEmpty ? machineName : 'Quality Control',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        height: 1.1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _headerCloseButton(),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // ── Chip data: ikon sebagai label (tanggal · shift · jam) ─
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              _headerChip(Icons.calendar_today_outlined, tglStr),
+              _headerChip(
+                Icons.groups_outlined,
+                'Shift ${widget.shift ?? '-'}',
+              ),
+              _headerChip(
+                Icons.access_time_rounded,
+                '${widget.hourStart}–${widget.hourEnd}',
               ),
             ],
           ),
-          const SizedBox(width: 8),
-          IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.close, size: 18, color: Color(0xFF9CA3AF)),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
+        ],
+      ),
+    );
+  }
+
+  // Chip translucent putih: ikon sebagai label, nilai di sampingnya.
+  Widget _headerChip(IconData icon, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: Colors.white.withValues(alpha: 0.9)),
+          const SizedBox(width: 5),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Sub-header: hanya jenis output, dengan label yang jelas.
+  Widget _buildMetaStrip() {
+    final outputJenis = widget.outputJenisList
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toSet()
+        .join(', ');
+
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFFF8FAFC),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+      child: Row(
+        children: [
+          const Icon(Icons.category_outlined, size: 14, color: _accent),
+          const SizedBox(width: 8),
+          const Text(
+            'OUTPUT',
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.5,
+              color: Color(0xFF94A3B8),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              outputJenis.isNotEmpty ? outputJenis : '-',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF334155),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _headerCloseButton() {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.18),
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: () => Navigator.of(context).pop(),
+        child: const Padding(
+          padding: EdgeInsets.all(6),
+          child: Icon(Icons.close, size: 18, color: Colors.white),
+        ),
       ),
     );
   }
@@ -521,6 +582,20 @@ class _QcBucketRowState extends State<_QcBucketRow> {
       labelColor = _accent;
     }
 
+    // Badge status ditaruh sebaris dengan label jam (bukan bertumpuk).
+    Widget? statusBadge;
+    if (isSubmitted) {
+      statusBadge = _statusChip(
+        Icons.check_circle_outline,
+        'Tersimpan',
+        _green,
+      );
+    } else if (isExpired) {
+      statusBadge = _statusChip(Icons.cancel_outlined, 'Terlewat', labelColor);
+    } else if (isLocked) {
+      statusBadge = _statusChip(Icons.lock_outline, 'Terkunci', labelColor);
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
@@ -531,82 +606,21 @@ class _QcBucketRowState extends State<_QcBucketRow> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // ── Jam label ─────────────────────────────────────────
-          SizedBox(
-            width: 88,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: labelColor.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    widget.label,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: labelColor,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                if (isSubmitted)
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.check_circle_outline,
-                        size: 11,
-                        color: _green,
-                      ),
-                      const SizedBox(width: 3),
-                      const Text(
-                        'Tersimpan',
-                        style: TextStyle(
-                          fontSize: 9,
-                          color: _green,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  )
-                else if (isExpired)
-                  Row(
-                    children: [
-                      Icon(Icons.cancel_outlined, size: 11, color: labelColor),
-                      const SizedBox(width: 3),
-                      Text(
-                        'Terlewat',
-                        style: TextStyle(
-                          fontSize: 9,
-                          color: labelColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  )
-                else if (isLocked)
-                  Row(
-                    children: [
-                      Icon(Icons.lock_outline, size: 11, color: labelColor),
-                      const SizedBox(width: 3),
-                      Text(
-                        'Terkunci',
-                        style: TextStyle(
-                          fontSize: 9,
-                          color: labelColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-              ],
+          // ── Status + jam label (satu baris, badge di kiri) ────
+          if (statusBadge != null) ...[statusBadge, const SizedBox(width: 6)],
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            decoration: BoxDecoration(
+              color: labelColor.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              widget.label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: labelColor,
+              ),
             ),
           ),
           const SizedBox(width: 8),
@@ -668,9 +682,27 @@ class _QcBucketRowState extends State<_QcBucketRow> {
               isLoading: _isSubmitting,
             )
           else
-            const SizedBox(width: 52),
+            const SizedBox(width: 44),
         ],
       ),
+    );
+  }
+
+  Widget _statusChip(IconData icon, String text, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 11, color: color),
+        const SizedBox(width: 3),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 9,
+            color: color,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 
@@ -858,39 +890,30 @@ class _QcBucketRowState extends State<_QcBucketRow> {
     bool isLoading = false,
   }) {
     return SizedBox(
-      width: 52,
-      height: 52,
+      width: 44,
+      height: 44,
       child: Material(
-        color: color.withValues(alpha: 0.12),
+        color: color,
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
           child: isLoading
-              ? Center(
+              ? const Center(
                   child: SizedBox(
-                    width: 14,
-                    height: 14,
+                    width: 13,
+                    height: 13,
                     child: CircularProgressIndicator(
                       strokeWidth: 1.5,
-                      color: color,
+                      color: Colors.white,
                     ),
                   ),
                 )
-              : Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(icon, size: 16, color: color),
-                    const SizedBox(height: 2),
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        color: color,
-                      ),
-                    ),
-                  ],
+              : Tooltip(
+                  message: label,
+                  child: Center(
+                    child: Icon(icon, size: 20, color: Colors.white),
+                  ),
                 ),
         ),
       ),

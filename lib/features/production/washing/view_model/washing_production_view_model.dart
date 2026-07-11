@@ -225,7 +225,7 @@ class WashingProductionViewModel extends ChangeNotifier {
 
       return created;
     } catch (e) {
-      saveError = e.toString();
+      saveError = e.toString().replaceFirst('Exception: ', '').trim();
       return null;
     } finally {
       isSaving = false;
@@ -304,7 +304,7 @@ class WashingProductionViewModel extends ChangeNotifier {
 
       return updated;
     } catch (e) {
-      saveError = e.toString();
+      saveError = e.toString().replaceFirst('Exception: ', '').trim();
       return null;
     } finally {
       isSaving = false;

@@ -279,7 +279,7 @@ class MixerProductionViewModel extends ChangeNotifier {
     } catch (e, st) {
       debugPrint('❌ [MIXER_VM] createProduksi error: $e, VM hash=$hashCode');
       debugPrint('❌ [MIXER_VM] createProduksi stack: $st');
-      saveError = e.toString();
+      saveError = e.toString().replaceFirst('Exception: ', '').trim();
       return null;
     } finally {
       isSaving = false;
@@ -352,7 +352,7 @@ class MixerProductionViewModel extends ChangeNotifier {
     } catch (e, st) {
       debugPrint('❌ [MIXER_VM] updateProduksi error: $e, VM hash=$hashCode');
       debugPrint('❌ [MIXER_VM] updateProduksi stack: $st');
-      saveError = e.toString();
+      saveError = e.toString().replaceFirst('Exception: ', '').trim();
       return null;
     } finally {
       isSaving = false;

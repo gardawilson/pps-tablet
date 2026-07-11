@@ -24,6 +24,7 @@ import '../model/bs_v2_label_info.dart';
 import '../model/bs_v2_transaction.dart';
 import '../repository/bs_v2_repository.dart';
 import '../utils/bs_v2_category_label.dart';
+import '../../production/shared/shared.dart';
 import 'bs_v2_sak_detail_dialog.dart';
 
 // ─── Theme constants (mirroring create screen) ─────────────────────────────
@@ -569,17 +570,24 @@ class _InputsCard extends StatelessWidget {
               ),
             )
           else ...[
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: inputs.length,
-              separatorBuilder: (_, __) => const Divider(
-                height: 1,
-                indent: 16,
-                endIndent: 16,
-                color: _kBorder,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 4),
+              child: LayoutBuilder(
+                builder: (_, c) => GridView(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: EdgeInsets.zero,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+                    crossAxisSpacing: 6,
+                    mainAxisSpacing: 6,
+                    mainAxisExtent: 80,
+                  ),
+                  children: inputs
+                      .map((lbl) => _BsV2InputTile(lbl: lbl, nf: nf))
+                      .toList(),
+                ),
               ),
-              itemBuilder: (_, i) => _InputTile(lbl: inputs[i], nf: nf),
             ),
             // Total row
             Container(
@@ -650,118 +658,78 @@ class _InputsCard extends StatelessWidget {
   }
 }
 
-class _InputTile extends StatelessWidget {
+// Card tile untuk satu label input — format identik dengan tile input/output
+// pada layar produksi (mis. broker): jenis sebagai judul, nomor label sebagai
+// sub judul, metrics (sak/berat/pcs) di baris bawah, tap untuk detail sak.
+class _BsV2InputTile extends StatelessWidget {
   final BsV2LabelInfo lbl;
   final NumberFormat nf;
 
-  const _InputTile({required this.lbl, required this.nf});
+  const _BsV2InputTile({required this.lbl, required this.nf});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: _kPrimary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.label_outline_rounded,
-              size: 16,
-              color: _kPrimary,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  lbl.labelCode,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1A1D23),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  lbl.namaJenis,
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-                ),
-                if (lbl.jumlahSak > 0) ...[
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE3F2FD),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      '${lbl.jumlahSak} sak',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: Color(0xFF1565C0),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+    final hasSakDetail = lbl.saks.isNotEmpty;
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _kBorder),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: hasSakDetail
+            ? () => showDialog<void>(
+                context: context,
+                builder: (_) => BsV2SakDetailDialog(lbl: lbl, nf: nf),
+              )
+            : null,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
               Text(
-                lbl.isPcsCategory
-                    ? '${lbl.totalBerat.toInt()} pcs'
-                    : '${nf.format(lbl.totalBerat)} kg',
+                lbl.namaJenis.isNotEmpty ? lbl.namaJenis : lbl.labelCode,
                 style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
                   color: Color(0xFF1A1D23),
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              if (lbl.saks.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                GestureDetector(
-                  onTap: () => showDialog<void>(
-                    context: context,
-                    builder: (_) => BsV2SakDetailDialog(lbl: lbl, nf: nf),
+              const SizedBox(height: 1),
+              Text(
+                lbl.labelCode,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 6,
+                runSpacing: 2,
+                children: [
+                  if (lbl.jumlahSak > 0)
+                    ProductionMiniMetric(
+                      icon: Icons.inventory_2_outlined,
+                      text: '${lbl.jumlahSak} sak',
+                    ),
+                  ProductionMiniMetric(
+                    icon: lbl.isPcsCategory
+                        ? Icons.category_outlined
+                        : Icons.scale_outlined,
+                    text: lbl.isPcsCategory
+                        ? '${lbl.totalBerat.toInt()} pcs'
+                        : '${nf.format(lbl.totalBerat)} kg',
                   ),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _kPrimary.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                    child: const Text(
-                      'Detail Sak',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: _kPrimary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -850,18 +818,25 @@ class _OutputsCard extends StatelessWidget {
               ),
             )
           else ...[
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: outputs.length,
-              separatorBuilder: (_, __) => const Divider(
-                height: 1,
-                indent: 16,
-                endIndent: 16,
-                color: _kBorder,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 4),
+              child: LayoutBuilder(
+                builder: (_, c) => GridView(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: EdgeInsets.zero,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+                    crossAxisSpacing: 6,
+                    mainAxisSpacing: 6,
+                    mainAxisExtent: 80,
+                  ),
+                  children: [
+                    for (var i = 0; i < outputs.length; i++)
+                      _BsV2OutputTile(out: outputs[i], nf: nf, index: i),
+                  ],
+                ),
               ),
-              itemBuilder: (_, i) =>
-                  _OutputTile(out: outputs[i], nf: nf, index: i),
             ),
             // Total row
             Container(
@@ -932,11 +907,18 @@ class _OutputsCard extends StatelessWidget {
   }
 }
 
-class _OutputTile extends StatelessWidget {
+// Card tile untuk satu label output — format identik dengan tile input/output
+// pada layar produksi (mis. broker): jenis sebagai judul, nomor label sebagai
+// sub judul, tombol print inline, metrics di baris bawah, tap untuk detail sak.
+class _BsV2OutputTile extends StatelessWidget {
   final BsV2OutputLabel out;
   final NumberFormat nf;
   final int index;
-  const _OutputTile({required this.out, required this.nf, required this.index});
+  const _BsV2OutputTile({
+    required this.out,
+    required this.nf,
+    required this.index,
+  });
 
   bool get _canPrint {
     final labelCode = (out.labelCode ?? '').trim();
@@ -1151,152 +1133,100 @@ class _OutputTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final labelCode = out.labelCode?.trim();
+    final title = out.namaJenis.isNotEmpty
+        ? out.namaJenis
+        : (labelCode ?? '#${index + 1}');
+    final subtitle = labelCode ?? '#${index + 1}';
+    final hasSakDetail = out.saks.isNotEmpty;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _kBorder),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: hasSakDetail
+            ? () => showDialog<void>(
+                context: context,
+                builder: (_) => BsV2SakDetailDialog(
+                  nf: nf,
+                  lbl: BsV2LabelInfo(
+                    labelCode: out.labelCode ?? '#${index + 1}',
+                    category: out.category,
+                    idJenis: out.idJenis,
+                    namaJenis: out.namaJenis,
+                    totalBerat: out.totalBerat,
+                    jumlahSak: out.jumlahSak,
+                    saks: out.saks
+                        .map(
+                          (s) =>
+                              BsV2LabelSak(noSak: s.noSak, berat: s.berat),
+                        )
+                        .toList(),
+                  ),
+                ),
+              )
+            : null,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                decoration: BoxDecoration(
-                  color: _kGreen.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  '#${index + 1}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: _kGreen,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (labelCode != null)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              labelCode,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF1A1D23),
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (_canPrint) ...[
-                            const SizedBox(width: 6),
-                            _OutputPrintButton(
-                              onPressed: () => _handlePrint(context, labelCode),
-                            ),
-                          ],
-                        ],
-                      ),
-                    Text(
-                      out.namaJenis,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
-                    if (out.jumlahSak > 0) ...[
-                      const SizedBox(height: 3),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _kGreen.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '${out.jumlahSak} sak',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: _kGreen,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              Row(
                 children: [
-                  Text(
-                    out.isPcsCategory
-                        ? '${out.totalBerat.toInt()} pcs'
-                        : '${nf.format(out.totalBerat)} kg',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: _kGreen,
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1A1D23),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  if (out.saks.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    GestureDetector(
-                      onTap: () => showDialog<void>(
-                        context: context,
-                        builder: (_) => BsV2SakDetailDialog(
-                          nf: nf,
-                          lbl: BsV2LabelInfo(
-                            labelCode: out.labelCode ?? '#${index + 1}',
-                            category: out.category,
-                            idJenis: out.idJenis,
-                            namaJenis: out.namaJenis,
-                            totalBerat: out.totalBerat,
-                            jumlahSak: out.jumlahSak,
-                            saks: out.saks
-                                .map(
-                                  (s) => BsV2LabelSak(
-                                    noSak: s.noSak,
-                                    berat: s.berat,
-                                  ),
-                                )
-                                .toList(),
-                          ),
-                        ),
-                      ),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _kGreen.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        child: const Text(
-                          'Detail Sak',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: _kGreen,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
+                  if (labelCode != null && _canPrint) ...[
+                    const SizedBox(width: 4),
+                    _OutputPrintButton(
+                      onPressed: () => _handlePrint(context, labelCode),
                     ),
                   ],
                 ],
               ),
+              const SizedBox(height: 1),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 6,
+                runSpacing: 2,
+                children: [
+                  if (out.jumlahSak > 0)
+                    ProductionMiniMetric(
+                      icon: Icons.inventory_2_outlined,
+                      text: '${out.jumlahSak} sak',
+                    ),
+                  ProductionMiniMetric(
+                    icon: out.isPcsCategory
+                        ? Icons.category_outlined
+                        : Icons.scale_outlined,
+                    text: out.isPcsCategory
+                        ? '${out.totalBerat.toInt()} pcs'
+                        : '${nf.format(out.totalBerat)} kg',
+                  ),
+                ],
+              ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }

@@ -16,6 +16,7 @@ import 'package:pps_tablet/features/production/shared/widgets/time_form_field.da
 import 'package:pps_tablet/features/regu/model/regu_model.dart';
 
 import '../../../../common/widgets/app_number_field.dart';
+import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../core/network/endpoints.dart';
 import '../../../../core/services/token_storage.dart';
 import '../../../../core/utils/date_formatter.dart';
@@ -340,8 +341,13 @@ class _MixerProductionFormDialogState
       widget.onSave?.call(result);
       Navigator.of(context).pop(result);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(prodVm.saveError ?? 'Gagal menyimpan data')),
+      final errMsg = prodVm.saveError ?? 'Gagal menyimpan data produksi';
+      await showDialog<void>(
+        context: context,
+        builder: (_) => ErrorStatusDialog(
+          title: 'Gagal Menyimpan',
+          message: errMsg,
+        ),
       );
     }
   }

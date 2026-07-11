@@ -31,6 +31,10 @@ class BrokerProduction {
   final DateTime? lastClosedDate;
   final bool isLocked;
 
+  // complete status
+  final bool isComplete;
+  final String? produksiStatus;
+
   const BrokerProduction({
     required this.noProduksi,
     required this.idOperators,
@@ -55,6 +59,8 @@ class BrokerProduction {
     this.hourEnd,
     this.lastClosedDate,
     this.isLocked = false,
+    this.isComplete = false,
+    this.produksiStatus,
   });
 
   // ── Backward-compat getters ──────────────────────────────────────────────
@@ -161,6 +167,10 @@ class BrokerProduction {
 
       lastClosedDate: _asDateTime(j['LastClosedDate']),
       isLocked: _asBool(j['IsLocked']),
+      isComplete: _asBool(j['IsComplete'], fallback: false) ||
+          j['status']?.toString() == 'complete',
+      produksiStatus: j['status']?.toString() ??
+          (_asBool(j['IsComplete'], fallback: false) ? 'complete' : 'pending'),
     );
   }
 

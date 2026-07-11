@@ -310,7 +310,7 @@ class GilinganProductionViewModel extends ChangeNotifier {
     } catch (e, st) {
       debugPrint('❌ [GILINGAN_VM] createProduksi error: $e, VM hash=$hashCode');
       debugPrint('❌ [GILINGAN_VM] createProduksi stack: $st');
-      saveError = e.toString();
+      saveError = e.toString().replaceFirst('Exception: ', '').trim();
       return null;
     } finally {
       isSaving = false;
@@ -379,7 +379,7 @@ class GilinganProductionViewModel extends ChangeNotifier {
     } catch (e, st) {
       debugPrint('❌ [GILINGAN_VM] updateProduksi error: $e, VM hash=$hashCode');
       debugPrint('❌ [GILINGAN_VM] updateProduksi stack: $st');
-      saveError = e.toString();
+      saveError = e.toString().replaceFirst('Exception: ', '').trim();
       return null;
     } finally {
       isSaving = false;

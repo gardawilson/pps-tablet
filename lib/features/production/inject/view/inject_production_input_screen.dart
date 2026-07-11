@@ -451,7 +451,8 @@ class _InjectProductionInputScreenState
       }
 
       if (tab != null) {
-        final allowedInputIds = _computeAllowedInputIdsByTab(formulaData)[tab] ?? const <int>{};
+        final allowedInputIds =
+            _computeAllowedInputIdsByTab(formulaData)[tab] ?? const <int>{};
         if (allowedInputIds.isNotEmpty) {
           final firstRow = res.data.first;
           final rawIdJenis = firstRow['idJenis'] ?? firstRow['IdJenis'];
@@ -459,7 +460,10 @@ class _InjectProductionInputScreenState
             final idJenis = (rawIdJenis as num).toInt();
             if (!allowedInputIds.contains(idJenis)) {
               final namaJenis =
-                  firstRow['namaJenis'] ?? firstRow['NamaJenis'] ?? firstRow['Jenis'] ?? 'tidak diketahui';
+                  firstRow['namaJenis'] ??
+                  firstRow['NamaJenis'] ??
+                  firstRow['Jenis'] ??
+                  'tidak diketahui';
               return 'Jenis "$namaJenis" tidak terdaftar dalam formula produksi ini.';
             }
           }
@@ -528,7 +532,9 @@ class _InjectProductionInputScreenState
       for (final f in o.formulas) {
         final k = '${f.inputKategoriKode} ${f.inputKategoriNama}'.toLowerCase();
         String? tab;
-        if (k.contains('furniture') || k.contains('fwip') || k.contains('wip')) {
+        if (k.contains('furniture') ||
+            k.contains('fwip') ||
+            k.contains('wip')) {
           tab = 'fwip';
         } else if (k.contains('broker')) {
           tab = 'broker';
@@ -2608,14 +2614,7 @@ class _InjectProductionInputScreenState
                         ? 'Produksi sudah selesai'
                         : null,
                     onGanti: _openSplitTimeDialog,
-                    onRefresh: () {
-                      vm.loadInputs(widget.noProduksi, force: true);
-                      vm.loadOutputs(widget.noProduksi, force: true);
-                      vm.loadBjOutputs(widget.noProduksi, force: true);
-                      vm.loadRejectOutputs(widget.noProduksi, force: true);
-                      vm.loadBonggolanOutputs(widget.noProduksi, force: true);
-                      _showSnack('Data di-refresh');
-                    },
+
                   ),
                 Expanded(
                   child: Builder(

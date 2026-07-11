@@ -300,13 +300,15 @@ class GilinganProductionRepository {
     print('⬅️ [${res.statusCode}] ${res.body}');
 
     if (res.statusCode != 201 && res.statusCode != 200) {
+      String msg;
       try {
         final decoded = json.decode(utf8.decode(res.bodyBytes));
-        final msg = decoded['message'] ?? 'Gagal membuat gilingan produksi';
-        throw Exception(msg);
+        msg = (decoded is Map ? decoded['message'] : null)?.toString() ??
+            'Gagal membuat gilingan produksi (${res.statusCode})';
       } catch (_) {
-        throw Exception('Gagal membuat gilingan produksi (${res.statusCode})');
+        msg = 'Gagal membuat gilingan produksi (${res.statusCode})';
       }
+      throw Exception(msg);
     }
 
     final decoded = utf8.decode(res.bodyBytes);
@@ -420,13 +422,15 @@ class GilinganProductionRepository {
     print('⬅️ [${res.statusCode}] ${res.body}');
 
     if (res.statusCode != 200) {
+      String msg;
       try {
         final decoded = json.decode(utf8.decode(res.bodyBytes));
-        final msg = decoded['message'] ?? 'Gagal mengubah gilingan produksi';
-        throw Exception(msg);
+        msg = (decoded is Map ? decoded['message'] : null)?.toString() ??
+            'Gagal mengubah gilingan produksi (${res.statusCode})';
       } catch (_) {
-        throw Exception('Gagal mengubah gilingan produksi (${res.statusCode})');
+        msg = 'Gagal mengubah gilingan produksi (${res.statusCode})';
       }
+      throw Exception(msg);
     }
 
     final decoded = utf8.decode(res.bodyBytes);
@@ -475,10 +479,9 @@ class GilinganProductionRepository {
       final bodyText = utf8.decode(res.bodyBytes);
       print('❌ Error body: $bodyText');
 
+      String msg;
       try {
         final decoded = json.decode(bodyText);
-
-        String msg;
 
         if (decoded is Map<String, dynamic>) {
           msg = (decoded['message'] ??
@@ -489,14 +492,43 @@ class GilinganProductionRepository {
         } else {
           msg = decoded.toString();
         }
-
-        throw Exception(msg);
-      } catch (e) {
-        if (bodyText.isNotEmpty) {
-          throw Exception(bodyText);
-        }
-        throw Exception('Gagal menghapus gilingan produksi (${res.statusCode})');
+      } catch (_) {
+        msg = bodyText.isNotEmpty
+            ? bodyText
+            : 'Gagal menghapus gilingan produksi (${res.statusCode})';
       }
+      throw Exception(msg);
+    }
+  }
+
+  // =========================
+  //  COMPLETE PRODUKSI
+  //  PATCH /api/production/gilingan/:noProduksi/complete
+  // =========================
+  Future<void> completeProduksi(String noProduksi) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/production/gilingan/$noProduksi/complete');
+
+    late http.Response res;
+    try {
+      res = await http.patch(url, headers: _headers(token)).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout menyelesaikan produksi gilingan');
+    } catch (e) {
+      rethrow;
+    }
+
+    if (res.statusCode != 200) {
+      final bodyText = utf8.decode(res.bodyBytes);
+      String msg;
+      try {
+        final decoded = json.decode(bodyText);
+        msg = (decoded is Map ? decoded['message'] : null)?.toString() ??
+            'Gagal menyelesaikan produksi (${res.statusCode})';
+      } catch (_) {
+        msg = 'Gagal menyelesaikan produksi (${res.statusCode})';
+      }
+      throw Exception(msg);
     }
   }
 

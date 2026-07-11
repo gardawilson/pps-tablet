@@ -28,6 +28,12 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
   final VoidCallback? onComplete;
   // Jika diset, tombol Selesai tetap tampil tapi disabled; pesan muncul saat long-press
   final String? completeDisabledReason;
+  // Jika diset, tombol Selesai tampil amber (menunggu) dengan ikon jam; tooltip dari sini
+  final String? completePendingReason;
+  // Approval actions — muncul saat CompleteRequestStatus == 'PENDING'
+  final VoidCallback? onApprove;
+  final VoidCallback? onReject;
+  final String? pendingApprovalInfo;
   final VoidCallback? onRiwayat;
   final VoidCallback? onRefresh;
   final List<Widget>? trailingActions;
@@ -56,6 +62,10 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
     this.terminateDisabledReason,
     this.onComplete,
     this.completeDisabledReason,
+    this.completePendingReason,
+    this.onApprove,
+    this.onReject,
+    this.pendingApprovalInfo,
     this.onRiwayat,
     this.onRefresh,
     this.trailingActions,
@@ -441,7 +451,10 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
                   ),
                 ),
               ],
-              if (onComplete != null || completeDisabledReason != null) ...[
+              if (onComplete != null ||
+                  completeDisabledReason != null ||
+                  completePendingReason != null ||
+                  onApprove != null) ...[
                 const SizedBox(width: 6),
                 if (completeDisabledReason != null)
                   Tooltip(
@@ -464,6 +477,91 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
                                 color: Color(0xFF9CA3AF),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                else if (onApprove != null) ...[
+                  Material(
+                    color: const Color(0xFF059669),
+                    borderRadius: BorderRadius.circular(6),
+                    child: InkWell(
+                      onTap: onApprove,
+                      borderRadius: BorderRadius.circular(6),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check, size: 13, color: Colors.white),
+                            SizedBox(width: 4),
+                            Text(
+                              'Setujui',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (onReject != null) ...[
+                    const SizedBox(width: 6),
+                    Material(
+                      color: const Color(0xFFDC2626),
+                      borderRadius: BorderRadius.circular(6),
+                      child: InkWell(
+                        onTap: onReject,
+                        borderRadius: BorderRadius.circular(6),
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.close, size: 13, color: Colors.white),
+                              SizedBox(width: 4),
+                              Text(
+                                'Tolak',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ]
+                else if (completePendingReason != null)
+                  Tooltip(
+                    message: completePendingReason!,
+                    triggerMode: TooltipTriggerMode.longPress,
+                    showDuration: const Duration(seconds: 3),
+                    child: Material(
+                      color: const Color(0xFFD97706),
+                      borderRadius: BorderRadius.circular(6),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.access_time, size: 13, color: Colors.white),
+                            SizedBox(width: 4),
+                            Text(
+                              'Menunggu',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
                               ),
                             ),
                           ],
@@ -524,20 +622,21 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
                 ),
                 const SizedBox(width: 2),
               ],
-              SizedBox(
-                width: 26,
-                height: 26,
-                child: IconButton(
-                  tooltip: 'Refresh',
-                  padding: EdgeInsets.zero,
-                  onPressed: onRefresh,
-                  icon: Icon(
-                    Icons.refresh,
-                    size: 15,
-                    color: Colors.grey.shade400,
+              if (onRefresh != null)
+                SizedBox(
+                  width: 26,
+                  height: 26,
+                  child: IconButton(
+                    tooltip: 'Refresh',
+                    padding: EdgeInsets.zero,
+                    onPressed: onRefresh,
+                    icon: Icon(
+                      Icons.refresh,
+                      size: 15,
+                      color: Colors.grey.shade400,
+                    ),
                   ),
                 ),
-              ),
               if (trailingActions != null) ...trailingActions!,
             ],
           ),

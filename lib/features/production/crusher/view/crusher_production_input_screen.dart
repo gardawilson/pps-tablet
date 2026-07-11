@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import 'package:pps_tablet/core/view/app_shell.dart';
 import 'package:pps_tablet/features/production/crusher/view_model/crusher_production_input_view_model.dart';
+import '../../../../common/widgets/confirm_dialog.dart';
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../../shared/models/broker_item.dart';
@@ -1010,6 +1011,53 @@ class _CrusherProductionInputScreenState
     );
   }
 
+  // ── Complete (Selesaikan produksi) ─────────────────────────────────────────
+
+  Future<void> _handleComplete() async {
+    final vm = context.read<CrusherProductionInputViewModel>();
+    if (vm.totalTempCount > 0) {
+      _showSnack(
+        'Masih ada ${vm.totalTempCount} data temp yang belum disimpan. '
+        'Simpan atau hapus dulu sebelum menyelesaikan.',
+        backgroundColor: Colors.orange,
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => ConfirmDialog(
+        title: 'Selesaikan Produksi?',
+        message:
+            'Yakin ingin menyelesaikan produksi ${widget.noCrusherProduksi}?\n'
+            'Setelah selesai, produksi akan dikunci dan tidak dapat diubah.',
+        confirmLabel: 'Selesaikan',
+        confirmIcon: Icons.check_circle_outline,
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await _prodRepo.completeProduksi(widget.noCrusherProduksi);
+      if (!mounted) return;
+      _showSnack(
+        '✅ Produksi berhasil diselesaikan',
+        backgroundColor: Colors.green,
+      );
+      await _loadHeader();
+    } catch (e) {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (_) => ErrorStatusDialog(
+          title: 'Gagal Menyelesaikan',
+          message: e.toString().replaceFirst('Exception: ', ''),
+        ),
+      );
+    }
+  }
+
   // ── Riwayat / timeline ────────────────────────────────────────────────────
 
   Future<void> _openTimelineDialog() async {
@@ -1312,6 +1360,13 @@ class _CrusherProductionInputScreenState
                         _header!.tanggal!.year == DateTime.now().year &&
                         _header!.tanggal!.month == DateTime.now().month &&
                         _header!.tanggal!.day == DateTime.now().day,
+                    produksiStatus: _header?.produksiStatus,
+                    onComplete: (_header?.isComplete == true)
+                        ? null
+                        : _handleComplete,
+                    completeDisabledReason: (_header?.isComplete == true)
+                        ? 'Produksi sudah selesai'
+                        : null,
                   ),
                 Expanded(
                   child: Builder(

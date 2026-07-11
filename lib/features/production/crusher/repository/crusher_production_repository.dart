@@ -307,13 +307,15 @@ class CrusherProductionRepository {
     print('⬅️ [${res.statusCode}] ${res.body}');
 
     if (res.statusCode != 201 && res.statusCode != 200) {
+      String msg;
       try {
         final decoded = json.decode(utf8.decode(res.bodyBytes));
-        final msg = decoded['message'] ?? 'Gagal membuat crusher produksi';
-        throw Exception(msg);
+        msg = (decoded is Map ? decoded['message'] : null)?.toString() ??
+            'Gagal membuat crusher produksi (${res.statusCode})';
       } catch (_) {
-        throw Exception('Gagal membuat crusher produksi (${res.statusCode})');
+        msg = 'Gagal membuat crusher produksi (${res.statusCode})';
       }
+      throw Exception(msg);
     }
 
     final decoded = utf8.decode(res.bodyBytes);
@@ -430,13 +432,15 @@ class CrusherProductionRepository {
     print('⬅️ [${res.statusCode}] ${res.body}');
 
     if (res.statusCode != 200) {
+      String msg;
       try {
         final decoded = json.decode(utf8.decode(res.bodyBytes));
-        final msg = decoded['message'] ?? 'Gagal mengubah crusher produksi';
-        throw Exception(msg);
+        msg = (decoded is Map ? decoded['message'] : null)?.toString() ??
+            'Gagal mengubah crusher produksi (${res.statusCode})';
       } catch (_) {
-        throw Exception('Gagal mengubah crusher produksi (${res.statusCode})');
+        msg = 'Gagal mengubah crusher produksi (${res.statusCode})';
       }
+      throw Exception(msg);
     }
 
     final decoded = utf8.decode(res.bodyBytes);
@@ -554,4 +558,35 @@ class CrusherProductionRepository {
     // _inputsCache.remove(noCrusherProduksi);
   }
 
+  // =========================
+  //  COMPLETE PRODUKSI
+  //  PATCH /api/production/crusher/:noCrusherProduksi/complete
+  // =========================
+  Future<void> completeProduksi(String noCrusherProduksi) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse(
+      '$_base/api/production/crusher/$noCrusherProduksi/complete',
+    );
+
+    late http.Response res;
+    try {
+      res = await http.patch(url, headers: _headers(token)).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout menyelesaikan produksi crusher');
+    } catch (e) {
+      rethrow;
+    }
+
+    if (res.statusCode != 200) {
+      final bodyText = utf8.decode(res.bodyBytes);
+      try {
+        final decoded = json.decode(bodyText);
+        final msg = (decoded is Map ? decoded['message'] : null) ??
+            'Gagal menyelesaikan produksi (${res.statusCode})';
+        throw Exception(msg);
+      } catch (_) {
+        throw Exception('Gagal menyelesaikan produksi (${res.statusCode})');
+      }
+    }
+  }
 }

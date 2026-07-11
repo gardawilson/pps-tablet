@@ -38,6 +38,10 @@ class WashingProduction {
   final int? idRegu;
   final String? namaRegu;
 
+  // ✅ Complete status
+  final bool isComplete;
+  final String? produksiStatus;
+
   const WashingProduction({
     required this.noProduksi,
     required this.idOperators,
@@ -63,6 +67,8 @@ class WashingProduction {
     this.lastClosedDate,
     this.idRegu,
     this.namaRegu,
+    this.isComplete = false,
+    this.produksiStatus,
   });
 
   // ── Backward-compat getters ──────────────────────────────────────────────
@@ -194,6 +200,10 @@ class WashingProduction {
       lastClosedDate: _asDateTime(j['LastClosedDate']),
       idRegu: _asInt(j['IdRegu']),
       namaRegu: j['NamaRegu'] as String?,
+      isComplete: _asBool(j['IsComplete'], fallback: false) ||
+          j['status']?.toString() == 'complete',
+      produksiStatus: j['status']?.toString() ??
+          (_asBool(j['IsComplete'], fallback: false) ? 'complete' : 'pending'),
     );
   }
 

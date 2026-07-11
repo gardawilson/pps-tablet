@@ -14,6 +14,7 @@ import '../../label/packing/repository/packing_repository.dart';
 import '../../label/reject/repository/reject_repository.dart';
 import '../model/sr_v2_transaction.dart';
 import '../repository/sr_v2_repository.dart';
+import '../../production/shared/shared.dart';
 
 // ─── Theme constants ───────────────────────────────────────────────────────
 const _kPrimary = Color(0xFF1E6FD9);
@@ -543,17 +544,24 @@ class _InputsCard extends StatelessWidget {
               ),
             )
           else ...[
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: inputs.length,
-              separatorBuilder: (_, __) => const Divider(
-                height: 1,
-                indent: 16,
-                endIndent: 16,
-                color: _kBorder,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 4),
+              child: LayoutBuilder(
+                builder: (_, c) => GridView(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: EdgeInsets.zero,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+                    crossAxisSpacing: 6,
+                    mainAxisSpacing: 6,
+                    mainAxisExtent: 80,
+                  ),
+                  children: inputs
+                      .map((lbl) => _SrV2InputTile(lbl: lbl, nf: nf))
+                      .toList(),
+                ),
               ),
-              itemBuilder: (_, i) => _InputTile(lbl: inputs[i], nf: nf),
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -593,69 +601,64 @@ class _InputsCard extends StatelessWidget {
   }
 }
 
-class _InputTile extends StatelessWidget {
+// Card tile untuk satu label input — format identik dengan tile input/output
+// pada layar produksi (mis. broker) dan bs_v2_detail_screen: jenis sebagai
+// judul, nomor label sebagai sub judul, metrics (pcs/operator) di baris bawah.
+class _SrV2InputTile extends StatelessWidget {
   final SrV2InputLabel lbl;
   final NumberFormat nf;
 
-  const _InputTile({required this.lbl, required this.nf});
+  const _SrV2InputTile({required this.lbl, required this.nf});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: _kPrimary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(8),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _kBorder),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            Text(
+              lbl.namaJenis.isNotEmpty ? lbl.namaJenis : lbl.noBJ,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1A1D23),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            child: const Icon(
-              Icons.label_outline_rounded,
-              size: 16,
-              color: _kPrimary,
+            const SizedBox(height: 1),
+            Text(
+              lbl.noBJ,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
             ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 6,
+              runSpacing: 2,
               children: [
-                Text(
-                  lbl.noBJ,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1A1D23),
-                  ),
+                ProductionMiniMetric(
+                  icon: Icons.inventory_2_outlined,
+                  text: '${nf.format(lbl.pcs)} pcs',
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  lbl.namaJenis,
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-                ),
-                if (lbl.createBy != null) ...[
-                  const SizedBox(height: 1),
-                  Text(
-                    'by ${lbl.createBy}',
-                    style: TextStyle(fontSize: 10, color: Colors.grey.shade400),
+                if (lbl.createBy != null)
+                  ProductionMiniMetric(
+                    icon: Icons.person_outline_rounded,
+                    text: lbl.createBy!,
                   ),
-                ],
               ],
             ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            '${nf.format(lbl.pcs)} pcs',
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF1A1D23),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -741,18 +744,25 @@ class _OutputsCard extends StatelessWidget {
               ),
             )
           else ...[
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: outputs.length,
-              separatorBuilder: (_, __) => const Divider(
-                height: 1,
-                indent: 16,
-                endIndent: 16,
-                color: _kBorder,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 4),
+              child: LayoutBuilder(
+                builder: (_, c) => GridView(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: EdgeInsets.zero,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: c.maxWidth < 380 ? 2 : 3,
+                    crossAxisSpacing: 6,
+                    mainAxisSpacing: 6,
+                    mainAxisExtent: 80,
+                  ),
+                  children: [
+                    for (var i = 0; i < outputs.length; i++)
+                      _SrV2OutputTile(out: outputs[i], nf: nf, index: i),
+                  ],
+                ),
               ),
-              itemBuilder: (_, i) =>
-                  _OutputTile(out: outputs[i], nf: nf, index: i),
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -794,12 +804,19 @@ class _OutputsCard extends StatelessWidget {
   }
 }
 
-class _OutputTile extends StatelessWidget {
+// Card tile untuk satu label output — format identik dengan tile input/output
+// pada layar produksi (mis. broker) dan bs_v2_detail_screen: jenis sebagai
+// judul, nomor label sebagai sub judul, tombol print inline.
+class _SrV2OutputTile extends StatelessWidget {
   final SrV2OutputLabel out;
   final NumberFormat nf;
   final int index;
 
-  const _OutputTile({required this.out, required this.nf, required this.index});
+  const _SrV2OutputTile({
+    required this.out,
+    required this.nf,
+    required this.index,
+  });
 
   bool get _canPrint {
     final noBJ = (out.noBJ ?? '').trim();
@@ -892,71 +909,61 @@ class _OutputTile extends StatelessWidget {
         ? '${nf.format(berat)} kg'
         : '${nf.format(out.pcs)} pcs';
     final noBJ = out.noBJ?.trim();
+    final title = out.namaJenis.isNotEmpty
+        ? out.namaJenis
+        : (noBJ ?? '#${index + 1}');
+    final subtitle = noBJ ?? '#${index + 1}';
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-            decoration: BoxDecoration(
-              color: _kGreen.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              '#${index + 1}',
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: _kGreen,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _kBorder),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                if (noBJ != null)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          noBJ,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1A1D23),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (_canPrint) ...[
-                        const SizedBox(width: 6),
-                        _OutputPrintButton(
-                          onPressed: () => _handlePrint(context, noBJ),
-                        ),
-                      ],
-                    ],
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1A1D23),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                Text(
-                  out.namaJenis,
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                 ),
+                if (noBJ != null && _canPrint) ...[
+                  const SizedBox(width: 4),
+                  _OutputPrintButton(
+                    onPressed: () => _handlePrint(context, noBJ),
+                  ),
+                ],
               ],
             ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            qtyText,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: _kGreen,
+            const SizedBox(height: 1),
+            Text(
+              subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
             ),
-          ),
-        ],
+            const SizedBox(height: 4),
+            ProductionMiniMetric(
+              icon: berat != null && berat > 0
+                  ? Icons.scale_outlined
+                  : Icons.inventory_2_outlined,
+              text: qtyText,
+            ),
+          ],
+        ),
       ),
     );
   }

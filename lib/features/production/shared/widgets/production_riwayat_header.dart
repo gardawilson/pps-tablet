@@ -17,6 +17,8 @@ class ProductionRiwayatHeader extends StatelessWidget {
     required this.onFilterChanged,
     this.onToggle,
     this.isExpanded = true,
+    this.showTitle = true,
+    this.showSemuaChip = true,
   });
 
   final List<MesinFilterItem> mesinList;
@@ -24,6 +26,16 @@ class ProductionRiwayatHeader extends StatelessWidget {
   final ValueChanged<int?> onFilterChanged;
   final VoidCallback? onToggle;
   final bool isExpanded;
+
+  /// Set false when this header sits under an outer panel header/tab
+  /// switcher that already shows the section title, so the title row
+  /// isn't duplicated.
+  final bool showTitle;
+
+  /// Set false when the "Semua" reset chip is rendered elsewhere (rare —
+  /// normally kept alongside the per-mesin chip row even if [showTitle]
+  /// is false).
+  final bool showSemuaChip;
 
   @override
   Widget build(BuildContext context) {
@@ -36,68 +48,82 @@ class ProductionRiwayatHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
-            height: 44,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: Row(
-                children: [
-                  if (onToggle != null) ...[
-                    Tooltip(
-                      message: 'Sembunyikan Riwayat',
-                      waitDuration: const Duration(milliseconds: 400),
-                      child: IconButton(
-                        onPressed: onToggle,
-                        icon: const Icon(
-                          Icons.keyboard_double_arrow_right_rounded,
-                          size: 16,
+          if (showTitle)
+            SizedBox(
+              height: 44,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: Row(
+                  children: [
+                    if (onToggle != null) ...[
+                      Tooltip(
+                        message: 'Sembunyikan Riwayat',
+                        waitDuration: const Duration(milliseconds: 400),
+                        child: IconButton(
+                          onPressed: onToggle,
+                          icon: const Icon(
+                            Icons.keyboard_double_arrow_right_rounded,
+                            size: 16,
+                          ),
+                          color: const Color(0xFF9CA3AF),
+                          hoverColor: const Color(0xFFEFF6FF),
+                          highlightColor: const Color(0xFFDBEAFE),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 28,
+                            minHeight: 28,
+                          ),
                         ),
-                        color: const Color(0xFF9CA3AF),
-                        hoverColor: const Color(0xFFEFF6FF),
-                        highlightColor: const Color(0xFFDBEAFE),
-                        padding: EdgeInsets.zero,
-                        constraints:
-                            const BoxConstraints(minWidth: 28, minHeight: 28),
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    const Text(
+                      'Riwayat Produksi',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1F2937),
                       ),
                     ),
-                    const SizedBox(width: 4),
+                    if (showSemuaChip) ...[
+                      const SizedBox(width: 10),
+                      ProductionFilterChip(
+                        label: 'Semua',
+                        selected: selectedIdMesin == null,
+                        onTap: () => onFilterChanged(null),
+                      ),
+                    ],
                   ],
-                  const Text(
-                    'Riwayat Produksi',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF1F2937),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  ProductionFilterChip(
-                    label: 'Semua',
-                    selected: selectedIdMesin == null,
-                    onTap: () => onFilterChanged(null),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
-          if (mesinList.isNotEmpty)
+          if (mesinList.isNotEmpty || (!showTitle && showSemuaChip))
             SizedBox(
-              height: 30,
+              height: 38,
               child: ListView(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
-                children: mesinList
-                    .map(
-                      (m) => Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: ProductionFilterChip(
-                          label: m.namaMesin,
-                          selected: selectedIdMesin == m.idMesin,
-                          onTap: () => onFilterChanged(m.idMesin),
-                        ),
+                padding: const EdgeInsets.fromLTRB(14, 8, 14, 6),
+                children: [
+                  if (!showTitle && showSemuaChip)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ProductionFilterChip(
+                        label: 'Semua',
+                        selected: selectedIdMesin == null,
+                        onTap: () => onFilterChanged(null),
                       ),
-                    )
-                    .toList(),
+                    ),
+                  ...mesinList.map(
+                    (m) => Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ProductionFilterChip(
+                        label: m.namaMesin,
+                        selected: selectedIdMesin == m.idMesin,
+                        onTap: () => onFilterChanged(m.idMesin),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
         ],

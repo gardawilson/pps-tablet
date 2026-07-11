@@ -1,0 +1,116 @@
+import 'dart:convert';
+
+import '../../../core/network/api_client.dart';
+import '../model/so_v2_kategori.dart';
+import '../model/so_v2_lokasi_page.dart';
+import '../model/so_v2_label_page.dart';
+
+class SoV2Repository {
+  final ApiClient _api;
+
+  SoV2Repository({ApiClient? apiClient}) : _api = apiClient ?? ApiClient();
+
+  Future<List<SoV2Kategori>> fetchKategori() async {
+    final body = await _api.getJson('/api/stock-opname-v2/kategori');
+    final dataList = (body['data'] ?? []) as List;
+    return dataList
+        .map((e) => SoV2Kategori.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  Future<Map<String, dynamic>> generateNoStockOpname({
+    required int categoryId,
+    required String date,
+  }) async {
+    final body = await _api.postJson(
+      '/api/stock-opname-v2/no-stock-opname',
+      body: {'categoryId': categoryId, 'date': date},
+    );
+    final data = body['data'] as Map<String, dynamic>?;
+    if (data == null) throw Exception('Response tidak mengandung data');
+    return data;
+  }
+
+  Future<List<String>> fetchBlok() async {
+    final body = await _api.getJson('/api/stock-opname-v2/blok');
+    final dataList = (body['data'] ?? []) as List;
+    return dataList.map((e) => e.toString()).toList();
+  }
+
+  Future<SoV2LokasiPage> fetchLokasi({
+    required String stockOpnameNo,
+    required String blok,
+  }) async {
+    final body = await _api.getJson(
+      '/api/stock-opname-v2/no-stock-opname/$stockOpnameNo/blok/$blok/lokasi',
+    );
+    final data = body['data'] as Map<String, dynamic>?;
+    if (data == null) throw Exception('Response tidak mengandung data');
+    return SoV2LokasiPage.fromJson(data);
+  }
+
+  Future<SoV2LabelPage> fetchLabelPage({
+    required String stockOpnameNo,
+    required String blok,
+    required int locationId,
+    required int page,
+    int pageSize = 20,
+    String? search,
+  }) async {
+    final qp = <String, dynamic>{
+      'page': page,
+      'pageSize': pageSize,
+      if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+    };
+    try {
+      final body = await _api.getJson(
+        '/api/stock-opname-v2/no-stock-opname/$stockOpnameNo/blok/$blok/lokasi/$locationId/label',
+        query: qp,
+      );
+      final data = body['data'] as Map<String, dynamic>?;
+      if (data == null) throw Exception('Response tidak mengandung data');
+      return SoV2LabelPage.fromJson(data);
+    } on ApiException catch (e) {
+      // Backend membalas 404 saat page > totalPages (atau belum ada snapshot),
+      // meski body-nya tetap membawa meta pagination valid dengan data
+      // kosong. Perlakukan sebagai halaman kosong, bukan error.
+      if (e.statusCode == 404 && e.responseBody != null) {
+        try {
+          final decoded = jsonDecode(e.responseBody!) as Map<String, dynamic>;
+          final data = decoded['data'] as Map<String, dynamic>?;
+          if (data != null) return SoV2LabelPage.fromJson(data);
+        } catch (_) {
+          // responseBody bukan JSON yang diharapkan -> rethrow di bawah.
+        }
+      }
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> submitHasil({
+    required String stockOpnameNo,
+    required String labelNo,
+    int? palletNo,
+  }) async {
+    final body = await _api.postJson(
+      '/api/stock-opname-v2/no-stock-opname/$stockOpnameNo/hasil',
+      body: {
+        'labelNo': labelNo,
+        if (palletNo != null) 'palletNo': palletNo,
+      },
+    );
+    final data = body['data'] as Map<String, dynamic>?;
+    if (data == null) throw Exception('Response tidak mengandung data');
+    return data;
+  }
+
+  Future<Map<String, dynamic>> completeStockOpname(
+    String stockOpnameNo,
+  ) async {
+    final body = await _api.patchJson(
+      '/api/stock-opname-v2/no-stock-opname/$stockOpnameNo/complete',
+    );
+    final data = body['data'] as Map<String, dynamic>?;
+    return data ?? {};
+  }
+}

@@ -29,6 +29,10 @@ class GilinganProduction {
   final DateTime? lastClosedDate;
   final bool isLocked;
 
+  // complete status
+  final bool isComplete;
+  final String? produksiStatus;
+
   const GilinganProduction({
     required this.noProduksi,
     required this.idOperator,
@@ -52,6 +56,8 @@ class GilinganProduction {
     this.namaRegu,
     this.lastClosedDate,
     this.isLocked = false,
+    this.isComplete = false,
+    this.produksiStatus,
   });
 
   // ---------- tolerant parsers ----------
@@ -155,6 +161,10 @@ class GilinganProduction {
           : _asString(j['NamaRegu']),
       lastClosedDate: _asDateTime(j['LastClosedDate']),
       isLocked: _asBool(j['IsLocked']),
+      isComplete: _asBool(j['IsComplete'], fallback: false) ||
+          j['status']?.toString() == 'complete',
+      produksiStatus: j['status']?.toString() ??
+          (_asBool(j['IsComplete'], fallback: false) ? 'complete' : 'pending'),
     );
   }
 
@@ -212,6 +222,8 @@ class GilinganProduction {
     int? idRegu,
     String? hourStart,
     String? hourEnd,
+    bool? isComplete,
+    String? produksiStatus,
   }) {
     return GilinganProduction(
       noProduksi: noProduksi,
@@ -236,6 +248,8 @@ class GilinganProduction {
       namaRegu: namaRegu ?? this.namaRegu,
       lastClosedDate: lastClosedDate,
       isLocked: isLocked,
+      isComplete: isComplete ?? this.isComplete,
+      produksiStatus: produksiStatus ?? this.produksiStatus,
     );
   }
 

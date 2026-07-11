@@ -365,13 +365,15 @@ class MixerProductionRepository {
     print('⬅️ [${res.statusCode}] ${res.body}');
 
     if (res.statusCode != 201 && res.statusCode != 200) {
+      String msg;
       try {
         final decoded = json.decode(utf8.decode(res.bodyBytes));
-        final msg = decoded['message'] ?? 'Gagal membuat mixer produksi';
-        throw Exception(msg);
+        msg = (decoded is Map ? decoded['message'] : null)?.toString() ??
+            'Gagal membuat mixer produksi (${res.statusCode})';
       } catch (_) {
-        throw Exception('Gagal membuat mixer produksi (${res.statusCode})');
+        msg = 'Gagal membuat mixer produksi (${res.statusCode})';
       }
+      throw Exception(msg);
     }
 
     final decoded = utf8.decode(res.bodyBytes);
@@ -488,13 +490,15 @@ class MixerProductionRepository {
     print('⬅️ [${res.statusCode}] ${res.body}');
 
     if (res.statusCode != 200) {
+      String msg;
       try {
         final decoded = json.decode(utf8.decode(res.bodyBytes));
-        final msg = decoded['message'] ?? 'Gagal mengubah mixer produksi';
-        throw Exception(msg);
+        msg = (decoded is Map ? decoded['message'] : null)?.toString() ??
+            'Gagal mengubah mixer produksi (${res.statusCode})';
       } catch (_) {
-        throw Exception('Gagal mengubah mixer produksi (${res.statusCode})');
+        msg = 'Gagal mengubah mixer produksi (${res.statusCode})';
       }
+      throw Exception(msg);
     }
 
     final decoded = utf8.decode(res.bodyBytes);
@@ -643,10 +647,9 @@ class MixerProductionRepository {
       final bodyText = utf8.decode(res.bodyBytes);
       print('❌ Error body: $bodyText');
 
+      String msg;
       try {
         final decoded = json.decode(bodyText);
-
-        String msg;
 
         if (decoded is Map<String, dynamic>) {
           msg = (decoded['message'] ??
@@ -657,14 +660,43 @@ class MixerProductionRepository {
         } else {
           msg = decoded.toString();
         }
-
-        throw Exception(msg);
-      } catch (e) {
-        if (bodyText.isNotEmpty) {
-          throw Exception(bodyText);
-        }
-        throw Exception('Gagal menghapus mixer produksi (${res.statusCode})');
+      } catch (_) {
+        msg = bodyText.isNotEmpty
+            ? bodyText
+            : 'Gagal menghapus mixer produksi (${res.statusCode})';
       }
+      throw Exception(msg);
+    }
+  }
+
+  // =========================
+  //  COMPLETE PRODUKSI
+  //  PATCH /api/production/mixer/:noProduksi/complete
+  // =========================
+  Future<void> completeProduksi(String noProduksi) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/production/mixer/$noProduksi/complete');
+
+    late http.Response res;
+    try {
+      res = await http.patch(url, headers: _headers(token)).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout menyelesaikan produksi mixer');
+    } catch (e) {
+      rethrow;
+    }
+
+    if (res.statusCode != 200) {
+      final bodyText = utf8.decode(res.bodyBytes);
+      String msg;
+      try {
+        final decoded = json.decode(bodyText);
+        msg = (decoded is Map ? decoded['message'] : null)?.toString() ??
+            'Gagal menyelesaikan produksi (${res.statusCode})';
+      } catch (_) {
+        msg = 'Gagal menyelesaikan produksi (${res.statusCode})';
+      }
+      throw Exception(msg);
     }
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
@@ -5,8 +7,8 @@ import 'package:shimmer/shimmer.dart';
 import 'package:pps_tablet/core/view/app_shell.dart';
 import 'package:pps_tablet/features/production/shared/shared.dart';
 
+import '../../../../common/widgets/confirm_dialog.dart';
 import '../../../../common/widgets/error_status_dialog.dart';
-import '../../../../common/widgets/scan_label_dialog.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../../shared/models/production_label_lookup_result.dart';
 import '../../shared/widgets/add_cabinet_material_dialog.dart';
@@ -20,11 +22,28 @@ import '../model/inject_production_model.dart'
 import '../repository/inject_production_repository.dart';
 import '../view_model/inject_production_input_view_model.dart';
 
+import '../model/inject_formula_model.dart';
 import '../view_model/inject_formula_view_model.dart';
-import '../widgets/inject_formula_dialog_v2.dart';
 import '../widgets/inject_shift_timeline_dialog.dart';
-import '../widgets/inject_sak_picker_dialog.dart';
+import '../widgets/counter_picker_dialog.dart';
+import '../widgets/inject_lookup_label_dialog.dart';
+import '../widgets/inject_lookup_label_partial_dialog.dart';
 import '../widgets/inject_split_time_dialog.dart';
+import '../widgets/inject_terminate_dialog.dart';
+import '../../../../features/reject_type/model/reject_type_model.dart';
+import '../../../../features/reject_type/view_model/reject_type_view_model.dart';
+import '../../../../features/jenis_bonggolan/model/jenis_bonggolan_model.dart';
+import '../../../../features/jenis_bonggolan/view_model/jenis_bonggolan_view_model.dart';
+import '../../../label/bonggolan/repository/bonggolan_repository.dart';
+import '../../../label/furniture_wip/repository/furniture_wip_repository.dart';
+import '../../../label/reject/repository/reject_repository.dart';
+import '../../../label/packing/repository/packing_repository.dart';
+import '../../../../core/network/endpoints.dart';
+import '../../../../core/network/api_client.dart';
+import '../../../../core/network/label_print_lock_api.dart';
+import '../../../../core/services/label_print_sync_queue.dart';
+import '../../../../core/utils/pdf_print_service.dart';
+import '../../../../core/view_model/label_print_lock_socket_manager.dart';
 
 // ── Colour palette ─────────────────────────────────────────────────────────────
 const _kInjectPrimary = Color(0xFF0277BD); // biru — input
@@ -46,6 +65,13 @@ class _InjectProductionInputScreenState
     extends State<InjectProductionInputScreen> {
   String _selectedInputTab = 'fwip';
 
+  // ── Scan mode (full = auto-add semua item baru, partial/select = dialog manual) ──
+  String _selectedMode = 'full';
+
+  // ── Multi-select state (input) ────────────────────────────────────────────
+  bool _isSelecting = false;
+  final Map<String, List<dynamic>> _selectedGroups = {};
+
   // ── Header (fetched from API) ─────────────────────────────────────────────
   final _prodRepo = InjectProductionRepository();
   InjectProduction? _header;
@@ -57,6 +83,9 @@ class _InjectProductionInputScreenState
   // ── Hourly bucket states ───────────────────────────────────────────────────
   final Map<String, _HourlyBucketData> _bucketStates = {};
   List<String> _bucketLabelOrder = [];
+  final Map<String, DateTime> _bucketStartTimes = {};
+  final Map<String, DateTime> _bucketEndTimes = {};
+  Timer? _statusTimer;
 
   // ── Batch / pcs-per-label ─────────────────────────────────────────────────
   InjectPcsPerLabelResult? _pcsPerLabelData;
@@ -67,6 +96,11 @@ class _InjectProductionInputScreenState
     return widget.noProduksi;
   }
 
+  // Terminate hanya boleh ketika ada bucket available (range jam sekarang belum diinput)
+  bool get _canTerminate => _bucketLabelOrder.any(
+    (l) => _bucketStates[l]?.status == _HourlyBucketStatus.available,
+  );
+
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   @override
@@ -74,6 +108,9 @@ class _InjectProductionInputScreenState
     super.initState();
     _cachedBreadcrumbLabel = widget.noProduksi;
     _loadHeader();
+    _statusTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(_recomputeBucketStatuses);
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       // Capture prev here (not in initState) so any pending dispose callbacks
@@ -109,7 +146,8 @@ class _InjectProductionInputScreenState
         _pcsPerLabelData = pcsPerLabel;
         _cachedBreadcrumbLabel = _breadcrumbLabel;
         _initBucketStatesFromHeader(header);
-        _restoreBucketStatesFromBatches(batches, pcsPerLabel.pcsPerLabel);
+        _restoreBucketStatesFromBatches(batches, pcsPerLabel);
+        _recomputeBucketStatuses();
       });
       _updateBreadcrumb();
     } catch (_) {}
@@ -117,7 +155,7 @@ class _InjectProductionInputScreenState
 
   void _restoreBucketStatesFromBatches(
     List<InjectBatchItem> batches,
-    int pcsPerLabel,
+    InjectPcsPerLabelResult pcsPerLabelData,
   ) {
     for (final batch in batches) {
       final bucketLabel = _bucketLabelOrder.firstWhere(
@@ -127,46 +165,69 @@ class _InjectProductionInputScreenState
       if (bucketLabel.isEmpty) continue;
 
       final isLast = _bucketLabelOrder.last == bucketLabel;
-      final totalPcs = batch.carryOverIn + batch.pcsInput;
-      final int labelsCreated;
-      if (isLast) {
-        final full = totalPcs ~/ pcsPerLabel;
-        final rem = totalPcs % pcsPerLabel;
-        labelsCreated = full + (rem > 0 ? 1 : 0);
+      final carryInByJenis = <int, int>{};
+      final pcsInByJenis = <int, int>{};
+      final carryOutByJenis = <int, int>{};
+      int labelsCreated = 0;
+
+      if (batch.jenisItems.isNotEmpty) {
+        for (final ji in batch.jenisItems) {
+          carryInByJenis[ji.idJenis] = ji.carryOverIn;
+          pcsInByJenis[ji.idJenis] = ji.pcsInput;
+          carryOutByJenis[ji.idJenis] = ji.carryOverOut;
+          final ppl = pcsPerLabelData.pplForJenis(ji.idJenis);
+          final totalPcs = ji.carryOverIn + ji.pcsInput;
+          if (isLast) {
+            labelsCreated += (totalPcs ~/ ppl) + (totalPcs % ppl > 0 ? 1 : 0);
+          } else {
+            labelsCreated += totalPcs ~/ ppl;
+          }
+        }
       } else {
-        labelsCreated = totalPcs ~/ pcsPerLabel;
+        // Legacy fallback
+        final ppl = pcsPerLabelData.items.isNotEmpty
+            ? pcsPerLabelData.items.first.pcsPerLabel.clamp(1, 999999)
+            : 100;
+        final totalPcs = batch.carryOverIn + batch.pcsInput;
+        if (isLast) {
+          labelsCreated = (totalPcs ~/ ppl) + (totalPcs % ppl > 0 ? 1 : 0);
+        } else {
+          labelsCreated = totalPcs ~/ ppl;
+        }
       }
 
+      final bonggolanLabel = batch.labels.bonggolan.isNotEmpty
+          ? batch.labels.bonggolan.first
+          : null;
+      final rejectLabel = batch.labels.reject.isNotEmpty
+          ? batch.labels.reject.first
+          : null;
       _bucketStates[bucketLabel] = _HourlyBucketData(
         status: _HourlyBucketStatus.submitted,
         carryOverIn: batch.carryOverIn,
+        carryOverInByJenis: carryInByJenis,
         pcsInput: batch.pcsInput,
+        pcsInputByJenis: pcsInByJenis,
         labelsCreated: labelsCreated,
         carryOverOut: batch.carryOverOut,
+        carryOverOutByJenis: carryOutByJenis,
         berat: batch.berat,
         cycleTime: batch.cycleTime,
         counter: batch.counter,
+        beratBonggolan: bonggolanLabel?.berat,
+        namaBonggolan:
+            bonggolanLabel != null && bonggolanLabel.namaJenis.isNotEmpty
+            ? bonggolanLabel.namaJenis
+            : null,
+        beratReject: rejectLabel?.berat,
+        namaReject: rejectLabel != null && rejectLabel.namaJenis.isNotEmpty
+            ? rejectLabel.namaJenis
+            : null,
         labelsFwip: batch.labels.furnitureWip,
+        labelsBarangJadi: batch.labels.barangJadi,
         labelsBonggolan: batch.labels.bonggolan,
         labelsReject: batch.labels.reject,
       );
-
-      // Unlock next bucket if not last
-      if (!isLast) {
-        final idx = _bucketLabelOrder.indexOf(bucketLabel);
-        if (idx >= 0 && idx < _bucketLabelOrder.length - 1) {
-          final nextLabel = _bucketLabelOrder[idx + 1];
-          if (_bucketStates[nextLabel]?.status == _HourlyBucketStatus.locked) {
-            _bucketStates[nextLabel] = _HourlyBucketData(
-              status: _HourlyBucketStatus.available,
-              carryOverIn: batch.carryOverOut,
-              pcsInput: 0,
-              labelsCreated: 0,
-              carryOverOut: 0,
-            );
-          }
-        }
-      }
     }
   }
 
@@ -200,9 +261,11 @@ class _InjectProductionInputScreenState
           : offset + step;
       final bucketStart = startDateTime.add(Duration(minutes: offset));
       final bucketEnd = startDateTime.add(Duration(minutes: nextOffset));
-      labels.add(
-        '${_formatHourMinute(bucketStart)} - ${_formatHourMinute(bucketEnd)}',
-      );
+      final label =
+          '${_formatHourMinute(bucketStart)} - ${_formatHourMinute(bucketEnd)}';
+      labels.add(label);
+      _bucketStartTimes[label] = bucketStart;
+      _bucketEndTimes[label] = bucketEnd;
       offset = nextOffset;
     }
     return labels;
@@ -212,12 +275,11 @@ class _InjectProductionInputScreenState
     final labels = _computeHourBucketLabels(header);
     if (labels.isEmpty) return;
     _bucketLabelOrder = labels;
-    for (int i = 0; i < labels.length; i++) {
-      if (!_bucketStates.containsKey(labels[i])) {
-        _bucketStates[labels[i]] = _HourlyBucketData(
-          status: i == 0
-              ? _HourlyBucketStatus.available
-              : _HourlyBucketStatus.locked,
+    // Initialize all as locked; _recomputeBucketStatuses will set correct status
+    for (final label in labels) {
+      if (!_bucketStates.containsKey(label)) {
+        _bucketStates[label] = const _HourlyBucketData(
+          status: _HourlyBucketStatus.locked,
           carryOverIn: 0,
           pcsInput: 0,
           labelsCreated: 0,
@@ -227,37 +289,125 @@ class _InjectProductionInputScreenState
     }
   }
 
+  // Recompute non-submitted bucket statuses based on current time.
+  // Must be called inside setState or within a setState callback.
+  void _recomputeBucketStatuses() {
+    final now = DateTime.now();
+    final isComplete = _header?.isComplete ?? false;
+    final lastLabel = _bucketLabelOrder.isNotEmpty
+        ? _bucketLabelOrder.last
+        : null;
+    int lastSubmittedCarryOut = 0;
+    var lastCarryOutByJenis = <int, int>{};
+
+    for (final label in _bucketLabelOrder) {
+      final startDt = _bucketStartTimes[label];
+      final endDt = _bucketEndTimes[label];
+      if (startDt == null || endDt == null) continue;
+
+      final current = _bucketStates[label];
+      if (current?.status == _HourlyBucketStatus.submitted) {
+        lastSubmittedCarryOut = current?.carryOverOut ?? 0;
+        lastCarryOutByJenis = Map.from(current?.carryOverOutByJenis ?? {});
+        continue;
+      }
+
+      // Bucket terakhir & produksi belum selesai → tidak expired meski jam sudah lewat
+      final isLastAndIncomplete = !isComplete && label == lastLabel;
+      final isPastEnd = !now.isBefore(endDt);
+
+      final _HourlyBucketStatus newStatus;
+      if (isPastEnd && !isLastAndIncomplete) {
+        newStatus = _HourlyBucketStatus.expired;
+      } else if (!now.isBefore(startDt)) {
+        newStatus = _HourlyBucketStatus.available;
+      } else {
+        newStatus = _HourlyBucketStatus.locked;
+      }
+
+      // Overdue: bucket terakhir yang belum selesai tapi sudah lewat jam akhirnya
+      final isOverdue = isLastAndIncomplete && isPastEnd;
+
+      final isActive =
+          newStatus == _HourlyBucketStatus.available ||
+          newStatus == _HourlyBucketStatus.expired;
+      _bucketStates[label] = _HourlyBucketData(
+        status: newStatus,
+        isOverdue: isOverdue,
+        carryOverIn: isActive ? lastSubmittedCarryOut : 0,
+        carryOverInByJenis: isActive ? Map.from(lastCarryOutByJenis) : {},
+        pcsInput: 0,
+        labelsCreated: 0,
+        carryOverOut: 0,
+      );
+    }
+  }
+
   Future<void> _onBucketSubmit(
     String label,
-    int pcs,
-    InjectOutputJenis? jenis,
+    List<_JenisSubmitItem> jenisItems,
     double? berat,
     double? cycleTime,
     int? counter,
     double? beratBonggolan,
-    double? beratReject, {
+    double? beratReject,
+    int? idRejectBonggolan,
+    int? idRejectReject, {
+    String? namaBonggolan,
+    String? namaReject,
     bool isLastBucket = false,
   }) async {
-    final data = _bucketStates[label];
-    if (data == null) return;
+    if (_bucketStates[label] == null) return;
 
-    final pcsPerLabel = _pcsPerLabelData?.pcsPerLabel ?? 100;
-    final idFurnitureWIP = _pcsPerLabelData?.idFurnitureWIP;
-    final totalPcs = data.carryOverIn + pcs;
-
-    // Derive hour start from bucket label ("08:00 - 09:00" → "08:00")
+    final pplData = _pcsPerLabelData;
     final hourStart = label.split(' - ').first.trim();
+
+    final itemsToSubmit = jenisItems
+        .where((i) => i.pcs > 0 || i.carryOverIn > 0)
+        .toList();
+    if (itemsToSubmit.isEmpty) return;
+
+    final carryOutByJenis = <int, int>{};
+    int totalCarryOverIn = 0;
+    int totalPcsInput = 0;
+    int totalLabelsCreated = 0;
+    int totalCarryOverOut = 0;
+
+    final itemsPayload = itemsToSubmit.map((item) {
+      final ppl = pplData?.pplForJenis(item.jenis.idJenis) ?? 100;
+      final totalPcs = item.carryOverIn + item.pcs;
+      final carryOut = isLastBucket ? 0 : totalPcs % ppl;
+      carryOutByJenis[item.jenis.idJenis] = carryOut;
+      totalCarryOverIn += item.carryOverIn;
+      totalPcsInput += item.pcs;
+      totalCarryOverOut += carryOut;
+      if (isLastBucket) {
+        totalLabelsCreated += (totalPcs ~/ ppl) + (totalPcs % ppl > 0 ? 1 : 0);
+      } else {
+        totalLabelsCreated += totalPcs ~/ ppl;
+      }
+      return <String, dynamic>{
+        'idJenis': item.jenis.idJenis,
+        'pcsInput': item.pcs,
+        'carryOverIn': item.carryOverIn,
+        'carryOverOut': carryOut,
+      };
+    }).toList();
 
     final payload = <String, dynamic>{
       'noProduksi': widget.noProduksi,
       'hourStart': hourStart,
-      'carryOverIn': data.carryOverIn,
-      'pcsInput': pcs,
-      'carryOverOut': isLastBucket ? 0 : totalPcs % pcsPerLabel,
       if (berat != null) 'berat': berat,
       if (cycleTime != null) 'cycleTime': cycleTime,
       if (counter != null) 'counter': counter,
-      if (idFurnitureWIP != null && jenis != null) 'idJenis': idFurnitureWIP,
+      'items': itemsPayload,
+      if (isLastBucket && idRejectBonggolan != null && beratBonggolan != null)
+        'bonggolan': {
+          'idBonggolan': idRejectBonggolan,
+          'berat': beratBonggolan,
+        },
+      if (isLastBucket && idRejectReject != null && beratReject != null)
+        'reject': {'idReject': idRejectReject, 'berat': beratReject},
     };
 
     final InjectBatchSubmitResult result;
@@ -270,74 +420,52 @@ class _InjectProductionInputScreenState
     }
     if (!mounted) return;
 
-    final int labelsCreated;
-    final int carryOverOut;
-    if (jenis != null) {
-      if (isLastBucket) {
-        final fullLabels = totalPcs ~/ pcsPerLabel;
-        final remainder = totalPcs % pcsPerLabel;
-        labelsCreated = fullLabels + (remainder > 0 ? 1 : 0);
-        carryOverOut = 0;
-      } else {
-        labelsCreated = totalPcs ~/ pcsPerLabel;
-        carryOverOut = totalPcs % pcsPerLabel;
-      }
-    } else {
-      labelsCreated = 0;
-      carryOverOut = isLastBucket ? 0 : totalPcs;
-    }
-
     setState(() {
       _bucketStates[label] = _HourlyBucketData(
         status: _HourlyBucketStatus.submitted,
-        carryOverIn: data.carryOverIn,
-        pcsInput: pcs,
-        labelsCreated: labelsCreated,
-        carryOverOut: carryOverOut,
+        carryOverIn: totalCarryOverIn,
+        carryOverInByJenis: {
+          for (final i in itemsToSubmit) i.jenis.idJenis: i.carryOverIn,
+        },
+        pcsInput: totalPcsInput,
+        pcsInputByJenis: {
+          for (final i in itemsToSubmit) i.jenis.idJenis: i.pcs,
+        },
+        labelsCreated: totalLabelsCreated,
+        carryOverOut: totalCarryOverOut,
+        carryOverOutByJenis: carryOutByJenis,
         berat: berat,
         cycleTime: cycleTime,
         counter: counter,
-        beratBonggolan: beratBonggolan,
-        beratReject: beratReject,
+        beratBonggolan: result.bonggolan?.berat ?? beratBonggolan,
+        namaBonggolan: (result.bonggolan?.namaJenis.isNotEmpty == true)
+            ? result.bonggolan!.namaJenis
+            : namaBonggolan,
+        beratReject: result.reject?.berat ?? beratReject,
+        namaReject: (result.reject?.namaJenis.isNotEmpty == true)
+            ? result.reject!.namaJenis
+            : namaReject,
         labelsFwip: result.furnitureWIP,
+        labelsBarangJadi: result.barangJadi,
         labelsBonggolan: result.bonggolan != null ? [result.bonggolan!] : [],
         labelsReject: result.reject != null ? [result.reject!] : [],
       );
-
-      final idx = _bucketLabelOrder.indexOf(label);
-      if (!isLastBucket && idx >= 0 && idx < _bucketLabelOrder.length - 1) {
-        final nextLabel = _bucketLabelOrder[idx + 1];
-        final nextData = _bucketStates[nextLabel];
-        if (nextData?.status == _HourlyBucketStatus.locked) {
-          _bucketStates[nextLabel] = _HourlyBucketData(
-            status: _HourlyBucketStatus.available,
-            carryOverIn: carryOverOut,
-            pcsInput: 0,
-            labelsCreated: 0,
-            carryOverOut: 0,
-          );
-        }
-      }
+      _recomputeBucketStatuses();
     });
 
-    String snackMsg;
-    final created = result.furnitureWIP;
-    if (isLastBucket && jenis != null) {
-      final fullLabels = totalPcs ~/ pcsPerLabel;
-      final remainder = totalPcs % pcsPerLabel;
-      if (remainder > 0) {
-        snackMsg =
-            '✅ $labelsCreated label ${jenis.namaJenis} tercipta ($fullLabels×${pcsPerLabel}pcs + 1×${remainder}pcs sisa)';
-      } else {
-        snackMsg = '✅ $labelsCreated label ${jenis.namaJenis} tercipta';
-      }
-    } else if (created.isNotEmpty) {
-      snackMsg =
-          '✅ ${created.length} label ${jenis!.namaJenis} tercipta · sisa $carryOverOut pcs carry-over';
+    if (totalLabelsCreated > 0) {
+      _showSnack(
+        '✅ $totalLabelsCreated label tercipta',
+        backgroundColor: Colors.green,
+      );
+    } else if (totalPcsInput > 0) {
+      _showSnack(
+        '✅ Pcs tersimpan · sisa $totalCarryOverOut pcs carry-over',
+        backgroundColor: Colors.green,
+      );
     } else {
-      snackMsg = '✅ Pcs tersimpan · $totalPcs pcs (belum cukup 1 label)';
+      _showSnack('✅ Data tersimpan', backgroundColor: Colors.green);
     }
-    _showSnack(snackMsg, backgroundColor: Colors.green);
   }
 
   void _updateBreadcrumb() {
@@ -358,6 +486,7 @@ class _InjectProductionInputScreenState
 
   @override
   void dispose() {
+    _statusTimer?.cancel();
     // Breadcrumb must update after the current frame — updating a ValueNotifier
     // during unmount triggers setState on AppShell while the tree is locked.
     final prev = _prevBreadcrumb;
@@ -447,36 +576,23 @@ class _InjectProductionInputScreenState
     }
   }
 
-  void _confirmClearTemp() {
+  Future<void> _confirmClearTemp() async {
     final vm = context.read<InjectProductionInputViewModel>();
     if (vm.totalTempCount == 0) return;
-    showDialog<void>(
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Hapus Semua Temp?'),
-        content: Text(
-          'Apakah Anda yakin ingin menghapus ${vm.totalTempCount} item temp?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () {
-              vm.clearAllTempItems();
-              Navigator.of(ctx).pop();
-              _showSnack('Semua temp items dihapus');
-            },
-            child: const Text('Hapus'),
-          ),
-        ],
+      builder: (_) => ConfirmDialog(
+        title: 'Hapus Semua Temp?',
+        message:
+            'Yakin ingin menghapus ${vm.totalTempCount} item temp?\n'
+            'Data yang belum disimpan akan hilang.',
+        confirmLabel: 'Hapus',
+        confirmIcon: Icons.delete_sweep,
       ),
     );
+    if (confirmed != true || !mounted) return;
+    vm.clearAllTempItems();
+    _showSnack('Semua temp items dihapus');
   }
 
   // ── Riwayat (Timeline) ───────────────────────────────────────────────────
@@ -524,6 +640,69 @@ class _InjectProductionInputScreenState
     );
   }
 
+  // ── Terminate ─────────────────────────────────────────────────────────────
+
+  Future<void> _openTerminateDialog() async {
+    final h = _header;
+    if (h == null || widget.noProduksi.isEmpty) return;
+
+    // Cari bucket available terakhir
+    final lastAvailable = _bucketLabelOrder.reversed.firstWhere(
+      (l) => _bucketStates[l]?.status == _HourlyBucketStatus.available,
+      orElse: () => '',
+    );
+
+    // carryOverIn untuk terminate = carryOverOut dari bucket submitted terakhir.
+    // Jika ada bucket available, carryOverIn-nya sudah diset = carryOverOut submitted terakhir.
+    // Jika tidak ada bucket available, ambil langsung dari submitted terakhir.
+    int carryOverIn;
+    Map<int, int> carryOverInByJenis;
+    String terminateHourStart;
+
+    if (lastAvailable.isNotEmpty) {
+      carryOverIn = _bucketStates[lastAvailable]?.carryOverIn ?? 0;
+      carryOverInByJenis =
+          _bucketStates[lastAvailable]?.carryOverInByJenis ??
+          const <int, int>{};
+      terminateHourStart = lastAvailable.split(' - ').first.trim();
+    } else {
+      // Fallback: langsung dari carryOverOut bucket submitted terakhir
+      final lastSubmitted = _bucketLabelOrder.reversed.firstWhere(
+        (l) => _bucketStates[l]?.status == _HourlyBucketStatus.submitted,
+        orElse: () => '',
+      );
+      carryOverIn = _bucketStates[lastSubmitted]?.carryOverOut ?? 0;
+      carryOverInByJenis =
+          _bucketStates[lastSubmitted]?.carryOverOutByJenis ??
+          const <int, int>{};
+      // hourStart = ujung akhir dari bucket submitted terakhir (= awal bucket berikutnya)
+      terminateHourStart = lastSubmitted.isNotEmpty
+          ? lastSubmitted.split(' - ').last.trim()
+          : '';
+    }
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => InjectTerminateDialog(
+        noProduksi: widget.noProduksi,
+        hourStart: terminateHourStart,
+        hourEnd: h.hourEnd ?? '',
+        carryOverIn: carryOverIn,
+        carryOverInByJenis: carryOverInByJenis,
+        outputJenisList: h.outputs,
+      ),
+    );
+    if (!mounted) return;
+    if (result == true) {
+      _showSnack(
+        '✅ Produksi berhasil di-terminate',
+        backgroundColor: Colors.red,
+      );
+      if (mounted) Navigator.of(context).pop();
+    }
+  }
+
   // ── Split Time (Ganti) ────────────────────────────────────────────────────
 
   Future<void> _openSplitTimeDialog() async {
@@ -541,7 +720,17 @@ class _InjectProductionInputScreenState
     );
     if (!mounted || mode == null) return;
 
-    final result = await showDialog<bool>(
+    // Cari bucket available terakhir untuk carry-over dan hourStart
+    final lastAvailable = _bucketLabelOrder.reversed.firstWhere(
+      (l) => _bucketStates[l]?.status == _HourlyBucketStatus.available,
+      orElse: () => '',
+    );
+    final carryOverIn = _bucketStates[lastAvailable]?.carryOverIn ?? 0;
+    final lastBucketHourStart = lastAvailable.isNotEmpty
+        ? lastAvailable.split(' - ').first.trim()
+        : null;
+
+    final result = await showDialog<InjectBatchSubmitResult>(
       context: context,
       barrierDismissible: false,
       builder: (_) => InjectSplitTimeDialog(
@@ -557,11 +746,43 @@ class _InjectProductionInputScreenState
         lockedNamaCetakan: mode == _GantiMode.warnaAndMaterial
             ? h.namaCetakan
             : null,
+        carryOverIn: carryOverIn,
+        pcsPerLabel: _pcsPerLabelData?.items.isNotEmpty == true
+            ? _pcsPerLabelData!.items.first.pcsPerLabel
+            : 100,
+        counterCurrent: _pcsPerLabelData?.counterCurrent,
+        outputJenisList: h.outputs,
+        noProduksi: widget.noProduksi,
+        lastBucketHourStart: lastBucketHourStart,
       ),
     );
     if (!mounted) return;
-    if (result == true) {
+    if (result != null) {
       _showSnack('✅ Produksi berhasil diganti', backgroundColor: Colors.green);
+      // Fetch ulang batch untuk mendapatkan label terbaru dari bucket yang di-split
+      if (lastBucketHourStart != null && mounted) {
+        try {
+          final batches = await _prodRepo.fetchBatch(widget.noProduksi);
+          if (!mounted) return;
+          final matchedBatch = batches.cast<InjectBatchItem?>().firstWhere(
+            (b) => b?.hourStart == lastBucketHourStart,
+            orElse: () => null,
+          );
+          if (matchedBatch != null) {
+            final printEntries = _buildPrintableEntriesFromBatch(matchedBatch);
+            if (printEntries.isNotEmpty && mounted) {
+              await showDialog<void>(
+                context: context,
+                builder: (_) => _BucketPrintDialog(
+                  hourLabel: lastBucketHourStart,
+                  entries: printEntries,
+                  onPrint: (selected) => _printLabelsBatch(selected),
+                ),
+              );
+            }
+          }
+        } catch (_) {}
+      }
       if (mounted) Navigator.of(context).pop();
     }
   }
@@ -569,22 +790,88 @@ class _InjectProductionInputScreenState
   // ── Scan / Lookup ──────────────────────────────────────────────────────────
 
   Future<void> _openScanDialog() async {
+    // Formula inputs (material yang diterima) untuk panel kiri dialog scan —
+    // pola yang sama seperti Washing production input screen.
+    final formulaData = context.read<InjectFormulaViewModel>().data;
+
+    // Master Input/Output belum diset: formula termuat & ada output, tapi tidak
+    // ada satu pun input formula → scan label tidak dapat dilakukan.
+    final outputs = formulaData?.outputs ?? const [];
+    final hasAnyFormula = outputs.any((o) => o.formulas.isNotEmpty);
+    if (formulaData != null && outputs.isNotEmpty && !hasAnyFormula) {
+      final jenis = outputs
+          .map((o) => o.namaJenis.trim())
+          .where((n) => n.isNotEmpty)
+          .join(', ');
+      await showDialog<void>(
+        context: context,
+        builder: (_) => ErrorStatusDialog(
+          title: 'Master Input Output Belum Diset',
+          message:
+              'Isi data output "$jenis" ke dalam Master Input Output '
+              'terlebih dahulu untuk dapat melakukan proses scan label.',
+        ),
+      );
+      return;
+    }
+
+    final formulaOutputs = outputs
+        .map(
+          (o) => ProductionFormulaOutput(
+            idJenis: o.idJenis,
+            namaJenis: o.namaJenis,
+            formulas: o.formulas
+                .map(
+                  (f) => ProductionFormulaItem(
+                    inputId: f.inputId,
+                    inputNama: f.inputNama ?? '',
+                    kategoriNama: f.inputKategoriNama,
+                    prefixLabel: f.inputKategoriKode,
+                  ),
+                )
+                .toList(),
+          ),
+        )
+        .toList();
+
     await showDialog<void>(
       context: context,
-      builder: (_) => ScanLabelDialog(
+      builder: (_) => ProductionScanLabelDialog(
         manualHint: 'BB. / D. / H. / V.',
-        acceptedLabels: const [
-          (prefix: 'BB', label: 'Furniture WIP'),
-          (prefix: 'D', label: 'Broker'),
-          (prefix: 'H', label: 'Mixer'),
-          (prefix: 'V', label: 'Gilingan'),
-        ],
+        headerSubtitle: _modeLabel(_selectedMode),
+        primaryColor: _kInjectPrimary,
+        formulaOutputs: formulaOutputs,
         onLookup: _onCodeReady,
       ),
     );
   }
 
+  String _modeLabel(String mode) {
+    switch (mode) {
+      case 'full':
+        return 'FULL PALLET';
+      case 'partial':
+        return 'PARTIAL';
+      default:
+        return mode.toUpperCase();
+    }
+  }
+
+  // Prefix label yang valid untuk proses Inject (sesuai validasi server).
+  static const List<String> _validInjectPrefixes = ['BB.', 'D.', 'H.', 'V.'];
+
   Future<String?> _onCodeReady(String code) async {
+    // Validasi prefix di sisi klien agar pesan jelas (server balas 500 untuk
+    // prefix tak dikenal: "Invalid prefix ...").
+    final normalized = code.trim().toUpperCase();
+    if (!_validInjectPrefixes.any((p) => normalized.startsWith(p))) {
+      final prefix = normalized.contains('.')
+          ? normalized.substring(0, normalized.indexOf('.') + 1)
+          : normalized;
+      return 'Prefix "$prefix" tidak diizinkan. '
+          'Label valid: BB. (Furniture WIP), D. (Broker), H. (Mixer), V. (Gilingan).';
+    }
+
     final vm = context.read<InjectProductionInputViewModel>();
     final res = await vm.lookupLabel(code, force: true);
     if (!mounted) return 'Halaman sudah tidak aktif';
@@ -593,37 +880,103 @@ class _InjectProductionInputScreenState
       return 'Label "$code" tidak memiliki data yang tersedia.';
     }
 
-    // TODO: re-enable prefix validation setelah formula siap
-    // const allowedPrefixes = {
-    //   PrefixType.furnitureWip,
-    //   PrefixType.broker,
-    //   PrefixType.mixer,
-    //   PrefixType.gilingan,
-    // };
-    // if (!allowedPrefixes.contains(res.prefixType)) {
-    //   if (mounted) {
-    //     await showDialog<void>(
-    //       context: context,
-    //       builder: (_) => ErrorStatusDialog(
-    //         title: 'Label Tidak Diizinkan',
-    //         message:
-    //             'Label "${res.prefix}" tidak dapat digunakan di proses Inject.\n\n'
-    //             'Prefix yang diperbolehkan: BB (Furniture WIP), D (Broker), H (Mixer), V (Gilingan).',
-    //       ),
-    //     );
-    //   }
-    //   return 'Prefix ${res.prefix} tidak diperbolehkan untuk proses Inject';
-    // }
+    // Validasi kategori + jenis terhadap formula hasil fetch API (jika sudah dimuat)
+    final formulaData = context.read<InjectFormulaViewModel>().data;
+    if (formulaData != null && formulaData.outputs.isNotEmpty) {
+      final allowedTabs = _computeAllowedTabs(formulaData);
+      final tab = _tabForPrefixType(res.prefixType);
+
+      if (allowedTabs.isNotEmpty && tab != null && !allowedTabs.contains(tab)) {
+        return 'Kategori label "${code.trim()}" tidak sesuai dengan formula produksi ini.';
+      }
+
+      if (tab != null) {
+        final allowedInputIds =
+            _computeAllowedInputIdsByTab(formulaData)[tab] ?? const <int>{};
+        if (allowedInputIds.isNotEmpty) {
+          final firstRow = res.data.first;
+          final rawIdJenis = firstRow['idJenis'] ?? firstRow['IdJenis'];
+          if (rawIdJenis != null) {
+            final idJenis = (rawIdJenis as num).toInt();
+            if (!allowedInputIds.contains(idJenis)) {
+              final namaJenis =
+                  firstRow['namaJenis'] ??
+                  firstRow['NamaJenis'] ??
+                  firstRow['Jenis'] ??
+                  'tidak diketahui';
+              return 'Jenis "$namaJenis" tidak terdaftar dalam formula produksi ini.';
+            }
+          }
+        }
+      }
+    }
 
     if (res.prefixType == PrefixType.furnitureWip) {
       await _handleFwipPcsFlow(vm, res);
-    } else {
+    } else if (_selectedMode == 'partial') {
       await showDialog<void>(
         context: context,
         barrierDismissible: true,
-        builder: (_) => InjectSakPickerDialog(noProduksi: widget.noProduksi),
+        builder: (_) => InjectLookupLabelPartialDialog(
+          noProduksi: widget.noProduksi,
+          selectedMode: _selectedMode,
+        ),
       );
+    } else if (_selectedMode == 'select') {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => InjectLookupLabelDialog(
+          noProduksi: widget.noProduksi,
+          selectedMode: _selectedMode,
+        ),
+      );
+    } else {
+      await _handleFullMode(vm, res);
     }
+    return null;
+  }
+
+  /// MODE FULL: auto-tambahkan semua item baru dari hasil scan tanpa dialog
+  /// pemilihan manual — sama seperti Washing production input screen.
+  Future<void> _handleFullMode(
+    InjectProductionInputViewModel vm,
+    ProductionLabelLookupResult res,
+  ) async {
+    final freshCount = vm.countNewRowsInLastLookup(widget.noProduksi);
+    if (freshCount == 0) {
+      final labelCode = _labelCodeOfFirst(res);
+      final hasTemp =
+          labelCode != null && vm.hasTemporaryDataForLabel(labelCode);
+      final suffix = hasTemp
+          ? ' • ${vm.getTemporaryDataSummary(labelCode)}'
+          : '';
+      _showSnack(
+        'Semua item untuk ${labelCode ?? "label ini"} sudah ada.$suffix',
+      );
+      return;
+    }
+
+    vm.clearPicks();
+    vm.pickAllNew(widget.noProduksi);
+    final result = vm.commitPickedToTemp(noProduksi: widget.noProduksi);
+
+    final msg = result.added > 0
+        ? '✅ Auto-added ${result.added} item${result.skipped > 0 ? ' • Duplikat terlewati ${result.skipped}' : ''}'
+        : 'Tidak ada item baru ditambahkan';
+    _showSnack(
+      msg,
+      backgroundColor: result.added > 0 ? Colors.green : Colors.orange,
+    );
+  }
+
+  String? _labelCodeOfFirst(ProductionLabelLookupResult res) {
+    if (res.typedItems.isEmpty) return null;
+    final item = res.typedItems.first;
+    if (item is BrokerItem) return _brokerTitleKey(item);
+    if (item is MixerItem) return _mixerTitleKey(item);
+    if (item is GilinganItem) return _gilinganTitleKey(item);
+    if (item is FurnitureWipItem) return _fwipTitleKey(item);
     return null;
   }
 
@@ -706,20 +1059,11 @@ class _InjectProductionInputScreenState
     final name = item.Nama ?? 'Material';
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Hapus Material?'),
-        content: Text('Yakin ingin menghapus $name?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Batal'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Hapus'),
-          ),
-        ],
+      builder: (_) => ConfirmDialog(
+        title: 'Hapus Material?',
+        message: 'Yakin ingin menghapus $name?',
+        confirmLabel: 'Hapus',
+        confirmIcon: Icons.delete_outline,
       ),
     );
     if (confirmed != true || !mounted) return;
@@ -753,6 +1097,217 @@ class _InjectProductionInputScreenState
     return part.isNotEmpty ? part : (e.noGilingan ?? '-');
   }
 
+  // ── Multi-select input (keluarkan label dari proses) ───────────────────────
+
+  void _startSelecting(String key, List<dynamic> items) {
+    setState(() {
+      _isSelecting = true;
+      _selectedGroups[key] = items;
+    });
+  }
+
+  void _toggleSelection(String key, List<dynamic> items) {
+    setState(() {
+      if (_selectedGroups.containsKey(key)) {
+        _selectedGroups.remove(key);
+        if (_selectedGroups.isEmpty) _isSelecting = false;
+      } else {
+        _selectedGroups[key] = items;
+      }
+    });
+  }
+
+  void _cancelSelection() {
+    setState(() {
+      _isSelecting = false;
+      _selectedGroups.clear();
+    });
+  }
+
+  // Long-press pada tile masuk mode multi-select dengan tile itu terpilih.
+  void _deleteInputGroup(
+    InjectProductionInputViewModel vm,
+    String labelKey,
+    List<dynamic> items,
+  ) {
+    _startSelecting(labelKey, items);
+  }
+
+  Future<void> _deleteSelected(InjectProductionInputViewModel vm) async {
+    if (_selectedGroups.isEmpty) return;
+    final count = _selectedGroups.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => ConfirmDialog(
+        title: 'Keluarkan Label Input?',
+        message:
+            'Yakin ingin mengeluarkan $count label dari proses ini?\n'
+            'Label tidak akan dihapus, hanya dilepas dari proses.',
+        confirmLabel: 'Keluarkan',
+        confirmIcon: Icons.logout,
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final allItems = _selectedGroups.values.expand((l) => l).toList();
+    final success = await vm.deleteItems(widget.noProduksi, allItems);
+    if (!mounted) return;
+    _cancelSelection();
+    _showSnack(
+      success
+          ? '✅ $count label berhasil dikeluarkan dari proses'
+          : (vm.deleteError ?? 'Gagal'),
+      backgroundColor: success ? Colors.green : Colors.red,
+    );
+  }
+
+  Widget _buildSelectionBar(InjectProductionInputViewModel vm) {
+    final count = _selectedGroups.length;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1565C0),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.check_circle,
+            size: 16,
+            color: Colors.white.withValues(alpha: 0.9),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '$count label dipilih',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: _cancelSelection,
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.white70,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text('Batal', style: TextStyle(fontSize: 12)),
+          ),
+          const SizedBox(width: 4),
+          FilledButton.icon(
+            onPressed: vm.isDeleting ? null : () => _deleteSelected(vm),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red.shade600,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            icon: vm.isDeleting
+                ? const SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.logout, size: 14),
+            label: Text(
+              vm.isDeleting ? 'Memproses...' : 'Keluarkan',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Formula → tab input yang diizinkan ──────────────────────────────────────
+
+  static const List<String> _inputTabOrder = [
+    'fwip',
+    'broker',
+    'mixer',
+    'gilingan',
+    'material',
+  ];
+
+  /// Set tab yang boleh ditampilkan berdasarkan kategori input pada formula.
+  /// Kosong = formula belum termuat / tak dikenali → tampilkan semua tab.
+  Set<String> _computeAllowedTabs(InjectFormulaData? data) {
+    if (data == null || data.outputs.isEmpty) return const {};
+    final tabs = <String>{};
+    for (final o in data.outputs) {
+      for (final f in o.formulas) {
+        final k = '${f.inputKategoriKode} ${f.inputKategoriNama}'.toLowerCase();
+        if (k.contains('furniture') ||
+            k.contains('fwip') ||
+            k.contains('wip')) {
+          tabs.add('fwip');
+        }
+        if (k.contains('broker')) tabs.add('broker');
+        if (k.contains('mixer')) tabs.add('mixer');
+        if (k.contains('gilingan')) tabs.add('gilingan');
+        if (k.contains('material') ||
+            k.contains('kabinet') ||
+            k.contains('cabinet')) {
+          tabs.add('material');
+        }
+      }
+    }
+    return tabs;
+  }
+
+  /// InputId formula yang diizinkan per tab, berdasarkan kategori input pada
+  /// formula (hasil fetch API). Dipakai untuk validasi jenis label saat scan.
+  Map<String, Set<int>> _computeAllowedInputIdsByTab(InjectFormulaData? data) {
+    final map = <String, Set<int>>{};
+    if (data == null) return map;
+    for (final o in data.outputs) {
+      for (final f in o.formulas) {
+        final k = '${f.inputKategoriKode} ${f.inputKategoriNama}'.toLowerCase();
+        String? tab;
+        if (k.contains('furniture') ||
+            k.contains('fwip') ||
+            k.contains('wip')) {
+          tab = 'fwip';
+        } else if (k.contains('broker')) {
+          tab = 'broker';
+        } else if (k.contains('mixer')) {
+          tab = 'mixer';
+        } else if (k.contains('gilingan')) {
+          tab = 'gilingan';
+        }
+        if (tab != null) {
+          (map[tab] ??= <int>{}).add(f.inputId);
+        }
+      }
+    }
+    return map;
+  }
+
+  String? _tabForPrefixType(PrefixType type) {
+    switch (type) {
+      case PrefixType.furnitureWip:
+        return 'fwip';
+      case PrefixType.broker:
+        return 'broker';
+      case PrefixType.mixer:
+        return 'mixer';
+      case PrefixType.gilingan:
+        return 'gilingan';
+      default:
+        return null;
+    }
+  }
+
   // ── Input panel ────────────────────────────────────────────────────────────
 
   Widget _buildInputPanel({
@@ -760,6 +1315,7 @@ class _InjectProductionInputScreenState
     required bool locked,
     required bool loading,
     required bool canDelete,
+    required Set<String> allowedTabs,
     required Map<String, List<FurnitureWipItem>> fwipGroups,
     required Map<String, List<BrokerItem>> brokerGroups,
     required Map<String, List<MixerItem>> mixerGroups,
@@ -767,6 +1323,8 @@ class _InjectProductionInputScreenState
     required List<CabinetMaterialItem> materialAll,
     required Set<int> tempMaterialIds,
   }) {
+    bool tabVisible(String key) =>
+        allowedTabs.isEmpty || allowedTabs.contains(key);
     // ── per-tab metrics ────────────────────────────────────────────
     double fwipBerat = 0;
     int fwipPcs = 0;
@@ -904,35 +1462,44 @@ class _InjectProductionInputScreenState
                     selectedValue: _selectedInputTab,
                     accentColor: _kInjectPrimary,
                     tabs: [
-                      ProductionTabItem(
-                        value: 'fwip',
-                        label: 'Furniture WIP',
-                        count: tabCounts['fwip'] ?? 0,
-                      ),
-                      ProductionTabItem(
-                        value: 'broker',
-                        label: 'Broker',
-                        count: tabCounts['broker'] ?? 0,
-                      ),
-                      ProductionTabItem(
-                        value: 'mixer',
-                        label: 'Mixer',
-                        count: tabCounts['mixer'] ?? 0,
-                      ),
-                      ProductionTabItem(
-                        value: 'gilingan',
-                        label: 'Gilingan',
-                        count: tabCounts['gilingan'] ?? 0,
-                      ),
-                      ProductionTabItem(
-                        value: 'material',
-                        label: 'Material',
-                        count: tabCounts['material'] ?? 0,
-                      ),
+                      if (tabVisible('fwip'))
+                        ProductionTabItem(
+                          value: 'fwip',
+                          label: 'Furniture WIP',
+                          count: tabCounts['fwip'] ?? 0,
+                        ),
+                      if (tabVisible('broker'))
+                        ProductionTabItem(
+                          value: 'broker',
+                          label: 'Broker',
+                          count: tabCounts['broker'] ?? 0,
+                        ),
+                      if (tabVisible('mixer'))
+                        ProductionTabItem(
+                          value: 'mixer',
+                          label: 'Mixer',
+                          count: tabCounts['mixer'] ?? 0,
+                        ),
+                      if (tabVisible('gilingan'))
+                        ProductionTabItem(
+                          value: 'gilingan',
+                          label: 'Gilingan',
+                          count: tabCounts['gilingan'] ?? 0,
+                        ),
+                      if (tabVisible('material'))
+                        ProductionTabItem(
+                          value: 'material',
+                          label: 'Material',
+                          count: tabCounts['material'] ?? 0,
+                        ),
                     ],
                     onChanged: (v) {
                       if (_selectedInputTab != v) {
-                        setState(() => _selectedInputTab = v);
+                        setState(() {
+                          _selectedInputTab = v;
+                          _isSelecting = false;
+                          _selectedGroups.clear();
+                        });
                       }
                     },
                   ),
@@ -963,76 +1530,79 @@ class _InjectProductionInputScreenState
                             ),
                           ),
                           const SizedBox(height: 6),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    ProductionCategorySummaryTile(
-                                      summary: activeTabSummary(),
-                                      accentColor: _kInjectPrimary,
-                                      sakLabel:
-                                          (_selectedInputTab == 'fwip' ||
-                                              _selectedInputTab == 'material')
-                                          ? 'Qty'
-                                          : 'Sak',
-                                      showBerat:
-                                          _selectedInputTab != 'fwip' &&
-                                          _selectedInputTab != 'material',
-                                      showLabel:
-                                          _selectedInputTab != 'material',
-                                    ),
-                                    const SizedBox(height: 6),
-                                    ProductionInputGrandTotalBar(
-                                      totalLabel: grandLabel,
-                                      totalSak: grandSak,
-                                      totalBerat: grandBerat,
-                                      color: _kInjectPrimary,
-                                      sakLabel: 'Qty',
-                                    ),
-                                  ],
+                          if (_isSelecting)
+                            _buildSelectionBar(vm)
+                          else
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      ProductionCategorySummaryTile(
+                                        summary: activeTabSummary(),
+                                        accentColor: _kInjectPrimary,
+                                        sakLabel:
+                                            (_selectedInputTab == 'fwip' ||
+                                                _selectedInputTab == 'material')
+                                            ? 'Qty'
+                                            : 'Sak',
+                                        showBerat:
+                                            _selectedInputTab != 'fwip' &&
+                                            _selectedInputTab != 'material',
+                                        showLabel:
+                                            _selectedInputTab != 'material',
+                                      ),
+                                      const SizedBox(height: 6),
+                                      ProductionInputGrandTotalBar(
+                                        totalLabel: grandLabel,
+                                        totalSak: grandSak,
+                                        totalBerat: grandBerat,
+                                        color: _kInjectPrimary,
+                                        sakLabel: 'Qty',
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 10),
-                              if (_selectedInputTab == 'material')
-                                FloatingActionButton(
-                                  heroTag: 'fab_add_inject_material',
-                                  mini: true,
-                                  backgroundColor: locked
-                                      ? Colors.grey.shade300
-                                      : _kInjectPrimary,
-                                  foregroundColor: Colors.white,
-                                  onPressed: locked
-                                      ? null
-                                      : () => _openAddMaterialDialog(vm),
-                                  child: const Icon(Icons.add),
-                                )
-                              else
-                                FloatingActionButton(
-                                  heroTag: 'fab_scan_inject_input',
-                                  mini: true,
-                                  backgroundColor: locked
-                                      ? Colors.grey.shade300
-                                      : _kInjectPrimary,
-                                  foregroundColor: Colors.white,
-                                  onPressed: locked || vm.isLookupLoading
-                                      ? null
-                                      : _openScanDialog,
-                                  child: vm.isLookupLoading
-                                      ? const SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Colors.white,
-                                          ),
-                                        )
-                                      : const Icon(Icons.qr_code_scanner),
-                                ),
-                            ],
-                          ),
+                                const SizedBox(width: 10),
+                                if (_selectedInputTab == 'material')
+                                  FloatingActionButton(
+                                    heroTag: 'fab_add_inject_material',
+                                    mini: true,
+                                    backgroundColor: locked
+                                        ? Colors.grey.shade300
+                                        : _kInjectPrimary,
+                                    foregroundColor: Colors.white,
+                                    onPressed: locked
+                                        ? null
+                                        : () => _openAddMaterialDialog(vm),
+                                    child: const Icon(Icons.add),
+                                  )
+                                else
+                                  FloatingActionButton(
+                                    heroTag: 'fab_scan_inject_input',
+                                    mini: true,
+                                    backgroundColor: locked
+                                        ? Colors.grey.shade300
+                                        : _kInjectPrimary,
+                                    foregroundColor: Colors.white,
+                                    onPressed: locked || vm.isLookupLoading
+                                        ? null
+                                        : _openScanDialog,
+                                    child: vm.isLookupLoading
+                                        ? const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : const Icon(Icons.qr_code_scanner),
+                                  ),
+                              ],
+                            ),
                         ],
                       ),
                     ),
@@ -1071,9 +1641,8 @@ class _InjectProductionInputScreenState
           emptyMessage: 'Belum ada label Broker',
           constraints: constraints,
           tileBuilder: (key, items) => ProductionInputGroupTile(
-            title: key,
-            headerSubtitle:
-                (items.isNotEmpty ? items.first.namaJenis : '-') ?? '-',
+            title: (items.isNotEmpty ? items.first.namaJenis : '-') ?? '-',
+            headerSubtitle: key,
             tileMetrics: [
               (
                 Icons.scale_outlined,
@@ -1084,6 +1653,11 @@ class _InjectProductionInputScreenState
             isTemp: vm.hasTemporaryDataForLabel(key),
             expandable: true,
             isPartialGroup: items.any((x) => x.isPartialRow),
+            isSelected: _selectedGroups.containsKey(key),
+            onTap: _isSelecting ? () => _toggleSelection(key, items) : null,
+            onLongPress: _isSelecting
+                ? null
+                : () => _deleteInputGroup(vm, key, items),
             detailsBuilder: () => [],
             chipItemsBuilder: () => items.map((item) {
               final isTemp =
@@ -1105,9 +1679,8 @@ class _InjectProductionInputScreenState
           emptyMessage: 'Belum ada label Mixer',
           constraints: constraints,
           tileBuilder: (key, items) => ProductionInputGroupTile(
-            title: key,
-            headerSubtitle:
-                (items.isNotEmpty ? items.first.namaJenis : '-') ?? '-',
+            title: (items.isNotEmpty ? items.first.namaJenis : '-') ?? '-',
+            headerSubtitle: key,
             tileMetrics: [
               (
                 Icons.scale_outlined,
@@ -1118,6 +1691,11 @@ class _InjectProductionInputScreenState
             isTemp: vm.hasTemporaryDataForLabel(key),
             expandable: true,
             isPartialGroup: items.any((x) => x.isPartialRow),
+            isSelected: _selectedGroups.containsKey(key),
+            onTap: _isSelecting ? () => _toggleSelection(key, items) : null,
+            onLongPress: _isSelecting
+                ? null
+                : () => _deleteInputGroup(vm, key, items),
             detailsBuilder: () => [],
             chipItemsBuilder: () => items.map((item) {
               final isTemp =
@@ -1139,9 +1717,8 @@ class _InjectProductionInputScreenState
           emptyMessage: 'Belum ada label Gilingan',
           constraints: constraints,
           tileBuilder: (key, items) => ProductionInputGroupTile(
-            title: key,
-            headerSubtitle:
-                (items.isNotEmpty ? items.first.namaJenis : '-') ?? '-',
+            title: (items.isNotEmpty ? items.first.namaJenis : '-') ?? '-',
+            headerSubtitle: key,
             tileMetrics: [
               (
                 Icons.scale_outlined,
@@ -1152,6 +1729,11 @@ class _InjectProductionInputScreenState
             isTemp: vm.hasTemporaryDataForLabel(key),
             expandable: true,
             isPartialGroup: items.any((x) => x.isPartialRow),
+            isSelected: _selectedGroups.containsKey(key),
+            onTap: _isSelecting ? () => _toggleSelection(key, items) : null,
+            onLongPress: _isSelecting
+                ? null
+                : () => _deleteInputGroup(vm, key, items),
             detailsBuilder: () => [],
             chipItemsBuilder: () => items.map((item) {
               final isTemp =
@@ -1202,12 +1784,12 @@ class _InjectProductionInputScreenState
               children: fwipGroups.entries.map((entry) {
                 final hasPartial = entry.value.any((x) => x.isPartialRow);
                 return ProductionInputGroupTile(
-                  title: entry.key,
-                  headerSubtitle:
+                  title:
                       (entry.value.isNotEmpty
                           ? entry.value.first.namaJenis
                           : '-') ??
                       '-',
+                  headerSubtitle: entry.key,
                   tileMetrics: [
                     (
                       Icons.inventory_2_outlined,
@@ -1224,6 +1806,13 @@ class _InjectProductionInputScreenState
                                 .noFurnitureWIP ??
                             '-')
                       : null,
+                  isSelected: _selectedGroups.containsKey(entry.key),
+                  onTap: _isSelecting
+                      ? () => _toggleSelection(entry.key, entry.value)
+                      : null,
+                  onLongPress: _isSelecting
+                      ? null
+                      : () => _deleteInputGroup(vm, entry.key, entry.value),
                   detailsBuilder: () => [],
                   chipItemsBuilder: () {
                     final dbItems =
@@ -1377,6 +1966,249 @@ class _InjectProductionInputScreenState
         ),
       );
 
+  // ── Bucket print ──────────────────────────────────────────────────────────
+
+  List<_PrintableLabelEntry> _buildPrintableEntries(String label) {
+    final data = _bucketStates[label];
+    if (data == null) return [];
+    final outputs = _header?.outputs ?? const [];
+    final singleOutputJenis = outputs.length == 1
+        ? outputs.first.namaJenis
+        : '';
+    String resolveJenis(String fromLabel) =>
+        fromLabel.isNotEmpty ? fromLabel : singleOutputJenis;
+    final entries = <_PrintableLabelEntry>[];
+    for (final c in data.labelsFwip) {
+      entries.add(
+        _PrintableLabelEntry(
+          code: c.code,
+          namaJenis: resolveJenis(c.namaJenis),
+          category: 'Furniture WIP',
+          pdfUrl: ApiConstants.furnitureWipLabelPdf(c.code),
+          feature: 'furniture_wip',
+          markAsPrinted: () => FurnitureWipRepository().markAsPrinted(c.code),
+          pcs: c.pcs,
+          hasBeenPrinted: c.hasBeenPrinted,
+        ),
+      );
+    }
+    for (final c in data.labelsBarangJadi) {
+      entries.add(
+        _PrintableLabelEntry(
+          code: c.code,
+          namaJenis: c.namaJenis,
+          category: 'Barang Jadi',
+          pdfUrl: ApiConstants.packingLabelPdf(c.code),
+          feature: 'packing',
+          markAsPrinted: () =>
+              PackingRepository(api: ApiClient()).markAsPrinted(c.code),
+          pcs: c.pcs,
+          hasBeenPrinted: c.hasBeenPrinted,
+        ),
+      );
+    }
+    for (final c in data.labelsBonggolan) {
+      entries.add(
+        _PrintableLabelEntry(
+          code: c.code,
+          namaJenis: c.namaJenis,
+          category: 'Bonggolan',
+          pdfUrl: ApiConstants.bonggolanLabelPdf(c.code),
+          feature: 'bonggolan',
+          markAsPrinted: () => BonggolanRepository().markAsPrinted(c.code),
+          berat: c.berat,
+          hasBeenPrinted: c.hasBeenPrinted,
+        ),
+      );
+    }
+    for (final c in data.labelsReject) {
+      entries.add(
+        _PrintableLabelEntry(
+          code: c.code,
+          namaJenis: c.namaJenis,
+          category: 'Reject',
+          pdfUrl: ApiConstants.rejectLabelPdf(c.code),
+          feature: 'reject',
+          markAsPrinted: () =>
+              RejectRepository(api: ApiClient()).markAsPrinted(c.code),
+          berat: c.berat,
+          hasBeenPrinted: c.hasBeenPrinted,
+        ),
+      );
+    }
+    return entries;
+  }
+
+  List<_PrintableLabelEntry> _buildPrintableEntriesFromBatch(
+    InjectBatchItem batch,
+  ) {
+    final outputs = _header?.outputs ?? const [];
+    final singleOutputJenis = outputs.length == 1
+        ? outputs.first.namaJenis
+        : '';
+    String resolveJenis(String fromLabel) =>
+        fromLabel.isNotEmpty ? fromLabel : singleOutputJenis;
+    final entries = <_PrintableLabelEntry>[];
+    for (final c in batch.labels.furnitureWip) {
+      entries.add(
+        _PrintableLabelEntry(
+          code: c.code,
+          namaJenis: resolveJenis(c.namaJenis),
+          category: 'Furniture WIP',
+          pdfUrl: ApiConstants.furnitureWipLabelPdf(c.code),
+          feature: 'furniture_wip',
+          markAsPrinted: () => FurnitureWipRepository().markAsPrinted(c.code),
+          pcs: c.pcs,
+          hasBeenPrinted: c.hasBeenPrinted,
+        ),
+      );
+    }
+    for (final c in batch.labels.barangJadi) {
+      entries.add(
+        _PrintableLabelEntry(
+          code: c.code,
+          namaJenis: c.namaJenis,
+          category: 'Barang Jadi',
+          pdfUrl: ApiConstants.packingLabelPdf(c.code),
+          feature: 'packing',
+          markAsPrinted: () =>
+              PackingRepository(api: ApiClient()).markAsPrinted(c.code),
+          pcs: c.pcs,
+          hasBeenPrinted: c.hasBeenPrinted,
+        ),
+      );
+    }
+    for (final c in batch.labels.bonggolan) {
+      entries.add(
+        _PrintableLabelEntry(
+          code: c.code,
+          namaJenis: c.namaJenis,
+          category: 'Bonggolan',
+          pdfUrl: ApiConstants.bonggolanLabelPdf(c.code),
+          feature: 'bonggolan',
+          markAsPrinted: () => BonggolanRepository().markAsPrinted(c.code),
+          berat: c.berat,
+          hasBeenPrinted: c.hasBeenPrinted,
+        ),
+      );
+    }
+    for (final c in batch.labels.reject) {
+      entries.add(
+        _PrintableLabelEntry(
+          code: c.code,
+          namaJenis: c.namaJenis,
+          category: 'Reject',
+          pdfUrl: ApiConstants.rejectLabelPdf(c.code),
+          feature: 'reject',
+          markAsPrinted: () =>
+              RejectRepository(api: ApiClient()).markAsPrinted(c.code),
+          berat: c.berat,
+          hasBeenPrinted: c.hasBeenPrinted,
+        ),
+      );
+    }
+    return entries;
+  }
+
+  void _openBucketPrintDialog(BuildContext ctx, String label) {
+    final entries = _buildPrintableEntries(label);
+    if (entries.isEmpty) return;
+    showDialog<void>(
+      context: ctx,
+      builder: (_) => _BucketPrintDialog(
+        hourLabel: label,
+        entries: entries,
+        onPrint: (selected) => _printLabelsBatch(selected),
+      ),
+    );
+  }
+
+  Future<void> _printLabelsBatch(List<_PrintableLabelEntry> entries) async {
+    if (entries.isEmpty) return;
+    final lockApi = LabelPrintLockApi();
+    final lockVm = context.read<LabelPrintLockSocketManager>();
+    final queue = context.read<LabelPrintSyncQueue>();
+    final rootCtx = Navigator.of(context, rootNavigator: true).context;
+
+    // Acquire locks for all labels before opening the viewer
+    final acquiredCodes = <String>{};
+    for (final entry in entries) {
+      if (!mounted) break;
+      try {
+        await lockApi.acquire(entry.code);
+        acquiredCodes.add(entry.code);
+      } catch (e) {
+        if (mounted) {
+          _showSnack(
+            'Gagal lock ${entry.code}: $e',
+            backgroundColor: Colors.red,
+          );
+        }
+      }
+    }
+
+    // Track which labels were printed (synchronous, so finally block is accurate)
+    final printedCodes = <String>{};
+
+    // Build per-label callbacks — fire-and-forget async inside VoidCallback
+    final callbacks = entries.map((entry) {
+      return () {
+            printedCodes.add(entry.code);
+            () async {
+              var needsIncrement = false;
+              var needsRelease = false;
+              try {
+                final count = await entry.markAsPrinted();
+                if (count != null) lockVm.setPrintCount(entry.code, count);
+              } catch (_) {
+                needsIncrement = true;
+              }
+              try {
+                await lockApi.release(entry.code);
+              } catch (_) {
+                needsRelease = true;
+              }
+              if (needsIncrement || needsRelease) {
+                await queue.enqueue(
+                  feature: entry.feature,
+                  noLabel: entry.code,
+                  needsIncrement: needsIncrement,
+                  needsReleaseLock: needsRelease,
+                );
+              }
+            }().ignore();
+          }
+          as VoidCallback;
+    }).toList();
+
+    try {
+      await PdfPrintService(defaultSystem: 'pps').previewMultipleFromUrls(
+        context: rootCtx,
+        pdfUrls: entries.map((e) => Uri.parse(e.pdfUrl)).toList(),
+        title: 'Cetak ${entries.length} Label',
+        onPrintedCallbacks: callbacks,
+      );
+    } finally {
+      // Release locks for labels that were NOT printed (user cancelled / failed)
+      for (final entry in entries) {
+        if (acquiredCodes.contains(entry.code) &&
+            !printedCodes.contains(entry.code)) {
+          () async {
+            try {
+              await lockApi.release(entry.code);
+            } catch (_) {
+              await queue.enqueue(
+                feature: entry.feature,
+                noLabel: entry.code,
+                needsReleaseLock: true,
+              );
+            }
+          }().ignore();
+        }
+      }
+    }
+  }
+
   // ── Output panel ───────────────────────────────────────────────────────────
 
   Widget _buildOutputPanel() {
@@ -1388,12 +2220,17 @@ class _InjectProductionInputScreenState
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 1, 1, 1),
-            child: productionSectionHeader(
-              Icons.output_rounded,
-              'Label Output',
-              iconColor: _kInjectOutput,
-              primaryColor: _kInjectPrimary,
+            padding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
+            child: Row(
+              children: [
+                productionSectionHeader(
+                  Icons.output_rounded,
+                  'Label Output',
+                  iconColor: _kInjectOutput,
+                  primaryColor: _kInjectPrimary,
+                ),
+                const Spacer(),
+              ],
             ),
           ),
           const Divider(height: 1, color: _kInjectBorder),
@@ -1428,60 +2265,22 @@ class _InjectProductionInputScreenState
     return _buildHourlyOutputTimeline<_BucketLabelEntry>(
       groups: _bucketLabelOrder.map((label) {
         final data = _bucketStates[label];
-        final items = <_BucketLabelEntry>[
-          ...?data?.labelsFwip.map(
-            (c) => _BucketLabelEntry(category: 'Furniture WIP', code: c),
-          ),
-          ...?data?.labelsBonggolan.map(
-            (c) => _BucketLabelEntry(category: 'Bonggolan', code: c),
-          ),
-          ...?data?.labelsReject.map(
-            (c) => _BucketLabelEntry(category: 'Reject', code: c),
-          ),
+        final codes = <String>[
+          ...?data?.labelsFwip.map((c) => c.code),
+          ...?data?.labelsBarangJadi.map((c) => c.code),
+          ...?data?.labelsBonggolan.map((c) => c.code),
+          ...?data?.labelsReject.map((c) => c.code),
         ];
-        return _HourlyTimelineGroup(label: label, items: items);
+        return _HourlyTimelineGroup<_BucketLabelEntry>(
+          label: label,
+          items: const [],
+          summaryText: codes.isEmpty ? null : codes.join(' · '),
+        );
       }).toList(),
       emptyRangeMessage: 'Belum ada output',
       icon: Icons.schedule_outlined,
-      summaryTextBuilder: (_) => '',
-      tileBuilder: (item) => _BucketLabelRow(entry: item),
-      categoryKeyBuilder: (item) => item.category,
-      categoryOrder: const ['Furniture WIP', 'Bonggolan', 'Reject'],
-      categoryHeaderBuilder: (cat, _) {
-        const catColors = {
-          'Furniture WIP': Color(0xFF0F766E),
-          'Bonggolan': Color(0xFF92400E),
-          'Reject': Color(0xFFB91C1C),
-        };
-        final color = catColors[cat] ?? _kInjectOutput;
-        return Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                cat,
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  color: color,
-                ),
-              ),
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Divider(
-                height: 1,
-                thickness: 1,
-                color: color.withValues(alpha: 0.15),
-              ),
-            ),
-          ],
-        );
-      },
+      summaryTextBuilder: (items) => '',
+      tileBuilder: (_) => const SizedBox.shrink(),
       hourPcsSectionBuilder: (label) {
         final data = _bucketStates[label];
         if (data == null) return const SizedBox.shrink();
@@ -1490,31 +2289,44 @@ class _InjectProductionInputScreenState
         return _HourlyPcsSection(
           data: data,
           headerOutputs: _header?.outputs ?? const [],
-          pcsPerLabel: _pcsPerLabelData?.pcsPerLabel ?? 100,
+          pplByJenis: _pcsPerLabelData?.pplByJenis ?? const {},
           isLastBucket: isLastBucket,
           onSubmit:
               (
-                pcs,
-                jenis,
+                jenisItems,
                 berat,
                 cycleTime,
                 counter,
                 beratBonggolan,
                 beratReject,
+                idRejectBonggolan,
+                idRejectReject,
+                namaBonggolan,
+                namaReject,
               ) => _onBucketSubmit(
                 label,
-                pcs,
-                jenis,
+                jenisItems,
                 berat,
                 cycleTime,
                 counter,
                 beratBonggolan,
                 beratReject,
+                idRejectBonggolan,
+                idRejectReject,
+                namaBonggolan: namaBonggolan,
+                namaReject: namaReject,
                 isLastBucket: isLastBucket,
               ),
+          onPrint: (ctx) => _openBucketPrintDialog(ctx, label),
+          counterCurrent: _pcsPerLabelData?.counterCurrent,
+          standarBerat: _pcsPerLabelData?.standarBerat,
+          standarCycleTime: _pcsPerLabelData?.standarCycleTime,
         );
       },
-      initiallyCollapsed: (_) => true,
+      initiallyCollapsed: (label) {
+        final status = _bucketStates[label]?.status;
+        return status != _HourlyBucketStatus.available;
+      },
       cardColorBuilder: (label) {
         final data = _bucketStates[label];
         if (data == null) return null;
@@ -1522,7 +2334,9 @@ class _InjectProductionInputScreenState
           case _HourlyBucketStatus.submitted:
             return const Color(0xFF15803D);
           case _HourlyBucketStatus.available:
-            return _kInjectPrimary;
+            return data.isOverdue ? const Color(0xFFB45309) : _kInjectPrimary;
+          case _HourlyBucketStatus.expired:
+            return const Color(0xFFDC2626);
           case _HourlyBucketStatus.locked:
             return null;
         }
@@ -1542,6 +2356,25 @@ class _InjectProductionInputScreenState
         final perm = context.watch<PermissionViewModel>();
         final locked = _header?.isLocked == true;
         final canDelete = perm.can('label_crusher:delete') && !locked;
+
+        // Tab input dibatasi oleh kategori pada formula produksi.
+        final allowedTabs = _computeAllowedTabs(
+          context.watch<InjectFormulaViewModel>().data,
+        );
+        if (allowedTabs.isNotEmpty &&
+            !allowedTabs.contains(_selectedInputTab)) {
+          final target = _inputTabOrder.firstWhere(
+            allowedTabs.contains,
+            orElse: () => _selectedInputTab,
+          );
+          if (target != _selectedInputTab) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted && !allowedTabs.contains(_selectedInputTab)) {
+                setState(() => _selectedInputTab = target);
+              }
+            });
+          }
+        }
 
         return PopScope(
           canPop: false,
@@ -1573,60 +2406,18 @@ class _InjectProductionInputScreenState
                     hourEnd: _header?.hourEnd,
                     showTimeInfo: false,
                     primaryColor: _kInjectPrimary,
-                    onGanti: _openSplitTimeDialog,
+                    produksiStatus: _header?.produksiStatus,
+                    onGanti: _canTerminate ? _openSplitTimeDialog : null,
+                    gantiDisabledReason: _canTerminate
+                        ? null
+                        : 'Tidak dapat ganti produksi: data pada jam saat ini sudah diinput. Tunggu jam berikutnya.',
+                    onTerminate: _canTerminate ? _openTerminateDialog : null,
+                    terminateDisabledReason: _canTerminate
+                        ? null
+                        : 'Tidak dapat terminate: data pada jam saat ini sudah diinput. Tunggu jam berikutnya.',
                     onRiwayat: _openTimelineDialog,
-                    onRefresh: () {
-                      vm.loadInputs(widget.noProduksi, force: true);
-                      _showSnack('Data di-refresh');
-                    },
-                    trailingActions: [
-                      const SizedBox(width: 4),
-                      Consumer<InjectFormulaViewModel>(
-                        builder: (_, fvm, __) => SizedBox(
-                          height: 26,
-                          child: TextButton.icon(
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 0,
-                              ),
-                              foregroundColor: _kInjectPrimary,
-                              backgroundColor: _kInjectPrimary.withValues(
-                                alpha: 0.07,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              visualDensity: VisualDensity.compact,
-                            ),
-                            onPressed: fvm.isLoading
-                                ? null
-                                : () {
-                                    final data = fvm.data;
-                                    if (data == null) return;
-                                    showDialog<void>(
-                                      context: context,
-                                      builder: (_) =>
-                                          InjectFormulaDialogV2(data: data),
-                                    );
-                                  },
-                            icon: fvm.isLoading
-                                ? const SizedBox(
-                                    width: 11,
-                                    height: 11,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 1.5,
-                                    ),
-                                  )
-                                : const Icon(Icons.science_outlined, size: 13),
-                            label: const Text(
-                              'Formula',
-                              style: TextStyle(fontSize: 11),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+
+                    trailingActions: const [],
                   ),
                 Expanded(
                   child: Builder(
@@ -1693,6 +2484,7 @@ class _InjectProductionInputScreenState
                           locked: locked,
                           loading: loading,
                           canDelete: canDelete,
+                          allowedTabs: allowedTabs,
                           fwipGroups: fwipGroups,
                           brokerGroups: brokerGroups,
                           mixerGroups: mixerGroups,
@@ -1922,7 +2714,10 @@ Widget _buildHourlyOutputTimeline<T>({
   String Function(T item)? categoryKeyBuilder,
   List<String>? categoryOrder,
   Widget Function(String categoryKey, int count)? categoryHeaderBuilder,
+  String Function(T item)? subGroupKeyBuilder,
+  Widget Function(String subGroupKey)? subGroupHeaderBuilder,
   Widget Function(String label)? hourPcsSectionBuilder,
+  Widget? Function(String label)? headerActionBuilder,
   bool Function(String label)? initiallyCollapsed,
   Color? Function(String label)? cardColorBuilder,
 }) {
@@ -1952,7 +2747,10 @@ Widget _buildHourlyOutputTimeline<T>({
         categoryKeyBuilder: categoryKeyBuilder,
         categoryOrder: categoryOrder,
         categoryHeaderBuilder: categoryHeaderBuilder,
+        subGroupKeyBuilder: subGroupKeyBuilder,
+        subGroupHeaderBuilder: subGroupHeaderBuilder,
         hourPcsSectionBuilder: hourPcsSectionBuilder,
+        headerActionBuilder: headerActionBuilder,
         initiallyCollapsed: startCollapsed,
         accentColor: accentColor,
       );
@@ -1969,7 +2767,10 @@ class _CollapsibleHourlyCard<T> extends StatefulWidget {
     this.categoryKeyBuilder,
     this.categoryOrder,
     this.categoryHeaderBuilder,
+    this.subGroupKeyBuilder,
+    this.subGroupHeaderBuilder,
     this.hourPcsSectionBuilder,
+    this.headerActionBuilder,
     this.initiallyCollapsed = false,
     this.accentColor,
   });
@@ -1981,7 +2782,10 @@ class _CollapsibleHourlyCard<T> extends StatefulWidget {
   final String Function(T item)? categoryKeyBuilder;
   final List<String>? categoryOrder;
   final Widget Function(String categoryKey, int count)? categoryHeaderBuilder;
+  final String Function(T item)? subGroupKeyBuilder;
+  final Widget Function(String subGroupKey)? subGroupHeaderBuilder;
   final Widget Function(String label)? hourPcsSectionBuilder;
+  final Widget? Function(String label)? headerActionBuilder;
   final bool initiallyCollapsed;
   final Color? accentColor;
 
@@ -2006,7 +2810,8 @@ class _CollapsibleHourlyCardState<T> extends State<_CollapsibleHourlyCard<T>> {
     final statusColor =
         widget.accentColor ??
         (hasItems ? _kInjectOutput : const Color(0xFF94A3B8));
-    final summary = widget.summaryTextBuilder(group.items);
+    final summary =
+        widget.group.summaryText ?? widget.summaryTextBuilder(group.items);
 
     final borderColor = widget.accentColor != null
         ? widget.accentColor!.withValues(alpha: 0.30)
@@ -2067,11 +2872,11 @@ class _CollapsibleHourlyCardState<T> extends State<_CollapsibleHourlyCard<T>> {
                     Expanded(
                       child: Text(
                         summary,
-                        textAlign: TextAlign.right,
-                        maxLines: 1,
+                        textAlign: TextAlign.left,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 9,
                           fontWeight: FontWeight.w600,
                           color: Color(0xFF6B7280),
                         ),
@@ -2079,6 +2884,9 @@ class _CollapsibleHourlyCardState<T> extends State<_CollapsibleHourlyCard<T>> {
                     ),
                   ] else
                     const Spacer(),
+                  if (widget.headerActionBuilder != null)
+                    widget.headerActionBuilder!(group.label) ??
+                        const SizedBox.shrink(),
                   if (hasItems || widget.hourPcsSectionBuilder != null) ...[
                     const SizedBox(width: 4),
                     Icon(
@@ -2161,9 +2969,45 @@ class _CollapsibleHourlyCardState<T> extends State<_CollapsibleHourlyCard<T>> {
         widgets.add(widget.categoryHeaderBuilder!(cat, catItems.length));
         widgets.add(const SizedBox(height: 4));
       }
-      for (var j = 0; j < catItems.length; j++) {
-        widgets.add(widget.tileBuilder(catItems[j]));
-        if (j < catItems.length - 1) widgets.add(const SizedBox(height: 4));
+      // Sub-group by namaJenis if builder provided
+      final sgKeyBuilder = widget.subGroupKeyBuilder;
+      if (sgKeyBuilder != null) {
+        final sgOrder = <String>[];
+        final sgMap = <String, List<T>>{};
+        for (final item in catItems) {
+          final key = sgKeyBuilder(item);
+          if (!sgMap.containsKey(key)) {
+            sgOrder.add(key);
+            sgMap[key] = [];
+          }
+          sgMap[key]!.add(item);
+        }
+        for (var si = 0; si < sgOrder.length; si++) {
+          final sg = sgOrder[si];
+          final sgItems = sgMap[sg]!;
+          if (widget.subGroupHeaderBuilder != null && sg.isNotEmpty) {
+            widgets.add(widget.subGroupHeaderBuilder!(sg));
+            widgets.add(const SizedBox(height: 4));
+          }
+          widgets.add(
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: sgItems
+                  .map(
+                    (item) =>
+                        SizedBox(width: 110, child: widget.tileBuilder(item)),
+                  )
+                  .toList(),
+            ),
+          );
+          if (si < sgOrder.length - 1) widgets.add(const SizedBox(height: 8));
+        }
+      } else {
+        for (var j = 0; j < catItems.length; j++) {
+          widgets.add(widget.tileBuilder(catItems[j]));
+          if (j < catItems.length - 1) widgets.add(const SizedBox(height: 4));
+        }
       }
       if (ci < order.length - 1) widgets.add(const SizedBox(height: 8));
     }
@@ -2176,10 +3020,40 @@ class _CollapsibleHourlyCardState<T> extends State<_CollapsibleHourlyCard<T>> {
 }
 
 class _HourlyTimelineGroup<T> {
-  const _HourlyTimelineGroup({required this.label, required this.items});
+  const _HourlyTimelineGroup({
+    required this.label,
+    required this.items,
+    this.summaryText,
+  });
 
   final String label;
   final List<T> items;
+  final String? summaryText;
+}
+
+// ── Printable label entry ─────────────────────────────────────────────────────
+
+class _PrintableLabelEntry {
+  const _PrintableLabelEntry({
+    required this.code,
+    required this.namaJenis,
+    required this.category,
+    required this.pdfUrl,
+    required this.feature,
+    required this.markAsPrinted,
+    this.pcs,
+    this.berat,
+    this.hasBeenPrinted = 0,
+  });
+  final String code;
+  final String namaJenis;
+  final String category;
+  final String pdfUrl;
+  final String feature;
+  final Future<int?> Function() markAsPrinted;
+  final int? pcs;
+  final double? berat;
+  final int hasBeenPrinted;
 }
 
 // ── Bucket label entry ────────────────────────────────────────────────────────
@@ -2192,7 +3066,7 @@ class _BucketLabelEntry {
 
 // ── Hourly bucket state ────────────────────────────────────────────────────────
 
-enum _HourlyBucketStatus { locked, available, submitted }
+enum _HourlyBucketStatus { locked, available, submitted, expired }
 
 class _HourlyBucketData {
   const _HourlyBucketData({
@@ -2201,17 +3075,26 @@ class _HourlyBucketData {
     required this.pcsInput,
     required this.labelsCreated,
     required this.carryOverOut,
+    this.isOverdue = false,
     this.berat,
     this.cycleTime,
     this.counter,
     this.beratBonggolan,
+    this.namaBonggolan,
     this.beratReject,
+    this.namaReject,
+    this.carryOverInByJenis = const {},
+    this.pcsInputByJenis = const {},
+    this.carryOverOutByJenis = const {},
     this.labelsFwip = const [],
+    this.labelsBarangJadi = const [],
     this.labelsBonggolan = const [],
     this.labelsReject = const [],
   });
 
   final _HourlyBucketStatus status;
+  // true when bucket is the last incomplete bucket and current time has passed hourEnd
+  final bool isOverdue;
   final int carryOverIn;
   final int pcsInput;
   final int labelsCreated;
@@ -2220,10 +3103,27 @@ class _HourlyBucketData {
   final double? cycleTime;
   final int? counter;
   final double? beratBonggolan;
+  final String? namaBonggolan;
   final double? beratReject;
-  final List<String> labelsFwip;
-  final List<String> labelsBonggolan;
-  final List<String> labelsReject;
+  final String? namaReject;
+  final Map<int, int> carryOverInByJenis;
+  final Map<int, int> pcsInputByJenis;
+  final Map<int, int> carryOverOutByJenis;
+  final List<InjectBatchLabelItem> labelsFwip;
+  final List<InjectBatchLabelItem> labelsBarangJadi;
+  final List<InjectBatchLabelItem> labelsBonggolan;
+  final List<InjectBatchLabelItem> labelsReject;
+}
+
+class _JenisSubmitItem {
+  const _JenisSubmitItem({
+    required this.jenis,
+    required this.pcs,
+    required this.carryOverIn,
+  });
+  final InjectOutputJenis jenis;
+  final int pcs;
+  final int carryOverIn;
 }
 
 // ── Hourly Pcs Section ────────────────────────────────────────────────────────
@@ -2233,22 +3133,33 @@ class _HourlyPcsSection extends StatefulWidget {
     required this.data,
     required this.headerOutputs,
     required this.onSubmit,
-    this.pcsPerLabel = 100,
+    this.pplByJenis = const {},
     this.isLastBucket = false,
+    this.onPrint,
+    this.counterCurrent,
+    this.standarBerat,
+    this.standarCycleTime,
   });
 
   final _HourlyBucketData data;
   final List<InjectOutputJenis> headerOutputs;
-  final int pcsPerLabel;
+  final Map<int, int> pplByJenis;
   final bool isLastBucket;
+  final void Function(BuildContext ctx)? onPrint;
+  final int? counterCurrent;
+  final double? standarBerat;
+  final double? standarCycleTime;
   final Future<void> Function(
-    int pcs,
-    InjectOutputJenis? jenis,
+    List<_JenisSubmitItem> jenisItems,
     double? berat,
     double? cycleTime,
     int? counter,
     double? beratBonggolan,
     double? beratReject,
+    int? idRejectBonggolan,
+    int? idRejectReject,
+    String? namaBonggolan,
+    String? namaReject,
   )
   onSubmit;
 
@@ -2257,17 +3168,53 @@ class _HourlyPcsSection extends StatefulWidget {
 }
 
 class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
-  final _pcsCtrl = TextEditingController();
+  final Map<int, TextEditingController> _jenisCtrl = {};
   final _beratCtrl = TextEditingController();
   final _cycleCtrl = TextEditingController();
   final _beratBonggolanCtrl = TextEditingController();
   final _beratRejectCtrl = TextEditingController();
-  int? _counterValue = 0;
+  int? _counterValue;
+  JenisBonggolan? _bonggolanJenis;
+  RejectType? _rejectJenis;
   bool _isSubmitting = false;
+  bool _beratError = false;
+  bool _cycleError = false;
+  bool _counterError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncJenisControllers(widget.headerOutputs);
+  }
+
+  @override
+  void didUpdateWidget(_HourlyPcsSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncJenisControllers(widget.headerOutputs);
+  }
+
+  void _syncJenisControllers(List<InjectOutputJenis> outputs) {
+    for (final jenis in outputs) {
+      if (!_jenisCtrl.containsKey(jenis.idJenis)) {
+        final ctrl = TextEditingController();
+        ctrl.addListener(() {
+          if (mounted) setState(() {});
+        });
+        _jenisCtrl[jenis.idJenis] = ctrl;
+      }
+    }
+  }
+
+  int _carryInForJenis(int idJenis) {
+    final byJenis = widget.data.carryOverInByJenis;
+    if (byJenis.containsKey(idJenis)) return byJenis[idJenis]!;
+    if (widget.headerOutputs.length == 1) return widget.data.carryOverIn;
+    return 0;
+  }
 
   @override
   void dispose() {
-    _pcsCtrl.dispose();
+    for (final ctrl in _jenisCtrl.values) ctrl.dispose();
     _beratCtrl.dispose();
     _cycleCtrl.dispose();
     _beratBonggolanCtrl.dispose();
@@ -2275,44 +3222,101 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
     super.dispose();
   }
 
+  void _showValidationError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.orange.shade700,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   Future<void> _handleSubmit() async {
-    final pcs = int.tryParse(_pcsCtrl.text.trim());
-    if (pcs == null || pcs < 0) return;
+    if (widget.headerOutputs.isEmpty) return;
 
-    final pcsPerLabel = widget.pcsPerLabel;
-    final totalPcs = widget.data.carryOverIn + pcs;
-    final labelsToCreate = totalPcs ~/ pcsPerLabel;
-    // Jam akhir: sisa pcs pun dibuatkan label, sehingga picker muncul selama totalPcs > 0
-    final needJenisPicker = widget.isLastBucket
-        ? totalPcs > 0
-        : labelsToCreate > 0;
-
-    InjectOutputJenis? pickedJenis;
-    if (needJenisPicker) {
-      final outputs = widget.headerOutputs;
-      if (outputs.isEmpty) return;
-      final displayCount = widget.isLastBucket
-          ? (labelsToCreate + (totalPcs % pcsPerLabel > 0 ? 1 : 0))
-          : labelsToCreate;
-      if (outputs.length == 1) {
-        pickedJenis = outputs.first;
-      } else {
-        pickedJenis = await showDialog<InjectOutputJenis>(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => _JenisPickerForAutoCreate(
-            options: outputs,
-            labelsCount: displayCount,
-            pcsPerLabel: pcsPerLabel,
-          ),
-        );
-        if (pickedJenis == null || !mounted) return;
-      }
+    final jenisItems = <_JenisSubmitItem>[];
+    for (final jenis in widget.headerOutputs) {
+      final pcs =
+          int.tryParse(_jenisCtrl[jenis.idJenis]?.text.trim() ?? '') ?? 0;
+      if (pcs < 0) return;
+      jenisItems.add(
+        _JenisSubmitItem(
+          jenis: jenis,
+          pcs: pcs,
+          carryOverIn: _carryInForJenis(jenis.idJenis),
+        ),
+      );
     }
 
     final berat = double.tryParse(_beratCtrl.text.replaceAll(',', '.'));
     final cycleTime = double.tryParse(_cycleCtrl.text.replaceAll(',', '.'));
     final counter = _counterValue;
+
+    final hasBeratErr = berat == null;
+    final hasCycleErr = cycleTime == null;
+    final hasCounterErr = counter == null;
+
+    if (hasBeratErr || hasCycleErr || hasCounterErr) {
+      setState(() {
+        _beratError = hasBeratErr;
+        _cycleError = hasCycleErr;
+        _counterError = hasCounterErr;
+      });
+      if (hasBeratErr) {
+        _showValidationError('Berat harus diisi');
+      } else if (hasCycleErr) {
+        _showValidationError('Cycle Time harus diisi');
+      } else {
+        _showValidationError('Counter harus dipilih');
+      }
+      return;
+    }
+
+    setState(() {
+      _beratError = false;
+      _cycleError = false;
+      _counterError = false;
+    });
+
+    // ── Counter odometer validation (must be >= counterCurrent) ──
+    final minCounter = widget.counterCurrent;
+    if (minCounter != null && counter < minCounter) {
+      setState(() => _counterError = true);
+      _showValidationError(
+        'Counter tidak boleh kurang dari $minCounter (odometer saat ini)',
+      );
+      return;
+    }
+
+    // ── Standar warning (berat & cycle time) ────────────────────
+    final standarBerat = widget.standarBerat;
+    final standarCycle = widget.standarCycleTime;
+    final beratWarning = standarBerat != null && berat != standarBerat;
+    final cycleWarning = standarCycle != null && cycleTime != standarCycle;
+    if (beratWarning || cycleWarning) {
+      final lines = <String>[];
+      if (beratWarning) {
+        lines.add('• Berat: $berat gr (standar: $standarBerat gr)');
+      }
+      if (cycleWarning) {
+        lines.add('• Cycle Time: $cycleTime sec (standar: $standarCycle sec)');
+      }
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => _StandarWarningDialog(
+          beratWarning: beratWarning
+              ? (input: berat, standar: standarBerat)
+              : null,
+          cycleWarning: cycleWarning
+              ? (input: cycleTime, standar: standarCycle)
+              : null,
+        ),
+      );
+      if (!mounted || proceed != true) return;
+    }
+
     final beratBonggolan = widget.isLastBucket
         ? double.tryParse(_beratBonggolanCtrl.text.replaceAll(',', '.'))
         : null;
@@ -2320,16 +3324,39 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
         ? double.tryParse(_beratRejectCtrl.text.replaceAll(',', '.'))
         : null;
 
+    int? idRejectBonggolan;
+    int? idRejectReject;
+    if (widget.isLastBucket) {
+      if (beratBonggolan != null && beratBonggolan > 0) {
+        final picked = _bonggolanJenis ?? await _showBonggolanJenisPicker();
+        if (!mounted) return;
+        if (picked == null) return;
+        setState(() => _bonggolanJenis = picked);
+        idRejectBonggolan = picked.idBonggolan;
+      }
+      if (beratReject != null && beratReject > 0) {
+        final picked =
+            _rejectJenis ?? await _showRejectTypePicker('Jenis Reject');
+        if (!mounted) return;
+        if (picked == null) return;
+        setState(() => _rejectJenis = picked);
+        idRejectReject = picked.idReject;
+      }
+    }
+
     setState(() => _isSubmitting = true);
     try {
       await widget.onSubmit(
-        pcs,
-        pickedJenis,
+        jenisItems,
         berat,
         cycleTime,
         counter,
         beratBonggolan,
         beratReject,
+        idRejectBonggolan,
+        idRejectReject,
+        _bonggolanJenis?.namaBonggolan,
+        _rejectJenis?.namaReject,
       );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -2345,8 +3372,98 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
         return _buildAvailable();
       case _HourlyBucketStatus.submitted:
         return _buildSubmitted();
+      case _HourlyBucketStatus.expired:
+        return _buildExpired();
     }
   }
+
+  Future<JenisBonggolan?> _showBonggolanJenisPicker() async {
+    final vm = context.read<JenisBonggolanViewModel>();
+    await vm.ensureLoaded();
+    if (!mounted) return null;
+    return showDialog<JenisBonggolan>(
+      context: context,
+      builder: (ctx) => _BonggolanJenisPickerDialog(vm: vm),
+    );
+  }
+
+  Future<RejectType?> _showRejectTypePicker(String title) async {
+    final vm = context.read<RejectTypeViewModel>();
+    await vm.ensureLoaded();
+    if (!mounted) return null;
+    return showDialog<RejectType>(
+      context: context,
+      builder: (ctx) => _RejectTypePickerDialog(title: title, vm: vm),
+    );
+  }
+
+  Widget _readonlyChip({
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color accent,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF374151),
+          ),
+        ),
+        const SizedBox(height: 3),
+        Container(
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            color: accent.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: accent.withValues(alpha: 0.20)),
+          ),
+          alignment: Alignment.centerLeft,
+          child: Row(
+            children: [
+              Icon(icon, size: 11, color: accent),
+              const SizedBox(width: 5),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: accent,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildExpired() => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFEF2F2),
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: const Color(0xFFFCA5A5)),
+    ),
+    child: Row(
+      children: [
+        Icon(Icons.cancel_outlined, size: 14, color: Colors.red.shade400),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            'Jam ini sudah lewat dan tidak diinput',
+            style: TextStyle(fontSize: 11, color: Colors.red.shade600),
+          ),
+        ),
+      ],
+    ),
+  );
 
   Widget _buildLocked() => Container(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -2370,101 +3487,61 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
   );
 
   Widget _buildAvailable() {
-    const accent = _kInjectPrimary;
+    final isOverdue = widget.data.isOverdue;
+    final accent = isOverdue ? const Color(0xFFB45309) : _kInjectPrimary;
     const mutedColor = Color(0xFF9CA3AF);
-    final carryOver = widget.data.carryOverIn;
+    final outputs = widget.headerOutputs;
+    final multiJenis = outputs.length > 1;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0F7FF),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: accent.withValues(alpha: 0.22)),
-      ),
-      child: Column(
+    // Build one input row per jenis
+    Widget buildJenisRow(InjectOutputJenis jenis, {bool showLabel = false}) {
+      final ctrl = _jenisCtrl[jenis.idJenis] ?? TextEditingController();
+      final carryIn = _carryInForJenis(jenis.idJenis);
+      final pcsTyped = int.tryParse(ctrl.text.trim()) ?? 0;
+      final ppl = (widget.pplByJenis[jenis.idJenis] ?? 100).clamp(1, 999999);
+      final carryOut = widget.isLastBucket ? 0 : (carryIn + pcsTyped) % ppl;
+
+      return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Row(
-            children: [
-              Icon(
-                Icons.precision_manufacturing_outlined,
-                size: 13,
-                color: accent,
+          if (showLabel) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(4),
               ),
-              SizedBox(width: 5),
-              Text(
-                'Input Pcs Produksi',
+              child: Text(
+                jenis.namaJenis,
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 10,
                   fontWeight: FontWeight.w700,
                   color: accent,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          // ── Carry-over (1/2) + Input pcs (1/2) ──────────────────
+            ),
+          ],
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Carry-over
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'Carry-over masuk',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF374151),
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Container(
-                      height: 36,
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      decoration: BoxDecoration(
-                        color: accent.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: accent.withValues(alpha: 0.20),
-                        ),
-                      ),
-                      alignment: Alignment.centerLeft,
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.arrow_forward,
-                            size: 11,
-                            color: accent,
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            '$carryOver pcs',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: accent,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                child: _readonlyChip(
+                  label: 'Carry Over Sebelumnya',
+                  value: '$carryIn / $ppl pcs',
+                  icon: Icons.arrow_forward,
+                  accent: accent,
                 ),
               ),
               const SizedBox(width: 8),
-              // Input pcs
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const Text(
-                      'Jumlah Barang Bagus (pcs)',
+                      'Jumlah Item Bagus (pcs)',
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
@@ -2475,7 +3552,7 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
                     SizedBox(
                       height: 36,
                       child: TextField(
-                        controller: _pcsCtrl,
+                        controller: ctrl,
                         keyboardType: TextInputType.number,
                         style: const TextStyle(
                           fontSize: 13,
@@ -2506,46 +3583,131 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(6),
-                            borderSide: const BorderSide(
-                              color: accent,
-                              width: 1.5,
-                            ),
+                            borderSide: BorderSide(color: accent, width: 1.5),
                           ),
                           filled: true,
                           fillColor: Colors.white,
-                          suffixText: '/ ${widget.pcsPerLabel} pcs',
-                          suffixStyle: const TextStyle(
-                            fontSize: 11,
-                            color: mutedColor,
-                          ),
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _readonlyChip(
+                  label: 'Carry Over Sesudah',
+                  value: '$carryOut pcs',
+                  icon: Icons.arrow_forward,
+                  accent: const Color(0xFF64748B),
+                ),
+              ),
             ],
           ),
+        ],
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: isOverdue ? const Color(0xFFFFFBEB) : const Color(0xFFF0F7FF),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: accent.withValues(alpha: 0.30),
+          width: isOverdue ? 1.5 : 1.0,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.precision_manufacturing_outlined,
+                size: 13,
+                color: accent,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                'Input Batch Produksi',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: accent,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // ── Per-jenis input rows ──
+          for (int i = 0; i < outputs.length; i++) ...[
+            if (i > 0) const SizedBox(height: 10),
+            buildJenisRow(outputs[i], showLabel: multiJenis),
+          ],
           // ── Sisa Akhir Shift (last bucket only) ──────────────────
           if (widget.isLastBucket) ...[
             const SizedBox(height: 10),
+            // Bonggolan: jenis (flex 3) + berat (flex 2) — pilih jenis dulu
             Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Expanded(
+                  flex: 3,
+                  child: _buildJenisPicker(
+                    label: 'Jenis Bonggolan',
+                    selectedName: _bonggolanJenis?.namaBonggolan,
+                    onTap: () async {
+                      final picked = await _showBonggolanJenisPicker();
+                      if (picked != null && mounted) {
+                        setState(() => _bonggolanJenis = picked);
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  flex: 2,
                   child: _qcField(
                     label: 'Berat Bonggolan (kg)',
                     ctrl: _beratBonggolanCtrl,
                     hint: '0.0',
                     decimal: true,
+                    enabled: _bonggolanJenis != null,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            // Reject: jenis (flex 3) + berat (flex 2) — pilih jenis dulu
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: _buildJenisPicker(
+                    label: 'Jenis Reject',
+                    selectedName: _rejectJenis?.namaReject,
+                    onTap: () async {
+                      final picked = await _showRejectTypePicker(
+                        'Jenis Reject',
+                      );
+                      if (picked != null && mounted) {
+                        setState(() => _rejectJenis = picked);
+                      }
+                    },
                   ),
                 ),
                 const SizedBox(width: 6),
                 Expanded(
+                  flex: 2,
                   child: _qcField(
                     label: 'Berat Reject (kg)',
                     ctrl: _beratRejectCtrl,
                     hint: '0.0',
                     decimal: true,
+                    enabled: _rejectJenis != null,
                   ),
                 ),
               ],
@@ -2556,19 +3718,27 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
             children: [
               Expanded(
                 child: _qcField(
-                  label: 'Berat (kg)',
+                  label: 'Berat (gr)',
                   ctrl: _beratCtrl,
                   hint: '0.0',
                   decimal: true,
+                  isError: _beratError,
+                  onChanged: () {
+                    if (_beratError) setState(() => _beratError = false);
+                  },
                 ),
               ),
               const SizedBox(width: 6),
               Expanded(
                 child: _qcField(
-                  label: 'Cycle Time (dtk)',
+                  label: 'Cycle Time (sec)',
                   ctrl: _cycleCtrl,
                   hint: '0.0',
                   decimal: true,
+                  isError: _cycleError,
+                  onChanged: () {
+                    if (_cycleError) setState(() => _cycleError = false);
+                  },
                 ),
               ),
               const SizedBox(width: 6),
@@ -2614,17 +3784,24 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
 
   Widget _buildCounterField() {
     const accent = _kInjectPrimary;
+    const errorColor = Color(0xFFDC2626);
     final hasValue = _counterValue != null;
+    final minCounter = widget.counterCurrent;
+    final borderColor = _counterError
+        ? errorColor
+        : hasValue
+        ? accent
+        : accent.withValues(alpha: 0.30);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text(
-          'Counter',
+        Text(
+          minCounter != null ? 'Counter · min $minCounter' : 'Counter',
           style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF374151),
+            color: _counterError ? errorColor : const Color(0xFF374151),
           ),
         ),
         const SizedBox(height: 3),
@@ -2632,28 +3809,33 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
           onTap: () async {
             final picked = await showDialog<int>(
               context: context,
-              builder: (_) =>
-                  _CounterPickerDialog(initialValue: _counterValue ?? 0),
+              builder: (_) => CounterPickerDialog(
+                initialValue: _counterValue ?? (minCounter ?? 0),
+                minValue: minCounter,
+              ),
             );
             if (picked != null && mounted) {
-              setState(() => _counterValue = picked);
+              setState(() {
+                _counterValue = picked;
+                _counterError = false;
+              });
             }
           },
           child: Container(
             height: 30,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: _counterError ? const Color(0xFFFEF2F2) : Colors.white,
               borderRadius: BorderRadius.circular(5),
               border: Border.all(
-                color: hasValue ? accent : accent.withValues(alpha: 0.30),
-                width: hasValue ? 1.5 : 1.0,
+                color: borderColor,
+                width: (_counterError || hasValue) ? 1.5 : 1.0,
               ),
             ),
             alignment: Alignment.center,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                if (hasValue) ...[
+                if (hasValue)
                   Text(
                     '$_counterValue',
                     style: const TextStyle(
@@ -2661,17 +3843,24 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
                       fontWeight: FontWeight.w700,
                       color: accent,
                     ),
-                  ),
-                ] else
+                  )
+                else
                   Text(
-                    'Pilih',
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+                    _counterError ? 'Wajib dipilih' : 'Pilih',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: _counterError ? errorColor : Colors.grey.shade400,
+                    ),
                   ),
                 const SizedBox(width: 4),
                 Icon(
                   Icons.expand_more,
                   size: 14,
-                  color: hasValue ? accent : Colors.grey.shade400,
+                  color: _counterError
+                      ? errorColor
+                      : hasValue
+                      ? accent
+                      : Colors.grey.shade400,
                 ),
               ],
             ),
@@ -2686,9 +3875,141 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
     required TextEditingController ctrl,
     required String hint,
     required bool decimal,
+    bool enabled = true,
+    bool isError = false,
+    VoidCallback? onChanged,
   }) {
     const accent = _kInjectPrimary;
+    const errorColor = Color(0xFFDC2626);
     const mutedColor = Color(0xFF9CA3AF);
+    final borderColor = isError
+        ? errorColor
+        : enabled
+        ? accent.withValues(alpha: 0.30)
+        : accent.withValues(alpha: 0.20);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: isError
+                ? errorColor
+                : enabled
+                ? const Color(0xFF374151)
+                : const Color(0xFF9CA3AF),
+          ),
+        ),
+        const SizedBox(height: 3),
+        SizedBox(
+          height: 30,
+          child: TextField(
+            controller: ctrl,
+            enabled: enabled,
+            keyboardType: TextInputType.numberWithOptions(decimal: decimal),
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+            onChanged: onChanged != null ? (_) => onChanged() : null,
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: const TextStyle(color: mutedColor, fontSize: 11),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 6,
+                vertical: 0,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(5),
+                borderSide: BorderSide(color: borderColor),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(5),
+                borderSide: BorderSide(
+                  color: borderColor,
+                  width: isError ? 1.5 : 1.0,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(5),
+                borderSide: BorderSide(
+                  color: isError ? errorColor : accent,
+                  width: 1.5,
+                ),
+              ),
+              filled: true,
+              fillColor: isError
+                  ? const Color(0xFFFEF2F2)
+                  : enabled
+                  ? Colors.white
+                  : const Color(0xFFF3F4F6),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildJenisPickerDisabled({
+    required String label,
+    required String? namaJenis,
+  }) {
+    const accent = Color(0xFF92400E);
+    final hasValue = namaJenis != null && namaJenis.isNotEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF9CA3AF),
+          ),
+        ),
+        const SizedBox(height: 3),
+        Container(
+          height: 30,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF3F4F6),
+            borderRadius: BorderRadius.circular(5),
+            border: Border.all(
+              color: hasValue
+                  ? accent.withValues(alpha: 0.30)
+                  : const Color(0xFFE5E7EB),
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  hasValue ? namaJenis : '-',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: hasValue ? FontWeight.w600 : FontWeight.w400,
+                    color: hasValue ? accent : Colors.grey.shade400,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Icon(Icons.expand_more, size: 14, color: Colors.grey.shade400),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildJenisPicker({
+    required String label,
+    required String? selectedName,
+    required VoidCallback onTap,
+  }) {
+    const accent = Color(0xFF92400E);
+    final hasValue = selectedName != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -2702,34 +4023,38 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
           ),
         ),
         const SizedBox(height: 3),
-        SizedBox(
-          height: 30,
-          child: TextField(
-            controller: ctrl,
-            keyboardType: TextInputType.numberWithOptions(decimal: decimal),
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-            decoration: InputDecoration(
-              hintText: hint,
-              hintStyle: const TextStyle(color: mutedColor, fontSize: 11),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 6,
-                vertical: 0,
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            height: 30,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(5),
+              border: Border.all(
+                color: hasValue ? accent : accent.withValues(alpha: 0.30),
+                width: hasValue ? 1.5 : 1.0,
               ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(5),
-                borderSide: BorderSide(color: accent.withValues(alpha: 0.30)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(5),
-                borderSide: BorderSide(color: accent.withValues(alpha: 0.30)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(5),
-                borderSide: const BorderSide(color: accent),
-              ),
-              filled: true,
-              fillColor: Colors.white,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    hasValue ? selectedName : 'Pilih...',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: hasValue ? FontWeight.w600 : FontWeight.w400,
+                      color: hasValue ? accent : Colors.grey.shade400,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Icon(
+                  Icons.expand_more,
+                  size: 14,
+                  color: hasValue ? accent : Colors.grey.shade400,
+                ),
+              ],
             ),
           ),
         ),
@@ -2740,9 +4065,122 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
   Widget _buildSubmitted() {
     final data = widget.data;
     final hasLabels = data.labelsCreated > 0;
-    final totalPcs = data.carryOverIn + data.pcsInput;
     const greenAccent = Color(0xFF15803D);
-    const mutedColor = Color(0xFF6B7280);
+    final outputs = widget.headerOutputs;
+    final multiJenis = outputs.length > 1;
+
+    Widget buildJenisRowDisabled(InjectOutputJenis jenis) {
+      final carryIn = data.carryOverInByJenis.containsKey(jenis.idJenis)
+          ? data.carryOverInByJenis[jenis.idJenis]!
+          : (outputs.length == 1 ? data.carryOverIn : 0);
+      final pcsIn = data.pcsInputByJenis.containsKey(jenis.idJenis)
+          ? data.pcsInputByJenis[jenis.idJenis]!
+          : (outputs.length == 1 ? data.pcsInput : 0);
+      final carryOut = data.carryOverOutByJenis.containsKey(jenis.idJenis)
+          ? data.carryOverOutByJenis[jenis.idJenis]!
+          : (outputs.length == 1 ? data.carryOverOut : 0);
+      final ppl = (widget.pplByJenis[jenis.idJenis] ?? 100).clamp(1, 999999);
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (multiJenis) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: greenAccent.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                jenis.namaJenis,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: greenAccent,
+                ),
+              ),
+            ),
+          ],
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Carry Over Sebelumnya
+              Expanded(
+                child: _readonlyChip(
+                  label: 'Carry Over Sebelumnya',
+                  value: '$carryIn / $ppl pcs',
+                  icon: Icons.arrow_forward,
+                  accent: greenAccent,
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Jumlah Item Bagus — disabled TextField
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Jumlah Item Bagus (pcs)',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF374151),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    SizedBox(
+                      height: 36,
+                      child: TextField(
+                        controller: TextEditingController(text: '$pcsIn'),
+                        enabled: false,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF374151),
+                        ),
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 0,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: BorderSide(
+                              color: greenAccent.withValues(alpha: 0.25),
+                            ),
+                          ),
+                          disabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: BorderSide(
+                              color: greenAccent.withValues(alpha: 0.25),
+                            ),
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF0FDF4),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Carry Over Sesudah
+              Expanded(
+                child: _readonlyChip(
+                  label: 'Carry Over Sesudah',
+                  value: '$carryOut pcs',
+                  icon: Icons.arrow_forward,
+                  accent: const Color(0xFF64748B),
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
@@ -2757,6 +4195,7 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Header status
           Row(
             children: [
               Icon(
@@ -2775,154 +4214,167 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          _PcsInfoRow(
-            label: 'Carry-over masuk',
-            value: '${data.carryOverIn} pcs',
-            color: mutedColor,
-          ),
-          const SizedBox(height: 3),
-          _PcsInfoRow(
-            label: 'Pcs jam ini',
-            value: '${data.pcsInput} pcs',
-            color: const Color(0xFF374151),
-            bold: true,
-          ),
-          const SizedBox(height: 3),
-          _PcsInfoRow(
-            label: 'Total',
-            value: '$totalPcs pcs',
-            color: const Color(0xFF374151),
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 6),
-            child: Divider(height: 1, color: Color(0xFFE5E7EB)),
-          ),
-          _PcsInfoRow(
-            label: 'Label tercipta',
-            value: '${data.labelsCreated} label',
-            color: hasLabels ? greenAccent : mutedColor,
-            bold: hasLabels,
-          ),
-          const SizedBox(height: 3),
-          _PcsInfoRow(
-            label: 'Carry-over keluar',
-            value: '${data.carryOverOut} pcs',
-            color: mutedColor,
-          ),
-          if (data.beratBonggolan != null || data.beratReject != null) ...[
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 6),
-              child: Divider(height: 1, color: Color(0xFFE5E7EB)),
-            ),
+          const SizedBox(height: 10),
+          // Per-jenis rows (disabled form)
+          for (int i = 0; i < outputs.length; i++) ...[
+            if (i > 0) const SizedBox(height: 10),
+            buildJenisRowDisabled(outputs[i]),
+          ],
+          // Sisa Akhir Shift — same layout as _buildAvailable but disabled
+          if (widget.isLastBucket) ...[
+            const SizedBox(height: 10),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                const Icon(
-                  Icons.recycling_outlined,
-                  size: 10,
-                  color: Color(0xFF6B7280),
+                Expanded(
+                  flex: 3,
+                  child: _buildJenisPickerDisabled(
+                    label: 'Jenis Bonggolan',
+                    namaJenis: data.namaBonggolan,
+                  ),
                 ),
-                const SizedBox(width: 4),
-                const Text(
-                  'Sisa Akhir Shift',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF6B7280),
+                const SizedBox(width: 6),
+                Expanded(
+                  flex: 2,
+                  child: _qcField(
+                    label: 'Berat Bonggolan (kg)',
+                    ctrl: TextEditingController(
+                      text: data.beratBonggolan != null
+                          ? data.beratBonggolan!.toStringAsFixed(1)
+                          : '',
+                    ),
+                    hint: '-',
+                    decimal: true,
+                    enabled: false,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                if (data.beratBonggolan != null)
-                  Expanded(
-                    child: _PcsInfoRow(
-                      label: 'Bonggolan',
-                      value: '${data.beratBonggolan!.toStringAsFixed(1)} kg',
-                      color: mutedColor,
-                    ),
+                Expanded(
+                  flex: 3,
+                  child: _buildJenisPickerDisabled(
+                    label: 'Jenis Reject',
+                    namaJenis: data.namaReject,
                   ),
-                if (data.beratReject != null)
-                  Expanded(
-                    child: _PcsInfoRow(
-                      label: 'Reject',
-                      value: '${data.beratReject!.toStringAsFixed(1)} kg',
-                      color: mutedColor,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  flex: 2,
+                  child: _qcField(
+                    label: 'Berat Reject (kg)',
+                    ctrl: TextEditingController(
+                      text: data.beratReject != null
+                          ? data.beratReject!.toStringAsFixed(1)
+                          : '',
                     ),
+                    hint: '-',
+                    decimal: true,
+                    enabled: false,
                   ),
+                ),
               ],
             ),
           ],
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 6),
-            child: Divider(height: 1, color: Color(0xFFE5E7EB)),
-          ),
+          const SizedBox(height: 8),
+          const Divider(height: 1, color: Color(0xFFD1FAE5)),
+          const SizedBox(height: 6),
           Row(
             children: [
               Expanded(
-                child: _PcsInfoRow(
-                  label: 'Berat',
-                  value: data.berat != null
-                      ? '${data.berat!.toStringAsFixed(1)} kg'
-                      : '-',
-                  color: mutedColor,
+                child: _qcField(
+                  label: 'Berat (gr)',
+                  ctrl: TextEditingController(
+                    text: data.berat != null
+                        ? data.berat!.toStringAsFixed(1)
+                        : '',
+                  ),
+                  hint: '-',
+                  decimal: true,
+                  enabled: false,
                 ),
               ),
+              const SizedBox(width: 6),
               Expanded(
-                child: _PcsInfoRow(
-                  label: 'Cycle',
-                  value: data.cycleTime != null
-                      ? '${data.cycleTime!.toStringAsFixed(1)}s'
-                      : '-',
-                  color: mutedColor,
+                child: _qcField(
+                  label: 'Cycle Time (sec)',
+                  ctrl: TextEditingController(
+                    text: data.cycleTime != null
+                        ? data.cycleTime!.toStringAsFixed(1)
+                        : '',
+                  ),
+                  hint: '-',
+                  decimal: true,
+                  enabled: false,
                 ),
               ),
-              Expanded(
-                child: _PcsInfoRow(
-                  label: 'Counter',
-                  value: data.counter != null ? '${data.counter}' : '-',
-                  color: mutedColor,
-                ),
-              ),
+              const SizedBox(width: 6),
+              Expanded(child: _buildCounterDisplay(data.counter)),
             ],
           ),
+          if (hasLabels && widget.onPrint != null) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              height: 36,
+              child: FilledButton.icon(
+                onPressed: () => widget.onPrint!(context),
+                style: FilledButton.styleFrom(
+                  backgroundColor: greenAccent,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                ),
+                icon: const Icon(Icons.print_outlined, size: 15),
+                label: Text(
+                  'Cetak Label',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
-}
 
-class _PcsInfoRow extends StatelessWidget {
-  const _PcsInfoRow({
-    required this.label,
-    required this.value,
-    required this.color,
-    this.bold = false,
-  });
-
-  final String label;
-  final String value;
-  final Color color;
-  final bool bold;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
+  Widget _buildCounterDisplay(int? counter) {
+    const accent = _kInjectPrimary;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+        const Text(
+          'Counter',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF374151),
           ),
         ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
-            color: color,
+        const SizedBox(height: 3),
+        Container(
+          height: 30,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF3F4F6),
+            borderRadius: BorderRadius.circular(5),
+            border: Border.all(color: accent.withValues(alpha: 0.20)),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            counter != null ? '$counter' : '-',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: counter != null ? accent : Colors.grey.shade400,
+            ),
           ),
         ),
       ],
@@ -3163,83 +4615,138 @@ class _MaterialListTile extends StatelessWidget {
   }
 }
 
-// ── Counter Drum Picker ────────────────────────────────────────────────────────
+// ── Bucket print dialog ───────────────────────────────────────────────────────
 
-class _CounterPickerDialog extends StatefulWidget {
-  const _CounterPickerDialog({required this.initialValue});
-  final int initialValue;
+class _BucketPrintDialog extends StatefulWidget {
+  const _BucketPrintDialog({
+    required this.hourLabel,
+    required this.entries,
+    required this.onPrint,
+  });
+
+  final String hourLabel;
+  final List<_PrintableLabelEntry> entries;
+  final void Function(List<_PrintableLabelEntry> selected) onPrint;
 
   @override
-  State<_CounterPickerDialog> createState() => _CounterPickerDialogState();
+  State<_BucketPrintDialog> createState() => _BucketPrintDialogState();
 }
 
-class _CounterPickerDialogState extends State<_CounterPickerDialog> {
-  static const int _max = 999;
-  late final FixedExtentScrollController _scrollCtrl;
-  late int _selected;
+class _BucketPrintDialogState extends State<_BucketPrintDialog> {
+  late final Set<String> _selected;
 
   @override
   void initState() {
     super.initState();
-    _selected = widget.initialValue.clamp(0, _max);
-    _scrollCtrl = FixedExtentScrollController(initialItem: _selected);
+    _selected = widget.entries.map((e) => e.code).toSet();
   }
 
-  @override
-  void dispose() {
-    _scrollCtrl.dispose();
-    super.dispose();
-  }
+  bool get _allSelected => _selected.length == widget.entries.length;
 
-  void _step(int delta) {
-    final next = (_selected + delta).clamp(0, _max);
-    if (next == _selected) return;
-    setState(() => _selected = next);
-    _scrollCtrl.animateToItem(
-      next,
-      duration: const Duration(milliseconds: 150),
-      curve: Curves.easeOut,
-    );
-  }
+  void _toggleAll() => setState(() {
+    if (_allSelected) {
+      _selected.clear();
+    } else {
+      _selected.addAll(widget.entries.map((e) => e.code));
+    }
+  });
+
+  static const _catColors = {
+    'Furniture WIP': Color(0xFF0F766E),
+    'Barang Jadi': Color(0xFF1D4ED8),
+    'Bonggolan': Color(0xFF92400E),
+    'Reject': Color(0xFFB91C1C),
+  };
+  static const _catOrder = [
+    'Furniture WIP',
+    'Barang Jadi',
+    'Bonggolan',
+    'Reject',
+  ];
 
   @override
   Widget build(BuildContext context) {
-    const accent = _kInjectPrimary;
+    const accent = _kInjectOutput;
+
+    final grouped = <String, List<_PrintableLabelEntry>>{};
+    for (final e in widget.entries) {
+      (grouped[e.category] ??= []).add(e);
+    }
+
+    final selectedEntries = widget.entries
+        .where((e) => _selected.contains(e.code))
+        .toList();
+    final selectedCount = selectedEntries.length;
+
     return Dialog(
       backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 280),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // ── Header ───────────────────────────────────────────
-              Row(
+        constraints: const BoxConstraints(maxWidth: 420, maxHeight: 600),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // ── Header ──────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
+              child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(7),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: accent.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(8),
+                      color: accent.withValues(alpha: 0.09),
+                      borderRadius: BorderRadius.circular(9),
                     ),
                     child: const Icon(
-                      Icons.speed_outlined,
-                      size: 16,
+                      Icons.print_outlined,
                       color: accent,
+                      size: 18,
                     ),
                   ),
                   const SizedBox(width: 10),
-                  const Text(
-                    'Counter',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF1F2937),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Pilih Label untuk Dicetak',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF1F2937),
+                          ),
+                        ),
+                        Text(
+                          widget.hourLabel,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const Spacer(),
+                  TextButton(
+                    onPressed: _toggleAll,
+                    style: TextButton.styleFrom(
+                      foregroundColor: accent,
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                    ),
+                    child: Text(
+                      _allSelected ? 'Batalkan Semua' : 'Pilih Semua',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(
@@ -3247,117 +4754,798 @@ class _CounterPickerDialogState extends State<_CounterPickerDialog> {
                       size: 18,
                       color: Color(0xFF9CA3AF),
                     ),
+                    visualDensity: VisualDensity.compact,
                     padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1, color: Color(0xFFE2E6EA)),
+            // ── Label list ───────────────────────────────────────────
+            Flexible(
+              child: ListView(
+                padding: const EdgeInsets.all(12),
+                shrinkWrap: true,
+                children: [
+                  for (final cat in _catOrder)
+                    if (grouped.containsKey(cat)) ...[
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4, bottom: 6),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: (_catColors[cat] ?? accent).withValues(
+                                  alpha: 0.10,
+                                ),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                cat,
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: _catColors[cat] ?? accent,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Divider(
+                                height: 1,
+                                color: (_catColors[cat] ?? accent).withValues(
+                                  alpha: 0.15,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      for (final entry in grouped[cat]!) ...[
+                        _LabelCheckTile(
+                          entry: entry,
+                          catColor: _catColors[cat] ?? accent,
+                          isSelected: _selected.contains(entry.code),
+                          onToggle: () => setState(() {
+                            if (_selected.contains(entry.code)) {
+                              _selected.remove(entry.code);
+                            } else {
+                              _selected.add(entry.code);
+                            }
+                          }),
+                        ),
+                        const SizedBox(height: 4),
+                      ],
+                    ],
+                ],
+              ),
+            ),
+            const Divider(height: 1, color: Color(0xFFE2E6EA)),
+            // ── Print button ─────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: FilledButton.icon(
+                onPressed: selectedCount == 0
+                    ? null
+                    : () {
+                        Navigator.of(context).pop();
+                        widget.onPrint(selectedEntries);
+                      },
+                style: FilledButton.styleFrom(
+                  backgroundColor: accent,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.grey.shade300,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                icon: const Icon(Icons.print, size: 16),
+                label: Text(
+                  selectedCount == 0
+                      ? 'Pilih label dulu'
+                      : 'Cetak $selectedCount Label',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LabelCheckTile extends StatelessWidget {
+  const _LabelCheckTile({
+    required this.entry,
+    required this.catColor,
+    required this.isSelected,
+    required this.onToggle,
+  });
+
+  final _PrintableLabelEntry entry;
+  final Color catColor;
+  final bool isSelected;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final printed = entry.hasBeenPrinted;
+    final printColor = printed > 0
+        ? const Color(0xFF15803D)
+        : const Color(0xFF9CA3AF);
+    final qtyText = entry.pcs != null
+        ? '${entry.pcs} pcs'
+        : entry.berat != null
+        ? '${entry.berat!.toStringAsFixed(1)} kg'
+        : '';
+
+    return InkWell(
+      onTap: onToggle,
+      borderRadius: BorderRadius.circular(8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? catColor.withValues(alpha: 0.06) : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected
+                ? catColor.withValues(alpha: 0.35)
+                : const Color(0xFFE5E7EB),
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              width: 18,
+              height: 18,
+              decoration: BoxDecoration(
+                color: isSelected ? catColor : Colors.white,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                  color: isSelected ? catColor : const Color(0xFFD1D5DB),
+                  width: 1.5,
+                ),
+              ),
+              child: isSelected
+                  ? const Icon(Icons.check, size: 12, color: Colors.white)
+                  : null,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    entry.namaJenis.isNotEmpty ? entry.namaJenis : entry.code,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: isSelected
+                          ? const Color(0xFF1F2937)
+                          : const Color(0xFF4B5563),
+                    ),
+                  ),
+                  if (entry.namaJenis.isNotEmpty)
+                    Text(
+                      entry.code,
+                      style: const TextStyle(
+                        fontSize: 9,
+                        color: Color(0xFF9CA3AF),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (qtyText.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Text(
+                qtyText,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: catColor,
+                ),
+              ),
+            ],
+            const SizedBox(width: 8),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  printed > 0 ? Icons.print : Icons.print_disabled_outlined,
+                  size: 11,
+                  color: printColor,
+                ),
+                const SizedBox(width: 2),
+                Text(
+                  '${printed}x',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    color: printColor,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Bucket label row ──────────────────────────────────────────────────────────
+
+// ── Reject Type Picker Dialog ─────────────────────────────────────────────────
+
+class _BonggolanJenisPickerDialog extends StatelessWidget {
+  const _BonggolanJenisPickerDialog({required this.vm});
+
+  final JenisBonggolanViewModel vm;
+
+  @override
+  Widget build(BuildContext context) {
+    const accent = Color(0xFF92400E);
+    final items = vm.list;
+
+    return Dialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 380, maxHeight: 480),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.recycling_outlined,
+                      size: 16,
+                      color: accent,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'Jenis Bonggolan',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1F2937),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(
+                      Icons.close,
+                      size: 18,
+                      color: Color(0xFF9CA3AF),
+                    ),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1, color: Color(0xFFE2E6EA)),
+            if (vm.isLoading)
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (items.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(
+                  child: Text(
+                    'Tidak ada data jenis bonggolan',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+                  ),
+                ),
+              )
+            else
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: items.length,
+                  separatorBuilder: (_, __) => const Divider(
+                    height: 1,
+                    color: Color(0xFFE2E6EA),
+                    indent: 16,
+                    endIndent: 16,
+                  ),
+                  itemBuilder: (ctx, i) {
+                    final jb = items[i];
+                    return InkWell(
+                      onTap: () => Navigator.of(ctx).pop(jb),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 26,
+                              height: 26,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: accent.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '${i + 1}',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: accent,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                jb.namaBonggolan,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF1F2937),
+                                ),
+                              ),
+                            ),
+                            const Icon(
+                              Icons.chevron_right,
+                              size: 18,
+                              color: Color(0xFF9CA3AF),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RejectTypePickerDialog extends StatelessWidget {
+  const _RejectTypePickerDialog({required this.title, required this.vm});
+
+  final String title;
+  final RejectTypeViewModel vm;
+
+  @override
+  Widget build(BuildContext context) {
+    const accent = Color(0xFF92400E);
+    final items = vm.list;
+
+    return Dialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 380, maxHeight: 480),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.recycling_outlined,
+                      size: 16,
+                      color: accent,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1F2937),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(
+                      Icons.close,
+                      size: 18,
+                      color: Color(0xFF9CA3AF),
+                    ),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1, color: Color(0xFFE2E6EA)),
+            if (vm.isLoading)
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (items.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(
+                  child: Text(
+                    'Tidak ada data jenis',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+                  ),
+                ),
+              )
+            else
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: items.length,
+                  separatorBuilder: (_, __) => const Divider(
+                    height: 1,
+                    color: Color(0xFFE2E6EA),
+                    indent: 16,
+                    endIndent: 16,
+                  ),
+                  itemBuilder: (ctx, i) {
+                    final rt = items[i];
+                    final code = (rt.itemCode ?? '').trim();
+                    return InkWell(
+                      onTap: () => Navigator.of(ctx).pop(rt),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 26,
+                              height: 26,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: accent.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '${i + 1}',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: accent,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    rt.namaReject,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                      color: Color(0xFF1F2937),
+                                    ),
+                                  ),
+                                  if (code.isNotEmpty)
+                                    Text(
+                                      code,
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        color: Color(0xFF9CA3AF),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            const Icon(
+                              Icons.chevron_right,
+                              size: 18,
+                              color: Color(0xFF9CA3AF),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Standar Warning Dialog ────────────────────────────────────────────────────
+
+typedef _StandarWarningEntry = ({double? input, double? standar});
+
+class _StandarWarningDialog extends StatelessWidget {
+  const _StandarWarningDialog({this.beratWarning, this.cycleWarning});
+
+  final _StandarWarningEntry? beratWarning;
+  final _StandarWarningEntry? cycleWarning;
+
+  @override
+  Widget build(BuildContext context) {
+    const orange = Color(0xFFEA580C);
+    const orangeLight = Color(0xFFFFF7ED);
+    const orangeBorder = Color(0xFFFED7AA);
+
+    Widget diffRow({
+      required IconData icon,
+      required String fieldLabel,
+      required double? input,
+      required double? standar,
+      required String unit,
+    }) {
+      final diff = (input ?? 0) - (standar ?? 0);
+      final isOver = diff > 0;
+      final diffColor = isOver
+          ? const Color(0xFFDC2626)
+          : const Color(0xFF2563EB);
+      final diffIcon = isOver
+          ? Icons.arrow_upward_rounded
+          : Icons.arrow_downward_rounded;
+      final diffLabel = isOver
+          ? '+${diff.toStringAsFixed(1)}'
+          : diff.toStringAsFixed(1);
+
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: orangeBorder),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    color: orange.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(icon, size: 12, color: orange),
+                ),
+                const SizedBox(width: 7),
+                Text(
+                  fieldLabel,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF374151),
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: diffColor.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(diffIcon, size: 10, color: diffColor),
+                      const SizedBox(width: 2),
+                      Text(
+                        '$diffLabel $unit',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: diffColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _StandarCompareChip(
+                    label: 'Input',
+                    value: '${input?.toStringAsFixed(1) ?? '-'} $unit',
+                    color: diffColor,
+                    isHighlight: true,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.compare_arrows_rounded,
+                  size: 14,
+                  color: Color(0xFF9CA3AF),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _StandarCompareChip(
+                    label: 'Standar',
+                    value: '${standar?.toStringAsFixed(1) ?? '-'} $unit',
+                    color: const Color(0xFF15803D),
+                    isHighlight: false,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Dialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ── Header ──────────────────────────────────────
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(9),
+                    decoration: BoxDecoration(
+                      color: orangeLight,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: orangeBorder),
+                    ),
+                    child: const Icon(
+                      Icons.warning_amber_rounded,
+                      size: 20,
+                      color: orange,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Nilai Tidak Sesuai Standar',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF111827),
+                          ),
+                        ),
+                        SizedBox(height: 1),
+                        Text(
+                          'Periksa kembali sebelum menyimpan',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
-              // ── Drum wheel ───────────────────────────────────────
-              Container(
-                height: 200,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF0F7FF),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: accent.withValues(alpha: 0.20)),
+              // ── Diff cards ─────────────────────────────────
+              if (beratWarning != null) ...[
+                diffRow(
+                  icon: Icons.scale_outlined,
+                  fieldLabel: 'Berat',
+                  input: beratWarning!.input,
+                  standar: beratWarning!.standar,
+                  unit: 'gr',
                 ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Positioned(
-                      child: Container(
-                        height: 44,
-                        margin: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          color: accent.withValues(alpha: 0.12),
+                if (cycleWarning != null) const SizedBox(height: 8),
+              ],
+              if (cycleWarning != null)
+                diffRow(
+                  icon: Icons.timer_outlined,
+                  fieldLabel: 'Cycle Time',
+                  input: cycleWarning!.input,
+                  standar: cycleWarning!.standar,
+                  unit: 'sec',
+                ),
+              const SizedBox(height: 14),
+              // ── Actions ────────────────────────────────────
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF374151),
+                        side: const BorderSide(color: Color(0xFFD1D5DB)),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: accent.withValues(alpha: 0.30),
-                          ),
+                        ),
+                      ),
+                      child: const Text(
+                        'Batal',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
-                    ListWheelScrollView.useDelegate(
-                      controller: _scrollCtrl,
-                      itemExtent: 44,
-                      perspective: 0.003,
-                      diameterRatio: 2.2,
-                      physics: const FixedExtentScrollPhysics(),
-                      onSelectedItemChanged: (i) =>
-                          setState(() => _selected = i),
-                      childDelegate: ListWheelChildBuilderDelegate(
-                        childCount: _max + 1,
-                        builder: (context, index) {
-                          final isSelected = index == _selected;
-                          return Center(
-                            child: Text(
-                              '$index',
-                              style: TextStyle(
-                                fontSize: isSelected ? 26 : 18,
-                                fontWeight: isSelected
-                                    ? FontWeight.w800
-                                    : FontWeight.w400,
-                                color: isSelected
-                                    ? accent
-                                    : const Color(0xFF9CA3AF),
-                              ),
-                            ),
-                          );
-                        },
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton.icon(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: orange,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      icon: const Icon(Icons.save_outlined, size: 15),
+                      label: const Text(
+                        'Tetap Simpan',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-              // ── +/- buttons + value display ───────────────────
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _CounterStepBtn(
-                    icon: Icons.remove,
-                    onTap: () => _step(-1),
-                    onLongPress: () => _step(-10),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Text(
-                      '$_selected',
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: accent,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ),
-                  _CounterStepBtn(
-                    icon: Icons.add,
-                    onTap: () => _step(1),
-                    onLongPress: () => _step(10),
                   ),
                 ],
-              ),
-              const SizedBox(height: 16),
-              // ── Confirm ──────────────────────────────────────────
-              SizedBox(
-                width: double.infinity,
-                height: 40,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: accent,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    elevation: 0,
-                  ),
-                  onPressed: () => Navigator.of(context).pop(_selected),
-                  child: const Text(
-                    'Konfirmasi',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                  ),
-                ),
               ),
             ],
           ),
@@ -3367,77 +5555,47 @@ class _CounterPickerDialogState extends State<_CounterPickerDialog> {
   }
 }
 
-class _CounterStepBtn extends StatelessWidget {
-  const _CounterStepBtn({
-    required this.icon,
-    required this.onTap,
-    this.onLongPress,
+class _StandarCompareChip extends StatelessWidget {
+  const _StandarCompareChip({
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.isHighlight,
   });
 
-  final IconData icon;
-  final VoidCallback onTap;
-  final VoidCallback? onLongPress;
+  final String label;
+  final String value;
+  final Color color;
+  final bool isHighlight;
 
   @override
   Widget build(BuildContext context) {
-    const accent = _kInjectPrimary;
-    return GestureDetector(
-      onTap: onTap,
-      onLongPress: onLongPress,
-      child: Container(
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(
-          color: accent.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: accent.withValues(alpha: 0.25)),
-        ),
-        child: Icon(icon, size: 18, color: accent),
-      ),
-    );
-  }
-}
-
-// ── Bucket label row ──────────────────────────────────────────────────────────
-
-class _BucketLabelRow extends StatelessWidget {
-  const _BucketLabelRow({required this.entry});
-
-  final _BucketLabelEntry entry;
-
-  static const _categoryColors = {
-    'Furniture WIP': Color(0xFF0F766E),
-    'Bonggolan': Color(0xFF92400E),
-    'Reject': Color(0xFFB91C1C),
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = _categoryColors[entry.category] ?? _kInjectOutput;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE2E6EA)),
+        color: color.withValues(alpha: isHighlight ? 0.08 : 0.06),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 6,
-            height: 6,
-            margin: const EdgeInsets.only(right: 8),
-            decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              color: color.withValues(alpha: 0.75),
+            ),
           ),
-          Expanded(
-            child: Text(
-              entry.code,
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF1A1D23),
-              ),
-              overflow: TextOverflow.ellipsis,
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: color,
             ),
           ),
         ],

@@ -826,4 +826,34 @@ class BrokerProductionRepository {
     // kalau sebelumnya kita sudah pernah ambil inputs untuk noProduksi ini, buang dari cache
     _inputsCache.remove(noProduksi);
   }
+
+  // =========================
+  //  COMPLETE PRODUKSI
+  //  PATCH /api/production/broker/:noProduksi/complete
+  // =========================
+  Future<void> completeProduksi(String noProduksi) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/production/broker/$noProduksi/complete');
+
+    late http.Response res;
+    try {
+      res = await http.patch(url, headers: _headers(token)).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout menyelesaikan produksi broker');
+    } catch (e) {
+      rethrow;
+    }
+
+    if (res.statusCode != 200) {
+      final bodyText = utf8.decode(res.bodyBytes);
+      try {
+        final decoded = json.decode(bodyText);
+        final msg = (decoded is Map ? decoded['message'] : null) ??
+            'Gagal menyelesaikan produksi (${res.statusCode})';
+        throw Exception(msg);
+      } catch (_) {
+        throw Exception('Gagal menyelesaikan produksi (${res.statusCode})');
+      }
+    }
+  }
 }

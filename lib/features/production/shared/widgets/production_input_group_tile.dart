@@ -37,6 +37,8 @@ class ProductionInputGroupTile extends StatelessWidget {
   final bool expandable;
   final bool isPartialGroup;
   final String? partialReference;
+  final bool isSelected;
+  final VoidCallback? onTap;
   final VoidCallback? onLongPress;
 
   /// Jika diisi → dialog chip sak.
@@ -55,6 +57,8 @@ class ProductionInputGroupTile extends StatelessWidget {
     this.expandable = true,
     this.isPartialGroup = false,
     this.partialReference,
+    this.isSelected = false,
+    this.onTap,
     this.onLongPress,
     this.chipItemsBuilder,
     this.detailsBuilder,
@@ -130,42 +134,71 @@ class ProductionInputGroupTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = isTemp ? Colors.yellow.shade50 : Colors.white;
-    final borderColor = isTemp ? Colors.amber.shade200 : kProductionBorder;
+    final bgColor = isSelected
+        ? const Color(0xFFE3F2FD)
+        : isTemp
+        ? Colors.yellow.shade50
+        : Colors.white;
+    final borderColor = isSelected
+        ? const Color(0xFF1565C0)
+        : isTemp
+        ? Colors.amber.shade200
+        : kProductionBorder;
 
     return Container(
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: borderColor),
+        border: Border.all(
+          color: borderColor,
+          width: isSelected ? 2 : 1,
+        ),
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: () {
-          if (chipItemsBuilder != null) {
-            showDialog<void>(
-              context: context,
-              builder: (_) => ProductionSakChipDetailDialog(
-                title: title,
-                subtitle: headerSubtitle ?? '-',
-                metrics: tileMetrics,
-                chips: chipItemsBuilder!(),
+      child: Stack(
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: onTap ?? () {
+              if (chipItemsBuilder != null) {
+                showDialog<void>(
+                  context: context,
+                  builder: (_) => ProductionSakChipDetailDialog(
+                    title: title,
+                    subtitle: headerSubtitle ?? '-',
+                    metrics: tileMetrics,
+                    chips: chipItemsBuilder!(),
+                  ),
+                );
+              } else if (detailsBuilder != null) {
+                showDialog<void>(
+                  context: context,
+                  builder: (_) => ProductionInputGroupDetailDialog(
+                    title: title,
+                    subtitle: headerSubtitle ?? '-',
+                    metrics: tileMetrics,
+                    details: detailsBuilder!(),
+                  ),
+                );
+              }
+            },
+            onLongPress: onLongPress,
+            child: _buildHeader(),
+          ),
+          if (isSelected)
+            Positioned(
+              top: 4,
+              right: 4,
+              child: Container(
+                width: 16,
+                height: 16,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF1565C0),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check, size: 11, color: Colors.white),
               ),
-            );
-          } else if (detailsBuilder != null) {
-            showDialog<void>(
-              context: context,
-              builder: (_) => ProductionInputGroupDetailDialog(
-                title: title,
-                subtitle: headerSubtitle ?? '-',
-                metrics: tileMetrics,
-                details: detailsBuilder!(),
-              ),
-            );
-          }
-        },
-        onLongPress: onLongPress,
-        child: _buildHeader(),
+            ),
+        ],
       ),
     );
   }

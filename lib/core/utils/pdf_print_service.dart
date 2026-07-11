@@ -266,6 +266,93 @@ class PdfPrintService {
     }
   }
 
+  /// Preview dan cetak beberapa label sekaligus dalam satu layar PDF viewer.
+  /// Semua PDF di-download, digabung menjadi satu dokumen multi-halaman,
+  /// lalu dibuka satu kali. Setelah user pilih printer, setiap URL dikirim
+  /// ke printer, dan [onPrintedCallbacks[i]] dipanggil jika label ke-i berhasil.
+  Future<void> previewMultipleFromUrls({
+    required BuildContext context,
+    required List<Uri> pdfUrls,
+    String? title,
+    List<VoidCallback?>? onPrintedCallbacks,
+  }) async {
+    if (pdfUrls.isEmpty) return;
+
+    Uint8List mergedBytes;
+    try {
+      mergedBytes = await _withLoading<Uint8List>(
+        context: context,
+        enabled: true,
+        message: 'Menyiapkan ${pdfUrls.length} label…',
+        run: () async {
+          final token = await TokenStorage.getToken();
+          final client = httpClient ?? http.Client();
+          final headers = <String, String>{
+            if (token != null && token.isNotEmpty)
+              'Authorization': 'Bearer $token',
+          };
+          final futures = pdfUrls.map((url) async {
+            final resp = await client
+                .get(url, headers: headers)
+                .timeout(const Duration(seconds: 30));
+            if (resp.statusCode != 200 || resp.bodyBytes.isEmpty) {
+              throw Exception('HTTP ${resp.statusCode} — ${url.path}');
+            }
+            return resp.bodyBytes;
+          });
+          final allBytes = await Future.wait(futures);
+          return _mergePdfs(allBytes);
+        },
+      );
+    } catch (_) {
+      return;
+    }
+
+    if (!context.mounted) return;
+
+    final outcome = await PdfViewerScreen.push(
+      context: context,
+      title: title ?? '${pdfUrls.length} Label',
+      pdfBytes: mergedBytes,
+    );
+
+    if (outcome == null || !context.mounted) return;
+
+    _showPrintingSnack(context, outcome.printerName);
+
+    final btService = BtPrintService(
+      baseUrl: baseUrl,
+      defaultSystem: defaultSystem,
+    );
+
+    var anyOk = false;
+    for (var i = 0; i < pdfUrls.length; i++) {
+      String? errorMsg;
+      final ok = await btService.printLabelFromUrl(
+        url: pdfUrls[i],
+        mac: outcome.mac,
+        onStatus: (_) {},
+        onError: (e) => errorMsg = e,
+      );
+      if (ok) {
+        anyOk = true;
+        onPrintedCallbacks?.elementAtOrNull(i)?.call();
+      }
+      debugPrint(
+        ok ? '✅ Printed ${pdfUrls[i]}' : '❌ Failed ${pdfUrls[i]}: $errorMsg',
+      );
+    }
+
+    if (!context.mounted) return;
+    if (anyOk) {
+      _showPrintSuccessSnack(context, outcome.printerName);
+      final printBy = await DevicePrinterService.getLoggedUsername();
+      DevicePrinterService.logPrint(printerId: outcome.mac, printBy: printBy);
+    } else {
+      _showPrintErrorSnack(context, 'Semua label gagal dicetak. Coba lagi.');
+    }
+  }
+
   /// Variant [previewReport80mm] yang menerima URL langsung (tidak melalui
   /// Crystal Report URL builder). Digunakan untuk endpoint PDF baru.
   Future<void> previewFromUrl({
@@ -584,6 +671,30 @@ class PdfPrintService {
           ),
         ),
       );
+    }
+    return doc.save();
+  }
+
+  /// Gabungkan beberapa PDF (sudah berformat thermal) menjadi satu dokumen
+  /// multi-halaman dengan cara rasterisasi setiap halaman.
+  Future<Uint8List> _mergePdfs(List<Uint8List> pdfs) async {
+    if (pdfs.length == 1) return pdfs.first;
+    final doc = pw.Document();
+    const pageWidthPt = 80 * PdfPageFormat.mm;
+    for (final pdfBytes in pdfs) {
+      await for (final r in Printing.raster(pdfBytes, dpi: 150)) {
+        final pageHeightPt = pageWidthPt * (r.height / r.width);
+        final png = await r.toPng();
+        doc.addPage(
+          pw.Page(
+            pageFormat: PdfPageFormat(pageWidthPt, pageHeightPt),
+            margin: pw.EdgeInsets.zero,
+            build: (_) => pw.Center(
+              child: pw.Image(pw.MemoryImage(png), fit: pw.BoxFit.contain),
+            ),
+          ),
+        );
+      }
     }
     return doc.save();
   }

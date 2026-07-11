@@ -4,8 +4,8 @@ import 'package:provider/provider.dart';
 
 import 'package:pps_tablet/core/view/app_shell.dart';
 import 'package:pps_tablet/features/production/crusher/view_model/crusher_production_input_view_model.dart';
+import '../../../../common/widgets/confirm_dialog.dart';
 import '../../../../common/widgets/error_status_dialog.dart';
-import '../../../../common/widgets/scan_label_dialog.dart';
 import '../../../../core/view_model/permission_view_model.dart';
 import '../../shared/models/broker_item.dart';
 import '../../shared/models/production_label_lookup_result.dart';
@@ -58,13 +58,33 @@ class _CrusherProductionInputScreenState
   String _selectedMode = 'full';
   String _selectedInputTab = 'bb';
 
+  List<ProductionFormulaOutput> _formulaOutputs = [];
+  Set<String>? _allowedInputKategori;
+
+  static const _kategoriToTab = {'bahanbaku': 'bb', 'bonggolan': 'bonggolan'};
+
+  bool _isTabAllowed(String tab) {
+    final kodes = _allowedInputKategori;
+    if (kodes == null) return true;
+    return kodes.any((k) => _kategoriToTab[k] == tab);
+  }
+
+  String? _firstAllowedTab(Set<String> kodes) {
+    for (final tab in ['bb', 'bonggolan']) {
+      if (kodes.any((k) => _kategoriToTab[k] == tab)) return tab;
+    }
+    return null;
+  }
+
   List<BreadcrumbSegment> _prevBreadcrumb = [];
   bool _isReplacing = false;
 
   String get _breadcrumbLabel {
     if (_header != null) {
       final name = _header!.namaMesin.trim();
-      return name.isNotEmpty ? '$name (${widget.noCrusherProduksi})' : widget.noCrusherProduksi;
+      return name.isNotEmpty
+          ? '$name (${widget.noCrusherProduksi})'
+          : widget.noCrusherProduksi;
     }
     return widget.noCrusherProduksi;
   }
@@ -74,6 +94,7 @@ class _CrusherProductionInputScreenState
     super.initState();
     _cachedBreadcrumbLabel = widget.noCrusherProduksi;
     _loadHeader();
+    _loadFormulaInputs();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
@@ -115,6 +136,23 @@ class _CrusherProductionInputScreenState
       });
       _updateBreadcrumb();
     } catch (_) {}
+  }
+
+  Future<void> _loadFormulaInputs() async {
+    try {
+      final result = await _repo.fetchFormulaInputs(widget.noCrusherProduksi);
+      if (!mounted) return;
+      setState(() {
+        _formulaOutputs = result.outputs;
+        _allowedInputKategori = result.kodes;
+        if (!_isTabAllowed(_selectedInputTab)) {
+          final first = _firstAllowedTab(result.kodes);
+          if (first != null) _selectedInputTab = first;
+        }
+      });
+    } catch (_) {
+      // Gagal fetch formula: semua tab tetap ditampilkan
+    }
   }
 
   void _updateBreadcrumb() {
@@ -272,13 +310,11 @@ class _CrusherProductionInputScreenState
   Future<void> _openScanDialog() async {
     await showDialog<void>(
       context: context,
-      builder: (_) => ScanLabelDialog(
+      builder: (_) => ProductionScanLabelDialog(
         manualHint: 'X.XXXXXXXXXX',
         headerSubtitle: _modeLabel(_selectedMode),
-        acceptedLabels: const [
-          (prefix: 'A', label: 'Bahan Baku'),
-          (prefix: 'M', label: 'Bonggolan'),
-        ],
+        primaryColor: _kCrusherPrimary,
+        formulaOutputs: _formulaOutputs,
         onLookup: (code) async => _onCodeReady(code),
       ),
     );
@@ -287,8 +323,18 @@ class _CrusherProductionInputScreenState
   Future<String?> _onCodeReady(String code) async {
     final vm = context.read<CrusherProductionInputViewModel>();
 
+    // Validasi prefix sebelum ke server
+    final trimmed = code.trim();
+    final prefix = trimmed.length >= 2
+        ? trimmed.substring(0, 2).toUpperCase()
+        : '';
+    const validPrefixes = {'A.', 'M.'};
+    if (prefix.isNotEmpty && !validPrefixes.contains(prefix)) {
+      return 'Label "$trimmed" tidak dapat diproses.\n'
+          'Proses crusher hanya menerima label Bahan Baku (A.) dan Bonggolan (M.).';
+    }
+
     if (_selectedMode == 'partial') {
-      final prefix = code.trim().toUpperCase().substring(0, 2);
       if (prefix == 'M.') {
         await PartialModeNotSupportedDialog.show(
           context: context,
@@ -303,11 +349,36 @@ class _CrusherProductionInputScreenState
     if (!mounted) return 'Halaman sudah tidak aktif';
 
     if (vm.lookupError != null) {
-      return 'Gagal ambil data: ${vm.lookupError}';
+      // Hindari menampilkan pesan teknis dari server langsung ke user
+      return 'Label "$trimmed" tidak dapat diproses pada produksi crusher ini.';
     }
 
     if (res == null || res.found == false || res.data.isEmpty) {
       return 'Label "$code" tidak memiliki data yang tersedia.';
+    }
+
+    // Validasi idJenis vs InputId formula (jika formula sudah dimuat)
+    if (_allowedInputKategori != null &&
+        _formulaOutputs.isNotEmpty &&
+        prefix.isNotEmpty) {
+      final firstRow = res.data.first;
+      final rawIdJenis = firstRow['idJenis'] ?? firstRow['IdJenis'];
+      if (rawIdJenis != null) {
+        final idJenis = (rawIdJenis as num).toInt();
+        final allowedInputIds = _formulaOutputs
+            .expand((o) => o.formulas)
+            .where((f) => f.prefixLabel.toUpperCase() == prefix)
+            .map((f) => f.inputId)
+            .toSet();
+        if (allowedInputIds.isNotEmpty && !allowedInputIds.contains(idJenis)) {
+          final namaJenis =
+              firstRow['namaJenis'] ??
+              firstRow['NamaJenis'] ??
+              firstRow['Jenis'] ??
+              'tidak diketahui';
+          return 'Jenis "$namaJenis" tidak terdaftar dalam formula produksi crusher ini.';
+        }
+      }
     }
 
     final tab = _tabForLookupResult(res);
@@ -551,16 +622,18 @@ class _CrusherProductionInputScreenState
                     selectedValue: _selectedInputTab,
                     accentColor: _kCrusherPrimary,
                     tabs: [
-                      ProductionTabItem(
-                        value: 'bb',
-                        label: 'Bahan Baku',
-                        count: bbGroups.length,
-                      ),
-                      ProductionTabItem(
-                        value: 'bonggolan',
-                        label: 'Bonggolan',
-                        count: bonggolGroups.length,
-                      ),
+                      if (_isTabAllowed('bb'))
+                        ProductionTabItem(
+                          value: 'bb',
+                          label: 'Bahan Baku',
+                          count: bbGroups.length,
+                        ),
+                      if (_isTabAllowed('bonggolan'))
+                        ProductionTabItem(
+                          value: 'bonggolan',
+                          label: 'Bonggolan',
+                          count: bonggolGroups.length,
+                        ),
                     ],
                     onChanged: (value) {
                       if (_selectedInputTab == value) return;
@@ -691,12 +764,12 @@ class _CrusherProductionInputScreenState
               children: bbGroups.entries.map((entry) {
                 final hasPartial = entry.value.any((x) => x.isPartialRow);
                 return ProductionInputGroupTile(
-                  title: entry.key,
-                  headerSubtitle:
+                  title:
                       (entry.value.isNotEmpty
                           ? entry.value.first.namaJenis
                           : '-') ??
                       '-',
+                  headerSubtitle: entry.key,
                   tileMetrics: [
                     (Icons.inventory_2_outlined, '${entry.value.length} sak'),
                     (
@@ -938,6 +1011,53 @@ class _CrusherProductionInputScreenState
     );
   }
 
+  // ── Complete (Selesaikan produksi) ─────────────────────────────────────────
+
+  Future<void> _handleComplete() async {
+    final vm = context.read<CrusherProductionInputViewModel>();
+    if (vm.totalTempCount > 0) {
+      _showSnack(
+        'Masih ada ${vm.totalTempCount} data temp yang belum disimpan. '
+        'Simpan atau hapus dulu sebelum menyelesaikan.',
+        backgroundColor: Colors.orange,
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => ConfirmDialog(
+        title: 'Selesaikan Produksi?',
+        message:
+            'Yakin ingin menyelesaikan produksi ${widget.noCrusherProduksi}?\n'
+            'Setelah selesai, produksi akan dikunci dan tidak dapat diubah.',
+        confirmLabel: 'Selesaikan',
+        confirmIcon: Icons.check_circle_outline,
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await _prodRepo.completeProduksi(widget.noCrusherProduksi);
+      if (!mounted) return;
+      _showSnack(
+        '✅ Produksi berhasil diselesaikan',
+        backgroundColor: Colors.green,
+      );
+      await _loadHeader();
+    } catch (e) {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (_) => ErrorStatusDialog(
+          title: 'Gagal Menyelesaikan',
+          message: e.toString().replaceFirst('Exception: ', ''),
+        ),
+      );
+    }
+  }
+
   // ── Riwayat / timeline ────────────────────────────────────────────────────
 
   Future<void> _openTimelineDialog() async {
@@ -1123,9 +1243,13 @@ class _CrusherProductionInputScreenState
                                     FloatingActionButton(
                                       heroTag: 'fab_add_crusher_output',
                                       mini: true,
-                                      backgroundColor: _header == null ? Colors.grey.shade300 : _kCrusherOutput,
+                                      backgroundColor: _header == null
+                                          ? Colors.grey.shade300
+                                          : _kCrusherOutput,
                                       foregroundColor: Colors.white,
-                                      onPressed: _header == null ? null : _openAddOutputDialog,
+                                      onPressed: _header == null
+                                          ? null
+                                          : _openAddOutputDialog,
                                       child: const Icon(Icons.add),
                                     ),
                                   ],
@@ -1217,21 +1341,33 @@ class _CrusherProductionInputScreenState
                 if (_header == null)
                   _buildToolbarSkeleton()
                 else
-                CrusherWorkspaceToolbar(
-                  isLocked: locked,
-                  idMesin: _header?.idMesin,
-                  namaJenis: _header?.outputJenisNama,
-                  tglProduksi: _header?.tanggal,
-                  shift: _header?.shift,
-                  hourStart: _header?.hourStart,
-                  hourEnd: _header?.hourEnd,
-                  onRefresh: () {
-                    vm.loadInputs(widget.noCrusherProduksi, force: true);
-                    _showSnack('Data di-refresh');
-                  },
-                  onGanti: locked ? null : _openSplitDialog,
-                  onRiwayat: _openTimelineDialog,
-                ),
+                  CrusherWorkspaceToolbar(
+                    isLocked: locked,
+                    idMesin: _header?.idMesin,
+                    namaJenis: _header?.outputJenisNama,
+                    tglProduksi: _header?.tanggal,
+                    shift: _header?.shift,
+                    hourStart: _header?.hourStart,
+                    hourEnd: _header?.hourEnd,
+                    onRefresh: () {
+                      vm.loadInputs(widget.noCrusherProduksi, force: true);
+                      _showSnack('Data di-refresh');
+                    },
+                    onGanti: locked ? null : _openSplitDialog,
+                    onRiwayat: _openTimelineDialog,
+                    showGantiRiwayat:
+                        _header?.tanggal != null &&
+                        _header!.tanggal!.year == DateTime.now().year &&
+                        _header!.tanggal!.month == DateTime.now().month &&
+                        _header!.tanggal!.day == DateTime.now().day,
+                    produksiStatus: _header?.produksiStatus,
+                    onComplete: (_header?.isComplete == true)
+                        ? null
+                        : _handleComplete,
+                    completeDisabledReason: (_header?.isComplete == true)
+                        ? 'Produksi sudah selesai'
+                        : null,
+                  ),
                 Expanded(
                   child: Builder(
                     builder: (_) {

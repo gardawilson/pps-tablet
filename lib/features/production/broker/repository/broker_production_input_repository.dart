@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import '../../../../core/network/endpoints.dart';
 import '../../../../core/services/token_storage.dart';
 import '../../../stock_opname/model/label_validation_result.dart';
+import '../../shared/models/production_formula_model.dart';
 import '../../shared/models/production_label_lookup_result.dart';
 import '../model/broker_inputs_model.dart';
 import '../model/broker_production_model.dart';
@@ -464,5 +465,66 @@ class BrokerProductionInputRepository {
           'Gagal delete inputs (HTTP ${res.statusCode})';
       throw Exception(message);
     }
+  }
+
+  // -----------------------------
+  // GET: Formula Inputs
+  // -----------------------------
+  /// GET /api/production/broker/:noProduksi/formula-inputs
+  Future<({Set<String> kodes, List<ProductionFormulaOutput> outputs})>
+      fetchFormulaInputs(String noProduksi) async {
+    final key = noProduksi.trim();
+    if (key.isEmpty) throw ArgumentError('noProduksi tidak boleh kosong');
+
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/production/broker/$key/formula-inputs');
+
+    print('➡️ [GET] $url');
+    http.Response res;
+    try {
+      res = await http.get(url, headers: _headers(token)).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout fetching formula-inputs ($key)');
+    } catch (e) {
+      print('❌ Request error (formula-inputs): $e');
+      rethrow;
+    }
+    print('⬅️ [${res.statusCode}] (formula-inputs)');
+
+    if (res.statusCode != 200) {
+      throw Exception(
+        'Gagal mengambil formula-inputs ($key), code ${res.statusCode}',
+      );
+    }
+
+    final body =
+        json.decode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    final data = body['data'] as Map<String, dynamic>?;
+    final rawOutputs = (data?['outputs'] as List?) ?? [];
+
+    final kodes = <String>{};
+    final outputs = <ProductionFormulaOutput>[];
+
+    for (final o in rawOutputs) {
+      final rawFormulas = (o['formulas'] as List?) ?? [];
+      final formulas = <ProductionFormulaItem>[];
+      for (final f in rawFormulas) {
+        final kode = f['InputKategoriKode'] as String?;
+        if (kode != null) kodes.add(kode);
+        formulas.add(ProductionFormulaItem(
+          inputId: f['InputId'] as int? ?? 0,
+          inputNama: f['InputNama'] as String? ?? '',
+          kategoriNama: f['InputKategoriNama'] as String? ?? '',
+          prefixLabel: f['InputPrefixLabel'] as String? ?? '',
+        ));
+      }
+      outputs.add(ProductionFormulaOutput(
+        idJenis: o['idJenis'] as int? ?? 0,
+        namaJenis: o['namaJenis'] as String? ?? '',
+        formulas: formulas,
+      ));
+    }
+
+    return (kodes: kodes, outputs: outputs);
   }
 }

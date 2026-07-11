@@ -37,7 +37,9 @@ class HotStampOutputTile extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      output.labelCode,
+                      output.namaJenis.isNotEmpty
+                          ? output.namaJenis
+                          : output.labelCode,
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
@@ -58,7 +60,7 @@ class HotStampOutputTile extends StatelessWidget {
               ),
               const SizedBox(height: 1),
               Text(
-                output.namaJenis,
+                output.labelCode,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(fontSize: 10, color: Colors.grey.shade600),

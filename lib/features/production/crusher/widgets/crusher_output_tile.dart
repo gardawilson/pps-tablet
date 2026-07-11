@@ -51,7 +51,9 @@ class CrusherOutputTile extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      output.noCrusher,
+                      output.namaJenis.isNotEmpty
+                          ? output.namaJenis
+                          : output.noCrusher,
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
@@ -83,7 +85,7 @@ class CrusherOutputTile extends StatelessWidget {
               ),
               const SizedBox(height: 1),
               Text(
-                output.namaJenis,
+                output.noCrusher,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(fontSize: 10, color: Colors.grey.shade600),

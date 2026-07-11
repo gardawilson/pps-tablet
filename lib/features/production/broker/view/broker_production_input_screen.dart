@@ -5,9 +5,10 @@ import 'package:provider/provider.dart';
 
 import 'package:pps_tablet/core/view/app_shell.dart';
 import 'package:pps_tablet/features/production/broker/view_model/broker_production_input_view_model.dart';
+import '../../../../common/widgets/confirm_dialog.dart';
 import '../../../../common/widgets/error_status_dialog.dart';
-import '../../../../common/widgets/scan_label_dialog.dart';
 import '../../../../core/view_model/permission_view_model.dart';
+import '../repository/broker_production_input_repository.dart';
 import '../../shared/models/production_label_lookup_result.dart';
 import '../../shared/widgets/confirm_save_temp_dialog.dart';
 import '../../shared/widgets/unsaved_temp_warning_dialog.dart';
@@ -57,6 +58,7 @@ class BrokerProductionInputScreen extends StatefulWidget {
 class _BrokerProductionInputScreenState
     extends State<BrokerProductionInputScreen> {
   final _prodRepo = BrokerProductionRepository();
+  final _inputRepo = BrokerProductionInputRepository();
 
   BrokerProduction? _header;
   late String _cachedBreadcrumbLabel;
@@ -64,6 +66,41 @@ class _BrokerProductionInputScreenState
   String _selectedMode = 'full';
   String _selectedInputTab = 'broker';
   String _selectedOutputTab = 'broker';
+
+  List<ProductionFormulaOutput> _formulaOutputs = [];
+  Set<String>? _allowedInputKategori; // null = belum dimuat, tampilkan semua
+
+  // Mapping InputKategoriKode (dari API) ke nilai tab di layar
+  static const _kategoriToTab = {
+    'bahanbaku': 'bb',
+    'washing': 'washing',
+    'broker': 'broker',
+    'crusher': 'crusher',
+    'gilingan': 'gilingan',
+    'mixer': 'mixer',
+    'reject': 'reject',
+  };
+
+  bool _isTabAllowed(String tab) {
+    final kodes = _allowedInputKategori;
+    if (kodes == null) return true;
+    return kodes.any((k) => _kategoriToTab[k] == tab);
+  }
+
+  String? _firstAllowedTab(Set<String> kodes) {
+    for (final tab in [
+      'broker',
+      'bb',
+      'washing',
+      'crusher',
+      'gilingan',
+      'mixer',
+      'reject',
+    ]) {
+      if (kodes.any((k) => _kategoriToTab[k] == tab)) return tab;
+    }
+    return null;
+  }
 
   List<BreadcrumbSegment> _prevBreadcrumb = [];
   bool _isReplacing = false;
@@ -79,6 +116,7 @@ class _BrokerProductionInputScreenState
     super.initState();
     _cachedBreadcrumbLabel = widget.noProduksi;
     _loadHeader();
+    _loadFormulaInputs();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
@@ -103,6 +141,23 @@ class _BrokerProductionInputScreenState
       });
       _updateBreadcrumb();
     } catch (_) {}
+  }
+
+  Future<void> _loadFormulaInputs() async {
+    try {
+      final result = await _inputRepo.fetchFormulaInputs(widget.noProduksi);
+      if (!mounted) return;
+      setState(() {
+        _formulaOutputs = result.outputs;
+        _allowedInputKategori = result.kodes;
+        if (!_isTabAllowed(_selectedInputTab)) {
+          final first = _firstAllowedTab(result.kodes);
+          if (first != null) _selectedInputTab = first;
+        }
+      });
+    } catch (_) {
+      // Gagal fetch formula: semua tab tetap ditampilkan
+    }
   }
 
   Widget _buildToolbarSkeleton() {
@@ -283,6 +338,53 @@ class _BrokerProductionInputScreenState
     );
   }
 
+  // ── Complete (Selesaikan produksi) ─────────────────────────────────────────
+
+  Future<void> _handleComplete() async {
+    final vm = context.read<BrokerProductionInputViewModel>();
+    if (vm.totalTempCount > 0) {
+      _showSnack(
+        'Masih ada ${vm.totalTempCount} data temp yang belum disimpan. '
+        'Simpan atau hapus dulu sebelum menyelesaikan.',
+        backgroundColor: Colors.orange,
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => ConfirmDialog(
+        title: 'Selesaikan Produksi?',
+        message:
+            'Yakin ingin menyelesaikan produksi ${widget.noProduksi}?\n'
+            'Setelah selesai, produksi akan dikunci dan tidak dapat diubah.',
+        confirmLabel: 'Selesaikan',
+        confirmIcon: Icons.check_circle_outline,
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await _prodRepo.completeProduksi(widget.noProduksi);
+      if (!mounted) return;
+      _showSnack(
+        '✅ Produksi berhasil diselesaikan',
+        backgroundColor: Colors.green,
+      );
+      await _loadHeader();
+    } catch (e) {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (_) => ErrorStatusDialog(
+          title: 'Gagal Menyelesaikan',
+          message: e.toString().replaceFirst('Exception: ', ''),
+        ),
+      );
+    }
+  }
+
   void _showSnack(String msg, {Color? backgroundColor}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -298,18 +400,11 @@ class _BrokerProductionInputScreenState
     setState(() => _selectedMode = mode);
     await showDialog<void>(
       context: context,
-      builder: (_) => ScanLabelDialog(
+      builder: (_) => ProductionScanLabelDialog(
         manualHint: 'X.XXXXXXXXXX',
         headerSubtitle: _modeLabel(_selectedMode),
-        acceptedLabels: const [
-          (prefix: 'A', label: 'Bahan Baku'),
-          (prefix: 'B', label: 'Washing'),
-          (prefix: 'D', label: 'Broker'),
-          (prefix: 'V', label: 'Gilingan'),
-          (prefix: 'F', label: 'Crusher'),
-          (prefix: 'H', label: 'Mixer'),
-          (prefix: 'BF', label: 'Reject'),
-        ],
+        primaryColor: _kBrokerPrimary,
+        formulaOutputs: _formulaOutputs,
         onLookup: (code) async => _onCodeReady(context, code),
       ),
     );
@@ -411,7 +506,7 @@ class _BrokerProductionInputScreenState
 
       if (lookupResult == null) {
         _showSnack(
-          'Gagal memuat data label: ${vm.lookupError ?? "error tidak diketahui"}',
+          'Gagal memuat data label "$labelTitle".',
           backgroundColor: Colors.red,
         );
         return;
@@ -497,11 +592,61 @@ class _BrokerProductionInputScreenState
     if (!mounted) return 'Halaman sudah tidak aktif';
 
     if (vm.lookupError != null) {
-      return 'Gagal ambil data: ${vm.lookupError}';
+      return 'Label "${code.trim()}" tidak dapat diproses pada produksi broker ini.';
     }
 
     if (res == null || res.found == false || res.data.isEmpty) {
       return 'Label "$code" tidak memiliki data yang tersedia.';
+    }
+
+    // DEBUG LOG
+    final dbgTab = _tabForLookupResult(res);
+    final dbgRow = res.data.isNotEmpty ? res.data.first : <String, dynamic>{};
+    final dbgPrefix = code.trim().length >= 2 ? code.trim().substring(0, 2).toUpperCase() : '??';
+    final dbgIdJenis = dbgRow['IdJenis'] ?? dbgRow['idJenis'] ?? dbgRow['JenisId'] ?? dbgRow['jenisId'];
+    final dbgNamaJenis = dbgRow['NamaJenis'] ?? dbgRow['namaJenis'] ?? dbgRow['Jenis'] ?? '-';
+    debugPrint('=== BROKER SCAN DEBUG ===');
+    debugPrint('  code       : $code');
+    debugPrint('  prefix     : $dbgPrefix');
+    debugPrint('  tab        : $dbgTab');
+    debugPrint('  idJenis    : $dbgIdJenis');
+    debugPrint('  namaJenis  : $dbgNamaJenis');
+    debugPrint('  rawKeys    : ${dbgRow.keys.toList()}');
+    debugPrint('  allowedKat : $_allowedInputKategori');
+    debugPrint('  isTabAllow : ${dbgTab != null ? _isTabAllowed(dbgTab) : 'tab=null'}');
+    debugPrint('  formulaOut : ${_formulaOutputs.map((o) => '(id=${o.idJenis}, nama=${o.namaJenis})').toList()}');
+    debugPrint('=========================');
+
+    // Validasi kategori + jenis terhadap formula (jika sudah dimuat)
+    if (_allowedInputKategori != null && _formulaOutputs.isNotEmpty) {
+      final tab = _tabForLookupResult(res);
+
+      // 1. Cek kategori
+      if (tab != null && !_isTabAllowed(tab)) {
+        return 'Kategori label "${code.trim()}" tidak sesuai dengan formula produksi ini.';
+      }
+
+      // 2. Cek idJenis vs InputId formula untuk prefix yang sama
+      final scanPrefix = code.trim().length >= 2
+          ? code.trim().substring(0, 2).toUpperCase()
+          : '';
+      if (scanPrefix.isNotEmpty) {
+        final firstRow = res.data.first;
+        final rawIdJenis = firstRow['idJenis'] ?? firstRow['IdJenis'];
+        if (rawIdJenis != null) {
+          final idJenis = (rawIdJenis as num).toInt();
+          // Kumpulkan semua InputId yang diizinkan untuk prefix ini
+          final allowedInputIds = _formulaOutputs
+              .expand((o) => o.formulas)
+              .where((f) => f.prefixLabel.toUpperCase() == scanPrefix)
+              .map((f) => f.inputId)
+              .toSet();
+          if (allowedInputIds.isNotEmpty && !allowedInputIds.contains(idJenis)) {
+            final namaJenis = firstRow['namaJenis'] ?? firstRow['NamaJenis'] ?? firstRow['Jenis'] ?? 'tidak diketahui';
+            return 'Jenis "$namaJenis" tidak terdaftar dalam formula produksi ini.';
+          }
+        }
+      }
     }
 
     // Auto-switch ke tab sesuai tipe label yang discan
@@ -1144,12 +1289,12 @@ class _BrokerProductionInputScreenState
                 children: brokerGroups.entries.map((entry) {
                   final hasPartial = entry.value.any((x) => x.isPartialRow);
                   return ProductionInputGroupTile(
-                    title: entry.key,
-                    headerSubtitle:
+                    title:
                         (entry.value.isNotEmpty
                             ? entry.value.first.namaJenis
                             : '-') ??
                         '-',
+                    headerSubtitle: entry.key,
                     tileMetrics: [
                       (Icons.inventory_2_outlined, '${entry.value.length} sak'),
                       (
@@ -1239,12 +1384,12 @@ class _BrokerProductionInputScreenState
                 children: bbGroups.entries.map((entry) {
                   final hasPartial = entry.value.any((x) => x.isPartialRow);
                   return ProductionInputGroupTile(
-                    title: entry.key,
-                    headerSubtitle:
+                    title:
                         (entry.value.isNotEmpty
                             ? entry.value.first.namaJenis
                             : '-') ??
                         '-',
+                    headerSubtitle: entry.key,
                     tileMetrics: [
                       (Icons.inventory_2_outlined, '${entry.value.length} sak'),
                       (
@@ -1327,12 +1472,12 @@ class _BrokerProductionInputScreenState
                 ),
                 children: washingGroups.entries.map((entry) {
                   return ProductionInputGroupTile(
-                    title: entry.key,
-                    headerSubtitle:
+                    title:
                         (entry.value.isNotEmpty
                             ? entry.value.first.namaJenis
                             : '-') ??
                         '-',
+                    headerSubtitle: entry.key,
                     tileMetrics: [
                       (Icons.inventory_2_outlined, '${entry.value.length} sak'),
                       (
@@ -1400,12 +1545,12 @@ class _BrokerProductionInputScreenState
                 ),
                 children: crusherGroups.entries.map((entry) {
                   return ProductionInputGroupTile(
-                    title: entry.key,
-                    headerSubtitle:
+                    title:
                         (entry.value.isNotEmpty
                             ? entry.value.first.namaJenis
                             : '-') ??
                         '-',
+                    headerSubtitle: entry.key,
                     tileMetrics: [
                       (
                         Icons.scale_outlined,
@@ -1475,12 +1620,12 @@ class _BrokerProductionInputScreenState
                 children: gilinganGroups.entries.map((entry) {
                   final hasPartial = entry.value.any((x) => x.isPartialRow);
                   return ProductionInputGroupTile(
-                    title: entry.key,
-                    headerSubtitle:
+                    title:
                         (entry.value.isNotEmpty
                             ? entry.value.first.namaJenis
                             : '-') ??
                         '-',
+                    headerSubtitle: entry.key,
                     tileMetrics: [
                       (
                         Icons.scale_outlined,
@@ -1571,12 +1716,12 @@ class _BrokerProductionInputScreenState
                 children: mixerGroups.entries.map((entry) {
                   final hasPartial = entry.value.any((x) => x.isPartialRow);
                   return ProductionInputGroupTile(
-                    title: entry.key,
-                    headerSubtitle:
+                    title:
                         (entry.value.isNotEmpty
                             ? entry.value.first.namaJenis
                             : '-') ??
                         '-',
+                    headerSubtitle: entry.key,
                     tileMetrics: [
                       (Icons.inventory_2_outlined, '${entry.value.length} sak'),
                       (
@@ -1660,12 +1805,12 @@ class _BrokerProductionInputScreenState
                 children: rejectGroups.entries.map((entry) {
                   final hasPartial = entry.value.any((x) => x.isPartialRow);
                   return ProductionInputGroupTile(
-                    title: entry.key,
-                    headerSubtitle:
+                    title:
                         (entry.value.isNotEmpty
                             ? entry.value.first.namaJenis
                             : '-') ??
                         '-',
+                    headerSubtitle: entry.key,
                     tileMetrics: [
                       (
                         Icons.scale_outlined,
@@ -1948,6 +2093,17 @@ class _BrokerProductionInputScreenState
                           vm.loadOutputs(widget.noProduksi);
                           _showSnack('Data di-refresh');
                         },
+                        showGantiRiwayat: _header?.tglProduksi != null &&
+                            _header!.tglProduksi!.year == DateTime.now().year &&
+                            _header!.tglProduksi!.month == DateTime.now().month &&
+                            _header!.tglProduksi!.day == DateTime.now().day,
+                        produksiStatus: _header?.produksiStatus,
+                        onComplete: (_header?.isComplete == true)
+                            ? null
+                            : _handleComplete,
+                        completeDisabledReason: (_header?.isComplete == true)
+                            ? 'Produksi sudah selesai'
+                            : null,
                       ),
                     Expanded(
                       child: LayoutBuilder(
@@ -1976,41 +2132,48 @@ class _BrokerProductionInputScreenState
                                     selectedValue: _selectedInputTab,
                                     accentColor: _kBrokerPrimary,
                                     tabs: [
-                                      ProductionTabItem(
-                                        value: 'broker',
-                                        label: 'Broker',
-                                        count: brokerGroups.length,
-                                      ),
-                                      ProductionTabItem(
-                                        value: 'bb',
-                                        label: 'Bahan Baku',
-                                        count: bbGroups.length,
-                                      ),
-                                      ProductionTabItem(
-                                        value: 'washing',
-                                        label: 'Washing',
-                                        count: washingGroups.length,
-                                      ),
-                                      ProductionTabItem(
-                                        value: 'crusher',
-                                        label: 'Crusher',
-                                        count: crusherGroups.length,
-                                      ),
-                                      ProductionTabItem(
-                                        value: 'gilingan',
-                                        label: 'Gilingan',
-                                        count: gilinganGroups.length,
-                                      ),
-                                      ProductionTabItem(
-                                        value: 'mixer',
-                                        label: 'Mixer',
-                                        count: mixerGroups.length,
-                                      ),
-                                      ProductionTabItem(
-                                        value: 'reject',
-                                        label: 'Reject',
-                                        count: rejectGroups.length,
-                                      ),
+                                      if (_isTabAllowed('broker'))
+                                        ProductionTabItem(
+                                          value: 'broker',
+                                          label: 'Broker',
+                                          count: brokerGroups.length,
+                                        ),
+                                      if (_isTabAllowed('bb'))
+                                        ProductionTabItem(
+                                          value: 'bb',
+                                          label: 'Bahan Baku',
+                                          count: bbGroups.length,
+                                        ),
+                                      if (_isTabAllowed('washing'))
+                                        ProductionTabItem(
+                                          value: 'washing',
+                                          label: 'Washing',
+                                          count: washingGroups.length,
+                                        ),
+                                      if (_isTabAllowed('crusher'))
+                                        ProductionTabItem(
+                                          value: 'crusher',
+                                          label: 'Crusher',
+                                          count: crusherGroups.length,
+                                        ),
+                                      if (_isTabAllowed('gilingan'))
+                                        ProductionTabItem(
+                                          value: 'gilingan',
+                                          label: 'Gilingan',
+                                          count: gilinganGroups.length,
+                                        ),
+                                      if (_isTabAllowed('mixer'))
+                                        ProductionTabItem(
+                                          value: 'mixer',
+                                          label: 'Mixer',
+                                          count: mixerGroups.length,
+                                        ),
+                                      if (_isTabAllowed('reject'))
+                                        ProductionTabItem(
+                                          value: 'reject',
+                                          label: 'Reject',
+                                          count: rejectGroups.length,
+                                        ),
                                     ],
                                     onChanged: (value) {
                                       if (_selectedInputTab == value) return;
@@ -2397,7 +2560,9 @@ class _BrokerOutputTile extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      output.noBroker ?? '-',
+                      (output.namaJenis ?? '').isNotEmpty
+                          ? output.namaJenis!
+                          : (output.noBroker ?? '-'),
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
@@ -2429,7 +2594,7 @@ class _BrokerOutputTile extends StatelessWidget {
               ),
               const SizedBox(height: 1),
               Text(
-                output.namaJenis ?? '-',
+                output.noBroker ?? '-',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
@@ -2565,7 +2730,9 @@ class _BonggolanOutputTile extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      output.noBonggolan ?? '-',
+                      (output.namaBonggolan ?? '').isNotEmpty
+                          ? output.namaBonggolan!
+                          : (output.noBonggolan ?? '-'),
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
@@ -2597,7 +2764,7 @@ class _BonggolanOutputTile extends StatelessWidget {
               ),
               const SizedBox(height: 1),
               Text(
-                output.namaBonggolan ?? '-',
+                output.noBonggolan ?? '-',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(fontSize: 10, color: Colors.grey.shade600),

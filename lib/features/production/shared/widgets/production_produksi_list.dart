@@ -17,6 +17,8 @@ class ProduksiRowData {
   final String? namaFurnitureMaterial;
 
   final String? noProduksi;
+  final String? produksiStatus;
+  final String? completeRequestStatus;
 
   const ProduksiRowData({
     required this.tglProduksi,
@@ -31,10 +33,12 @@ class ProduksiRowData {
     this.namaWarna,
     this.namaFurnitureMaterial,
     this.noProduksi,
+    this.produksiStatus,
+    this.completeRequestStatus,
   });
 }
 
-class ProductionProduksiList<T> extends StatelessWidget {
+class ProductionProduksiList<T> extends StatefulWidget {
   const ProductionProduksiList({
     super.key,
     required this.items,
@@ -45,7 +49,8 @@ class ProductionProduksiList<T> extends StatelessWidget {
     required this.onTap,
     required this.onEdit,
     required this.onDelete,
-    required this.onInput,
+    this.onApprove,
+    this.onReject,
     this.showMesin = true,
   });
 
@@ -57,15 +62,41 @@ class ProductionProduksiList<T> extends StatelessWidget {
   final Future<void> Function(T) onTap;
   final Future<void> Function(T) onEdit;
   final Future<void> Function(T) onDelete;
-  final Future<void> Function(T) onInput;
+  final Future<void> Function(T)? onApprove;
+  final Future<void> Function(T)? onReject;
   final bool showMesin;
 
   @override
+  State<ProductionProduksiList<T>> createState() =>
+      _ProductionProduksiListState<T>();
+}
+
+class _ProductionProduksiListState<T>
+    extends State<ProductionProduksiList<T>> {
+  int? _activeIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    widget.scrollController.removeListener(_onScroll);
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_activeIndex != null && mounted) setState(() => _activeIndex = null);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (isLoading) {
+    if (widget.isLoading) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }
-    if (items.isEmpty) {
+    if (widget.items.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -81,26 +112,79 @@ class ProductionProduksiList<T> extends StatelessWidget {
       );
     }
 
+    final hasActive = _activeIndex != null;
+
     return ListView.builder(
-      controller: scrollController,
+      controller: widget.scrollController,
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
-      itemCount: items.length + (isFetchingMore ? 1 : 0),
+      itemCount: widget.items.length + (widget.isFetchingMore ? 1 : 0),
       itemBuilder: (context, index) {
-        if (index == items.length) {
+        if (index == widget.items.length) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 10),
             child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
           );
         }
-        final item = items[index];
-        final data = dataOf(item);
-        return _ProduksiRow(
-          data: data,
-          showMesin: showMesin,
-          onTap: () => onTap(item),
-          onEdit: () => onEdit(item),
-          onDelete: () => onDelete(item),
-          onInput: () => onInput(item),
+        final item = widget.items[index];
+        final data = widget.dataOf(item);
+        final isActive = _activeIndex == index;
+        return AnimatedOpacity(
+          opacity: hasActive && !isActive ? 0.35 : 1.0,
+          duration: const Duration(milliseconds: 180),
+          child: _ProduksiRow(
+            data: data,
+            showMesin: widget.showMesin,
+            onTap: () => widget.onTap(item),
+            onLongPress: (cardBox) async {
+              setState(() => _activeIndex = index);
+              final overlay =
+                  Overlay.of(context).context.findRenderObject() as RenderBox;
+              final cardOffset = cardBox.localToGlobal(Offset.zero);
+              final cardSize = cardBox.size;
+
+              final isPending = data.completeRequestStatus == 'PENDING';
+              final value = await showMenu<String>(
+                context: context,
+                color: Colors.transparent,
+                shadowColor: Colors.transparent,
+                surfaceTintColor: Colors.transparent,
+                elevation: 0,
+                position: RelativeRect.fromRect(
+                  Rect.fromLTWH(
+                    cardOffset.dx,
+                    cardOffset.dy,
+                    cardSize.width,
+                    cardSize.height,
+                  ),
+                  Offset.zero & overlay.size,
+                ),
+                items: [
+                  PopupMenuItem<String>(
+                    enabled: false,
+                    padding: EdgeInsets.zero,
+                    child: _ContextMenu(
+                      onEdit: () => Navigator.of(context).pop('edit'),
+                      onDelete: () => Navigator.of(context).pop('hapus'),
+                      onApprove: isPending && widget.onApprove != null
+                          ? () => Navigator.of(context).pop('approve')
+                          : null,
+                      onReject: isPending && widget.onReject != null
+                          ? () => Navigator.of(context).pop('reject')
+                          : null,
+                    ),
+                  ),
+                ],
+              );
+
+              if (mounted) setState(() => _activeIndex = null);
+              if (value == 'edit') widget.onEdit(item);
+              if (value == 'hapus') widget.onDelete(item);
+              if (value == 'approve') widget.onApprove?.call(item);
+              if (value == 'reject') widget.onReject?.call(item);
+            },
+            onEdit: () => widget.onEdit(item),
+            onDelete: () => widget.onDelete(item),
+          ),
         );
       },
     );
@@ -111,23 +195,46 @@ const _kBlue = Color(0xFF1D4ED8);
 const _kLocked = Color(0xFFF97316);
 const _kGreen = Color(0xFF059669);
 const _kRed = Color(0xFFDC2626);
+const _kYellow = Color(0xFFD97706);
 
-class _ProduksiRow extends StatelessWidget {
+Color _statusColor(String? status) {
+  switch (status) {
+    case 'current':
+      return _kBlue;
+    case 'pending':
+      return _kYellow;
+    case 'complete':
+      return _kGreen;
+    default:
+      return const Color(0xFFD1D5DB);
+  }
+}
+
+// ── Row widget ────────────────────────────────────────────────────────────────
+
+class _ProduksiRow extends StatefulWidget {
   const _ProduksiRow({
     required this.data,
     required this.showMesin,
     required this.onTap,
+    required this.onLongPress,
     required this.onEdit,
     required this.onDelete,
-    required this.onInput,
   });
 
   final ProduksiRowData data;
   final bool showMesin;
   final VoidCallback onTap;
+  final Future<void> Function(RenderBox) onLongPress;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
-  final VoidCallback onInput;
+
+  @override
+  State<_ProduksiRow> createState() => _ProduksiRowState();
+}
+
+class _ProduksiRowState extends State<_ProduksiRow> {
+  final _key = GlobalKey();
 
   String _fmtDate(DateTime? date) {
     if (date == null) return '-';
@@ -141,29 +248,23 @@ class _ProduksiRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final data = widget.data;
     final hasCetakanInfo = (data.namaCetakan ?? '').trim().isNotEmpty ||
         (data.namaWarna ?? '').trim().isNotEmpty ||
         (data.namaFurnitureMaterial ?? '').trim().isNotEmpty;
 
     final metaItems = <_MetaItem>[
-      if (showMesin)
+      if (widget.showMesin)
         _MetaItem(
           label: 'Mesin',
-          value: data.namaMesin.trim().isNotEmpty
-              ? data.namaMesin.trim()
-              : '-',
+          value:
+              data.namaMesin.trim().isNotEmpty ? data.namaMesin.trim() : '-',
         ),
       if (hasCetakanInfo) ...[
         if ((data.namaCetakan ?? '').trim().isNotEmpty)
-          _MetaItem(
-            label: 'Cetakan',
-            value: data.namaCetakan!.trim(),
-          ),
+          _MetaItem(label: 'Cetakan', value: data.namaCetakan!.trim()),
         if ((data.namaWarna ?? '').trim().isNotEmpty)
-          _MetaItem(
-            label: 'Warna',
-            value: data.namaWarna!.trim(),
-          ),
+          _MetaItem(label: 'Warna', value: data.namaWarna!.trim()),
         _MetaItem(
           label: 'Material',
           value: (data.namaFurnitureMaterial ?? '').trim().isNotEmpty
@@ -186,108 +287,273 @@ class _ProduksiRow extends StatelessWidget {
       ],
     ];
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(10),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.calendar_today_outlined,
-                                  size: 14,
-                                  color: Colors.grey.shade600,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  _fmtDate(data.tglProduksi),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF111827),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Icon(
-                                  Icons.schedule_outlined,
-                                  size: 14,
-                                  color: Colors.grey.shade600,
-                                ),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    '${_fmtTime(data.hourStart)} - ${_fmtTime(data.hourEnd)}',
+    final statusColor = _statusColor(data.produksiStatus);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: RepaintBoundary(
+        key: _key,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(width: 4, color: statusColor),
+                  Expanded(
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: widget.onTap,
+                        onLongPress: () {
+                          final box = _key.currentContext
+                              ?.findRenderObject() as RenderBox?;
+                          if (box != null) widget.onLongPress(box);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.calendar_today_outlined,
+                                      size: 14, color: Colors.grey.shade600),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _fmtDate(data.tglProduksi),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF111827),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF111827)),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Icon(Icons.schedule_outlined,
+                                      size: 14, color: Colors.grey.shade600),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      '${_fmtTime(data.hourStart)} - ${_fmtTime(data.hourEnd)}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF111827)),
                                     ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _TitleBadge(text: 'Shift ${data.shift}'),
+                                  if (data.isLocked)
+                                    const Padding(
+                                      padding: EdgeInsets.only(left: 6),
+                                      child: _StatusChip(
+                                          label: 'Locked',
+                                          foreground: _kLocked,
+                                          background: Color(0xFFFFF7ED)),
+                                    ),
+                                  if (data.completeRequestStatus == 'PENDING')
+                                    const Padding(
+                                      padding: EdgeInsets.only(left: 6),
+                                      child: _StatusChip(
+                                        label: 'Approval',
+                                        foreground: _kYellow,
+                                        background: Color(0xFFFFFBEB),
+                                      ),
+                                    ),
+                                  if (data.completeRequestStatus == 'REJECTED')
+                                    const Padding(
+                                      padding: EdgeInsets.only(left: 6),
+                                      child: _StatusChip(
+                                        label: 'Ditolak',
+                                        foreground: _kRed,
+                                        background: Color(0xFFFEF2F2),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              _MetaSection(items: metaItems),
+                              if ((data.noProduksi ?? '').trim().isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    data.noProduksi!.trim(),
+                                    style: TextStyle(
+                                        fontSize: 10,
+                                        fontStyle: FontStyle.italic,
+                                        color: Colors.grey.shade400),
                                   ),
                                 ),
                               ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          _TitleBadge(text: 'Shift ${data.shift}'),
-                          if (data.isLocked)
-                            const Padding(
-                              padding: EdgeInsets.only(left: 8),
-                              child: _StatusChip(
-                                label: 'Locked',
-                                foreground: _kLocked,
-                                background: Color(0xFFFFF7ED),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      _MetaSection(items: metaItems),
-                      if ((data.noProduksi ?? '').trim().isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            data.noProduksi!.trim(),
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontStyle: FontStyle.italic,
-                              color: Colors.grey.shade400,
-                            ),
+                            ],
                           ),
                         ),
-                      ],
-                    ],
+                      ),
+                    ),
                   ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Context menu (horizontal Edit | Delete) ───────────────────────────────────
+
+class _ContextMenu extends StatelessWidget {
+  const _ContextMenu({
+    required this.onEdit,
+    required this.onDelete,
+    this.onApprove,
+    this.onReject,
+  });
+
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final VoidCallback? onApprove;
+  final VoidCallback? onReject;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasApproval = onApprove != null || onReject != null;
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.22),
+            blurRadius: 24,
+            spreadRadius: 2,
+            offset: const Offset(0, 8),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: IntrinsicWidth(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (hasApproval) ...[
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (onApprove != null)
+                    _MenuBtn(
+                      icon: Icons.check_circle_outline,
+                      label: 'Setujui',
+                      color: _kGreen,
+                      isFirst: true,
+                      isLast: onReject == null,
+                      onTap: onApprove!,
+                    ),
+                  if (onApprove != null && onReject != null)
+                    Container(width: 1, height: 60, color: const Color(0xFFE5E7EB)),
+                  if (onReject != null)
+                    _MenuBtn(
+                      icon: Icons.cancel_outlined,
+                      label: 'Tolak',
+                      color: _kRed,
+                      isFirst: onApprove == null,
+                      isLast: true,
+                      onTap: onReject!,
+                    ),
+                ],
+              ),
+              if (hasApproval)
+                Container(height: 1, color: const Color(0xFFE5E7EB)),
+            ],
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _MenuBtn(
+                  icon: Icons.edit_outlined,
+                  label: 'Edit',
+                  color: _kBlue,
+                  isFirst: !hasApproval,
+                  isLast: false,
+                  onTap: onEdit,
                 ),
-                _ActionMenu(
-                  onInput: onInput,
-                  onEdit: onEdit,
-                  onDelete: onDelete,
+                Container(width: 1, height: 60, color: const Color(0xFFE5E7EB)),
+                _MenuBtn(
+                  icon: Icons.delete_outline,
+                  label: 'Hapus',
+                  color: _kRed,
+                  isFirst: false,
+                  isLast: true,
+                  onTap: onDelete,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MenuBtn extends StatelessWidget {
+  const _MenuBtn({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.isFirst,
+    required this.isLast,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final bool isFirst;
+  final bool isLast;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.horizontal(
+        left: isFirst ? const Radius.circular(12) : Radius.zero,
+        right: isLast ? const Radius.circular(12) : Radius.zero,
+      ),
+      child: Material(
+        color: Colors.white,
+        child: InkWell(
+          onTap: onTap,
+          splashColor: color.withValues(alpha: 0.10),
+          highlightColor: color.withValues(alpha: 0.06),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 22, color: color),
+                const SizedBox(height: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: color),
                 ),
               ],
             ),
@@ -297,6 +563,8 @@ class _ProduksiRow extends StatelessWidget {
     );
   }
 }
+
+// ── Supporting widgets ────────────────────────────────────────────────────────
 
 class _TitleBadge extends StatelessWidget {
   const _TitleBadge({required this.text});
@@ -418,70 +686,6 @@ class _StatusChip extends StatelessWidget {
           fontWeight: FontWeight.w600,
           color: foreground,
         ),
-      ),
-    );
-  }
-}
-
-class _ActionMenu extends StatelessWidget {
-  const _ActionMenu({
-    required this.onInput,
-    required this.onEdit,
-    required this.onDelete,
-  });
-  final VoidCallback onInput;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 32,
-      height: 32,
-      child: PopupMenuButton<String>(
-        padding: EdgeInsets.zero,
-        icon: Icon(Icons.more_vert, size: 18, color: Colors.grey.shade500),
-        tooltip: 'Aksi',
-        onSelected: (value) {
-          if (value == 'input') onInput();
-          if (value == 'edit') onEdit();
-          if (value == 'hapus') onDelete();
-        },
-        itemBuilder: (_) => const [
-          PopupMenuItem(
-            value: 'input',
-            height: 38,
-            child: Row(
-              children: [
-                Icon(Icons.edit_note_outlined, size: 15, color: _kGreen),
-                SizedBox(width: 8),
-                Text('Input', style: TextStyle(fontSize: 13)),
-              ],
-            ),
-          ),
-          PopupMenuItem(
-            value: 'edit',
-            height: 38,
-            child: Row(
-              children: [
-                Icon(Icons.edit_outlined, size: 15, color: _kBlue),
-                SizedBox(width: 8),
-                Text('Edit', style: TextStyle(fontSize: 13)),
-              ],
-            ),
-          ),
-          PopupMenuItem(
-            value: 'hapus',
-            height: 38,
-            child: Row(
-              children: [
-                Icon(Icons.delete_outline, size: 15, color: _kRed),
-                SizedBox(width: 8),
-                Text('Hapus', style: TextStyle(fontSize: 13)),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

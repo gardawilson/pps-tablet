@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-
 import '../../../common/widgets/search_dropdown_field.dart';
 import '../model/jenis_bonggolan_model.dart';
 import '../view_model/jenis_bonggolan_view_model.dart';
@@ -49,7 +48,9 @@ class _JenisBonggolanDropdownState extends State<JenisBonggolanDropdown> {
       if (!mounted) return;
 
       if (widget.preselectId != null && vm.list.isNotEmpty) {
-        final found = vm.list.where((e) => e.idBonggolan == widget.preselectId).toList();
+        final found = vm.list
+            .where((e) => e.idBonggolan == widget.preselectId)
+            .toList();
         if (found.isNotEmpty) {
           setState(() => _value = found.first);
           widget.onChanged?.call(_value);

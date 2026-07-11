@@ -20,9 +20,25 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
 
   final bool showTimeInfo;
   final VoidCallback? onGanti;
+  // Jika diset, tombol Ganti tetap tampil tapi disabled; pesan muncul saat long-press
+  final String? gantiDisabledReason;
+  final VoidCallback? onTerminate;
+  // Jika diset, tombol Terminate tetap tampil tapi disabled; pesan muncul saat long-press
+  final String? terminateDisabledReason;
+  final VoidCallback? onComplete;
+  // Jika diset, tombol Selesai tetap tampil tapi disabled; pesan muncul saat long-press
+  final String? completeDisabledReason;
+  // Jika diset, tombol Selesai tampil amber (menunggu) dengan ikon jam; tooltip dari sini
+  final String? completePendingReason;
+  // Approval actions — muncul saat CompleteRequestStatus == 'PENDING'
+  final VoidCallback? onApprove;
+  final VoidCallback? onReject;
+  final String? pendingApprovalInfo;
   final VoidCallback? onRiwayat;
   final VoidCallback? onRefresh;
   final List<Widget>? trailingActions;
+  final bool showGantiRiwayat;
+  final String? produksiStatus;
 
   const ProductionWorkspaceToolbar({
     super.key,
@@ -41,9 +57,20 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
     this.namaJenisList,
     this.showTimeInfo = true,
     this.onGanti,
+    this.gantiDisabledReason,
+    this.onTerminate,
+    this.terminateDisabledReason,
+    this.onComplete,
+    this.completeDisabledReason,
+    this.completePendingReason,
+    this.onApprove,
+    this.onReject,
+    this.pendingApprovalInfo,
     this.onRiwayat,
     this.onRefresh,
     this.trailingActions,
+    this.showGantiRiwayat = true,
+    this.produksiStatus,
   });
 
   bool _isWithinTimeRange() {
@@ -91,7 +118,7 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
     final hEnd = (hourEnd ?? '').trim();
     final isActive = !isLocked && _isWithinTimeRange();
     final hasJenis = (namaJenis ?? '').trim().isNotEmpty;
-    final canGanti = idMesin != null && shift != null && tglProduksi != null;
+    final canGanti = isActive && idMesin != null && shift != null && tglProduksi != null;
 
     final hasJenisList =
         namaJenisList != null && namaJenisList!.isNotEmpty;
@@ -102,13 +129,27 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
 
     final accentColor = isLocked
         ? lockedAccent
-        : (isActive ? activeAccent : pastAccent);
+        : switch (produksiStatus) {
+            'current' => const Color(0xFF2563EB), // realtime → biru
+            'complete' => const Color(0xFF059669), // complete → hijau
+            'pending' => const Color(0xFFF59E0B), // pending → kuning
+            _ => isActive ? activeAccent : pastAccent,
+          };
     final statusLabel = isLocked
         ? 'Locked'
-        : (isActive ? 'Real-Time' : 'Backdate');
+        : switch (produksiStatus) {
+            'current' => 'Real-Time',
+            'pending' => 'Pending',
+            'complete' => 'Complete',
+            _ => isActive ? 'Real-Time' : 'Pending',
+          };
     final statusIcon = isLocked
         ? Icons.lock_outline
-        : (isActive ? Icons.play_circle_outline : Icons.history_rounded);
+        : switch (produksiStatus) {
+            'current' => Icons.play_circle_outline,
+            'complete' => Icons.check_circle_outline,
+            _ => isActive ? Icons.play_circle_outline : Icons.history_rounded,
+          };
     final jamText = (hStart.isNotEmpty || hEnd.isNotEmpty)
         ? '${hStart.isNotEmpty ? hStart : "--:--"} – ${hEnd.isNotEmpty ? hEnd : "--:--"}'
         : '-- : --';
@@ -257,13 +298,133 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              if (canGanti) ...[
+              if (showGantiRiwayat && canGanti) ...[
                 const SizedBox(width: 4),
+                if (gantiDisabledReason != null)
+                  Tooltip(
+                    message: gantiDisabledReason!,
+                    triggerMode: TooltipTriggerMode.longPress,
+                    showDuration: const Duration(seconds: 3),
+                    child: Material(
+                      color: const Color(0xFFD1D5DB),
+                      borderRadius: BorderRadius.circular(6),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.swap_horiz_rounded, size: 13, color: Color(0xFF9CA3AF)),
+                            SizedBox(width: 4),
+                            Text(
+                              'Ganti',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF9CA3AF),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  Material(
+                    color: accentColor,
+                    borderRadius: BorderRadius.circular(6),
+                    child: InkWell(
+                      onTap: onGanti,
+                      borderRadius: BorderRadius.circular(6),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.swap_horiz_rounded,
+                              size: 13,
+                              color: Colors.white,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              'Ganti',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                if (onTerminate != null || terminateDisabledReason != null) ...[
+                  const SizedBox(width: 4),
+                  if (terminateDisabledReason != null)
+                    Tooltip(
+                      message: terminateDisabledReason!,
+                      triggerMode: TooltipTriggerMode.longPress,
+                      showDuration: const Duration(seconds: 3),
+                      child: Material(
+                        color: const Color(0xFFD1D5DB),
+                        borderRadius: BorderRadius.circular(6),
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.stop_circle_outlined, size: 13, color: Color(0xFF9CA3AF)),
+                              SizedBox(width: 4),
+                              Text(
+                                'Terminate',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF9CA3AF),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Material(
+                      color: const Color(0xFFDC2626),
+                      borderRadius: BorderRadius.circular(6),
+                      child: InkWell(
+                        onTap: onTerminate,
+                        borderRadius: BorderRadius.circular(6),
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.stop_circle_outlined, size: 13, color: Colors.white),
+                              SizedBox(width: 4),
+                              Text(
+                                'Terminate',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ],
+              if (showGantiRiwayat && canGanti) ...[
+                const SizedBox(width: 6),
                 Material(
-                  color: accentColor,
+                  color: primaryColor,
                   borderRadius: BorderRadius.circular(6),
                   child: InkWell(
-                    onTap: onGanti,
+                    onTap: onRiwayat,
                     borderRadius: BorderRadius.circular(6),
                     child: const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -271,13 +432,13 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            Icons.swap_horiz_rounded,
+                            Icons.timeline_rounded,
                             size: 13,
                             color: Colors.white,
                           ),
                           SizedBox(width: 4),
                           Text(
-                            'Ganti',
+                            'Riwayat',
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
@@ -290,37 +451,152 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
                   ),
                 ),
               ],
-              const SizedBox(width: 6),
-              Material(
-                color: primaryColor,
-                borderRadius: BorderRadius.circular(6),
-                child: InkWell(
-                  onTap: onRiwayat,
-                  borderRadius: BorderRadius.circular(6),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.timeline_rounded,
-                          size: 13,
-                          color: Colors.white,
+              if (onComplete != null ||
+                  completeDisabledReason != null ||
+                  completePendingReason != null ||
+                  onApprove != null) ...[
+                const SizedBox(width: 6),
+                if (completeDisabledReason != null)
+                  Tooltip(
+                    message: completeDisabledReason!,
+                    triggerMode: TooltipTriggerMode.longPress,
+                    showDuration: const Duration(seconds: 3),
+                    child: Material(
+                      color: const Color(0xFFD1D5DB),
+                      borderRadius: BorderRadius.circular(6),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check_circle_outline, size: 13, color: Color(0xFF9CA3AF)),
+                            SizedBox(width: 4),
+                            Text(
+                              'Selesai',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF9CA3AF),
+                              ),
+                            ),
+                          ],
                         ),
-                        SizedBox(width: 4),
-                        Text(
-                          'Riwayat',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
+                      ),
+                    ),
+                  )
+                else if (onApprove != null) ...[
+                  Material(
+                    color: const Color(0xFF059669),
+                    borderRadius: BorderRadius.circular(6),
+                    child: InkWell(
+                      onTap: onApprove,
+                      borderRadius: BorderRadius.circular(6),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check, size: 13, color: Colors.white),
+                            SizedBox(width: 4),
+                            Text(
+                              'Setujui',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ),
+                  if (onReject != null) ...[
+                    const SizedBox(width: 6),
+                    Material(
+                      color: const Color(0xFFDC2626),
+                      borderRadius: BorderRadius.circular(6),
+                      child: InkWell(
+                        onTap: onReject,
+                        borderRadius: BorderRadius.circular(6),
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.close, size: 13, color: Colors.white),
+                              SizedBox(width: 4),
+                              Text(
+                                'Tolak',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ]
+                else if (completePendingReason != null)
+                  Tooltip(
+                    message: completePendingReason!,
+                    triggerMode: TooltipTriggerMode.longPress,
+                    showDuration: const Duration(seconds: 3),
+                    child: Material(
+                      color: const Color(0xFFD97706),
+                      borderRadius: BorderRadius.circular(6),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.access_time, size: 13, color: Colors.white),
+                            SizedBox(width: 4),
+                            Text(
+                              'Menunggu',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  Material(
+                    color: const Color(0xFF059669),
+                    borderRadius: BorderRadius.circular(6),
+                    child: InkWell(
+                      onTap: onComplete,
+                      borderRadius: BorderRadius.circular(6),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check_circle_outline, size: 13, color: Colors.white),
+                            SizedBox(width: 4),
+                            Text(
+                              'Selesai',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
               if (showTimeInfo) ...[
                 vline(),
                 if (tglText != null) ...[
@@ -346,20 +622,21 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
                 ),
                 const SizedBox(width: 2),
               ],
-              SizedBox(
-                width: 26,
-                height: 26,
-                child: IconButton(
-                  tooltip: 'Refresh',
-                  padding: EdgeInsets.zero,
-                  onPressed: onRefresh,
-                  icon: Icon(
-                    Icons.refresh,
-                    size: 15,
-                    color: Colors.grey.shade400,
+              if (onRefresh != null)
+                SizedBox(
+                  width: 26,
+                  height: 26,
+                  child: IconButton(
+                    tooltip: 'Refresh',
+                    padding: EdgeInsets.zero,
+                    onPressed: onRefresh,
+                    icon: Icon(
+                      Icons.refresh,
+                      size: 15,
+                      color: Colors.grey.shade400,
+                    ),
                   ),
                 ),
-              ),
               if (trailingActions != null) ...trailingActions!,
             ],
           ),

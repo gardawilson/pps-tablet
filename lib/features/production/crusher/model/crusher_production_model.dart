@@ -33,6 +33,10 @@ class CrusherProduction {
   final DateTime? lastClosedDate; // date only
   final bool isLocked;
 
+  // complete status
+  final bool isComplete;
+  final String? produksiStatus;
+
   /// Convenience: parsed list of outputs (trimmed)
   List<String> get outputNoCrusherList =>
       (outputNoCrusher ?? '')
@@ -68,6 +72,8 @@ class CrusherProduction {
     // ✅ NEW
     this.lastClosedDate,
     this.isLocked = false,
+    this.isComplete = false,
+    this.produksiStatus,
   });
 
   // ---------- tolerant parsers ----------
@@ -176,6 +182,10 @@ class CrusherProduction {
       // ✅ NEW: mapping dari backend
       lastClosedDate: _asDateTime(j['LastClosedDate']),
       isLocked: _asBool(j['IsLocked']),
+      isComplete: _asBool(j['IsComplete'], fallback: false) ||
+          j['status']?.toString() == 'complete',
+      produksiStatus: j['status']?.toString() ??
+          (_asBool(j['IsComplete'], fallback: false) ? 'complete' : 'pending'),
     );
   }
 
@@ -257,6 +267,8 @@ class CrusherProduction {
     String? namaRegu,
     DateTime? lastClosedDate,
     bool? isLocked,
+    bool? isComplete,
+    String? produksiStatus,
   }) {
     return CrusherProduction(
       noCrusherProduksi: noCrusherProduksi ?? this.noCrusherProduksi,
@@ -283,6 +295,8 @@ class CrusherProduction {
       namaRegu: namaRegu ?? this.namaRegu,
       lastClosedDate: lastClosedDate ?? this.lastClosedDate,
       isLocked: isLocked ?? this.isLocked,
+      isComplete: isComplete ?? this.isComplete,
+      produksiStatus: produksiStatus ?? this.produksiStatus,
     );
   }
 }

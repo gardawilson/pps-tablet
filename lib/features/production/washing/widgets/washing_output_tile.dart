@@ -58,7 +58,9 @@ class WashingOutputTile extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      output.noWashing,
+                      output.namaJenis.isNotEmpty
+                          ? output.namaJenis
+                          : output.noWashing,
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
@@ -89,9 +91,9 @@ class WashingOutputTile extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 1),
-              // NamaJenis subtitle
+              // Nomor label subtitle
               Text(
-                output.namaJenis,
+                output.noWashing,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(fontSize: 10, color: Colors.grey.shade600),

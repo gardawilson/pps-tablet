@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'production_stat_badge.dart';
 
-/// Header section panel kiri (daftar mesin).
-/// Menampilkan judul dan badge aktif/nonaktif.
-/// Generic — bisa dipakai di semua modul production.
 class MesinSectionHeader extends StatelessWidget {
   const MesinSectionHeader({
     super.key,
@@ -12,10 +9,12 @@ class MesinSectionHeader extends StatelessWidget {
     required this.activeCount,
     required this.inactiveCount,
     required this.isLoading,
+    this.pendingCount = 0,
   });
 
   final String title;
   final int activeCount;
+  final int pendingCount;
   final int inactiveCount;
   final bool isLoading;
 
@@ -46,6 +45,15 @@ class MesinSectionHeader extends StatelessWidget {
               color: const Color(0xFF16A34A),
               bg: const Color(0xFFDCFCE7),
             ),
+            if (pendingCount > 0) ...[
+              const SizedBox(width: 6),
+              ProductionStatBadge(
+                count: pendingCount,
+                label: 'Pending',
+                color: const Color(0xFFB45309),
+                bg: const Color(0xFFFEF3C7),
+              ),
+            ],
             const SizedBox(width: 6),
             ProductionStatBadge(
               count: inactiveCount,

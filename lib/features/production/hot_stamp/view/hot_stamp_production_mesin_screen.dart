@@ -5,11 +5,16 @@ import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
 import '../../../../features/mesin/model/mesin_model.dart';
 import '../../../shift/repository/shift_repository.dart';
+import '../../shared/models/furniture_wip_stok_item.dart';
+import '../../shared/models/furniture_wip_stok_label.dart';
+import '../../shared/repository/furniture_wip_stok_repository.dart';
 import '../../shared/widgets/mesin_section_header.dart';
 import '../../shared/widgets/production_mesin_card.dart';
 import '../../shared/widgets/production_produksi_list.dart';
+import '../../shared/widgets/production_overlay_drawer.dart';
 import '../../shared/widgets/production_riwayat_header.dart';
-import '../../shared/widgets/riwayat_animated_panel.dart';
+import '../../shared/widgets/sidebar_tab_switcher.dart';
+import '../../shared/widgets/stok_item_section.dart';
 import '../model/hot_stamp_production_model.dart';
 import '../repository/hot_stamp_production_repository.dart';
 import '../view_model/hot_stamp_production_view_model.dart';
@@ -28,6 +33,8 @@ class HotStampProductionMesinScreen extends StatefulWidget {
 class _HotStampProductionMesinScreenState
     extends State<HotStampProductionMesinScreen> {
   final _prodRepo = HotStampProductionRepository();
+  final _furnitureWipStokRepo = FurnitureWipStokRepository();
+  final _stokSectionController = StokItemSectionController();
   Future<List<HotStampMesinInfo>> _mesinFuture = Future.value(
     <HotStampMesinInfo>[],
   );
@@ -41,7 +48,8 @@ class _HotStampProductionMesinScreenState
   final _produksiScrollCtl = ScrollController();
   int? _filterIdMesin;
   HotStampMesinInfo? _selectedMesinInfo;
-  bool _isRiwayatExpanded = true;
+  bool _isRiwayatExpanded = false;
+  int _sidebarTab = 0; // 0 = Riwayat Produksi, 1 = Stok Item
 
   @override
   void initState() {
@@ -125,6 +133,7 @@ class _HotStampProductionMesinScreenState
   void _refreshAll() {
     _loadMesin();
     _loadProduksiPage();
+    _stokSectionController.refreshAll();
   }
 
   Future<void> _openBackdateDialog(HotStampMesinInfo mesin) async {
@@ -299,11 +308,10 @@ class _HotStampProductionMesinScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       body: LayoutBuilder(
-        builder: (_, c) => Row(
+        builder: (_, c) => Stack(
           children: [
-            // ── LEFT: mesin grid (3/5) ──────────────────────────────
-            Expanded(
-              flex: 3,
+            // ── Mesin grid (selalu full width) ──────────────────────
+            Positioned.fill(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -382,165 +390,205 @@ class _HotStampProductionMesinScreenState
               ),
             ),
 
-            // ── RIGHT: riwayat produksi ──────────────────────────
-            RiwayatAnimatedPanel(
-              expandedWidth: c.maxWidth * 0.4,
-              isExpanded: _isRiwayatExpanded,
-              onToggle: () =>
-                  setState(() => _isRiwayatExpanded = !_isRiwayatExpanded),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  FutureBuilder<List<HotStampMesinInfo>>(
-                    future: _mesinFuture,
-                    builder: (context, snapshot) {
-                      return ProductionRiwayatHeader(
-                        mesinList: (snapshot.data ?? [])
-                            .map(
-                              (m) => MesinFilterItem(
-                                idMesin: m.idMesin,
-                                namaMesin: m.namaMesin,
-                              ),
-                            )
-                            .toList(),
-                        selectedIdMesin: _filterIdMesin,
-                        onFilterChanged: (id) {
-                          final mesinData = snapshot.data ?? [];
-                          setState(() {
-                            _filterIdMesin = id;
-                            _selectedMesinInfo = id == null
-                                ? null
-                                : mesinData
-                                      .where((m) => m.idMesin == id)
-                                      .firstOrNull;
-                          });
-                          _loadProduksiPage();
-                        },
-                        onToggle: () => setState(
-                          () => _isRiwayatExpanded = !_isRiwayatExpanded,
+            // ── Overlay drawer: Riwayat Produksi / Stok Item ────────
+            Positioned.fill(
+              child: ProductionOverlayDrawer(
+                isOpen: _isRiwayatExpanded,
+                onClose: () => setState(() => _isRiwayatExpanded = false),
+                width: c.maxWidth * 0.4,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SidebarTabSwitcher(
+                      tabs: const [
+                        SidebarTabItem(
+                          label: 'Riwayat Produksi',
+                          icon: Icons.history_rounded,
                         ),
-                        isExpanded: _isRiwayatExpanded,
-                      );
-                    },
-                  ),
-                  Expanded(
-                    child: Stack(
-                      children: [
-                        RefreshIndicator(
-                          onRefresh: _loadProduksiPage,
-                          child: ProductionProduksiList<HotStampProduction>(
-                            items: _produksiItems,
-                            dataOf: _toRowData,
-                            isLoading: _produksiLoading,
-                            isFetchingMore: _produksiFetchingMore,
-                            scrollController: _produksiScrollCtl,
-                            showMesin: _filterIdMesin == null,
-                            onTap: (row) async {
-                              await Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      HotStampingProductionInputScreen(
-                                        noProduksi: row.noProduksi,
-                                      ),
-                                ),
-                              );
-                              if (mounted) _refreshAll();
-                            },
-                            onEdit: (row) async {
-                              final editVm = HotStampProductionViewModel();
-                              try {
-                                await showDialog<void>(
-                                  context: context,
-                                  barrierDismissible: false,
-                                  builder: (_) => ChangeNotifierProvider.value(
-                                    value: editVm,
-                                    child: HotStampProductionFormDialog(
-                                      header: row,
-                                    ),
-                                  ),
-                                );
-                              } finally {
-                                editVm.dispose();
-                              }
-                              if (mounted) _refreshAll();
-                            },
-                            onDelete: (row) async {
-                              await showDialog<void>(
-                                context: context,
-                                barrierDismissible: false,
-                                builder: (ctx) => HotStampProductionDeleteDialog(
-                                  header: row,
-                                  onConfirm: () async {
-                                    final deleteVm =
-                                        HotStampProductionViewModel();
-                                    final success = await deleteVm
-                                        .deleteProduksi(row.noProduksi);
-                                    final errMsg = deleteVm.saveError;
-                                    deleteVm.dispose();
-                                    if (ctx.mounted) Navigator.of(ctx).pop();
-                                    if (!mounted) return;
-                                    if (success) {
-                                      // ignore: use_build_context_synchronously
-                                      showDialog(
-                                        context: context,
-                                        builder: (_) => SuccessStatusDialog(
-                                          title: 'Berhasil Menghapus',
-                                          message:
-                                              'No. Produksi ${row.noProduksi} berhasil dihapus.',
-                                        ),
-                                      );
-                                    } else {
-                                      // ignore: use_build_context_synchronously
-                                      showDialog(
-                                        context: context,
-                                        builder: (_) => ErrorStatusDialog(
-                                          title: 'Gagal Menghapus!',
-                                          message:
-                                              errMsg ?? 'Gagal menghapus data',
-                                        ),
-                                      );
-                                    }
-                                    _refreshAll();
-                                  },
-                                ),
-                              );
-                            },
-                            onInput: (row) async {
-                              await Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      HotStampingProductionInputScreen(
-                                        noProduksi: row.noProduksi,
-                                      ),
-                                ),
-                              );
-                              if (mounted) _refreshAll();
-                            },
-                          ),
+                        SidebarTabItem(
+                          label: 'Stok Item',
+                          icon: Icons.inventory_2_rounded,
                         ),
-                        if (_selectedMesinInfo != null)
-                          Positioned(
-                            right: 16,
-                            bottom: 16,
-                            child: FloatingActionButton.small(
-                              heroTag: 'fab_backdate_hotstamp',
-                              onPressed: () =>
-                                  _openBackdateDialog(_selectedMesinInfo!),
-                              backgroundColor: const Color(0xFF1D4ED8),
-                              foregroundColor: Colors.white,
-                              tooltip: 'Tambah Backdate',
-                              child: const Icon(Icons.add),
-                            ),
-                          ),
                       ],
+                      selectedIndex: _sidebarTab,
+                      onSelected: (i) => setState(() => _sidebarTab = i),
+                      onToggle: () =>
+                          setState(() => _isRiwayatExpanded = false),
                     ),
-                  ),
-                ],
+                    Expanded(
+                      child: _sidebarTab == 0
+                          ? _buildRiwayatContent()
+                          : _buildStokItemContent(),
+                    ),
+                  ],
+                ),
               ),
             ),
+
+            // ── Toggle: buka drawer saat tertutup ────────────────────
+            if (!_isRiwayatExpanded)
+              Positioned(
+                right: 0,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: ProductionOverlayDrawerToggle(
+                    onPressed: () => setState(() => _isRiwayatExpanded = true),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
+    );
+  }
+
+  // ── Stok Item: chip kategori (Furniture WIP) ────────────────────────────────
+
+  Widget _buildStokItemContent() {
+    return StokItemSection(
+      controller: _stokSectionController,
+      sources: [
+        TypedStokItemSource<FurnitureWipStokItem, FurnitureWipStokLabel>(
+          label: 'Furniture WIP',
+          fetchStok: _furnitureWipStokRepo.fetchStok,
+          fetchLabel: (item) =>
+              _furnitureWipStokRepo.fetchLabel(item.idCabinetWip),
+          sakColumnLabel: 'PCS',
+          oldestDateOf: (item) => item.dateCreateTertua,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRiwayatContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FutureBuilder<List<HotStampMesinInfo>>(
+          future: _mesinFuture,
+          builder: (context, snapshot) {
+            return ProductionRiwayatHeader(
+              showTitle: false,
+              mesinList: (snapshot.data ?? [])
+                  .map(
+                    (m) => MesinFilterItem(
+                      idMesin: m.idMesin,
+                      namaMesin: m.namaMesin,
+                    ),
+                  )
+                  .toList(),
+              selectedIdMesin: _filterIdMesin,
+              onFilterChanged: (id) {
+                final mesinData = snapshot.data ?? [];
+                setState(() {
+                  _filterIdMesin = id;
+                  _selectedMesinInfo = id == null
+                      ? null
+                      : mesinData.where((m) => m.idMesin == id).firstOrNull;
+                });
+                _loadProduksiPage();
+              },
+            );
+          },
+        ),
+        Expanded(
+          child: Stack(
+            children: [
+              RefreshIndicator(
+                onRefresh: _loadProduksiPage,
+                child: ProductionProduksiList<HotStampProduction>(
+                  items: _produksiItems,
+                  dataOf: _toRowData,
+                  isLoading: _produksiLoading,
+                  isFetchingMore: _produksiFetchingMore,
+                  scrollController: _produksiScrollCtl,
+                  showMesin: _filterIdMesin == null,
+                  onTap: (row) async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => HotStampingProductionInputScreen(
+                          noProduksi: row.noProduksi,
+                        ),
+                      ),
+                    );
+                    if (mounted) _refreshAll();
+                  },
+                  onEdit: (row) async {
+                    final editVm = HotStampProductionViewModel();
+                    try {
+                      await showDialog<void>(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (_) => ChangeNotifierProvider.value(
+                          value: editVm,
+                          child: HotStampProductionFormDialog(header: row),
+                        ),
+                      );
+                    } finally {
+                      editVm.dispose();
+                    }
+                    if (mounted) _refreshAll();
+                  },
+                  onDelete: (row) async {
+                    await showDialog<void>(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (ctx) => HotStampProductionDeleteDialog(
+                        header: row,
+                        onConfirm: () async {
+                          final deleteVm = HotStampProductionViewModel();
+                          final success = await deleteVm.deleteProduksi(
+                            row.noProduksi,
+                          );
+                          final errMsg = deleteVm.saveError;
+                          deleteVm.dispose();
+                          if (ctx.mounted) Navigator.of(ctx).pop();
+                          if (!mounted) return;
+                          if (success) {
+                            // ignore: use_build_context_synchronously
+                            showDialog(
+                              context: context,
+                              builder: (_) => SuccessStatusDialog(
+                                title: 'Berhasil Menghapus',
+                                message:
+                                    'No. Produksi ${row.noProduksi} berhasil dihapus.',
+                              ),
+                            );
+                          } else {
+                            // ignore: use_build_context_synchronously
+                            showDialog(
+                              context: context,
+                              builder: (_) => ErrorStatusDialog(
+                                title: 'Gagal Menghapus!',
+                                message: errMsg ?? 'Gagal menghapus data',
+                              ),
+                            );
+                          }
+                          _refreshAll();
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+              if (_selectedMesinInfo != null)
+                Positioned(
+                  right: 16,
+                  bottom: 16,
+                  child: FloatingActionButton.small(
+                    heroTag: 'fab_backdate_hotstamp',
+                    onPressed: () => _openBackdateDialog(_selectedMesinInfo!),
+                    backgroundColor: const Color(0xFF1D4ED8),
+                    foregroundColor: Colors.white,
+                    tooltip: 'Tambah Backdate',
+                    child: const Icon(Icons.add),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

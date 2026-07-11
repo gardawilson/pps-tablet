@@ -12,6 +12,7 @@ import '../model/inject_production_model.dart';
 import '../model/furniture_wip_by_inject_production_model.dart';
 import '../model/packing_by_inject_production_model.dart';
 import '../model/inject_batch_model.dart';
+import '../model/inject_qc_model.dart';
 
 class InjectProductionRepository {
   final ApiClient api;
@@ -98,6 +99,17 @@ class InjectProductionRepository {
       'totalPages': totalPages,
       'total': totalData,
     };
+  }
+
+  /// Fetch single production header by noProduksi (to get IsRealtime flag).
+  Future<InjectProduction?> fetchOneByNoProduksi(String noProduksi) async {
+    final result = await fetchAll(
+      page: 1,
+      pageSize: 1,
+      search: noProduksi,
+    );
+    final items = result['items'] as List<InjectProduction>;
+    return items.isNotEmpty ? items.first : null;
   }
 
   /* =============================
@@ -407,6 +419,7 @@ class InjectProductionRepository {
     required int idCetakan,
     required int idWarna,
     int? idFurnitureMaterial,
+    Map<String, dynamic>? batch,
   }) async {
     final tgl =
         '${tglProduksi.year.toString().padLeft(4, '0')}-${tglProduksi.month.toString().padLeft(2, '0')}-${tglProduksi.day.toString().padLeft(2, '0')}';
@@ -417,6 +430,7 @@ class InjectProductionRepository {
       'idWarna': idWarna,
       if (idFurnitureMaterial != null)
         'idFurnitureMaterial': idFurnitureMaterial,
+      if (batch != null) 'batch': batch,
     };
     try {
       return await api.postJson(path, body: body);
@@ -441,6 +455,69 @@ class InjectProductionRepository {
     return InjectPcsPerLabelResult.fromJson(
       body['data'] as Map<String, dynamic>? ?? {},
     );
+  }
+
+  /* =============================
+   * TERMINATE
+   * POST /api/production/inject/:noProduksi/terminate
+   * ============================= */
+
+  Future<void> terminate({
+    required String noProduksi,
+    required String hourStart,
+    required String hourEnd,
+    double? berat,
+    double? cycleTime,
+    int? counter,
+    required List<Map<String, dynamic>> items,
+    int? idBonggolan,
+    double? beratBonggolan,
+    int? idReject,
+    double? beratReject,
+  }) async {
+    final encoded = Uri.encodeComponent(noProduksi.trim());
+    final body = <String, dynamic>{
+      'hourStart': hourStart,
+      'hourEnd': hourEnd,
+      if (berat != null) 'berat': berat,
+      if (cycleTime != null) 'cycleTime': cycleTime,
+      if (counter != null) 'counter': counter,
+      'items': items,
+      if (idBonggolan != null && beratBonggolan != null)
+        'bonggolan': {'idBonggolan': idBonggolan, 'berat': beratBonggolan},
+      if (idReject != null && beratReject != null)
+        'reject': {'idReject': idReject, 'berat': beratReject},
+    };
+    try {
+      await api.postJson('/api/production/inject/$encoded/terminate', body: body);
+    } on ApiException catch (e) {
+      final parsed = _tryDecodeMap(e.responseBody);
+      final msg = (parsed['message'] as String?) ??
+          'Gagal terminate produksi (HTTP ${e.statusCode})';
+      throw Exception(msg);
+    }
+  }
+
+  /* =============================
+   * COMPLETE (request approval)
+   * PATCH /api/production/inject/:noProduksi/complete
+   * Sekarang mengirim request approval — response { status: "pending_approval" }
+   * jika berhasil, atau langsung IsComplete = 1 jika auto-approve.
+   * ============================= */
+
+  Future<Map<String, dynamic>> completeProduksi(String noProduksi) async {
+    final encoded = Uri.encodeComponent(noProduksi.trim());
+    try {
+      final body = await api.patchJson(
+        '/api/production/inject/$encoded/complete',
+      );
+      return body;
+    } on ApiException catch (e) {
+      final parsed = _tryDecodeMap(e.responseBody);
+      final msg = (parsed['message'] as String?) ??
+          'Gagal mengirim permintaan penyelesaian (HTTP ${e.statusCode})';
+      throw Exception(msg);
+    }
   }
 
   /* =============================
@@ -486,6 +563,113 @@ class InjectProductionRepository {
       final msg =
           (parsed['message'] as String?) ??
           'Gagal submit batch (HTTP ${e.statusCode})';
+      throw Exception(msg);
+    }
+  }
+
+  /* =============================
+   * QC
+   * POST :7500/api/production/inject/qc
+   * GET  :7500/api/production/inject/qc/:noProduksi
+   * ============================= */
+
+  Future<InjectQcItem> submitQc(Map<String, dynamic> payload) async {
+    try {
+      final body = await api.postJson(
+        '/api/production/inject/qc',
+        body: payload,
+      );
+      return InjectQcItem.fromJson(
+        body['data'] as Map<String, dynamic>? ?? {},
+      );
+    } on ApiException catch (e) {
+      final parsed = _tryDecodeMap(e.responseBody);
+      final msg =
+          (parsed['message'] as String?) ??
+          'Gagal submit QC (HTTP ${e.statusCode})';
+      throw Exception(msg);
+    }
+  }
+
+  Future<List<InjectQcItem>> fetchQc(String noProduksi) async {
+    try {
+      final body = await api.getJson(
+        '/api/production/inject/qc/$noProduksi',
+      );
+      final raw = body['data'] as List<dynamic>? ?? [];
+      return raw
+          .map((e) => InjectQcItem.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on ApiException catch (e) {
+      throw Exception('Gagal memuat QC (HTTP ${e.statusCode})');
+    }
+  }
+
+  /// GET :7500/api/production/inject/qc/counter/:idMesin
+  ///
+  /// Mengambil nilai odometer/counter mesin saat ini. Dipakai sebagai
+  /// nilai default sekaligus batas minimum wajib pada field counter QC.
+  Future<int?> fetchQcCounter(int idMesin) async {
+    try {
+      final body = await api.getJson(
+        '/api/production/inject/qc/counter/$idMesin',
+      );
+      final data = body['data'] as Map<String, dynamic>?;
+      final raw = data?['counterCurrent'];
+      if (raw == null) return null;
+      if (raw is int) return raw;
+      if (raw is num) return raw.toInt();
+      return int.tryParse(raw.toString());
+    } on ApiException catch (e) {
+      if (e.statusCode == 404) return null;
+      rethrow;
+    }
+  }
+
+  Future<InjectQcItem> updateQc(int id, Map<String, dynamic> payload) async {
+    try {
+      final body = await api.putJson(
+        '/api/production/inject/qc/$id',
+        body: payload,
+      );
+      return InjectQcItem.fromJson(body['data'] as Map<String, dynamic>);
+    } on ApiException catch (e) {
+      final msg = (e.responseBody?.isNotEmpty == true) ? e.responseBody! : 'Gagal update QC (HTTP ${e.statusCode})';
+      throw Exception(msg);
+    }
+  }
+
+  /* =============================
+   * COMPLETE APPROVAL
+   * ============================= */
+
+  /// GET /api/production/inject/complete-requests/pending
+  Future<List<String>> fetchPendingCompleteRequests() async {
+    try {
+      final body = await api.getJson(
+        '/api/production/inject/complete-requests/pending',
+      );
+      final data = body['data'] as List<dynamic>? ?? [];
+      return data
+          .map((e) => e is Map ? (e['NoProduksi']?.toString() ?? '') : '')
+          .where((s) => s.isNotEmpty)
+          .toList();
+    } on ApiException {
+      return [];
+    }
+  }
+
+  /// PATCH /api/production/inject/:noProduksi/complete/approve
+  Future<void> approveComplete(String noProduksi) async {
+    final encoded = Uri.encodeComponent(noProduksi.trim());
+    try {
+      await api.patchJson(
+        '/api/production/inject/$encoded/complete/approve',
+      );
+    } on ApiException catch (e) {
+      final parsed = _tryDecodeMap(e.responseBody);
+      final msg = (parsed['message'] as String?) ??
+          'Gagal menyetujui penyelesaian (HTTP ${e.statusCode})';
       throw Exception(msg);
     }
   }

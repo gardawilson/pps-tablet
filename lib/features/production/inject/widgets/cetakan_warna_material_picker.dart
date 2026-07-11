@@ -275,7 +275,7 @@ class CetakanWarnaMaterialPickerField extends StatelessWidget {
             _VerticalDivider(),
             _Col(
               icon: Icons.inventory_2_outlined,
-              label: 'MATERIAL',
+              label: 'BHN PENDUKUNG',
               value: hasMaterial ? (selectedMaterial!.nama ?? '-') : null,
               hint: 'Opsional',
               optional: true,
@@ -755,7 +755,7 @@ class _CetakanWarnaMaterialPickerDialogState
                       child: Column(
                         children: [
                           _ColHeader(
-                            label: 'MATERIAL',
+                            label: 'BAHAN PENDUKUNG',
                             icon: Icons.inventory_2_outlined,
                             color: const Color(0xFF475569),
                           ),
@@ -1495,7 +1495,7 @@ class _PanduanTableHeader extends StatelessWidget {
           const Expanded(
             flex: 3,
             child: Text(
-              'MATERIAL',
+              'BAHAN PENDUKUNG',
               style: TextStyle(
                 fontSize: 9,
                 fontWeight: FontWeight.w700,

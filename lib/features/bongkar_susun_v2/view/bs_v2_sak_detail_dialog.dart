@@ -49,7 +49,9 @@ class BsV2SakDetailDialog extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          lbl.labelCode,
+                          lbl.namaJenis.isNotEmpty
+                              ? lbl.namaJenis
+                              : lbl.labelCode,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 14,
@@ -57,7 +59,7 @@ class BsV2SakDetailDialog extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          lbl.namaJenis,
+                          lbl.labelCode,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.7),
                             fontSize: 11,

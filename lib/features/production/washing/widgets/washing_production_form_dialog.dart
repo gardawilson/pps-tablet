@@ -14,6 +14,7 @@ import 'package:pps_tablet/features/washing_type/model/washing_type_model.dart';
 import 'package:pps_tablet/features/washing_type/widgets/washing_type_dropdown.dart';
 
 import '../../../../common/widgets/app_number_field.dart';
+import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../core/network/endpoints.dart';
 import '../../../../core/services/token_storage.dart';
 import '../../../../core/utils/time_formatter.dart';
@@ -335,8 +336,13 @@ class _WashingProductionFormDialogState
       widget.onSave?.call(result);
       Navigator.of(context).pop(result);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(prodVm.saveError ?? 'Gagal menyimpan data')),
+      final errMsg = prodVm.saveError ?? 'Gagal menyimpan data produksi';
+      await showDialog<void>(
+        context: context,
+        builder: (_) => ErrorStatusDialog(
+          title: 'Gagal Menyimpan',
+          message: errMsg,
+        ),
       );
     }
   }

@@ -16,6 +16,10 @@ class BrokerWorkspaceToolbar extends StatelessWidget {
   final VoidCallback? onGanti;
   final VoidCallback? onTimeline;
   final VoidCallback? onRefresh;
+  final bool showGantiRiwayat;
+  final VoidCallback? onComplete;
+  final String? completeDisabledReason;
+  final String? produksiStatus;
 
   const BrokerWorkspaceToolbar({
     super.key,
@@ -30,6 +34,10 @@ class BrokerWorkspaceToolbar extends StatelessWidget {
     this.onGanti,
     this.onTimeline,
     this.onRefresh,
+    this.showGantiRiwayat = true,
+    this.onComplete,
+    this.completeDisabledReason,
+    this.produksiStatus,
   });
 
   @override
@@ -47,6 +55,10 @@ class BrokerWorkspaceToolbar extends StatelessWidget {
       onGanti: onGanti,
       onRiwayat: onTimeline,
       onRefresh: onRefresh,
+      showGantiRiwayat: showGantiRiwayat,
+      onComplete: onComplete,
+      completeDisabledReason: completeDisabledReason,
+      produksiStatus: produksiStatus,
     );
   }
 }

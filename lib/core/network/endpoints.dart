@@ -209,4 +209,94 @@ class ApiConstants {
     final encodedPallet = Uri.encodeComponent(noPallet);
     return 'http://$host:7500/api/labels/bahan-baku/$encodedBB/pallet/$encodedPallet/pdf/';
   }
+
+  static String get stokBahanBakuProses {
+    final host = Uri.parse(baseUrl).host;
+    return 'http://$host:7500/api/master/bahan-baku/proses/stok';
+  }
+
+  static String stokBahanBakuProsesLabel(int idJenis) {
+    final host = Uri.parse(baseUrl).host;
+    return 'http://$host:7500/api/master/bahan-baku/proses/$idJenis/label';
+  }
+
+  static String get mstWashingStok {
+    final host = Uri.parse(baseUrl).host;
+    return 'http://$host:7500/api/mst-washing/stok';
+  }
+
+  static String mstWashingStokLabel(int idWashing) {
+    final host = Uri.parse(baseUrl).host;
+    return 'http://$host:7500/api/mst-washing/$idWashing/label';
+  }
+
+  static String get mstCrusherStok {
+    final host = Uri.parse(baseUrl).host;
+    return 'http://$host:7500/api/mst-crusher/stok';
+  }
+
+  static String mstCrusherStokLabel(int idCrusher) {
+    final host = Uri.parse(baseUrl).host;
+    return 'http://$host:7500/api/mst-crusher/$idCrusher/label';
+  }
+
+  static String get stokBahanBakuPakai {
+    final host = Uri.parse(baseUrl).host;
+    return 'http://$host:7500/api/master/bahan-baku/pakai/stok';
+  }
+
+  static String stokBahanBakuPakaiLabel(int idBB) {
+    final host = Uri.parse(baseUrl).host;
+    return 'http://$host:7500/api/master/bahan-baku/pakai/$idBB/label';
+  }
+
+  static String get mstBrokerStok {
+    final host = Uri.parse(baseUrl).host;
+    return 'http://$host:7500/api/mst-broker/stok';
+  }
+
+  static String mstBrokerStokLabel(int idBroker) {
+    final host = Uri.parse(baseUrl).host;
+    return 'http://$host:7500/api/mst-broker/$idBroker/label';
+  }
+
+  static String get mstFurnitureWipStok {
+    final host = Uri.parse(baseUrl).host;
+    return 'http://$host:7500/api/mst-furniture-wip/stok';
+  }
+
+  static String mstFurnitureWipStokLabel(int idCabinetWip) {
+    final host = Uri.parse(baseUrl).host;
+    return 'http://$host:7500/api/mst-furniture-wip/$idCabinetWip/label';
+  }
+
+  static String get mstMixerStok {
+    final host = Uri.parse(baseUrl).host;
+    return 'http://$host:7500/api/mst-mixer/stok';
+  }
+
+  static String mstMixerStokLabel(int idMixer) {
+    final host = Uri.parse(baseUrl).host;
+    return 'http://$host:7500/api/mst-mixer/$idMixer/label';
+  }
+
+  static String get rejectTypeStok {
+    final host = Uri.parse(baseUrl).host;
+    return 'http://$host:7500/api/reject-type/stok';
+  }
+
+  static String rejectTypeStokLabel(int idReject) {
+    final host = Uri.parse(baseUrl).host;
+    return 'http://$host:7500/api/reject-type/$idReject/label';
+  }
+
+  static String get mstBonggolanStok {
+    final host = Uri.parse(baseUrl).host;
+    return 'http://$host:7500/api/mst-bonggolan/stok';
+  }
+
+  static String mstBonggolanStokLabel(int idBonggolan) {
+    final host = Uri.parse(baseUrl).host;
+    return 'http://$host:7500/api/mst-bonggolan/$idBonggolan/label';
+  }
 }

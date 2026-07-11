@@ -41,6 +41,7 @@ import 'package:pps_tablet/features/production/washing/view/washing_production_m
 import 'package:pps_tablet/features/report/view/report_list_screen.dart';
 import 'package:pps_tablet/features/sortir_reject_v2/view/sr_v2_list_screen.dart';
 import 'package:pps_tablet/features/stock_opname/view/stock_opname_list_screen.dart';
+import 'package:pps_tablet/features/stock_opname_v2/view/so_v2_kategori_list_screen.dart';
 import 'package:provider/provider.dart';
 
 class BreadcrumbSegment {
@@ -490,6 +491,8 @@ class _AppShellState extends State<AppShell> {
         return const BsV2ListScreen();
       case '/shell/sortir-reject':
         return const SrV2ListScreen();
+      case '/shell/stock-opname-v2':
+        return const SoV2KategoriListScreen();
       case '/shell/bj-jual':
         return const BJJualScreen();
       case '/shell/laporan':

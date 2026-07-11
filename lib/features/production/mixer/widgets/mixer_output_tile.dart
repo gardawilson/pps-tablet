@@ -51,7 +51,7 @@ class MixerOutputTile extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      output.noMixer,
+                      output.namaJenis.isNotEmpty ? output.namaJenis : output.noMixer,
                       style: const TextStyle(
                         fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF1A1D23),
                       ),
@@ -72,7 +72,7 @@ class MixerOutputTile extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 1),
-              Text(output.namaJenis,
+              Text(output.noMixer,
                   maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
               const SizedBox(height: 4),

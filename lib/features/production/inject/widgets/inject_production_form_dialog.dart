@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../core/network/endpoints.dart';
 import '../../../../core/services/token_storage.dart';
 import '../../../../core/utils/date_formatter.dart';
@@ -462,10 +463,12 @@ class _InjectProductionFormDialogState
       widget.onSave?.call(result);
       Navigator.of(context).pop(result);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(prodVm.saveError ?? 'Gagal menyimpan data'),
-          backgroundColor: Colors.red,
+      final errMsg = prodVm.saveError ?? 'Gagal menyimpan data produksi';
+      await showDialog<void>(
+        context: context,
+        builder: (_) => ErrorStatusDialog(
+          title: 'Gagal Menyimpan',
+          message: errMsg,
         ),
       );
     }

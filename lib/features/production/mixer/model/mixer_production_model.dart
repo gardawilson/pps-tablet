@@ -37,6 +37,10 @@ class MixerProduction {
   final DateTime? lastClosedDate;
   final bool isLocked;
 
+  // complete status
+  final bool isComplete;
+  final String? produksiStatus;
+
   const MixerProduction({
     required this.noProduksi,
     required this.idOperator,
@@ -62,6 +66,8 @@ class MixerProduction {
     this.hourEnd,
     this.lastClosedDate,
     this.isLocked = false,
+    this.isComplete = false,
+    this.produksiStatus,
   });
 
   // ---------- tolerant parsers ----------
@@ -172,6 +178,10 @@ class MixerProduction {
       hourEnd: _asTimeHHmm(j['HourEnd']),
       lastClosedDate: _asDateTime(j['LastClosedDate']),
       isLocked: _asBool(j['IsLocked']),
+      isComplete: _asBool(j['IsComplete'], fallback: false) ||
+          j['status']?.toString() == 'complete',
+      produksiStatus: j['status']?.toString() ??
+          (_asBool(j['IsComplete'], fallback: false) ? 'complete' : 'pending'),
     );
   }
 
@@ -285,6 +295,8 @@ class MixerProduction {
     String? hourEnd,
     DateTime? lastClosedDate,
     bool? isLocked,
+    bool? isComplete,
+    String? produksiStatus,
   }) {
     return MixerProduction(
       noProduksi: noProduksi ?? this.noProduksi,
@@ -311,6 +323,8 @@ class MixerProduction {
       hourEnd: hourEnd ?? this.hourEnd,
       lastClosedDate: lastClosedDate ?? this.lastClosedDate,
       isLocked: isLocked ?? this.isLocked,
+      isComplete: isComplete ?? this.isComplete,
+      produksiStatus: produksiStatus ?? this.produksiStatus,
     );
   }
 }

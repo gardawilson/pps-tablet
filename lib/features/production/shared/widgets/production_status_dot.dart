@@ -1,15 +1,33 @@
 import 'package:flutter/material.dart';
 
-/// Dot indikator status aktif/tidak aktif pada kartu mesin.
-/// Hijau = aktif, Merah = tidak aktif.
-class ProductionStatusDot extends StatelessWidget {
-  const ProductionStatusDot({super.key, required this.active});
+import '../../../production/inject/model/inject_production_model.dart';
 
-  final bool active;
+/// Dot indikator status mesin.
+/// - Gunakan [active] (bool) untuk modul yang hanya punya 2 state.
+/// - Gunakan [machineStatus] untuk inject yang punya 3 state (active/pending/inactive).
+class ProductionStatusDot extends StatelessWidget {
+  const ProductionStatusDot({
+    super.key,
+    this.active,
+    this.machineStatus,
+  });
+
+  final bool? active;
+  final MachineStatus? machineStatus;
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? const Color(0xFF16A34A) : const Color(0xFFDC2626);
+    final Color color;
+    if (machineStatus != null) {
+      color = switch (machineStatus!) {
+        MachineStatus.active => const Color(0xFF16A34A),
+        MachineStatus.pending => const Color(0xFFD97706),
+        MachineStatus.inactive => const Color(0xFFDC2626),
+      };
+    } else {
+      color = (active ?? false) ? const Color(0xFF16A34A) : const Color(0xFFDC2626);
+    }
+
     return Container(
       width: 7,
       height: 7,

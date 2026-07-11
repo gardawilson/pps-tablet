@@ -190,6 +190,12 @@ class _HomeSidebarState extends State<HomeSidebar> {
       icon: Icons.checklist_rtl_rounded,
       route: '/stockopname',
     ),
+    _MenuItem(
+      title: 'Stock Opname V2',
+      subtitle: 'Stock opname per kategori (baru)',
+      icon: Icons.fact_check_outlined,
+      route: '/shell/stock-opname-v2',
+    ),
   ];
 
   static List<_MenuItem> get _laporanItems => <_MenuItem>[

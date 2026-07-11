@@ -5,11 +5,19 @@ import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
 import '../../../../features/mesin/model/mesin_model.dart';
 import '../../../shift/repository/shift_repository.dart';
+import '../../shared/models/crusher_stok_item.dart';
+import '../../shared/models/crusher_stok_label.dart';
+import '../../shared/models/washing_stok_item.dart';
+import '../../shared/models/washing_stok_label.dart';
+import '../../shared/repository/crusher_stok_repository.dart';
+import '../../shared/repository/washing_stok_repository.dart';
 import '../../shared/widgets/mesin_section_header.dart';
 import '../../shared/widgets/production_mesin_card.dart';
 import '../../shared/widgets/production_produksi_list.dart';
+import '../../shared/widgets/production_overlay_drawer.dart';
 import '../../shared/widgets/production_riwayat_header.dart';
-import '../../shared/widgets/riwayat_animated_panel.dart';
+import '../../shared/widgets/sidebar_tab_switcher.dart';
+import '../../shared/widgets/stok_item_section.dart';
 import '../model/broker_production_model.dart';
 import '../repository/broker_production_repository.dart';
 import '../view_model/broker_production_view_model.dart';
@@ -28,6 +36,9 @@ class BrokerProductionMesinScreen extends StatefulWidget {
 class _BrokerProductionMesinScreenState
     extends State<BrokerProductionMesinScreen> {
   final _prodRepo = BrokerProductionRepository();
+  final _stokRepo = WashingStokRepository();
+  final _crusherStokRepo = CrusherStokRepository();
+  final _stokSectionController = StokItemSectionController();
   Future<List<BrokerMesinInfo>> _mesinFuture = Future.value(
     <BrokerMesinInfo>[],
   );
@@ -41,7 +52,8 @@ class _BrokerProductionMesinScreenState
   final _produksiScrollCtl = ScrollController();
   int? _filterIdMesin;
   BrokerMesinInfo? _selectedMesinInfo;
-  bool _isRiwayatExpanded = true;
+  bool _isRiwayatExpanded = false;
+  int _sidebarTab = 0; // 0 = Riwayat Produksi, 1 = Stok Item
 
   @override
   void initState() {
@@ -125,6 +137,7 @@ class _BrokerProductionMesinScreenState
   void _refreshAll() {
     _loadMesin();
     _loadProduksiPage();
+    _stokSectionController.refreshAll();
   }
 
   // ── Card / row data converters ────────────────────────────────────────────
@@ -159,6 +172,7 @@ class _BrokerProductionMesinScreenState
       namaRegu: row.namaRegu,
       outputJenisNama: row.outputJenisNama,
       noProduksi: row.noProduksi,
+      produksiStatus: row.produksiStatus,
     );
   }
 
@@ -191,9 +205,8 @@ class _BrokerProductionMesinScreenState
       if (created != null) {
         await Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => BrokerProductionInputScreen(
-              noProduksi: created.noProduksi,
-            ),
+            builder: (_) =>
+                BrokerProductionInputScreen(noProduksi: created.noProduksi),
           ),
         );
         if (!mounted) return;
@@ -233,9 +246,8 @@ class _BrokerProductionMesinScreenState
     if (created != null) {
       await Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => BrokerProductionInputScreen(
-            noProduksi: created.noProduksi,
-          ),
+          builder: (_) =>
+              BrokerProductionInputScreen(noProduksi: created.noProduksi),
         ),
       );
       if (!mounted) return;
@@ -254,9 +266,8 @@ class _BrokerProductionMesinScreenState
     }
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => BrokerProductionInputScreen(
-          noProduksi: item.noProduksi,
-        ),
+        builder: (_) =>
+            BrokerProductionInputScreen(noProduksi: item.noProduksi),
       ),
     );
     if (!mounted) return;
@@ -269,240 +280,292 @@ class _BrokerProductionMesinScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       body: LayoutBuilder(
-        builder: (_, c) => Row(
-        children: [
-          // ── LEFT: mesin grid (3/5) ──────────────────────────────
-          Expanded(
-            flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                FutureBuilder<List<BrokerMesinInfo>>(
-                  future: _mesinFuture,
-                  builder: (context, snapshot) {
-                    final allMesin = snapshot.data ?? [];
-                    final activeCount = allMesin
-                        .where((m) => m.isActive)
-                        .length;
-                    final inactiveCount = allMesin.length - activeCount;
-                    return MesinSectionHeader(
-                      title: 'Status Mesin Broker',
-                      activeCount: activeCount,
-                      inactiveCount: inactiveCount,
-                      isLoading:
-                          snapshot.connectionState == ConnectionState.waiting,
-                    );
-                  },
-                ),
-                Expanded(
-                  child: FutureBuilder<List<BrokerMesinInfo>>(
-                    future: _mesinFuture,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      if (snapshot.hasError) {
-                        return Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Text(
-                              'Gagal memuat mesin\n${snapshot.error}',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF64748B),
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-                      final allMesin = snapshot.data ?? [];
-                      return LayoutBuilder(
-                        builder: (context, constraints) {
-                          final cols = (constraints.maxWidth / 150)
-                              .floor()
-                              .clamp(2, 6);
-                          return GridView.builder(
-                            padding: const EdgeInsets.all(12),
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: cols,
-                                  mainAxisExtent: 110,
-                                  crossAxisSpacing: 10,
-                                  mainAxisSpacing: 10,
-                                ),
-                            itemCount: allMesin.length,
-                            itemBuilder: (context, index) {
-                              final mesin = allMesin[index];
-                              return ProductionMesinCard(
-                                data: _toMesinCardData(mesin),
-                                onTap: () => _onMesinTap(mesin),
-                              );
-                            },
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // ── RIGHT: riwayat produksi ──────────────────────────
-          RiwayatAnimatedPanel(
-            expandedWidth: c.maxWidth * 0.4,
-            isExpanded: _isRiwayatExpanded,
-            onToggle: () => setState(() => _isRiwayatExpanded = !_isRiwayatExpanded),
-            child: Column(
+        builder: (_, c) => Stack(
+          children: [
+            // ── Mesin grid (selalu full width) ──────────────────────
+            Positioned.fill(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   FutureBuilder<List<BrokerMesinInfo>>(
                     future: _mesinFuture,
                     builder: (context, snapshot) {
-                      return ProductionRiwayatHeader(
-                        mesinList: (snapshot.data ?? [])
-                            .map(
-                              (m) => MesinFilterItem(
-                                idMesin: m.idMesin,
-                                namaMesin: m.namaMesin,
-                              ),
-                            )
-                            .toList(),
-                        selectedIdMesin: _filterIdMesin,
-                        onFilterChanged: (id) {
-                          final mesinData = snapshot.data ?? [];
-                          setState(() {
-                            _filterIdMesin = id;
-                            _selectedMesinInfo = id == null
-                                ? null
-                                : mesinData
-                                      .where((m) => m.idMesin == id)
-                                      .firstOrNull;
-                          });
-                          _loadProduksiPage();
-                        },
-                        onToggle: () => setState(() => _isRiwayatExpanded = !_isRiwayatExpanded),
-                        isExpanded: _isRiwayatExpanded,
+                      final allMesin = snapshot.data ?? [];
+                      final activeCount = allMesin
+                          .where((m) => m.isActive)
+                          .length;
+                      final inactiveCount = allMesin.length - activeCount;
+                      return MesinSectionHeader(
+                        title: 'Status Mesin Broker',
+                        activeCount: activeCount,
+                        inactiveCount: inactiveCount,
+                        isLoading:
+                            snapshot.connectionState == ConnectionState.waiting,
                       );
                     },
                   ),
                   Expanded(
-                    child: Stack(
-                      children: [
-                        RefreshIndicator(
-                          onRefresh: _loadProduksiPage,
-                          child: ProductionProduksiList<BrokerProduction>(
-                            items: _produksiItems,
-                            dataOf: _toRowData,
-                            isLoading: _produksiLoading,
-                            isFetchingMore: _produksiFetchingMore,
-                            scrollController: _produksiScrollCtl,
-                            showMesin: _filterIdMesin == null,
-                            onTap: (row) async {
-                              await Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => BrokerProductionInputScreen(
-                                    noProduksi: row.noProduksi,
-                                  ),
+                    child: FutureBuilder<List<BrokerMesinInfo>>(
+                      future: _mesinFuture,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+                        if (snapshot.hasError) {
+                          return Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Text(
+                                'Gagal memuat mesin\n${snapshot.error}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF64748B),
                                 ),
-                              );
-                              if (mounted) _refreshAll();
-                            },
-                            onEdit: (row) async {
-                              final editVm = BrokerProductionViewModel();
-                              try {
-                                await showDialog<void>(
-                                  context: context,
-                                  barrierDismissible: false,
-                                  builder: (_) => ChangeNotifierProvider.value(
-                                    value: editVm,
-                                    child: BrokerProductionFormDialog(
-                                      header: row,
-                                    ),
-                                  ),
-                                );
-                              } finally {
-                                editVm.dispose();
-                              }
-                              if (mounted) _refreshAll();
-                            },
-                            onDelete: (row) async {
-                              await showDialog<void>(
-                                context: context,
-                                barrierDismissible: false,
-                                builder: (ctx) => BrokerProductionDeleteDialog(
-                                  header: row,
-                                  onConfirm: () async {
-                                    final deleteVm =
-                                        BrokerProductionViewModel();
-                                    final success = await deleteVm
-                                        .deleteProduksi(row.noProduksi);
-                                    final errMsg = deleteVm.saveError;
-                                    deleteVm.dispose();
-                                    if (ctx.mounted) Navigator.of(ctx).pop();
-                                    if (!mounted) return;
-                                    if (success) {
-                                      // ignore: use_build_context_synchronously
-                                      showDialog(
-                                        context: context,
-                                        builder: (_) => SuccessStatusDialog(
-                                          title: 'Berhasil Menghapus',
-                                          message:
-                                              'No. Produksi ${row.noProduksi} berhasil dihapus.',
-                                        ),
-                                      );
-                                    } else {
-                                      // ignore: use_build_context_synchronously
-                                      showDialog(
-                                        context: context,
-                                        builder: (_) => ErrorStatusDialog(
-                                          title: 'Gagal Menghapus!',
-                                          message:
-                                              errMsg ?? 'Gagal menghapus data',
-                                        ),
-                                      );
-                                    }
-                                    _refreshAll();
-                                  },
-                                ),
-                              );
-                            },
-                            onInput: (row) async {
-                              await Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => BrokerProductionInputScreen(
-                                    noProduksi: row.noProduksi,
-                                  ),
-                                ),
-                              );
-                              if (mounted) _refreshAll();
-                            },
-                          ),
-                        ),
-                        if (_selectedMesinInfo != null)
-                          Positioned(
-                            right: 16,
-                            bottom: 16,
-                            child: FloatingActionButton.small(
-                              heroTag: 'fab_backdate_broker',
-                              onPressed: () =>
-                                  _openBackdateDialog(_selectedMesinInfo!),
-                              backgroundColor: const Color(0xFF1D4ED8),
-                              foregroundColor: Colors.white,
-                              tooltip: 'Tambah Backdate',
-                              child: const Icon(Icons.add),
+                              ),
                             ),
-                          ),
-                      ],
+                          );
+                        }
+                        final allMesin = snapshot.data ?? [];
+                        return LayoutBuilder(
+                          builder: (context, constraints) {
+                            final cols = (constraints.maxWidth / 150)
+                                .floor()
+                                .clamp(2, 6);
+                            return GridView.builder(
+                              padding: const EdgeInsets.all(12),
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: cols,
+                                    mainAxisExtent: 110,
+                                    crossAxisSpacing: 10,
+                                    mainAxisSpacing: 10,
+                                  ),
+                              itemCount: allMesin.length,
+                              itemBuilder: (context, index) {
+                                final mesin = allMesin[index];
+                                return ProductionMesinCard(
+                                  data: _toMesinCardData(mesin),
+                                  onTap: () => _onMesinTap(mesin),
+                                );
+                              },
+                            );
+                          },
+                        );
+                      },
                     ),
                   ),
                 ],
               ),
             ),
-        ],
+
+            // ── Overlay drawer: Riwayat Produksi / Stok Item ────────
+            Positioned.fill(
+              child: ProductionOverlayDrawer(
+                isOpen: _isRiwayatExpanded,
+                onClose: () => setState(() => _isRiwayatExpanded = false),
+                width: c.maxWidth * 0.4,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SidebarTabSwitcher(
+                      tabs: const [
+                        SidebarTabItem(
+                          label: 'Riwayat Produksi',
+                          icon: Icons.history_rounded,
+                        ),
+                        SidebarTabItem(
+                          label: 'Stok Item',
+                          icon: Icons.inventory_2_rounded,
+                        ),
+                      ],
+                      selectedIndex: _sidebarTab,
+                      onSelected: (i) => setState(() => _sidebarTab = i),
+                      onToggle: () =>
+                          setState(() => _isRiwayatExpanded = false),
+                    ),
+                    Expanded(
+                      child: _sidebarTab == 0
+                          ? _buildRiwayatContent()
+                          : _buildStokItemContent(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // ── Toggle: buka drawer saat tertutup ────────────────────
+            if (!_isRiwayatExpanded)
+              Positioned(
+                right: 0,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: ProductionOverlayDrawerToggle(
+                    onPressed: () => setState(() => _isRiwayatExpanded = true),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
-    ),
+    );
+  }
+
+  // ── Stok Item: filter by chip kategori (Stok Washing / Stok Crusher) ──────
+
+  Widget _buildStokItemContent() {
+    return StokItemSection(
+      controller: _stokSectionController,
+      sources: [
+        TypedStokItemSource<WashingStokItem, WashingStokLabel>(
+          label: 'Washing',
+          fetchStok: _stokRepo.fetchStok,
+          fetchLabel: (item) => _stokRepo.fetchLabel(item.idWashing),
+          oldestDateOf: (item) => item.dateCreateTertua,
+        ),
+        TypedStokItemSource<CrusherStokItem, CrusherStokLabel>(
+          label: 'Crusher',
+          fetchStok: _crusherStokRepo.fetchStok,
+          fetchLabel: (item) => _crusherStokRepo.fetchLabel(item.idCrusher),
+          showSakColumn: false,
+          oldestDateOf: (item) => item.dateCreateTertua,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRiwayatContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FutureBuilder<List<BrokerMesinInfo>>(
+          future: _mesinFuture,
+          builder: (context, snapshot) {
+            return ProductionRiwayatHeader(
+              showTitle: false,
+              mesinList: (snapshot.data ?? [])
+                  .map(
+                    (m) => MesinFilterItem(
+                      idMesin: m.idMesin,
+                      namaMesin: m.namaMesin,
+                    ),
+                  )
+                  .toList(),
+              selectedIdMesin: _filterIdMesin,
+              onFilterChanged: (id) {
+                final mesinData = snapshot.data ?? [];
+                setState(() {
+                  _filterIdMesin = id;
+                  _selectedMesinInfo = id == null
+                      ? null
+                      : mesinData.where((m) => m.idMesin == id).firstOrNull;
+                });
+                _loadProduksiPage();
+              },
+            );
+          },
+        ),
+        Expanded(
+          child: Stack(
+            children: [
+              RefreshIndicator(
+                onRefresh: _loadProduksiPage,
+                child: ProductionProduksiList<BrokerProduction>(
+                  items: _produksiItems,
+                  dataOf: _toRowData,
+                  isLoading: _produksiLoading,
+                  isFetchingMore: _produksiFetchingMore,
+                  scrollController: _produksiScrollCtl,
+                  showMesin: _filterIdMesin == null,
+                  onTap: (row) async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => BrokerProductionInputScreen(
+                          noProduksi: row.noProduksi,
+                        ),
+                      ),
+                    );
+                    if (mounted) _refreshAll();
+                  },
+                  onEdit: (row) async {
+                    final editVm = BrokerProductionViewModel();
+                    try {
+                      await showDialog<void>(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (_) => ChangeNotifierProvider.value(
+                          value: editVm,
+                          child: BrokerProductionFormDialog(header: row),
+                        ),
+                      );
+                    } finally {
+                      editVm.dispose();
+                    }
+                    if (mounted) _refreshAll();
+                  },
+                  onDelete: (row) async {
+                    await showDialog<void>(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (ctx) => BrokerProductionDeleteDialog(
+                        header: row,
+                        onConfirm: () async {
+                          final deleteVm = BrokerProductionViewModel();
+                          final success = await deleteVm.deleteProduksi(
+                            row.noProduksi,
+                          );
+                          final errMsg = deleteVm.saveError;
+                          deleteVm.dispose();
+                          if (ctx.mounted) Navigator.of(ctx).pop();
+                          if (!mounted) return;
+                          if (success) {
+                            // ignore: use_build_context_synchronously
+                            showDialog(
+                              context: context,
+                              builder: (_) => SuccessStatusDialog(
+                                title: 'Berhasil Menghapus',
+                                message:
+                                    'No. Produksi ${row.noProduksi} berhasil dihapus.',
+                              ),
+                            );
+                          } else {
+                            // ignore: use_build_context_synchronously
+                            showDialog(
+                              context: context,
+                              builder: (_) => ErrorStatusDialog(
+                                title: 'Gagal Menghapus!',
+                                message: errMsg ?? 'Gagal menghapus data',
+                              ),
+                            );
+                          }
+                          _refreshAll();
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+              if (_selectedMesinInfo != null)
+                Positioned(
+                  right: 16,
+                  bottom: 16,
+                  child: FloatingActionButton.small(
+                    heroTag: 'fab_backdate_broker',
+                    onPressed: () => _openBackdateDialog(_selectedMesinInfo!),
+                    backgroundColor: const Color(0xFF1D4ED8),
+                    foregroundColor: Colors.white,
+                    tooltip: 'Tambah Backdate',
+                    child: const Icon(Icons.add),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

@@ -9,12 +9,14 @@ class ProductionSmallInfoRow extends StatelessWidget {
     required this.text,
     this.bold = false,
     this.color,
+    this.maxLines = 1,
   });
 
   final IconData icon;
   final String text;
   final bool bold;
   final Color? color;
+  final int maxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +28,7 @@ class ProductionSmallInfoRow extends StatelessWidget {
         Expanded(
           child: Text(
             text,
-            maxLines: 1,
+            maxLines: maxLines,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 9,

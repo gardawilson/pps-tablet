@@ -426,7 +426,7 @@ class _MixerProductionMesinScreenState
       controller: _stokSectionController,
       sources: [
         TypedStokItemSource<StokBahanBakuItem, BahanBakuProsesLabel>(
-          label: 'Bahan Baku',
+          label: 'Bahan Baku Pakai',
           fetchStok: _stokRepo.fetchStok,
           fetchLabel: (item) => _stokRepo.fetchLabel(item.idBB),
           oldestDateOf: (item) => item.dateCreateTertua,

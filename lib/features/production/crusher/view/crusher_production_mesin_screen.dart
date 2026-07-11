@@ -425,7 +425,7 @@ class _CrusherProductionMesinScreenState
       controller: _stokSectionController,
       sources: [
         TypedStokItemSource<BonggolanStokItem, BonggolanStokLabel>(
-          label: 'Stok Bonggolan',
+          label: 'Bonggolan',
           fetchStok: _bonggolanStokRepo.fetchStok,
           fetchLabel: (item) => _bonggolanStokRepo.fetchLabel(item.idBonggolan),
           showSakColumn: false,

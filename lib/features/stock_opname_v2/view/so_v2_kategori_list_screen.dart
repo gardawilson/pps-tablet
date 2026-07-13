@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../common/widgets/confirm_dialog.dart';
+import '../../../common/widgets/loading_dialog.dart';
 import '../model/so_v2_kategori.dart';
 import '../view_model/so_v2_kategori_list_view_model.dart';
-import '../widgets/so_v2_generate_date_dialog.dart';
 import '../widgets/so_v2_status_badge.dart';
 import 'so_v2_detail_screen.dart';
 
@@ -14,8 +15,7 @@ class SoV2KategoriListScreen extends StatefulWidget {
   const SoV2KategoriListScreen({super.key});
 
   @override
-  State<SoV2KategoriListScreen> createState() =>
-      _SoV2KategoriListScreenState();
+  State<SoV2KategoriListScreen> createState() => _SoV2KategoriListScreenState();
 }
 
 class _SoV2KategoriListScreenState extends State<SoV2KategoriListScreen> {
@@ -36,14 +36,37 @@ class _SoV2KategoriListScreenState extends State<SoV2KategoriListScreen> {
 
   Future<void> _onTapKategori(SoV2Kategori kategori) async {
     if (kategori.status == SoV2Status.notStarted) {
-      final date = await showDialog<DateTime>(
+      showDialog(
         context: context,
-        builder: (_) => SoV2GenerateDateDialog(
-          categoryName: kategori.categoryName,
+        barrierDismissible: false,
+        builder: (_) => const LoadingDialog(message: 'Memuat preview...'),
+      );
+      final preview = await _vm.previewGenerate(categoryId: kategori.categoryId);
+      if (!mounted) return;
+      Navigator.pop(context); // close loading
+      if (preview.errorMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(preview.errorMessage!),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+        return;
+      }
+
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (_) => ConfirmDialog(
+          title: 'Generate Stock Opname',
+          message: preview.message!,
+          confirmLabel: 'Generate',
+          confirmIcon: Icons.playlist_add_check_rounded,
+          confirmColor: const Color(0xFF1E6FD9),
         ),
       );
-      if (date == null) return;
-      final res = await _vm.generate(categoryId: kategori.categoryId, date: date);
+      if (confirmed != true) return;
+
+      final res = await _vm.generate(categoryId: kategori.categoryId);
       if (!mounted) return;
       if (res.errorMessage != null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -59,7 +82,8 @@ class _SoV2KategoriListScreenState extends State<SoV2KategoriListScreen> {
         MaterialPageRoute(
           builder: (_) => SoV2DetailScreen(
             stockOpnameNo: result['stockOpnameNo'].toString(),
-            categoryCode: result['categoryCode']?.toString() ?? kategori.categoryCode,
+            categoryCode:
+                result['categoryCode']?.toString() ?? kategori.categoryCode,
           ),
         ),
       );
@@ -77,6 +101,43 @@ class _SoV2KategoriListScreenState extends State<SoV2KategoriListScreen> {
     }
   }
 
+  Future<void> _onDeleteKategori(SoV2Kategori kategori) async {
+    final stockOpnameNo = kategori.stockOpnameNo;
+    if (stockOpnameNo == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => ConfirmDialog(
+        title: 'Hapus Stock Opname',
+        message:
+            'Yakin ingin menghapus stock opname $stockOpnameNo '
+            '("${kategori.categoryName}")? Semua data hasil scan yang '
+            'sudah tercatat akan ikut terhapus dan tidak dapat dikembalikan.',
+        confirmLabel: 'Hapus',
+        confirmIcon: Icons.delete_outline_rounded,
+      ),
+    );
+    if (confirmed != true) return;
+
+    final errorMessage = await _vm.deleteStockOpname(stockOpnameNo);
+    if (!mounted) return;
+    if (errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$stockOpnameNo berhasil dihapus'),
+        backgroundColor: Colors.green.shade700,
+      ),
+    );
+    _vm.load();
+  }
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider<SoV2KategoriListViewModel>.value(
@@ -85,10 +146,7 @@ class _SoV2KategoriListScreenState extends State<SoV2KategoriListScreen> {
         builder: (context, vm, _) {
           return Scaffold(
             backgroundColor: _kSurface,
-            body: RefreshIndicator(
-              onRefresh: vm.load,
-              child: _buildBody(vm),
-            ),
+            body: RefreshIndicator(onRefresh: vm.load, child: _buildBody(vm)),
           );
         },
       ),
@@ -103,10 +161,17 @@ class _SoV2KategoriListScreenState extends State<SoV2KategoriListScreen> {
       return ListView(
         children: [
           const SizedBox(height: 80),
-          Icon(Icons.error_outline_rounded, size: 40, color: Colors.red.shade300),
+          Icon(
+            Icons.error_outline_rounded,
+            size: 40,
+            color: Colors.red.shade300,
+          ),
           const SizedBox(height: 12),
           Center(
-            child: Text(vm.error!, style: TextStyle(color: Colors.red.shade700)),
+            child: Text(
+              vm.error!,
+              style: TextStyle(color: Colors.red.shade700),
+            ),
           ),
         ],
       );
@@ -121,10 +186,7 @@ class _SoV2KategoriListScreenState extends State<SoV2KategoriListScreen> {
     }
     return LayoutBuilder(
       builder: (context, constraints) {
-        final crossAxisCount = (constraints.maxWidth / 220).floor().clamp(
-          1,
-          8,
-        );
+        final crossAxisCount = (constraints.maxWidth / 220).floor().clamp(1, 8);
         return GridView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: vm.items.length,
@@ -139,6 +201,9 @@ class _SoV2KategoriListScreenState extends State<SoV2KategoriListScreen> {
             return _KategoriTile(
               kategori: kategori,
               onTap: () => _onTapKategori(kategori),
+              onDelete: kategori.stockOpnameNo == null
+                  ? null
+                  : () => _onDeleteKategori(kategori),
             );
           },
         );
@@ -150,14 +215,22 @@ class _SoV2KategoriListScreenState extends State<SoV2KategoriListScreen> {
 class _KategoriTile extends StatelessWidget {
   final SoV2Kategori kategori;
   final VoidCallback onTap;
+  final VoidCallback? onDelete;
 
-  const _KategoriTile({required this.kategori, required this.onTap});
+  const _KategoriTile({
+    required this.kategori,
+    required this.onTap,
+    this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
     final percent = (kategori.progress * 100).round();
-    final complete = kategori.labelCount > 0 && kategori.scannedCount >= kategori.labelCount;
-    final progressColor = complete ? const Color(0xFF0A7349) : const Color(0xFF1E6FD9);
+    final complete =
+        kategori.labelCount > 0 && kategori.scannedCount >= kategori.labelCount;
+    final progressColor = complete
+        ? const Color(0xFF0A7349)
+        : const Color(0xFF1E6FD9);
 
     return InkWell(
       onTap: onTap,
@@ -196,6 +269,21 @@ class _KategoriTile extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
                 SoV2StatusBadge(status: kategori.status),
+                if (onDelete != null) ...[
+                  const SizedBox(width: 4),
+                  InkWell(
+                    onTap: onDelete,
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.all(2),
+                      child: Icon(
+                        Icons.delete_outline_rounded,
+                        size: 16,
+                        color: Colors.red.shade400,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 4),

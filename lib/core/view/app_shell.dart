@@ -107,38 +107,59 @@ class _AppShellState extends State<AppShell> {
       },
       child: Scaffold(
         body: SafeArea(
-          child: Row(
+          child: Stack(
+            clipBehavior: Clip.none,
             children: [
-              HomeSidebar(
-                navigatorKey: AppShell.shellNavigatorKey,
-                isCollapsed: _sidebarCollapsed,
-                onToggleCollapse: () =>
-                    setState(() => _sidebarCollapsed = !_sidebarCollapsed),
-                onNavigate: (title, {String? parentTitle}) {
-                  if (parentTitle != null) {
-                    AppShell.breadcrumb.value = [
-                      BreadcrumbSegment(parentTitle),
-                      BreadcrumbSegment(title),
-                    ];
-                  } else {
-                    AppShell.breadcrumb.value = [BreadcrumbSegment(title)];
-                  }
-                },
-              ),
-              Expanded(
-                child: Column(
-                  children: [
-                    _buildCompactAppBar(context),
-                    Expanded(
-                      child: ClipRect(
-                        child: Navigator(
-                          key: AppShell.shellNavigatorKey,
-                          initialRoute: '/shell/welcome',
-                          onGenerateRoute: _generateRoute,
-                        ),
-                      ),
+              Row(
+                children: [
+                  HomeSidebar(
+                    navigatorKey: AppShell.shellNavigatorKey,
+                    isCollapsed: _sidebarCollapsed,
+                    onToggleCollapse: () => setState(
+                      () => _sidebarCollapsed = !_sidebarCollapsed,
                     ),
-                  ],
+                    onNavigate: (title, {String? parentTitle}) {
+                      if (parentTitle != null) {
+                        AppShell.breadcrumb.value = [
+                          BreadcrumbSegment(parentTitle),
+                          BreadcrumbSegment(title),
+                        ];
+                      } else {
+                        AppShell.breadcrumb.value = [BreadcrumbSegment(title)];
+                      }
+                    },
+                  ),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        _buildCompactAppBar(context),
+                        Expanded(
+                          child: ClipRect(
+                            child: Navigator(
+                              key: AppShell.shellNavigatorKey,
+                              initialRoute: '/shell/welcome',
+                              onGenerateRoute: _generateRoute,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              // ── Toggle handle: menempel di garis tepi sidebar, separuh
+              // di dalam & separuh menonjol ke konten. Dirender di sini
+              // (bukan di dalam HomeSidebar) supaya tergambar di atas
+              // area konten, tidak tertutup olehnya.
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeInOut,
+                left: (_sidebarCollapsed ? 64.0 : 260.0) - 14,
+                top: 26,
+                child: SidebarToggleHandle(
+                  isCollapsed: _sidebarCollapsed,
+                  onTap: () =>
+                      setState(() => _sidebarCollapsed = !_sidebarCollapsed),
                 ),
               ),
             ],

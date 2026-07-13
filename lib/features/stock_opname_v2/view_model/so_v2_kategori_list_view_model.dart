@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:intl/intl.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_error.dart';
@@ -30,21 +29,45 @@ class SoV2KategoriListViewModel extends ChangeNotifier {
     }
   }
 
+  /// Return preview message on success, or an error message string.
+  Future<({String? message, String? errorMessage})> previewGenerate({
+    required int categoryId,
+  }) async {
+    try {
+      final preview = await repository.previewGenerate(categoryId: categoryId);
+      return (message: preview.message, errorMessage: null);
+    } on ApiException catch (e) {
+      return (message: null, errorMessage: apiErrorMessage(e));
+    } catch (e) {
+      return (message: null, errorMessage: e.toString());
+    }
+  }
+
   /// Return null + result map on success, or an error message string.
   Future<({Map<String, dynamic>? result, String? errorMessage})> generate({
     required int categoryId,
-    required DateTime date,
   }) async {
     try {
       final result = await repository.generateNoStockOpname(
         categoryId: categoryId,
-        date: DateFormat('yyyy-MM-dd').format(date),
       );
       return (result: result, errorMessage: null);
     } on ApiException catch (e) {
       return (result: null, errorMessage: apiErrorMessage(e));
     } catch (e) {
       return (result: null, errorMessage: e.toString());
+    }
+  }
+
+  /// Return null on success, or an error message string.
+  Future<String?> deleteStockOpname(String stockOpnameNo) async {
+    try {
+      await repository.deleteStockOpname(stockOpnameNo);
+      return null;
+    } on ApiException catch (e) {
+      return apiErrorMessage(e);
+    } catch (e) {
+      return e.toString();
     }
   }
 }

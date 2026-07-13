@@ -18,17 +18,32 @@ class SoV2Repository {
         .toList();
   }
 
+  Future<({String message, Map<String, dynamic> data})> previewGenerate({
+    required int categoryId,
+  }) async {
+    final body = await _api.getJson(
+      '/api/stock-opname-v2/no-stock-opname/preview',
+      query: {'categoryId': categoryId},
+    );
+    final data = body['data'] as Map<String, dynamic>?;
+    if (data == null) throw Exception('Response tidak mengandung data');
+    return (message: body['message']?.toString() ?? '', data: data);
+  }
+
   Future<Map<String, dynamic>> generateNoStockOpname({
     required int categoryId,
-    required String date,
   }) async {
     final body = await _api.postJson(
       '/api/stock-opname-v2/no-stock-opname',
-      body: {'categoryId': categoryId, 'date': date},
+      body: {'categoryId': categoryId},
     );
     final data = body['data'] as Map<String, dynamic>?;
     if (data == null) throw Exception('Response tidak mengandung data');
     return data;
+  }
+
+  Future<void> deleteStockOpname(String stockOpnameNo) async {
+    await _api.deleteJson('/api/stock-opname-v2/no-stock-opname/$stockOpnameNo');
   }
 
   Future<List<String>> fetchBlok() async {

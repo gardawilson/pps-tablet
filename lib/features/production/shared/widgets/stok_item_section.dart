@@ -40,6 +40,7 @@ class TypedStokItemSource<T extends StokItemData, L extends StokLabelData>
     required this.fetchLabel,
     this.showSakColumn = true,
     this.sakColumnLabel = 'SAK',
+    this.showBeratColumn = true,
     this.oldestDateOf,
   });
 
@@ -47,6 +48,10 @@ class TypedStokItemSource<T extends StokItemData, L extends StokLabelData>
   final Future<List<L>> Function(T item) fetchLabel;
   final bool showSakColumn;
   final String sakColumnLabel;
+
+  /// Set `false` bila UOM item ini murni satuan ([sakSisa]) dan berat
+  /// tidak relevan untuk ditampilkan — mis. Furniture WIP (Pcs).
+  final bool showBeratColumn;
   final DateTime? Function(T item)? oldestDateOf;
 
   @override
@@ -122,12 +127,16 @@ class _StokItemSourcePaneState<T extends StokItemData, L extends StokLabelData>
         isLoading: _loading,
         errorMessage: _error,
         oldestDateOf: widget.source.oldestDateOf,
+        showSakColumn: widget.source.showSakColumn,
+        sakColumnLabel: widget.source.sakColumnLabel,
+        showBeratColumn: widget.source.showBeratColumn,
         onTap: (item) => showDialog<void>(
           context: context,
           builder: (_) => StokItemLabelDialog<T, L>(
             item: item,
             showSakColumn: widget.source.showSakColumn,
             sakColumnLabel: widget.source.sakColumnLabel,
+            showBeratColumn: widget.source.showBeratColumn,
             fetchLabels: widget.source.fetchLabel,
           ),
         ),

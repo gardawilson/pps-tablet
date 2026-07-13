@@ -9,12 +9,17 @@ class ProductionOverlayDrawer extends StatelessWidget {
     super.key,
     required this.isOpen,
     required this.onClose,
+    required this.onOpen,
     required this.child,
     this.width,
   });
 
   final bool isOpen;
   final VoidCallback onClose;
+
+  /// Dipanggil saat tab pembuka (floating toggle) ditekan ketika drawer
+  /// tertutup.
+  final VoidCallback onOpen;
   final Widget child;
   final double? width;
 
@@ -23,35 +28,60 @@ class ProductionOverlayDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final panelWidth = width ?? MediaQuery.sizeOf(context).width * 0.4;
-    return IgnorePointer(
-      ignoring: !isOpen,
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: AnimatedOpacity(
-              duration: _duration,
-              opacity: isOpen ? 1 : 0,
-              child: GestureDetector(
-                onTap: onClose,
-                child: Container(color: Colors.black.withValues(alpha: 0.25)),
+    return Stack(
+      children: [
+        IgnorePointer(
+          ignoring: !isOpen,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: AnimatedOpacity(
+                  duration: _duration,
+                  opacity: isOpen ? 1 : 0,
+                  child: GestureDetector(
+                    onTap: onClose,
+                    child: Container(
+                      color: Colors.black.withValues(alpha: 0.25),
+                    ),
+                  ),
+                ),
               ),
+              AnimatedPositioned(
+                duration: _duration,
+                curve: Curves.easeInOut,
+                top: 0,
+                bottom: 0,
+                right: isOpen ? 0 : -panelWidth,
+                width: panelWidth,
+                child: Material(
+                  elevation: 8,
+                  color: Colors.white,
+                  child: child,
+                ),
+              ),
+            ],
+          ),
+        ),
+        // ── Floating toggle: selalu di tengah (vertikal), menempel di
+        // tepi kiri drawer — geser mengikuti lebar panel saat buka/tutup,
+        // bukan diam di header panel.
+        AnimatedPositioned(
+          duration: _duration,
+          curve: Curves.easeInOut,
+          right: isOpen ? panelWidth : 0,
+          top: 0,
+          bottom: 0,
+          child: Center(
+            child: ProductionOverlayDrawerToggle(
+              onPressed: isOpen ? onClose : onOpen,
+              icon: isOpen
+                  ? Icons.keyboard_double_arrow_right_rounded
+                  : Icons.keyboard_double_arrow_left_rounded,
+              tooltip: isOpen ? 'Sembunyikan Sidebar' : 'Tampilkan Sidebar',
             ),
           ),
-          AnimatedPositioned(
-            duration: _duration,
-            curve: Curves.easeInOut,
-            top: 0,
-            bottom: 0,
-            right: isOpen ? 0 : -panelWidth,
-            width: panelWidth,
-            child: Material(
-              elevation: 8,
-              color: Colors.white,
-              child: child,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

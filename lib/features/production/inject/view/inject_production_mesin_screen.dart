@@ -24,7 +24,7 @@ import '../view_model/inject_production_view_model.dart';
 import '../widgets/inject_production_delete_dialog.dart';
 import '../widgets/inject_production_form_dialog.dart';
 import '../widgets/inject_qc_dialog.dart';
-import 'inject_production_input_router.dart';
+import 'inject_production_input_screen.dart';
 
 class InjectProductionMesinScreen extends StatefulWidget {
   const InjectProductionMesinScreen({super.key});
@@ -141,17 +141,11 @@ class _InjectProductionMesinScreenState
     _stokSectionController.refreshAll();
   }
 
-  Future<void> _openInputScreen(
-    String noProduksi, {
-    bool isRealtime = false,
-  }) async {
+  Future<void> _openInputScreen(String noProduksi) async {
     if (!mounted) return;
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => InjectProductionInputRouter(
-          noProduksi: noProduksi,
-          isRealtimeHint: isRealtime,
-        ),
+        builder: (_) => InjectProductionInputScreen(noProduksi: noProduksi),
       ),
     );
   }
@@ -188,12 +182,7 @@ class _InjectProductionMesinScreenState
       );
       if (!mounted) return;
       if (created != null) {
-        await _openInputScreen(
-          created.noProduksi,
-          // Asal create menentukan layar: mesin card -> realtime (v3),
-          // FAB riwayat (backdate) -> v1. Hint ini fallback bila header gagal.
-          isRealtime: !isBackdateInput,
-        );
+        await _openInputScreen(created.noProduksi);
         if (!mounted) return;
         _refreshAll();
       }
@@ -209,7 +198,7 @@ class _InjectProductionMesinScreenState
       return;
     }
     final noProduksi = mesin.produksiList.first.noProduksi;
-    await _openInputScreen(noProduksi, isRealtime: true);
+    await _openInputScreen(noProduksi);
     if (mounted) _refreshAll();
   }
 
@@ -540,10 +529,7 @@ class _InjectProductionMesinScreenState
                   scrollController: _produksiScrollCtl,
                   showMesin: _filterIdMesin == null,
                   onTap: (row) async {
-                    await _openInputScreen(
-                      row.noProduksi,
-                      isRealtime: row.isRealtimeInput,
-                    );
+                    await _openInputScreen(row.noProduksi);
                     if (mounted) _refreshAll();
                   },
                   onEdit: (row) async {

@@ -1,5 +1,7 @@
 import 'package:intl/intl.dart';
 
+import '../../inject/model/inject_production_model.dart' show MachineStatus;
+
 class GilinganProduction {
   final String noProduksi;
   final int idOperator;
@@ -280,8 +282,13 @@ class GilinganMesinInfo {
   final int? shift;
   final String? hourStart;
   final String? hourEnd;
+  final MachineStatus machineStatus;
 
-  bool get isActive => noProduksi != null;
+  /// Ada produksi tercatat untuk mesin ini (aktif ataupun pending).
+  bool get hasProduction => noProduksi != null;
+
+  bool get isActive => machineStatus == MachineStatus.active;
+  bool get isPending => machineStatus == MachineStatus.pending;
 
   const GilinganMesinInfo({
     required this.idMesin,
@@ -298,6 +305,7 @@ class GilinganMesinInfo {
     this.shift,
     this.hourStart,
     this.hourEnd,
+    this.machineStatus = MachineStatus.inactive,
   });
 
   factory GilinganMesinInfo.fromJson(Map<String, dynamic> j) {
@@ -314,6 +322,18 @@ class GilinganMesinInfo {
       final parts = raw.split(':');
       if (parts.length < 2) return raw;
       return '${parts[0].padLeft(2, '0')}:${parts[1].padLeft(2, '0')}';
+    }
+    MachineStatus parseStatus(dynamic v) {
+      switch (v?.toString()) {
+        case 'current':
+        case 'active':
+        case 'aktif':
+          return MachineStatus.active;
+        case 'pending':
+          return MachineStatus.pending;
+        default:
+          return MachineStatus.inactive;
+      }
     }
 
     final List<int> ids = [];
@@ -345,6 +365,7 @@ class GilinganMesinInfo {
       shift: i(j['Shift']),
       hourStart: timeHHmm(j['HourStart']),
       hourEnd: timeHHmm(j['HourEnd']),
+      machineStatus: parseStatus(j['status'] ?? j['machineStatus']),
     );
   }
 }

@@ -48,6 +48,8 @@ class SoV2Kategori {
   final SoV2Status status;
   final int labelCount;
   final int scannedCount;
+  final DateTime? startDate;
+  final DateTime? completedAt;
 
   SoV2Kategori({
     required this.categoryId,
@@ -57,6 +59,8 @@ class SoV2Kategori {
     required this.status,
     required this.labelCount,
     required this.scannedCount,
+    this.startDate,
+    this.completedAt,
   });
 
   double get progress => labelCount > 0 ? scannedCount / labelCount : 0;
@@ -70,6 +74,8 @@ class SoV2Kategori {
       status: SoV2Status.fromApi(json['status']?.toString() ?? 'not_started'),
       labelCount: (json['labelCount'] as num?)?.toInt() ?? 0,
       scannedCount: (json['scannedCount'] as num?)?.toInt() ?? 0,
+      startDate: DateTime.tryParse(json['startDate']?.toString() ?? ''),
+      completedAt: DateTime.tryParse(json['completedAt']?.toString() ?? ''),
     );
   }
 }

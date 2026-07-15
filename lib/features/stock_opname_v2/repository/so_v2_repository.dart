@@ -10,8 +10,14 @@ class SoV2Repository {
 
   SoV2Repository({ApiClient? apiClient}) : _api = apiClient ?? ApiClient();
 
-  Future<List<SoV2Kategori>> fetchKategori() async {
-    final body = await _api.getJson('/api/stock-opname-v2/kategori');
+  Future<List<SoV2Kategori>> fetchKategori({int? year, int? month}) async {
+    final body = await _api.getJson(
+      '/api/stock-opname-v2/kategori',
+      query: {
+        if (year != null) 'year': year,
+        if (month != null) 'month': month,
+      },
+    );
     final dataList = (body['data'] ?? []) as List;
     return dataList
         .map((e) => SoV2Kategori.fromJson(Map<String, dynamic>.from(e as Map)))
@@ -43,11 +49,16 @@ class SoV2Repository {
   }
 
   Future<void> deleteStockOpname(String stockOpnameNo) async {
-    await _api.deleteJson('/api/stock-opname-v2/no-stock-opname/$stockOpnameNo');
+    await _api.deleteJson(
+      '/api/stock-opname-v2/no-stock-opname/$stockOpnameNo',
+    );
   }
 
-  Future<List<String>> fetchBlok() async {
-    final body = await _api.getJson('/api/stock-opname-v2/blok');
+  Future<List<String>> fetchBlok({required String stockOpnameNo}) async {
+    final body = await _api.getJson(
+      '/api/stock-opname-v2/blok',
+      query: {'stockOpnameNo': stockOpnameNo},
+    );
     final dataList = (body['data'] ?? []) as List;
     return dataList.map((e) => e.toString()).toList();
   }
@@ -109,19 +120,14 @@ class SoV2Repository {
   }) async {
     final body = await _api.postJson(
       '/api/stock-opname-v2/no-stock-opname/$stockOpnameNo/hasil',
-      body: {
-        'labelNo': labelNo,
-        if (palletNo != null) 'palletNo': palletNo,
-      },
+      body: {'labelNo': labelNo, if (palletNo != null) 'palletNo': palletNo},
     );
     final data = body['data'] as Map<String, dynamic>?;
     if (data == null) throw Exception('Response tidak mengandung data');
     return data;
   }
 
-  Future<Map<String, dynamic>> completeStockOpname(
-    String stockOpnameNo,
-  ) async {
+  Future<Map<String, dynamic>> completeStockOpname(String stockOpnameNo) async {
     final body = await _api.patchJson(
       '/api/stock-opname-v2/no-stock-opname/$stockOpnameNo/complete',
     );

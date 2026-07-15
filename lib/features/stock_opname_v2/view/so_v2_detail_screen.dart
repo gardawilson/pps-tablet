@@ -16,6 +16,9 @@ import '../widgets/so_v2_pallet_no_dialog.dart';
 const _kPrimary = Color(0xFF1E6FD9);
 const _kSurface = Color(0xFFF8F9FB);
 const _kBorder = Color(0xFFE2E6EA);
+const _kWarning = Color(0xFFB45309);
+const _kWarningBg = Color(0xFFFFF7ED);
+const _kWarningBorder = Color(0xFFFCD9A8);
 
 /// Screen gabungan: panel blok, panel lokasi (dalam blok terpilih), panel
 /// label (dalam lokasi terpilih). Tidak memakai AppBar sendiri karena sudah
@@ -47,7 +50,7 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
   @override
   void initState() {
     super.initState();
-    _blokVm = SoV2BlokListViewModel();
+    _blokVm = SoV2BlokListViewModel(stockOpnameNo: widget.stockOpnameNo);
     _blokVm.load();
   }
 
@@ -282,12 +285,20 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
         child: Text('Belum ada blok', style: TextStyle(fontSize: 12)),
       );
     }
+    final sortedItems = [...vm.items]..sort((a, b) {
+      final aUnknown = a == kSoV2UnknownBlok;
+      final bUnknown = b == kSoV2UnknownBlok;
+      if (aUnknown != bUnknown) return aUnknown ? 1 : -1;
+      return a.compareTo(b);
+    });
     return ListView.builder(
       padding: const EdgeInsets.all(8),
-      itemCount: vm.items.length,
+      itemCount: sortedItems.length,
       itemBuilder: (context, index) {
-        final blok = vm.items[index];
+        final blok = sortedItems[index];
+        final isUnknown = blok == kSoV2UnknownBlok;
         final selected = _selectedBlok == blok;
+        final baseColor = isUnknown ? _kWarning : _kPrimary;
         return Padding(
           padding: const EdgeInsets.only(bottom: 6),
           child: InkWell(
@@ -296,20 +307,40 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: selected ? _kPrimary.withValues(alpha: 0.08) : _kSurface,
+                color: selected
+                    ? baseColor.withValues(alpha: 0.08)
+                    : (isUnknown ? _kWarningBg : _kSurface),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: selected ? _kPrimary : _kBorder,
+                  color: selected
+                      ? baseColor
+                      : (isUnknown ? _kWarningBorder : _kBorder),
                   width: selected ? 1.5 : 1,
                 ),
               ),
-              child: Text(
-                'Blok $blok',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: selected ? _kPrimary : const Color(0xFF1A1D23),
-                ),
+              child: Row(
+                children: [
+                  if (isUnknown) ...[
+                    Icon(
+                      Icons.location_off_rounded,
+                      size: 14,
+                      color: selected ? baseColor : _kWarning,
+                    ),
+                    const SizedBox(width: 6),
+                  ],
+                  Expanded(
+                    child: Text(
+                      isUnknown ? 'Tanpa Blok' : 'Blok $blok',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: selected
+                            ? baseColor
+                            : (isUnknown ? _kWarning : const Color(0xFF1A1D23)),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -350,11 +381,15 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Blok $_selectedBlok',
-                              style: const TextStyle(
+                              _selectedBlok == kSoV2UnknownBlok
+                                  ? 'Tanpa Blok'
+                                  : 'Blok $_selectedBlok',
+                              style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
-                                color: Color(0xFF1A1D23),
+                                color: _selectedBlok == kSoV2UnknownBlok
+                                    ? _kWarning
+                                    : const Color(0xFF1A1D23),
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -442,43 +477,73 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
         ],
       );
     }
+    final sortedItems = [...vm.items]..sort((a, b) {
+      if (a.isUnknown != b.isUnknown) return a.isUnknown ? 1 : -1;
+      return 0;
+    });
     return ListView.separated(
       padding: const EdgeInsets.all(12),
-      itemCount: vm.items.length,
+      itemCount: sortedItems.length,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
-        final lokasi = vm.items[index];
+        final lokasi = sortedItems[index];
         final selected = _selectedLokasi?.locationId == lokasi.locationId;
+        final baseColor = lokasi.isUnknown ? _kWarning : _kPrimary;
         return InkWell(
           onTap: () => _selectLokasi(lokasi),
           borderRadius: BorderRadius.circular(10),
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: selected ? _kPrimary.withValues(alpha: 0.08) : _kSurface,
+              color: selected
+                  ? baseColor.withValues(alpha: 0.08)
+                  : (lokasi.isUnknown ? _kWarningBg : _kSurface),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: selected ? _kPrimary : _kBorder,
+                color: selected
+                    ? baseColor
+                    : (lokasi.isUnknown ? _kWarningBorder : _kBorder),
                 width: selected ? 1.5 : 1,
               ),
             ),
             child: Row(
               children: [
+                if (lokasi.isUnknown) ...[
+                  Icon(Icons.location_off_rounded, color: baseColor, size: 18),
+                  const SizedBox(width: 10),
+                ],
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Blok $_selectedBlok${lokasi.locationId}',
+                        lokasi.isUnknown
+                            ? 'Lokasi Tidak Diketahui'
+                            : 'Blok $_selectedBlok${lokasi.locationId}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: selected ? _kPrimary : const Color(0xFF1A1D23),
+                          color: selected
+                              ? baseColor
+                              : (lokasi.isUnknown
+                                  ? _kWarning
+                                  : const Color(0xFF1A1D23)),
                         ),
                       ),
-                      if (lokasi.description.isNotEmpty) ...[
+                      if (lokasi.isUnknown) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Label tanpa lokasi tercatat',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: _kWarning.withValues(alpha: 0.85),
+                          ),
+                        ),
+                      ] else if (lokasi.description.isNotEmpty) ...[
                         const SizedBox(height: 2),
                         Text(
                           lokasi.description,
@@ -550,15 +615,33 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            _selectedLokasi!.description.isNotEmpty
-                                ? _selectedLokasi!.description
-                                : 'Lokasi ${_selectedLokasi!.locationId}',
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF1A1D23),
-                            ),
+                          Row(
+                            children: [
+                              if (_selectedLokasi!.isUnknown) ...[
+                                const Icon(
+                                  Icons.location_off_rounded,
+                                  size: 16,
+                                  color: _kWarning,
+                                ),
+                                const SizedBox(width: 6),
+                              ],
+                              Flexible(
+                                child: Text(
+                                  _selectedLokasi!.isUnknown
+                                      ? 'Lokasi Tidak Diketahui'
+                                      : (_selectedLokasi!.description.isNotEmpty
+                                          ? _selectedLokasi!.description
+                                          : 'Lokasi ${_selectedLokasi!.locationId}'),
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: _selectedLokasi!.isUnknown
+                                        ? _kWarning
+                                        : const Color(0xFF1A1D23),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 2),
                           Text(
@@ -604,6 +687,35 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                   ],
                 ),
               ),
+              if (_selectedLokasi!.isUnknown)
+                Container(
+                  width: double.infinity,
+                  color: _kWarningBg,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.info_outline_rounded,
+                        size: 16,
+                        color: _kWarning,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Label berikut tidak memiliki blok/lokasi tercatat di sistem. Scan tetap dapat dilakukan seperti biasa.',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: _kWarning,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               _SearchBar(
                 controller: _searchCtl,
                 onChanged: vm.setSearchDebounced,

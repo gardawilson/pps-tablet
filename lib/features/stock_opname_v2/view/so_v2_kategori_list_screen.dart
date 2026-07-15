@@ -3,8 +3,10 @@ import 'package:provider/provider.dart';
 
 import '../../../common/widgets/confirm_dialog.dart';
 import '../../../common/widgets/loading_dialog.dart';
+import '../../../core/utils/date_formatter.dart';
 import '../model/so_v2_kategori.dart';
 import '../view_model/so_v2_kategori_list_view_model.dart';
+import '../widgets/so_v2_period_picker_dialog.dart';
 import '../widgets/so_v2_status_badge.dart';
 import 'so_v2_detail_screen.dart';
 
@@ -34,14 +36,37 @@ class _SoV2KategoriListScreenState extends State<SoV2KategoriListScreen> {
     super.dispose();
   }
 
+  Future<void> _openRiwayat() async {
+    final now = DateTime.now();
+    final period = await showDialog<({int year, int month})>(
+      context: context,
+      builder: (_) => SoV2PeriodPickerDialog(
+        initialYear: _vm.riwayatPeriod?.year ?? now.year,
+        initialMonth: _vm.riwayatPeriod?.month ?? now.month,
+      ),
+    );
+    if (period == null) return;
+    _vm.loadRiwayat(year: period.year, month: period.month);
+  }
+
   Future<void> _onTapKategori(SoV2Kategori kategori) async {
     if (kategori.status == SoV2Status.notStarted) {
+      if (_vm.isRiwayatMode) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Tidak ada data stock opname pada periode ini'),
+          ),
+        );
+        return;
+      }
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (_) => const LoadingDialog(message: 'Memuat preview...'),
       );
-      final preview = await _vm.previewGenerate(categoryId: kategori.categoryId);
+      final preview = await _vm.previewGenerate(
+        categoryId: kategori.categoryId,
+      );
       if (!mounted) return;
       Navigator.pop(context); // close loading
       if (preview.errorMessage != null) {
@@ -146,7 +171,30 @@ class _SoV2KategoriListScreenState extends State<SoV2KategoriListScreen> {
         builder: (context, vm, _) {
           return Scaffold(
             backgroundColor: _kSurface,
-            body: RefreshIndicator(onRefresh: vm.load, child: _buildBody(vm)),
+            body: Stack(
+              children: [
+                Positioned.fill(
+                  child: RefreshIndicator(
+                    onRefresh: () => vm.isRiwayatMode
+                        ? vm.loadRiwayat(
+                            year: vm.riwayatPeriod!.year,
+                            month: vm.riwayatPeriod!.month,
+                          )
+                        : vm.load(),
+                    child: _buildBody(vm),
+                  ),
+                ),
+                Positioned(
+                  top: 12,
+                  right: 16,
+                  child: _RiwayatFilterChip(
+                    period: vm.riwayatPeriod,
+                    onTap: _openRiwayat,
+                    onClear: vm.load,
+                  ),
+                ),
+              ],
+            ),
           );
         },
       ),
@@ -188,7 +236,7 @@ class _SoV2KategoriListScreenState extends State<SoV2KategoriListScreen> {
       builder: (context, constraints) {
         final crossAxisCount = (constraints.maxWidth / 220).floor().clamp(1, 8);
         return GridView.builder(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 60, 16, 16),
           itemCount: vm.items.length,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
@@ -201,7 +249,8 @@ class _SoV2KategoriListScreenState extends State<SoV2KategoriListScreen> {
             return _KategoriTile(
               kategori: kategori,
               onTap: () => _onTapKategori(kategori),
-              onDelete: kategori.stockOpnameNo == null
+              dimmed: vm.isRiwayatMode && kategori.stockOpnameNo == null,
+              onDelete: (vm.isRiwayatMode || kategori.stockOpnameNo == null)
                   ? null
                   : () => _onDeleteKategori(kategori),
             );
@@ -216,11 +265,13 @@ class _KategoriTile extends StatelessWidget {
   final SoV2Kategori kategori;
   final VoidCallback onTap;
   final VoidCallback? onDelete;
+  final bool dimmed;
 
   const _KategoriTile({
     required this.kategori,
     required this.onTap,
     this.onDelete,
+    this.dimmed = false,
   });
 
   @override
@@ -232,99 +283,219 @@ class _KategoriTile extends StatelessWidget {
         ? const Color(0xFF0A7349)
         : const Color(0xFF1E6FD9);
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
+    return Opacity(
+      opacity: dimmed ? 0.55 : 1,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _kBorder),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      kategori.categoryName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1A1D23),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  SoV2StatusBadge(status: kategori.status),
+                  if (onDelete != null) ...[
+                    const SizedBox(width: 4),
+                    InkWell(
+                      onTap: onDelete,
+                      borderRadius: BorderRadius.circular(6),
+                      child: Padding(
+                        padding: const EdgeInsets.all(2),
+                        child: Icon(
+                          Icons.delete_outline_rounded,
+                          size: 16,
+                          color: Colors.red.shade400,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                kategori.stockOpnameNo ?? '-',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              ),
+              if (kategori.startDate != null) ...[
+                const SizedBox(height: 3),
+                Row(
+                  children: [
+                    Icon(
+                      kategori.completedAt != null
+                          ? Icons.check_circle_rounded
+                          : Icons.event_rounded,
+                      size: 11,
+                      color: kategori.completedAt != null
+                          ? const Color(0xFF0A7349)
+                          : Colors.grey.shade500,
+                    ),
+                    const SizedBox(width: 3),
+                    Expanded(
+                      child: Text(
+                        kategori.completedAt != null
+                            ? 'Selesai ${formatDateToShortId(kategori.completedAt)}'
+                            : 'Mulai ${formatDateToShortId(kategori.startDate)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                          color: kategori.completedAt != null
+                              ? const Color(0xFF0A7349)
+                              : Colors.grey.shade600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const Spacer(),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${kategori.scannedCount}/${kategori.labelCount} label',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  Text(
+                    '$percent%',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: progressColor,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: kategori.progress.clamp(0, 1),
+                  minHeight: 5,
+                  backgroundColor: _kBorder,
+                  valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Filter mengambang di pojok kanan-atas konten (bukan bar penuh) supaya
+/// tidak menumpuk dengan compact app bar global milik AppShell.
+class _RiwayatFilterChip extends StatelessWidget {
+  final ({int year, int month})? period;
+  final VoidCallback onTap;
+  final VoidCallback onClear;
+
+  const _RiwayatFilterChip({
+    required this.period,
+    required this.onTap,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final active = period != null;
+    final color = active ? const Color(0xFFB45309) : const Color(0xFF1E6FD9);
+    final bgColor = active ? const Color(0xFFFFF7ED) : Colors.white;
+    final borderColor = active ? const Color(0xFFFCD9A8) : _kBorder;
+
+    return Material(
+      color: Colors.transparent,
       child: Container(
-        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: _kBorder),
+          color: bgColor,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: borderColor),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 6,
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 8,
               offset: const Offset(0, 2),
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    kategori.categoryName,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF1A1D23),
+            InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(20),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(12, 8, active ? 6 : 12, 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      active
+                          ? Icons.history_rounded
+                          : Icons.calendar_month_rounded,
+                      size: 15,
+                      color: color,
                     ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                SoV2StatusBadge(status: kategori.status),
-                if (onDelete != null) ...[
-                  const SizedBox(width: 4),
-                  InkWell(
-                    onTap: onDelete,
-                    borderRadius: BorderRadius.circular(6),
-                    child: Padding(
-                      padding: const EdgeInsets.all(2),
-                      child: Icon(
-                        Icons.delete_outline_rounded,
-                        size: 16,
-                        color: Colors.red.shade400,
+                    const SizedBox(width: 6),
+                    Text(
+                      active
+                          ? '${soV2MonthName(period!.month)} ${period!.year}'
+                          : 'Riwayat',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: color,
                       ),
                     ),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              kategori.stockOpnameNo ?? '-',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-            ),
-            const Spacer(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '${kategori.scannedCount}/${kategori.labelCount} label',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade600,
-                  ),
+                  ],
                 ),
-                Text(
-                  '$percent%',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: progressColor,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: kategori.progress.clamp(0, 1),
-                minHeight: 5,
-                backgroundColor: _kBorder,
-                valueColor: AlwaysStoppedAnimation<Color>(progressColor),
               ),
             ),
+            if (active)
+              InkWell(
+                onTap: onClear,
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 8, 10, 8),
+                  child: Icon(Icons.close_rounded, size: 15, color: color),
+                ),
+              ),
           ],
         ),
       ),

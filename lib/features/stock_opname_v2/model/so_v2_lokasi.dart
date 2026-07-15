@@ -1,3 +1,9 @@
+/// Sentinel blok value untuk label yang tidak memiliki Blok tercatat.
+const String kSoV2UnknownBlok = 'TIDAK_DIKETAHUI';
+
+/// Sentinel locationId untuk label yang tidak memiliki lokasi tercatat.
+const int kSoV2UnknownLocationId = 0;
+
 class SoV2Lokasi {
   final int locationId;
   final String description;
@@ -12,6 +18,8 @@ class SoV2Lokasi {
     required this.scannedCount,
     required this.totalWeight,
   });
+
+  bool get isUnknown => locationId == kSoV2UnknownLocationId;
 
   double get progress => labelCount > 0 ? scannedCount / labelCount : 0;
 

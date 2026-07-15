@@ -9,18 +9,38 @@ class SoV2KategoriListViewModel extends ChangeNotifier {
   final SoV2Repository repository;
 
   SoV2KategoriListViewModel({SoV2Repository? repository})
-      : repository = repository ?? SoV2Repository();
+    : repository = repository ?? SoV2Repository();
 
   List<SoV2Kategori> items = [];
   bool isLoading = false;
   String? error;
 
+  /// Non-null saat sedang menampilkan riwayat periode (year, month).
+  ({int year, int month})? riwayatPeriod;
+  bool get isRiwayatMode => riwayatPeriod != null;
+
   Future<void> load() async {
+    riwayatPeriod = null;
     isLoading = true;
     error = null;
     notifyListeners();
     try {
       items = await repository.fetchKategori();
+    } catch (e) {
+      error = apiErrorMessage(e);
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadRiwayat({required int year, required int month}) async {
+    riwayatPeriod = (year: year, month: month);
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      items = await repository.fetchKategori(year: year, month: month);
     } catch (e) {
       error = apiErrorMessage(e);
     } finally {

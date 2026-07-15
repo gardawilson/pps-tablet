@@ -5,9 +5,12 @@ import '../repository/so_v2_repository.dart';
 
 class SoV2BlokListViewModel extends ChangeNotifier {
   final SoV2Repository repository;
+  final String stockOpnameNo;
 
-  SoV2BlokListViewModel({SoV2Repository? repository})
-      : repository = repository ?? SoV2Repository();
+  SoV2BlokListViewModel({
+    required this.stockOpnameNo,
+    SoV2Repository? repository,
+  }) : repository = repository ?? SoV2Repository();
 
   List<String> items = [];
   bool isLoading = false;
@@ -18,7 +21,7 @@ class SoV2BlokListViewModel extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      items = await repository.fetchBlok();
+      items = await repository.fetchBlok(stockOpnameNo: stockOpnameNo);
     } catch (e) {
       error = apiErrorMessage(e);
     } finally {

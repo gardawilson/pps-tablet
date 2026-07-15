@@ -21,6 +21,12 @@ class SoV2LokasiListViewModel extends ChangeNotifier {
   String? error;
   bool isComplete = false;
 
+  int get totalLabelCount =>
+      items.fold(0, (sum, item) => sum + item.labelCount);
+
+  double get totalWeight =>
+      items.fold(0.0, (sum, item) => sum + item.totalWeight);
+
   Future<void> load() async {
     isLoading = true;
     error = null;

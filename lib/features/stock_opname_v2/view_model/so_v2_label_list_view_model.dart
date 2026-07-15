@@ -3,8 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 
-import '../../../core/network/api_error.dart';
-import '../model/so_v2_label_row.dart';
+import '../model/so_v2_label_group.dart';
 import '../repository/so_v2_repository.dart';
 
 class SoV2LabelListViewModel extends ChangeNotifier {
@@ -24,8 +23,8 @@ class SoV2LabelListViewModel extends ChangeNotifier {
     _initPaging();
   }
 
-  late final PagingController<int, SoV2LabelRow> _pagingController;
-  PagingController<int, SoV2LabelRow> get pagingController =>
+  late final PagingController<int, SoV2LabelGroup> _pagingController;
+  PagingController<int, SoV2LabelGroup> get pagingController =>
       _pagingController;
 
   String _search = '';
@@ -35,18 +34,15 @@ class SoV2LabelListViewModel extends ChangeNotifier {
   int totalRecords = 0;
   int totalScanned = 0;
 
-  bool get palletNoRequired =>
-      categoryCode == 'bahanbaku' || categoryCode == 'bahanbakupakai';
-
   void _initPaging() {
-    _pagingController = PagingController<int, SoV2LabelRow>(
+    _pagingController = PagingController<int, SoV2LabelGroup>(
       getNextPageKey: (state) =>
           state.lastPageIsEmpty ? null : state.nextIntPageKey,
       fetchPage: _fetchPage,
     );
   }
 
-  Future<List<SoV2LabelRow>> _fetchPage(int pageKey) async {
+  Future<List<SoV2LabelGroup>> _fetchPage(int pageKey) async {
     final page = await repository.fetchLabelPage(
       stockOpnameNo: stockOpnameNo,
       blok: blok,
@@ -76,21 +72,6 @@ class SoV2LabelListViewModel extends ChangeNotifier {
   void clearSearch() {
     _search = '';
     _pagingController.refresh();
-  }
-
-  /// Return null on success, or an error message string.
-  Future<String?> scanLabel({required String labelNo, int? palletNo}) async {
-    try {
-      await repository.submitHasil(
-        stockOpnameNo: stockOpnameNo,
-        labelNo: labelNo,
-        palletNo: palletNo,
-      );
-      _pagingController.refresh();
-      return null;
-    } catch (e) {
-      return apiErrorMessage(e);
-    }
   }
 
   @override

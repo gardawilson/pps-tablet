@@ -29,7 +29,12 @@ class SoV2Lokasi {
       description: json['description']?.toString() ?? '',
       labelCount: (json['labelCount'] as num?)?.toInt() ?? 0,
       scannedCount: (json['scannedCount'] as num?)?.toInt() ?? 0,
-      totalWeight: (json['totalWeight'] as num?)?.toDouble() ?? 0,
+      // Kategori berbasis pcs (mis. furniturewip) mengirim "totalPcs",
+      // bukan "totalWeight".
+      totalWeight:
+          (json['totalWeight'] as num?)?.toDouble() ??
+          (json['totalPcs'] as num?)?.toDouble() ??
+          0,
     );
   }
 }

@@ -11,20 +11,20 @@ class SoV2StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = status.color;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: status == SoV2Status.inProgress
-            ? const Border(left: BorderSide(color: Color(0xFFF59E0B), width: 3))
-            : null,
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(3),
+        border: Border.all(color: color.withValues(alpha: 0.35), width: 1),
       ),
       child: Text(
-        status.label,
+        status.label.toUpperCase(),
         style: TextStyle(
-          fontSize: 11,
+          fontSize: 9,
           fontWeight: FontWeight.w700,
           color: color,
+          letterSpacing: 0.4,
+          height: 1,
         ),
       ),
     );

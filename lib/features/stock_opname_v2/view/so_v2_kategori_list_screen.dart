@@ -7,11 +7,12 @@ import '../../../core/utils/date_formatter.dart';
 import '../model/so_v2_kategori.dart';
 import '../view_model/so_v2_kategori_list_view_model.dart';
 import '../widgets/so_v2_period_picker_dialog.dart';
-import '../widgets/so_v2_status_badge.dart';
 import 'so_v2_detail_screen.dart';
 
 const _kSurface = Color(0xFFF8F9FB);
-const _kBorder = Color(0xFFE2E6EA);
+const _kBorder = Color(0xFFECEEF1);
+const _kInk = Color(0xFF1A1D23);
+const _kMuted = Color(0xFF767E8C);
 
 class SoV2KategoriListScreen extends StatefulWidget {
   const SoV2KategoriListScreen({super.key});
@@ -184,6 +185,7 @@ class _SoV2KategoriListScreenState extends State<SoV2KategoriListScreen> {
                     child: _buildBody(vm),
                   ),
                 ),
+                const Positioned(top: 16, left: 16, child: _StatusLegend()),
                 Positioned(
                   top: 12,
                   right: 16,
@@ -234,15 +236,18 @@ class _SoV2KategoriListScreenState extends State<SoV2KategoriListScreen> {
     }
     return LayoutBuilder(
       builder: (context, constraints) {
-        final crossAxisCount = (constraints.maxWidth / 220).floor().clamp(1, 8);
+        final crossAxisCount = (constraints.maxWidth / 176).floor().clamp(
+          1,
+          12,
+        );
         return GridView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 60, 16, 16),
+          padding: const EdgeInsets.fromLTRB(16, 64, 16, 16),
           itemCount: vm.items.length,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            childAspectRatio: 1.5,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 1.15,
           ),
           itemBuilder: (context, index) {
             final kategori = vm.items[index];
@@ -282,139 +287,243 @@ class _KategoriTile extends StatelessWidget {
     final progressColor = complete
         ? const Color(0xFF0A7349)
         : const Color(0xFF1E6FD9);
+    final startLabel = kategori.startDate == null
+        ? null
+        : formatDateToShortId(kategori.startDate);
+    final completedLabel = kategori.completedAt == null
+        ? null
+        : formatDateToShortId(kategori.completedAt);
 
     return Opacity(
       opacity: dimmed ? 0.55 : 1,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _kBorder),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(
-                      kategori.categoryName,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF1A1D23),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  SoV2StatusBadge(status: kategori.status),
-                  if (onDelete != null) ...[
-                    const SizedBox(width: 4),
-                    InkWell(
-                      onTap: onDelete,
-                      borderRadius: BorderRadius.circular(6),
-                      child: Padding(
-                        padding: const EdgeInsets.all(2),
-                        child: Icon(
-                          Icons.delete_outline_rounded,
-                          size: 16,
-                          color: Colors.red.shade400,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                kategori.stockOpnameNo ?? '-',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-              ),
-              if (kategori.startDate != null) ...[
-                const SizedBox(height: 3),
-                Row(
-                  children: [
-                    Icon(
-                      kategori.completedAt != null
-                          ? Icons.check_circle_rounded
-                          : Icons.event_rounded,
-                      size: 11,
-                      color: kategori.completedAt != null
-                          ? const Color(0xFF0A7349)
-                          : Colors.grey.shade500,
-                    ),
-                    const SizedBox(width: 3),
-                    Expanded(
-                      child: Text(
-                        kategori.completedAt != null
-                            ? 'Selesai ${formatDateToShortId(kategori.completedAt)}'
-                            : 'Mulai ${formatDateToShortId(kategori.startDate)}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w600,
-                          color: kategori.completedAt != null
-                              ? const Color(0xFF0A7349)
-                              : Colors.grey.shade600,
-                        ),
-                      ),
-                    ),
-                  ],
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          onTap: onTap,
+          onLongPress: onDelete,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: _kBorder),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.035),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
               ],
-              const Spacer(),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '${kategori.scannedCount}/${kategori.labelCount} label',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade600,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        kategori.categoryName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: _kInk,
+                          height: 1.2,
+                        ),
+                      ),
                     ),
-                  ),
-                  Text(
-                    '$percent%',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: progressColor,
-                    ),
+                    const SizedBox(width: 6),
+                    _StatusDot(color: kategori.status.color),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  kategori.stockOpnameNo ?? 'Belum ada nomor SO',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 10.5, color: _kMuted),
+                ),
+                if (startLabel != null) ...[
+                  const SizedBox(height: 4),
+                  _DateInfo(label: 'Mulai', value: startLabel, color: _kMuted),
+                  const SizedBox(height: 2),
+                  _DateInfo(
+                    label: 'Selesai',
+                    value: completedLabel ?? '-',
+                    color: completedLabel != null
+                        ? const Color(0xFF0A7349)
+                        : _kMuted,
                   ),
                 ],
-              ),
-              const SizedBox(height: 4),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: kategori.progress.clamp(0, 1),
-                  minHeight: 5,
-                  backgroundColor: _kBorder,
-                  valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+                const Spacer(),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${kategori.scannedCount}/${kategori.labelCount} label',
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w500,
+                        color: _kMuted,
+                      ),
+                    ),
+                    Text(
+                      '$percent%',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: progressColor,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 4),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: kategori.progress.clamp(0, 1),
+                    minHeight: 5,
+                    backgroundColor: const Color(0xFFF1F2F4),
+                    valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _DateInfo extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _DateInfo({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: '$label  ',
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w500,
+              color: color.withValues(alpha: 0.75),
+            ),
+          ),
+          TextSpan(
+            text: value,
+            style: TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+}
+
+/// Titik status dengan lingkaran halo lembut di sekelilingnya.
+class _StatusDot extends StatelessWidget {
+  final Color color;
+
+  const _StatusDot({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 16,
+      height: 16,
+      margin: const EdgeInsets.only(top: 1),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        shape: BoxShape.circle,
+      ),
+      child: Container(
+        width: 7,
+        height: 7,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
+    );
+  }
+}
+
+/// Legenda arti warna titik status pada tiap kartu kategori.
+class _StatusLegend extends StatelessWidget {
+  const _StatusLegend();
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _kBorder),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final status in SoV2Status.values) ...[
+              if (status != SoV2Status.values.first) const SizedBox(width: 14),
+              _LegendDot(status: status),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LegendDot extends StatelessWidget {
+  final SoV2Status status;
+
+  const _LegendDot({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _StatusDot(color: status.color),
+        const SizedBox(width: 5),
+        Text(
+          status.label,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: _kMuted,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -448,7 +557,7 @@ class _RiwayatFilterChip extends StatelessWidget {
           border: Border.all(color: borderColor),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),

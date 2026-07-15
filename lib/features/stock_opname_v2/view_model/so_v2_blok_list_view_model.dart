@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_error.dart';
+import '../model/so_v2_blok.dart';
 import '../repository/so_v2_repository.dart';
 
 class SoV2BlokListViewModel extends ChangeNotifier {
@@ -12,7 +13,7 @@ class SoV2BlokListViewModel extends ChangeNotifier {
     SoV2Repository? repository,
   }) : repository = repository ?? SoV2Repository();
 
-  List<String> items = [];
+  List<SoV2Blok> items = [];
   bool isLoading = false;
   String? error;
 

@@ -3,22 +3,20 @@ import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 import 'package:provider/provider.dart';
 
 import '../../../common/widgets/confirm_dialog.dart';
-import '../../../common/widgets/scan_label_dialog.dart';
-import '../model/so_v2_label_row.dart';
+import '../model/so_v2_label_group.dart';
 import '../model/so_v2_lokasi.dart';
 import '../repository/so_v2_repository.dart';
 import '../view_model/so_v2_blok_list_view_model.dart';
 import '../view_model/so_v2_label_list_view_model.dart';
 import '../view_model/so_v2_lokasi_list_view_model.dart';
-import '../widgets/so_v2_label_tile.dart';
-import '../widgets/so_v2_pallet_no_dialog.dart';
+import '../utils/so_v2_number_format.dart';
+import '../widgets/so_v2_label_group_tile.dart';
 
 const _kPrimary = Color(0xFF1E6FD9);
 const _kSurface = Color(0xFFF8F9FB);
 const _kBorder = Color(0xFFE2E6EA);
 const _kWarning = Color(0xFFB45309);
 const _kWarningBg = Color(0xFFFFF7ED);
-const _kWarningBorder = Color(0xFFFCD9A8);
 
 /// Screen gabungan: panel blok, panel lokasi (dalam blok terpilih), panel
 /// label (dalam lokasi terpilih). Tidak memakai AppBar sendiri karena sudah
@@ -46,6 +44,10 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
   SoV2LabelListViewModel? _labelVm;
   final _searchCtl = TextEditingController();
   bool _completing = false;
+  bool _searchOpen = false;
+
+  /// Furniturewip memakai UOM pcs, bukan kg seperti kategori lain.
+  String get _uom => widget.categoryCode == 'furniturewip' ? 'pcs' : 'kg';
 
   @override
   void initState() {
@@ -72,6 +74,7 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
       _selectedBlok = blok;
       _selectedLokasi = null;
       _labelVm = null;
+      _searchOpen = false;
       _lokasiVm = SoV2LokasiListViewModel(
         stockOpnameNo: widget.stockOpnameNo,
         blok: blok,
@@ -86,6 +89,7 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
     _searchCtl.clear();
     setState(() {
       _selectedLokasi = lokasi;
+      _searchOpen = false;
       _labelVm = SoV2LabelListViewModel(
         stockOpnameNo: widget.stockOpnameNo,
         blok: _selectedBlok!,
@@ -127,47 +131,20 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
     Navigator.of(context).pop();
   }
 
-  Future<String?> _handleLookup(String code) async {
-    final vm = _labelVm;
-    if (vm == null) return 'Pilih lokasi terlebih dahulu';
-    int? palletNo;
-    if (vm.palletNoRequired) {
-      final palletStr = await showDialog<String>(
-        context: context,
-        builder: (_) => const SoV2PalletNoDialog(),
-      );
-      if (palletStr == null) return 'Nomor pallet dibutuhkan';
-      palletNo = int.tryParse(palletStr);
-      if (palletNo == null) return 'Nomor pallet tidak valid';
-    }
-    return vm.scanLabel(labelNo: code, palletNo: palletNo);
-  }
-
-  void _openScanDialog() {
-    if (_selectedLokasi == null) return;
-    showDialog<void>(
-      context: context,
-      builder: (_) => ScanLabelDialog(
-        onLookup: _handleLookup,
-        manualHint: 'Masukkan nomor label',
-        headerSubtitle: _selectedLokasi!.description,
-      ),
-    );
+  void _toggleSearch(SoV2LabelListViewModel vm) {
+    setState(() {
+      _searchOpen = !_searchOpen;
+      if (!_searchOpen) {
+        _searchCtl.clear();
+        vm.clearSearch();
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _kSurface,
-      floatingActionButton: (_labelVm != null && !(_labelVm!.isComplete))
-          ? FloatingActionButton.extended(
-              onPressed: _openScanDialog,
-              backgroundColor: _kPrimary,
-              foregroundColor: Colors.white,
-              icon: const Icon(Icons.qr_code_scanner_rounded),
-              label: const Text('Scan'),
-            )
-          : null,
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -285,63 +262,64 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
         child: Text('Belum ada blok', style: TextStyle(fontSize: 12)),
       );
     }
-    final sortedItems = [...vm.items]..sort((a, b) {
-      final aUnknown = a == kSoV2UnknownBlok;
-      final bUnknown = b == kSoV2UnknownBlok;
-      if (aUnknown != bUnknown) return aUnknown ? 1 : -1;
-      return a.compareTo(b);
-    });
-    return ListView.builder(
-      padding: const EdgeInsets.all(8),
+    final sortedItems = [...vm.items]
+      ..sort((a, b) {
+        final aUnknown = a.blok == kSoV2UnknownBlok;
+        final bUnknown = b.blok == kSoV2UnknownBlok;
+        if (aUnknown != bUnknown) return aUnknown ? 1 : -1;
+        return a.blok.compareTo(b.blok);
+      });
+    return ListView.separated(
       itemCount: sortedItems.length,
+      separatorBuilder: (_, __) => const Divider(height: 1, color: _kBorder),
       itemBuilder: (context, index) {
-        final blok = sortedItems[index];
-        final isUnknown = blok == kSoV2UnknownBlok;
-        final selected = _selectedBlok == blok;
+        final blokItem = sortedItems[index];
+        final isUnknown = blokItem.blok == kSoV2UnknownBlok;
+        final selected = _selectedBlok == blokItem.blok;
         final baseColor = isUnknown ? _kWarning : _kPrimary;
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 6),
-          child: InkWell(
-            onTap: () => _selectBlok(blok),
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: selected
-                    ? baseColor.withValues(alpha: 0.08)
-                    : (isUnknown ? _kWarningBg : _kSurface),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: selected
-                      ? baseColor
-                      : (isUnknown ? _kWarningBorder : _kBorder),
-                  width: selected ? 1.5 : 1,
+        return InkWell(
+          onTap: () => _selectBlok(blokItem.blok),
+          child: Container(
+            decoration: BoxDecoration(
+              color: selected
+                  ? baseColor.withValues(alpha: 0.05)
+                  : (isUnknown ? _kWarningBg : null),
+              border: Border(
+                left: BorderSide(
+                  color: selected ? baseColor : Colors.transparent,
+                  width: 3,
                 ),
               ),
-              child: Row(
-                children: [
-                  if (isUnknown) ...[
-                    Icon(
-                      Icons.location_off_rounded,
-                      size: 14,
-                      color: selected ? baseColor : _kWarning,
-                    ),
-                    const SizedBox(width: 6),
-                  ],
-                  Expanded(
-                    child: Text(
-                      isUnknown ? 'Tanpa Blok' : 'Blok $blok',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: selected
-                            ? baseColor
-                            : (isUnknown ? _kWarning : const Color(0xFF1A1D23)),
-                      ),
+            ),
+            padding: const EdgeInsets.fromLTRB(9, 12, 12, 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                if (isUnknown) ...[
+                  Icon(
+                    Icons.location_off_rounded,
+                    size: 14,
+                    color: selected ? baseColor : _kWarning,
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                Expanded(
+                  child: Text(
+                    isUnknown
+                        ? 'Tanpa Blok (${blokItem.locationCount})'
+                        : 'Blok ${blokItem.blok} (${blokItem.locationCount})',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: selected
+                          ? baseColor
+                          : (isUnknown ? _kWarning : const Color(0xFF1A1D23)),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         );
@@ -370,20 +348,22 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
             child: Column(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
                   decoration: const BoxDecoration(
                     border: Border(bottom: BorderSide(color: _kBorder)),
                   ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
                               _selectedBlok == kSoV2UnknownBlok
                                   ? 'Tanpa Blok'
                                   : 'Blok $_selectedBlok',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
@@ -392,36 +372,63 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                                     : const Color(0xFF1A1D23),
                               ),
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${vm.items.length} lokasi',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey.shade600,
+                          ),
+                          if (vm.isComplete)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                'Selesai',
+                                style: TextStyle(
+                                  color: Colors.green.shade700,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
-                          ],
-                        ),
+                        ],
                       ),
-                      if (vm.isComplete)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade50,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            'Selesai',
-                            style: TextStyle(
-                              color: Colors.green.shade700,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _HeaderStat(
+                              label: 'LOKASI',
+                              value: '${vm.items.length}',
                             ),
                           ),
-                        ),
+                          Container(
+                            width: 1,
+                            height: 24,
+                            color: _kBorder,
+                            margin: const EdgeInsets.symmetric(horizontal: 10),
+                          ),
+                          Expanded(
+                            child: _HeaderStat(
+                              label: 'LABEL',
+                              value: '${vm.totalLabelCount}',
+                            ),
+                          ),
+                          Container(
+                            width: 1,
+                            height: 24,
+                            color: _kBorder,
+                            margin: const EdgeInsets.symmetric(horizontal: 10),
+                          ),
+                          Expanded(
+                            child: _HeaderStat(
+                              label: _uom == 'pcs' ? 'PCS' : 'BERAT',
+                              value: soV2FormatQty(vm.totalWeight),
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -477,105 +484,98 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
         ],
       );
     }
-    final sortedItems = [...vm.items]..sort((a, b) {
-      if (a.isUnknown != b.isUnknown) return a.isUnknown ? 1 : -1;
-      return 0;
-    });
+    final sortedItems = [...vm.items]
+      ..sort((a, b) {
+        if (a.isUnknown != b.isUnknown) return a.isUnknown ? 1 : -1;
+        return 0;
+      });
     return ListView.separated(
-      padding: const EdgeInsets.all(12),
       itemCount: sortedItems.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, __) => const Divider(height: 1, color: _kBorder),
       itemBuilder: (context, index) {
         final lokasi = sortedItems[index];
         final selected = _selectedLokasi?.locationId == lokasi.locationId;
         final baseColor = lokasi.isUnknown ? _kWarning : _kPrimary;
+        final complete =
+            lokasi.labelCount > 0 && lokasi.scannedCount >= lokasi.labelCount;
+        final progressColor = complete ? const Color(0xFF0A7349) : baseColor;
         return InkWell(
           onTap: () => _selectLokasi(lokasi),
-          borderRadius: BorderRadius.circular(10),
           child: Container(
-            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: selected
-                  ? baseColor.withValues(alpha: 0.08)
-                  : (lokasi.isUnknown ? _kWarningBg : _kSurface),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: selected
-                    ? baseColor
-                    : (lokasi.isUnknown ? _kWarningBorder : _kBorder),
-                width: selected ? 1.5 : 1,
+                  ? baseColor.withValues(alpha: 0.05)
+                  : (lokasi.isUnknown ? _kWarningBg : null),
+              border: Border(
+                left: BorderSide(
+                  color: selected ? baseColor : Colors.transparent,
+                  width: 3,
+                ),
               ),
             ),
+            padding: const EdgeInsets.fromLTRB(9, 12, 12, 12),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 if (lokasi.isUnknown) ...[
-                  Icon(Icons.location_off_rounded, color: baseColor, size: 18),
-                  const SizedBox(width: 10),
+                  Icon(Icons.location_off_rounded, color: baseColor, size: 14),
+                  const SizedBox(width: 6),
                 ],
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      Text(
-                        lokasi.isUnknown
-                            ? 'Lokasi Tidak Diketahui'
-                            : 'Blok $_selectedBlok${lokasi.locationId}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: selected
-                              ? baseColor
-                              : (lokasi.isUnknown
-                                  ? _kWarning
-                                  : const Color(0xFF1A1D23)),
-                        ),
+                      Expanded(
+                        child: lokasi.isUnknown
+                            ? Text(
+                                'Lokasi Tidak Diketahui',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: selected ? baseColor : _kWarning,
+                                ),
+                              )
+                            : Text.rich(
+                                TextSpan(
+                                  children: [
+                                    TextSpan(
+                                      text:
+                                          '$_selectedBlok${lokasi.locationId} ',
+                                      style: TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: selected
+                                            ? baseColor
+                                            : const Color(0xFF1A1D23),
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text:
+                                          '(${lokasi.scannedCount}/${lokasi.labelCount})',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: progressColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                       ),
-                      if (lokasi.isUnknown) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          'Label tanpa lokasi tercatat',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: _kWarning.withValues(alpha: 0.85),
+                      if (complete)
+                        const Padding(
+                          padding: EdgeInsets.only(left: 4),
+                          child: Icon(
+                            Icons.check_circle_rounded,
+                            size: 13,
+                            color: Color(0xFF0A7349),
                           ),
                         ),
-                      ] else if (lokasi.description.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          lokasi.description,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey.shade700,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 3),
-                      Text(
-                        '${lokasi.labelCount} label · ${lokasi.totalWeight} kg',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
                     ],
                   ),
-                ),
-                const SizedBox(width: 8),
-                _ScannedCountBadge(
-                  scanned: lokasi.scannedCount,
-                  total: lokasi.labelCount,
-                ),
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: Colors.grey.shade400,
-                  size: 18,
                 ),
               ],
             ),
@@ -604,86 +604,139 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
           return Column(
             children: [
               Container(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
                 decoration: const BoxDecoration(
                   color: Colors.white,
                   border: Border(bottom: BorderSide(color: _kBorder)),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              if (_selectedLokasi!.isUnknown) ...[
-                                const Icon(
-                                  Icons.location_off_rounded,
-                                  size: 16,
-                                  color: _kWarning,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _searchOpen
+                              ? TextField(
+                                  controller: _searchCtl,
+                                  autofocus: true,
+                                  onChanged: vm.setSearchDebounced,
+                                  style: const TextStyle(fontSize: 14),
+                                  decoration: InputDecoration(
+                                    isDense: true,
+                                    hintText: 'Cari nomor label...',
+                                    hintStyle: TextStyle(
+                                      color: Colors.grey.shade400,
+                                    ),
+                                    border: InputBorder.none,
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                )
+                              : Row(
+                                  children: [
+                                    if (_selectedLokasi!.isUnknown) ...[
+                                      const Icon(
+                                        Icons.location_off_rounded,
+                                        size: 16,
+                                        color: _kWarning,
+                                      ),
+                                      const SizedBox(width: 6),
+                                    ],
+                                    Flexible(
+                                      child: Text(
+                                        _selectedLokasi!.isUnknown
+                                            ? 'Lokasi Tidak Diketahui'
+                                            : '$_selectedBlok${_selectedLokasi!.locationId}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
+                                          color: _selectedLokasi!.isUnknown
+                                              ? _kWarning
+                                              : const Color(0xFF1A1D23),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                        ),
+                        if (!_searchOpen && vm.isComplete) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade50,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.check_circle_rounded,
+                                  color: Colors.green.shade700,
+                                  size: 14,
                                 ),
                                 const SizedBox(width: 6),
-                              ],
-                              Flexible(
-                                child: Text(
-                                  _selectedLokasi!.isUnknown
-                                      ? 'Lokasi Tidak Diketahui'
-                                      : (_selectedLokasi!.description.isNotEmpty
-                                          ? _selectedLokasi!.description
-                                          : 'Lokasi ${_selectedLokasi!.locationId}'),
+                                Text(
+                                  'Selesai',
                                   style: TextStyle(
-                                    fontSize: 15,
+                                    color: Colors.green.shade700,
+                                    fontSize: 11,
                                     fontWeight: FontWeight.w700,
-                                    color: _selectedLokasi!.isUnknown
-                                        ? _kWarning
-                                        : const Color(0xFF1A1D23),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Total berat: ${vm.totalWeight} kg · Discan: ${vm.totalScanned}/${vm.totalRecords}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
+                          const SizedBox(width: 4),
+                        ],
+                        IconButton(
+                          onPressed: () => _toggleSearch(vm),
+                          icon: Icon(
+                            _searchOpen
+                                ? Icons.close_rounded
+                                : Icons.search_rounded,
+                            size: 20,
+                            color: _searchOpen
+                                ? Colors.grey.shade600
+                                : _kPrimary,
+                          ),
+                          splashRadius: 20,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 36,
+                            minHeight: 36,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (!_searchOpen) ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _HeaderStat(
+                              label: 'LABEL',
+                              value: '${vm.totalScanned}/${vm.totalRecords}',
+                            ),
+                          ),
+                          Container(
+                            width: 1,
+                            height: 24,
+                            color: _kBorder,
+                            margin: const EdgeInsets.symmetric(horizontal: 10),
+                          ),
+                          Expanded(
+                            child: _HeaderStat(
+                              label: _uom == 'pcs' ? 'PCS' : 'BERAT',
+                              value: soV2FormatQty(vm.totalWeight),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    if (vm.isComplete)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.green.shade50,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.check_circle_rounded,
-                              color: Colors.green.shade700,
-                              size: 14,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Selesai',
-                              style: TextStyle(
-                                color: Colors.green.shade700,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                    ],
                   ],
                 ),
               ),
@@ -716,28 +769,23 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                     ],
                   ),
                 ),
-              _SearchBar(
-                controller: _searchCtl,
-                onChanged: vm.setSearchDebounced,
-                onClear: () {
-                  _searchCtl.clear();
-                  vm.clearSearch();
-                },
-              ),
               Expanded(
-                child: PagingListener<int, SoV2LabelRow>(
+                child: PagingListener<int, SoV2LabelGroup>(
                   controller: vm.pagingController,
                   builder: (context, state, fetchNextPage) {
                     return RefreshIndicator(
                       onRefresh: () async => vm.pagingController.refresh(),
-                      child: PagedListView<int, SoV2LabelRow>(
+                      child: PagedListView<int, SoV2LabelGroup>(
                         state: state,
                         fetchNextPage: fetchNextPage,
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         builderDelegate:
-                            PagedChildBuilderDelegate<SoV2LabelRow>(
-                              itemBuilder: (context, row, index) =>
-                                  SoV2LabelTile(row: row),
+                            PagedChildBuilderDelegate<SoV2LabelGroup>(
+                              itemBuilder: (context, group, index) =>
+                                  SoV2LabelGroupTile(
+                                    group: group,
+                                    weightUnit: _uom,
+                                  ),
                               noItemsFoundIndicatorBuilder: (context) =>
                                   const Center(
                                     child: Padding(
@@ -759,89 +807,39 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
   }
 }
 
-class _ScannedCountBadge extends StatelessWidget {
-  final int scanned;
-  final int total;
+/// Statistik header panel: caption kecil di atas, nilai tebal di bawah.
+class _HeaderStat extends StatelessWidget {
+  final String label;
+  final String value;
 
-  const _ScannedCountBadge({required this.scanned, required this.total});
-
-  @override
-  Widget build(BuildContext context) {
-    final complete = total > 0 && scanned >= total;
-    final color = complete ? const Color(0xFF0A7349) : const Color(0xFF6B7280);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        '$scanned/$total',
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: color,
-        ),
-      ),
-    );
-  }
-}
-
-class _SearchBar extends StatelessWidget {
-  final TextEditingController controller;
-  final ValueChanged<String> onChanged;
-  final VoidCallback onClear;
-
-  const _SearchBar({
-    required this.controller,
-    required this.onChanged,
-    required this.onClear,
-  });
+  const _HeaderStat({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-      child: TextField(
-        controller: controller,
-        onChanged: onChanged,
-        style: const TextStyle(fontSize: 14),
-        decoration: InputDecoration(
-          hintText: 'Cari nomor label...',
-          hintStyle: TextStyle(fontSize: 14, color: Colors.grey.shade400),
-          prefixIcon: Icon(
-            Icons.search_rounded,
-            size: 18,
-            color: Colors.grey.shade400,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.4,
+            color: Colors.grey.shade500,
           ),
-          suffixIcon: controller.text.isNotEmpty
-              ? IconButton(
-                  icon: Icon(
-                    Icons.close_rounded,
-                    size: 16,
-                    color: Colors.grey.shade500,
-                  ),
-                  onPressed: onClear,
-                )
-              : null,
-          filled: true,
-          fillColor: _kSurface,
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: _kBorder),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: _kPrimary, width: 1.5),
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 11,
-          ),
-          isDense: true,
         ),
-      ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF1A1D23),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -9,15 +9,20 @@ import '../view_model/inject_production_input_view_model.dart';
 
 class InjectSakPickerDialog extends StatelessWidget {
   final String noProduksi;
+  final bool isPartialMode;
 
-  const InjectSakPickerDialog({super.key, required this.noProduksi});
+  const InjectSakPickerDialog({
+    super.key,
+    required this.noProduksi,
+    this.isPartialMode = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final vm = context.read<InjectProductionInputViewModel>();
     return ProductionSakPickerDialog(
       noProduksi: noProduksi,
-      isPartialMode: false,
+      isPartialMode: isPartialMode,
       vm: vm,
       getLookup: () => vm.lastLookup,
       willBeDuplicate: (row, np) => vm.willBeDuplicate(row, np),

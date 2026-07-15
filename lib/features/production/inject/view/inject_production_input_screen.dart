@@ -27,8 +27,7 @@ import '../../../label/furniture_wip/repository/furniture_wip_repository.dart';
 import '../../../label/reject/repository/reject_repository.dart';
 import '../../../../core/network/endpoints.dart';
 import '../../../../core/network/api_client.dart';
-import '../widgets/inject_lookup_label_dialog.dart';
-import '../widgets/inject_lookup_label_partial_dialog.dart';
+import '../widgets/inject_sak_picker_dialog.dart';
 import '../widgets/inject_split_time_dialog.dart';
 import '../../../label/packing/repository/packing_repository.dart';
 
@@ -421,70 +420,19 @@ class _InjectProductionInputScreenState
 
     if (res.prefixType == PrefixType.furnitureWip) {
       await _handleFwipPcsFlow(vm, res);
-    } else if (_selectedMode == 'partial') {
-      await showDialog<void>(
-        context: context,
-        barrierDismissible: true,
-        builder: (_) => InjectLookupLabelPartialDialog(
-          noProduksi: widget.noProduksi,
-          selectedMode: _selectedMode,
-        ),
-      );
-    } else if (_selectedMode == 'select') {
-      await showDialog<void>(
-        context: context,
-        barrierDismissible: true,
-        builder: (_) => InjectLookupLabelDialog(
-          noProduksi: widget.noProduksi,
-          selectedMode: _selectedMode,
-        ),
-      );
     } else {
-      await _handleFullMode(vm, res);
-    }
-    return null;
-  }
-
-  /// MODE FULL: auto-tambahkan semua item baru dari hasil scan tanpa dialog
-  /// pemilihan manual — sama seperti Washing production input screen.
-  Future<void> _handleFullMode(
-    InjectProductionInputViewModel vm,
-    ProductionLabelLookupResult res,
-  ) async {
-    final freshCount = vm.countNewRowsInLastLookup(widget.noProduksi);
-    if (freshCount == 0) {
-      final labelCode = _labelCodeOfFirst(res);
-      final hasTemp =
-          labelCode != null && vm.hasTemporaryDataForLabel(labelCode);
-      final suffix = hasTemp
-          ? ' • ${vm.getTemporaryDataSummary(labelCode)}'
-          : '';
-      _showSnack(
-        'Semua item untuk ${labelCode ?? "label ini"} sudah ada.$suffix',
+      // Mode FULL, SELECT & PARTIAL sama-sama menampilkan dialog konfirmasi
+      // berformat kartu sak sebelum commit ke temp — mengikuti pola Mixer
+      // production input screen.
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => InjectSakPickerDialog(
+          noProduksi: widget.noProduksi,
+          isPartialMode: _selectedMode == 'partial',
+        ),
       );
-      return;
     }
-
-    vm.clearPicks();
-    vm.pickAllNew(widget.noProduksi);
-    final result = vm.commitPickedToTemp(noProduksi: widget.noProduksi);
-
-    final msg = result.added > 0
-        ? '✅ Auto-added ${result.added} item${result.skipped > 0 ? ' • Duplikat terlewati ${result.skipped}' : ''}'
-        : 'Tidak ada item baru ditambahkan';
-    _showSnack(
-      msg,
-      backgroundColor: result.added > 0 ? Colors.green : Colors.orange,
-    );
-  }
-
-  String? _labelCodeOfFirst(ProductionLabelLookupResult res) {
-    if (res.typedItems.isEmpty) return null;
-    final item = res.typedItems.first;
-    if (item is BrokerItem) return _brokerTitleKey(item);
-    if (item is MixerItem) return _mixerTitleKey(item);
-    if (item is GilinganItem) return _gilinganTitleKey(item);
-    if (item is FurnitureWipItem) return _fwipTitleKey(item);
     return null;
   }
 

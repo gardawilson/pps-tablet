@@ -195,6 +195,7 @@ class _HomeSidebarState extends State<HomeSidebar> {
       subtitle: 'Stock opname per kategori (baru)',
       icon: Icons.fact_check_outlined,
       route: '/shell/stock-opname-v2',
+      enabled: false,
     ),
   ];
 
@@ -557,17 +558,30 @@ class _HomeSidebarState extends State<HomeSidebar> {
 
   Widget _buildFlatItem(_MenuItem item) {
     final isSelected = _selectedRoute == item.route;
+    final isDisabled = !item.enabled;
+    final tooltipMessage = isDisabled
+        ? '${item.title} — Under Construction'
+        : (_collapsed ? item.title : '');
+    final iconColor = isDisabled
+        ? Colors.white.withValues(alpha: 0.3)
+        : (isSelected ? Colors.white : Colors.white70);
+    final textColor = isDisabled
+        ? Colors.white.withValues(alpha: 0.3)
+        : (isSelected ? Colors.white : Colors.white70);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       child: Tooltip(
-        message: _collapsed ? item.title : '',
+        message: tooltipMessage,
         preferBelow: false,
         child: Material(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(10),
           child: InkWell(
             borderRadius: BorderRadius.circular(10),
-            onTap: () => _navigateTo(item.route, item.title),
+            onTap: isDisabled
+                ? null
+                : () => _navigateTo(item.route, item.title),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               padding: EdgeInsets.symmetric(
@@ -581,26 +595,16 @@ class _HomeSidebarState extends State<HomeSidebar> {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: _collapsed
-                  ? Center(
-                      child: Icon(
-                        item.icon,
-                        color: isSelected ? Colors.white : Colors.white70,
-                        size: 20,
-                      ),
-                    )
+                  ? Center(child: Icon(item.icon, color: iconColor, size: 20))
                   : Row(
                       children: [
-                        Icon(
-                          item.icon,
-                          color: isSelected ? Colors.white : Colors.white70,
-                          size: 20,
-                        ),
+                        Icon(item.icon, color: iconColor, size: 20),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             item.title,
                             style: TextStyle(
-                              color: isSelected ? Colors.white : Colors.white70,
+                              color: textColor,
                               fontSize: 13,
                               fontWeight: isSelected
                                   ? FontWeight.bold
@@ -608,7 +612,26 @@ class _HomeSidebarState extends State<HomeSidebar> {
                             ),
                           ),
                         ),
-                        if (isSelected)
+                        if (isDisabled)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'Under Construction',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.5),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          )
+                        else if (isSelected)
                           const Icon(
                             Icons.chevron_right,
                             color: Colors.white,
@@ -653,11 +676,13 @@ class _MenuItem {
   final String subtitle;
   final IconData icon;
   final String route;
+  final bool enabled;
 
   const _MenuItem({
     required this.title,
     required this.subtitle,
     required this.icon,
     required this.route,
+    this.enabled = true,
   });
 }

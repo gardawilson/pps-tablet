@@ -329,6 +329,7 @@ class _MappingLokasiView extends StatelessWidget {
         width: width,
         height: height,
         margin: margin,
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: borderRadius,
@@ -370,107 +371,185 @@ class _MappingLokasiView extends StatelessWidget {
                 ),
               )
             : isLokasi
-            ? Padding(
-                padding: const EdgeInsets.all(4),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      cell.lokasiLabel ?? '',
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: _primary,
-                        height: 1,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      cell.lokasiDescription?.isNotEmpty == true
-                          ? cell.lokasiDescription!
-                          : '-',
-                      textAlign: TextAlign.center,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.black,
-                        height: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    _buildTotalLabelBadge(vm, cell),
-                  ],
-                ),
-              )
+            ? _buildLokasiCellContent(vm, cell)
             : const SizedBox.shrink(),
       ),
     );
   }
 
-  Widget _buildTotalLabelBadge(MappingLokasiViewModel vm, GridCell cell) {
+  // Struktur: ID besar → divider → jenis (tengah) → footer bar ikon ringkasan.
+  Widget _buildLokasiCellContent(MappingLokasiViewModel vm, GridCell cell) {
     final lokasi = vm.lokasiList
         .where((l) => l.idLokasi == cell.idLokasi)
         .firstOrNull;
-    if (lokasi == null) return const SizedBox.shrink();
-
-    final hasLabel = lokasi.totalLabel > 0;
-
-    String? uomText;
-    bool hasUom = false;
-    final uom = lokasi.namaUOM.toUpperCase();
-    if (uom == 'KG' || lokasi.totalBerat > 0) {
-      hasUom = lokasi.totalBerat > 0;
-      uomText = '${_formatNum(lokasi.totalBerat)} kg';
-    } else if (uom == 'PCS' || lokasi.totalQty > 0) {
-      hasUom = lokasi.totalQty > 0;
-      uomText = '${lokasi.totalQty} pcs';
-    }
+    final hasLabel = (lokasi?.totalLabel ?? 0) > 0;
 
     return Column(
-      mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-          decoration: BoxDecoration(
-            color: hasLabel
-                ? _primary.withValues(alpha: 0.10)
-                : Colors.grey.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            '${lokasi.totalLabel} label',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: hasLabel ? _primary : Colors.grey,
-            ),
+        const SizedBox(height: 6),
+        Text(
+          cell.lokasiLabel ?? '',
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+            color: _primary,
+            height: 1,
           ),
         ),
-        if (uomText != null) ...[
-          const SizedBox(height: 2),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-            decoration: BoxDecoration(
-              color: hasUom
-                  ? const Color(0xFF2E7D32).withValues(alpha: 0.10)
-                  : Colors.grey.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              uomText,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: hasUom ? const Color(0xFF2E7D32) : Colors.grey,
+        const SizedBox(height: 4),
+        Divider(
+          height: 1,
+          thickness: 1,
+          color: Colors.grey.shade200,
+          indent: 10,
+          endIndent: 10,
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            child: _buildJenisList(lokasi),
+          ),
+        ),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          decoration: BoxDecoration(
+            color: hasLabel
+                ? _primary.withValues(alpha: 0.06)
+                : Colors.grey.withValues(alpha: 0.06),
+            border: Border(top: BorderSide(color: Colors.grey.shade200)),
+          ),
+          child: _buildFooterIcons(lokasi),
+        ),
+      ],
+    );
+  }
+
+  // Daftar jenis (bisa lebih dari 1 kategori/jenis per lokasi) sebagai list bullet.
+  Widget _buildJenisList(MappingLokasi? lokasi) {
+    final jenisList = lokasi?.jenisList ?? const [];
+
+    if (jenisList.isEmpty) {
+      return Center(
+        child: Text(
+          '-',
+          style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+        ),
+      );
+    }
+
+    const maxShown = 2;
+    final shown = jenisList.take(maxShown).toList();
+    final extra = jenisList.length - shown.length;
+
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final j in shown)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 1),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '•',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey.shade400,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(width: 3),
+                  Expanded(
+                    child: Text(
+                      j.namaJenis,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: Colors.black,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
+          if (extra > 0)
+            Padding(
+              padding: const EdgeInsets.only(left: 10),
+              child: Text(
+                '+$extra lainnya',
+                style: TextStyle(
+                  fontSize: 9.5,
+                  fontStyle: FontStyle.italic,
+                  color: Colors.grey.shade400,
+                ),
+              ),
+            ),
         ],
-      ],
+      ),
+    );
+  }
+
+  // Ikon + angka untuk jumlah label & berat/qty — tanpa label teks "label"/"kg"/"pcs".
+  Widget _buildFooterIcons(MappingLokasi? lokasi) {
+    if (lokasi == null) {
+      return Center(
+        child: Icon(
+          Icons.inventory_2_outlined,
+          size: 13,
+          color: Colors.grey.shade400,
+        ),
+      );
+    }
+
+    final hasLabel = lokasi.totalLabel > 0;
+    final color = hasLabel ? _primary : Colors.grey.shade400;
+
+    String? uomText;
+    final uom = lokasi.namaUOM.toUpperCase();
+    if (uom == 'KG' || lokasi.totalBerat > 0) {
+      uomText = '${_formatNum(lokasi.totalBerat)}kg';
+    } else if (uom == 'PCS' || lokasi.totalQty > 0) {
+      uomText = '${lokasi.totalQty}pcs';
+    }
+
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.sell_rounded, size: 12, color: color),
+          const SizedBox(width: 3),
+          Text(
+            '${lokasi.totalLabel}',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+          if (uomText != null) ...[
+            const SizedBox(width: 8),
+            Icon(Icons.scale_rounded, size: 12, color: color),
+            const SizedBox(width: 3),
+            Text(
+              uomText,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -648,7 +727,7 @@ class _MappingLokasiView extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                item.namaJenis.isNotEmpty ? item.namaJenis : 'N/A',
+                item.namaJenis.isNotEmpty ? item.namaJenis : '-',
                 textAlign: TextAlign.center,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,

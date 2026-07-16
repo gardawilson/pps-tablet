@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:pps_tablet/common/widgets/search_dropdown_field.dart';
 import 'package:pps_tablet/core/network/api_client.dart';
 import 'package:pps_tablet/features/mapping/model/mapping_lokasi_model.dart';
 import 'package:pps_tablet/features/mapping/repository/mapping_repository.dart';
@@ -19,18 +18,20 @@ class JenisPairValue {
       };
 }
 
-class _PairEntry {
+class _CategoryEntry {
   MasterKategori? kategori;
-  MasterJenis? jenis;
   List<MasterJenis> jenisOptions;
+  Set<int> selectedJenisIds;
   bool loadingJenis;
 
-  _PairEntry({this.kategori})
+  _CategoryEntry({this.kategori})
       : jenisOptions = [],
+        selectedJenisIds = {},
         loadingJenis = false;
 }
 
-/// Editor untuk daftar pasangan kategori-jenis (multi kategori/jenis per lokasi).
+/// Editor untuk daftar kategori, tiap kategori bisa memilih banyak jenis
+/// sekaligus (checklist) tanpa perlu menambah kategori yang sama berulang.
 class JenisPairListEditor extends StatefulWidget {
   final MappingRepository repository;
   final List<LokasiJenis> initial;
@@ -51,14 +52,16 @@ class JenisPairListEditorState extends State<JenisPairListEditor> {
   bool _loadingKategori = true;
   String? _error;
   List<MasterKategori> _kategoriList = [];
-  final List<_PairEntry> _entries = [];
+  final List<_CategoryEntry> _entries = [];
 
   bool get isReady => !_loadingKategori;
 
-  // Minimal 1 jenis wajib diisi — lokasi tidak boleh disimpan tanpa jenis.
+  // Minimal 1 kategori dengan minimal 1 jenis wajib diisi.
   bool get isValid =>
       _entries.isNotEmpty &&
-      _entries.every((e) => e.kategori != null && e.jenis != null);
+      _entries.every(
+        (e) => e.kategori != null && e.selectedJenisIds.isNotEmpty,
+      );
 
   @override
   void initState() {
@@ -73,14 +76,26 @@ class JenisPairListEditorState extends State<JenisPairListEditor> {
         _kategoriList = list;
         _loadingKategori = false;
       });
+
+      // Kelompokkan data awal per kategori agar jenis yang sekategori
+      // muncul sebagai satu entry dengan banyak jenis terpilih.
+      final grouped = <int, List<LokasiJenis>>{};
       for (final j in widget.initial) {
+        grouped.putIfAbsent(j.idKategori, () => []).add(j);
+      }
+
+      for (final entryList in grouped.values) {
+        final idKategori = entryList.first.idKategori;
         final kategori =
-            list.where((k) => k.idKategori == j.idKategori).firstOrNull;
+            list.where((k) => k.idKategori == idKategori).firstOrNull;
         if (kategori == null) continue;
-        final entry = _PairEntry(kategori: kategori);
+        final entry = _CategoryEntry(kategori: kategori);
         _entries.add(entry);
         setState(() {});
-        await _loadJenisFor(entry, preselectIdJenis: j.idJenis);
+        await _loadJenisFor(
+          entry,
+          preselectIds: entryList.map((j) => j.idJenis).toSet(),
+        );
       }
       _emitChange();
     } catch (e) {
@@ -91,20 +106,26 @@ class JenisPairListEditorState extends State<JenisPairListEditor> {
     }
   }
 
-  Future<void> _loadJenisFor(_PairEntry entry, {int? preselectIdJenis}) async {
+  Future<void> _loadJenisFor(
+    _CategoryEntry entry, {
+    Set<int>? preselectIds,
+  }) async {
     setState(() {
       entry.loadingJenis = true;
       entry.jenisOptions = [];
-      entry.jenis = null;
+      entry.selectedJenisIds = {};
     });
     try {
-      final list = await widget.repository.fetchJenis(entry.kategori!.idKategori);
+      final list =
+          await widget.repository.fetchJenis(entry.kategori!.idKategori);
       setState(() {
         entry.jenisOptions = list;
         entry.loadingJenis = false;
-        if (preselectIdJenis != null) {
-          entry.jenis =
-              list.where((j) => j.idJenis == preselectIdJenis).firstOrNull;
+        if (preselectIds != null) {
+          entry.selectedJenisIds = list
+              .where((j) => preselectIds.contains(j.idJenis))
+              .map((j) => j.idJenis)
+              .toSet();
         }
       });
     } catch (e) {
@@ -116,15 +137,20 @@ class JenisPairListEditorState extends State<JenisPairListEditor> {
   }
 
   void _emitChange() {
-    final values = _entries
-        .where((e) => e.kategori != null && e.jenis != null)
-        .map((e) => JenisPairValue(kategori: e.kategori!, jenis: e.jenis!))
-        .toList();
+    final values = <JenisPairValue>[];
+    for (final entry in _entries) {
+      if (entry.kategori == null) continue;
+      for (final jenis in entry.jenisOptions) {
+        if (entry.selectedJenisIds.contains(jenis.idJenis)) {
+          values.add(JenisPairValue(kategori: entry.kategori!, jenis: jenis));
+        }
+      }
+    }
     widget.onChanged(values);
   }
 
   void _addEntry() {
-    setState(() => _entries.add(_PairEntry()));
+    setState(() => _entries.add(_CategoryEntry()));
     _emitChange();
   }
 
@@ -133,13 +159,18 @@ class JenisPairListEditorState extends State<JenisPairListEditor> {
     _emitChange();
   }
 
-  Widget _buildDropdown<T>({
-    required T? value,
-    required String hint,
-    required List<T> items,
-    required String Function(T) itemLabel,
-    required void Function(T?)? onChanged,
-  }) {
+  void _toggleJenis(_CategoryEntry entry, MasterJenis jenis, bool selected) {
+    setState(() {
+      if (selected) {
+        entry.selectedJenisIds.add(jenis.idJenis);
+      } else {
+        entry.selectedJenisIds.remove(jenis.idJenis);
+      }
+    });
+    _emitChange();
+  }
+
+  Widget _buildKategoriDropdown(_CategoryEntry entry) {
     return InputDecorator(
       decoration: InputDecoration(
         contentPadding:
@@ -151,22 +182,238 @@ class JenisPairListEditorState extends State<JenisPairListEditor> {
         ),
       ),
       child: DropdownButtonHideUnderline(
-        child: DropdownButton<T>(
-          value: value,
+        child: DropdownButton<MasterKategori>(
+          value: entry.kategori,
           isExpanded: true,
-          hint: Text(hint, style: const TextStyle(fontSize: 13)),
-          items: items
-              .map((item) => DropdownMenuItem<T>(
+          hint: const Text('Pilih kategori', style: TextStyle(fontSize: 13)),
+          items: _kategoriList
+              .map((item) => DropdownMenuItem<MasterKategori>(
                     value: item,
                     child: Text(
-                      itemLabel(item),
+                      item.namaKategori,
                       style: const TextStyle(fontSize: 13),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ))
               .toList(),
-          onChanged: onChanged,
+          onChanged: (val) async {
+            setState(() => entry.kategori = val);
+            if (val != null) {
+              await _loadJenisFor(entry);
+            }
+            _emitChange();
+          },
         ),
+      ),
+    );
+  }
+
+  Future<void> _openJenisPicker(_CategoryEntry entry) async {
+    var tempSelected = Set<int>.from(entry.selectedJenisIds);
+    final searchCtrl = TextEditingController();
+    var query = '';
+
+    final result = await showDialog<Set<int>>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSt) {
+          final filtered = query.isEmpty
+              ? entry.jenisOptions
+              : entry.jenisOptions
+                  .where((j) =>
+                      j.namaJenis.toLowerCase().contains(query.toLowerCase()))
+                  .toList();
+
+          return AlertDialog(
+            scrollable: true,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Text(
+              'Pilih Jenis${entry.kategori != null ? ' — ${entry.kategori!.namaKategori}' : ''}',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            ),
+            content: SizedBox(
+              width: 300,
+              child: entry.jenisOptions.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      child: Text(
+                        'Tidak ada jenis untuk kategori ini',
+                        style:
+                            TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                      ),
+                    )
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextField(
+                          controller: searchCtrl,
+                          autofocus: true,
+                          onChanged: (v) => setSt(() => query = v),
+                          style: const TextStyle(fontSize: 13),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            hintText: 'Cari jenis...',
+                            hintStyle: const TextStyle(fontSize: 13),
+                            prefixIcon: const Icon(Icons.search_rounded, size: 18),
+                            suffixIcon: query.isEmpty
+                                ? null
+                                : IconButton(
+                                    icon: const Icon(Icons.close_rounded, size: 16),
+                                    onPressed: () {
+                                      searchCtrl.clear();
+                                      setSt(() => query = '');
+                                    },
+                                  ),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 8),
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8)),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide:
+                                  const BorderSide(color: _primary, width: 2),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.maxFinite,
+                          height: 280,
+                          child: filtered.isEmpty
+                              ? Center(
+                                  child: Text(
+                                    'Jenis tidak ditemukan',
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade500),
+                                  ),
+                                )
+                              : ListView(
+                                  shrinkWrap: true,
+                                  children: [
+                                    for (final jenis in filtered)
+                                      CheckboxListTile(
+                                        dense: true,
+                                        contentPadding: EdgeInsets.zero,
+                                        controlAffinity:
+                                            ListTileControlAffinity.leading,
+                                        activeColor: _primary,
+                                        title: Text(
+                                          jenis.namaJenis,
+                                          style: const TextStyle(fontSize: 13),
+                                        ),
+                                        value: tempSelected
+                                            .contains(jenis.idJenis),
+                                        onChanged: (checked) {
+                                          setSt(() {
+                                            if (checked ?? false) {
+                                              tempSelected.add(jenis.idJenis);
+                                            } else {
+                                              tempSelected
+                                                  .remove(jenis.idJenis);
+                                            }
+                                          });
+                                        },
+                                      ),
+                                  ],
+                                ),
+                        ),
+                      ],
+                    ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Batal'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, tempSelected),
+                style: FilledButton.styleFrom(backgroundColor: _primary),
+                child: const Text('Terapkan'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (result != null) {
+      setState(() => entry.selectedJenisIds = result);
+      _emitChange();
+    }
+  }
+
+  Widget _buildJenisField(_CategoryEntry entry) {
+    if (entry.loadingJenis) {
+      return const SizedBox(
+        height: 40,
+        child: Center(
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+
+    final enabled = entry.kategori != null;
+    final selectedJenis = entry.jenisOptions
+        .where((j) => entry.selectedJenisIds.contains(j.idJenis))
+        .toList();
+
+    return InkWell(
+      onTap: enabled ? () => _openJenisPicker(entry) : null,
+      borderRadius: BorderRadius.circular(8),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(
+              color: enabled ? Colors.grey.shade300 : Colors.grey.shade200,
+            ),
+          ),
+          suffixIcon: Icon(
+            Icons.arrow_drop_down_rounded,
+            color: enabled ? Colors.grey.shade600 : Colors.grey.shade300,
+          ),
+        ),
+        child: !enabled
+            ? Text(
+                'Pilih kategori dahulu',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+              )
+            : selectedJenis.isEmpty
+                ? Text(
+                    'Pilih jenis...',
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+                  )
+                : Wrap(
+                    spacing: 4,
+                    runSpacing: 4,
+                    children: [
+                      for (final jenis in selectedJenis)
+                        Chip(
+                          label: Text(
+                            jenis.namaJenis,
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                          labelStyle: const TextStyle(color: _primary),
+                          backgroundColor: _primary.withValues(alpha: 0.10),
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          padding: const EdgeInsets.symmetric(horizontal: 2),
+                          deleteIcon: const Icon(Icons.close, size: 14),
+                          onDeleted: () =>
+                              _toggleJenis(entry, jenis, false),
+                        ),
+                    ],
+                  ),
       ),
     );
   }
@@ -230,7 +477,7 @@ class JenisPairListEditorState extends State<JenisPairListEditor> {
                     Icon(Icons.add, size: 14, color: _primary),
                     SizedBox(width: 2),
                     Text(
-                      'Tambah',
+                      'Tambah Kategori',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
@@ -248,7 +495,7 @@ class JenisPairListEditorState extends State<JenisPairListEditor> {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 10),
             child: Text(
-              'Minimal 1 kategori/jenis wajib diisi. Tekan "Tambah" untuk menambahkan.',
+              'Minimal 1 kategori dengan 1 jenis wajib diisi. Tekan "Tambah Kategori" untuk menambahkan.',
               style: TextStyle(fontSize: 11, color: Colors.red.shade400),
             ),
           )
@@ -269,7 +516,7 @@ class JenisPairListEditorState extends State<JenisPairListEditor> {
                     children: [
                       Expanded(
                         child: Text(
-                          'Jenis ${i + 1}',
+                          'Kategori ${i + 1}',
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
@@ -289,57 +536,9 @@ class JenisPairListEditorState extends State<JenisPairListEditor> {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  _buildDropdown<MasterKategori>(
-                    value: _entries[i].kategori,
-                    hint: 'Pilih kategori',
-                    items: _kategoriList,
-                    itemLabel: (k) => k.namaKategori,
-                    onChanged: (val) async {
-                      setState(() {
-                        _entries[i].kategori = val;
-                        _entries[i].jenis = null;
-                        _entries[i].jenisOptions = [];
-                      });
-                      if (val != null) {
-                        await _loadJenisFor(_entries[i]);
-                      }
-                      _emitChange();
-                    },
-                  ),
+                  _buildKategoriDropdown(_entries[i]),
                   const SizedBox(height: 8),
-                  if (_entries[i].loadingJenis)
-                    const SizedBox(
-                      height: 40,
-                      child: Center(
-                        child: SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      ),
-                    )
-                  else
-                    SearchDropdownField<MasterJenis>(
-                      value: _entries[i].jenis,
-                      items: _entries[i].jenisOptions,
-                      itemAsString: (j) => j.namaJenis,
-                      hint: _entries[i].kategori == null
-                          ? 'Pilih kategori dahulu'
-                          : 'Pilih jenis',
-                      searchHint: 'Cari jenis...',
-                      enabled: _entries[i].kategori != null,
-                      fieldHeight: 40,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 0,
-                      ),
-                      onChanged: _entries[i].kategori == null
-                          ? null
-                          : (val) {
-                              setState(() => _entries[i].jenis = val);
-                              _emitChange();
-                            },
-                    ),
+                  _buildJenisField(_entries[i]),
                 ],
               ),
             ),

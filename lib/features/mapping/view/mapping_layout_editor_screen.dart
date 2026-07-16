@@ -337,8 +337,8 @@ class _EditorViewState extends State<_EditorView> {
                           row,
                           col,
                           details.data as MappingLokasi,
-                          rowSpan: 2,
-                          colSpan: 2,
+                          rowSpan: 1,
+                          colSpan: 1,
                         );
                       } else if (details.data is _CellMoveData) {
                         final d = details.data as _CellMoveData;
@@ -371,8 +371,8 @@ class _EditorViewState extends State<_EditorView> {
                       int rs = 1, cs = 1;
                       Color color = _primary;
                       if (details.data is MappingLokasi) {
-                        rs = 2;
-                        cs = 2;
+                        rs = 1;
+                        cs = 1;
                       } else if (details.data is _CellMoveData) {
                         final d = details.data as _CellMoveData;
                         final src = vm.grid[d.row][d.col];
@@ -1032,10 +1032,8 @@ class _EditorViewState extends State<_EditorView> {
           activeColor: _primary,
           row: row,
           col: col,
-          initRowSpan: cell.rowSpan < 2 ? 2 : cell.rowSpan,
-          initColSpan: cell.colSpan < 2 ? 2 : cell.colSpan,
-          minRowSpan: 2,
-          minColSpan: 2,
+          initRowSpan: cell.rowSpan,
+          initColSpan: cell.colSpan,
           canPlace: (rs, cs) => vm.canPlaceSpan(
             row,
             col,

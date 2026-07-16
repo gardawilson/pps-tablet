@@ -431,6 +431,16 @@ class _EditorViewState extends State<_EditorView> {
                                       width: vm.grid[r][c].colSpan * _slotW - 3,
                                       height:
                                           vm.grid[r][c].rowSpan * _slotH - 3,
+                                      jenisList:
+                                          vm.lokasiList
+                                              .where(
+                                                (l) =>
+                                                    l.idLokasi ==
+                                                    vm.grid[r][c].idLokasi,
+                                              )
+                                              .firstOrNull
+                                              ?.jenisList ??
+                                          const [],
                                     ),
                                   ),
                             // Hover preview overlay
@@ -692,7 +702,13 @@ class _EditorViewState extends State<_EditorView> {
                     onTap: () async {
                       final added = await showDialog<bool>(
                         context: context,
-                        builder: (_) => AddLokasiDialog(blok: widget.blok),
+                        builder: (_) => AddLokasiDialog(
+                          blok: widget.blok,
+                          namaWarehouse: widget.namaWarehouse,
+                          existingIds: vm.lokasiList
+                              .map((l) => l.idLokasi)
+                              .toSet(),
+                        ),
                       );
                       if (added ?? false) {
                         await vm.refreshLokasi();
@@ -899,18 +915,20 @@ class _EditorViewState extends State<_EditorView> {
                       blok: widget.blok,
                       idLokasi: cell.idLokasi ?? 0,
                       lokasiLabel: cell.lokasiLabel ?? '',
-                      initialIdKategori: lokasi?.idKategori ?? 0,
-                      initialIdJenis: lokasi?.idJenis ?? 0,
+                      initialJenisList: lokasi?.jenisList ?? const [],
                     ),
                   );
-                  if ((updated ?? false) && context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Data lokasi berhasil diperbarui'),
-                        backgroundColor: Colors.green,
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
+                  if (updated ?? false) {
+                    await vm.refreshLokasi();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Data lokasi berhasil diperbarui'),
+                          backgroundColor: Colors.green,
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
                   }
                 },
               ),
@@ -1551,7 +1569,7 @@ class _DraggableLokasi extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              lokasi.namaJenis.isNotEmpty ? lokasi.namaJenis : 'N/A',
+              lokasi.namaJenis.isNotEmpty ? lokasi.namaJenis : '-',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
@@ -1575,11 +1593,13 @@ class _GridCell extends StatelessWidget {
   final GridCell cell;
   final double width;
   final double height;
+  final List<LokasiJenis> jenisList;
 
   const _GridCell({
     required this.cell,
     required this.width,
     required this.height,
+    this.jenisList = const [],
   });
 
   @override
@@ -1616,6 +1636,7 @@ class _GridCell extends StatelessWidget {
       width: width,
       height: height,
       margin: const EdgeInsets.all(1.5),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(6),
@@ -1663,43 +1684,108 @@ class _GridCell extends StatelessWidget {
               ),
             )
           : isLokasi
-          ? Padding(
-              padding: const EdgeInsets.all(4),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+          ? Column(
+              children: [
+                const SizedBox(height: 6),
+                Text(
+                  cell.lokasiLabel ?? '',
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: _primary,
+                    height: 1,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: Colors.grey.shade200,
+                  indent: 10,
+                  endIndent: 10,
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    child: _buildJenisList(),
+                  ),
+                ),
+              ],
+            )
+          : const SizedBox.shrink(),
+    );
+  }
+
+  // Daftar jenis (bisa lebih dari 1 kategori/jenis per lokasi) sebagai list bullet.
+  Widget _buildJenisList() {
+    if (jenisList.isEmpty) {
+      return Center(
+        child: Text(
+          '-',
+          style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+        ),
+      );
+    }
+
+    const maxShown = 2;
+    final shown = jenisList.take(maxShown).toList();
+    final extra = jenisList.length - shown.length;
+
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final j in shown)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 1),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    cell.lokasiLabel ?? '',
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: _primary,
-                      height: 1,
+                    '•',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey.shade400,
+                      height: 1.2,
                     ),
                   ),
-                  ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      cell.lokasiDescription?.isNotEmpty == true
-                          ? cell.lokasiDescription!
-                          : '-',
-                      textAlign: TextAlign.center,
+                  const SizedBox(width: 3),
+                  Expanded(
+                    child: Text(
+                      j.namaJenis,
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 10.5,
+                        fontSize: 10,
                         color: Colors.black,
                         height: 1.2,
                       ),
                     ),
-                  ],
+                  ),
                 ],
               ),
-            )
-          : const SizedBox.shrink(),
+            ),
+          if (extra > 0)
+            Padding(
+              padding: const EdgeInsets.only(left: 10),
+              child: Text(
+                '+$extra lainnya',
+                style: TextStyle(
+                  fontSize: 9.5,
+                  fontStyle: FontStyle.italic,
+                  color: Colors.grey.shade400,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

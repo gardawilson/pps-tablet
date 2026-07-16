@@ -15,6 +15,20 @@ class ApiException implements Exception {
 
   ApiException(this.statusCode, this.message, {this.responseBody});
 
+  // Pesan ramah untuk ditampilkan ke user — ambil field "message" dari body JSON
+  // server jika ada (mis. pesan validasi), fallback ke [message] teknis.
+  String get friendlyMessage {
+    final body = responseBody;
+    if (body == null || body.isEmpty) return message;
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map && decoded['message'] is String) {
+        return decoded['message'] as String;
+      }
+    } catch (_) {}
+    return message;
+  }
+
   @override
   String toString() =>
       'ApiException($statusCode): $message ${responseBody ?? ''}';

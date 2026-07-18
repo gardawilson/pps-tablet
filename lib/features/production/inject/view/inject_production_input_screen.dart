@@ -14,8 +14,8 @@ import '../../shared/widgets/confirm_save_temp_dialog.dart';
 import '../../shared/widgets/save_button_with_badge.dart';
 import '../../shared/widgets/unsaved_temp_warning_dialog.dart';
 import '../model/inject_output_model.dart';
-import '../model/inject_formula_model.dart';
 import '../model/inject_production_inputs_model.dart';
+import '../model/inject_formula_model.dart';
 import '../model/inject_production_model.dart'
     show InjectOutputJenis, InjectProduction;
 import '../repository/inject_production_repository.dart';
@@ -352,10 +352,10 @@ class _InjectProductionInputScreenState
     // Formula inputs (material yang diterima) untuk panel kiri dialog scan —
     // pola yang sama seperti Washing production input screen.
     final formulaData = context.read<InjectFormulaViewModel>().data;
-    final outputs = formulaData?.outputs ?? const [];
 
     // Master Input/Output belum diset: formula termuat & ada output, tapi tidak
-    // ada satu pun input formula -> scan label tidak dapat dilakukan.
+    // ada satu pun input formula → scan label tidak dapat dilakukan.
+    final outputs = formulaData?.outputs ?? const [];
     final hasAnyFormula = outputs.any((o) => o.formulas.isNotEmpty);
     if (formulaData != null && outputs.isNotEmpty && !hasAnyFormula) {
       final jenis = outputs
@@ -555,49 +555,6 @@ class _InjectProductionInputScreenState
       default:
         return null;
     }
-  }
-
-  /// MODE FULL: auto-tambahkan semua item baru dari hasil scan tanpa dialog
-  /// pemilihan manual - sama seperti Washing production input screen.
-  Future<void> _handleFullMode(
-    InjectProductionInputViewModel vm,
-    ProductionLabelLookupResult res,
-  ) async {
-    final freshCount = vm.countNewRowsInLastLookup(widget.noProduksi);
-    if (freshCount == 0) {
-      final labelCode = _labelCodeOfFirst(res);
-      final hasTemp =
-          labelCode != null && vm.hasTemporaryDataForLabel(labelCode);
-      final suffix = hasTemp
-          ? ' • ${vm.getTemporaryDataSummary(labelCode)}'
-          : '';
-      _showSnack(
-        'Semua item untuk ${labelCode ?? "label ini"} sudah ada.$suffix',
-      );
-      return;
-    }
-
-    vm.clearPicks();
-    vm.pickAllNew(widget.noProduksi);
-    final result = vm.commitPickedToTemp(noProduksi: widget.noProduksi);
-
-    final msg = result.added > 0
-        ? '✅ Auto-added ${result.added} item${result.skipped > 0 ? ' • Duplikat terlewati ${result.skipped}' : ''}'
-        : 'Tidak ada item baru ditambahkan';
-    _showSnack(
-      msg,
-      backgroundColor: result.added > 0 ? Colors.green : Colors.orange,
-    );
-  }
-
-  String? _labelCodeOfFirst(ProductionLabelLookupResult res) {
-    if (res.typedItems.isEmpty) return null;
-    final item = res.typedItems.first;
-    if (item is BrokerItem) return _brokerTitleKey(item);
-    if (item is MixerItem) return _mixerTitleKey(item);
-    if (item is GilinganItem) return _gilinganTitleKey(item);
-    if (item is FurnitureWipItem) return _fwipTitleKey(item);
-    return null;
   }
 
   Future<void> _handleFwipPcsFlow(

@@ -14,6 +14,7 @@ import '../../shared/widgets/confirm_save_temp_dialog.dart';
 import '../../shared/widgets/save_button_with_badge.dart';
 import '../../shared/widgets/unsaved_temp_warning_dialog.dart';
 import '../model/inject_output_model.dart';
+import '../model/inject_formula_model.dart';
 import '../model/inject_production_inputs_model.dart';
 import '../model/inject_production_model.dart'
     show InjectOutputJenis, InjectProduction;
@@ -353,6 +354,26 @@ class _InjectProductionInputScreenState
     final formulaData = context.read<InjectFormulaViewModel>().data;
     final outputs = formulaData?.outputs ?? const [];
 
+    // Master Input/Output belum diset: formula termuat & ada output, tapi tidak
+    // ada satu pun input formula -> scan label tidak dapat dilakukan.
+    final hasAnyFormula = outputs.any((o) => o.formulas.isNotEmpty);
+    if (formulaData != null && outputs.isNotEmpty && !hasAnyFormula) {
+      final jenis = outputs
+          .map((o) => o.namaJenis.trim())
+          .where((n) => n.isNotEmpty)
+          .join(', ');
+      await showDialog<void>(
+        context: context,
+        builder: (_) => ErrorStatusDialog(
+          title: 'Master Input Output Belum Diset',
+          message:
+              'Isi data output "$jenis" ke dalam Master Input Output '
+              'terlebih dahulu untuk dapat melakukan proses scan label.',
+        ),
+      );
+      return;
+    }
+
     final formulaOutputs = outputs
         .map(
           (o) => ProductionFormulaOutput(
@@ -418,6 +439,37 @@ class _InjectProductionInputScreenState
       return 'Label "$code" tidak memiliki data yang tersedia.';
     }
 
+    // Validasi kategori + jenis terhadap formula hasil fetch API (jika sudah dimuat)
+    final formulaData = context.read<InjectFormulaViewModel>().data;
+    if (formulaData != null && formulaData.outputs.isNotEmpty) {
+      final allowedTabs = _computeAllowedTabs(formulaData);
+      final tab = _tabForPrefixType(res.prefixType);
+
+      if (allowedTabs.isNotEmpty && tab != null && !allowedTabs.contains(tab)) {
+        return 'Kategori label "${code.trim()}" tidak sesuai dengan formula produksi ini.';
+      }
+
+      if (tab != null) {
+        final allowedInputIds =
+            _computeAllowedInputIdsByTab(formulaData)[tab] ?? const <int>{};
+        if (allowedInputIds.isNotEmpty) {
+          final firstRow = res.data.first;
+          final rawIdJenis = firstRow['idJenis'] ?? firstRow['IdJenis'];
+          if (rawIdJenis != null) {
+            final idJenis = (rawIdJenis as num).toInt();
+            if (!allowedInputIds.contains(idJenis)) {
+              final namaJenis =
+                  firstRow['namaJenis'] ??
+                  firstRow['NamaJenis'] ??
+                  firstRow['Jenis'] ??
+                  'tidak diketahui';
+              return 'Jenis "$namaJenis" tidak terdaftar dalam formula produksi ini.';
+            }
+          }
+        }
+      }
+    }
+
     if (res.prefixType == PrefixType.furnitureWip) {
       await _handleFwipPcsFlow(vm, res);
     } else {
@@ -433,6 +485,118 @@ class _InjectProductionInputScreenState
         ),
       );
     }
+    return null;
+  }
+
+  /// Set tab yang boleh ditampilkan berdasarkan kategori input pada formula.
+  /// Kosong = formula belum termuat / tak dikenali → tampilkan semua tab.
+  Set<String> _computeAllowedTabs(InjectFormulaData? data) {
+    if (data == null || data.outputs.isEmpty) return const {};
+    final tabs = <String>{};
+    for (final o in data.outputs) {
+      for (final f in o.formulas) {
+        final k = '${f.inputKategoriKode} ${f.inputKategoriNama}'.toLowerCase();
+        if (k.contains('furniture') ||
+            k.contains('fwip') ||
+            k.contains('wip')) {
+          tabs.add('fwip');
+        }
+        if (k.contains('broker')) tabs.add('broker');
+        if (k.contains('mixer')) tabs.add('mixer');
+        if (k.contains('gilingan')) tabs.add('gilingan');
+        if (k.contains('material') ||
+            k.contains('kabinet') ||
+            k.contains('cabinet')) {
+          tabs.add('material');
+        }
+      }
+    }
+    return tabs;
+  }
+
+  /// InputId formula yang diizinkan per tab, berdasarkan kategori input pada
+  /// formula (hasil fetch API). Dipakai untuk validasi jenis label saat scan.
+  Map<String, Set<int>> _computeAllowedInputIdsByTab(InjectFormulaData? data) {
+    final map = <String, Set<int>>{};
+    if (data == null) return map;
+    for (final o in data.outputs) {
+      for (final f in o.formulas) {
+        final k = '${f.inputKategoriKode} ${f.inputKategoriNama}'.toLowerCase();
+        String? tab;
+        if (k.contains('furniture') ||
+            k.contains('fwip') ||
+            k.contains('wip')) {
+          tab = 'fwip';
+        } else if (k.contains('broker')) {
+          tab = 'broker';
+        } else if (k.contains('mixer')) {
+          tab = 'mixer';
+        } else if (k.contains('gilingan')) {
+          tab = 'gilingan';
+        }
+        if (tab != null) {
+          (map[tab] ??= <int>{}).add(f.inputId);
+        }
+      }
+    }
+    return map;
+  }
+
+  String? _tabForPrefixType(PrefixType type) {
+    switch (type) {
+      case PrefixType.furnitureWip:
+        return 'fwip';
+      case PrefixType.broker:
+        return 'broker';
+      case PrefixType.mixer:
+        return 'mixer';
+      case PrefixType.gilingan:
+        return 'gilingan';
+      default:
+        return null;
+    }
+  }
+
+  /// MODE FULL: auto-tambahkan semua item baru dari hasil scan tanpa dialog
+  /// pemilihan manual - sama seperti Washing production input screen.
+  Future<void> _handleFullMode(
+    InjectProductionInputViewModel vm,
+    ProductionLabelLookupResult res,
+  ) async {
+    final freshCount = vm.countNewRowsInLastLookup(widget.noProduksi);
+    if (freshCount == 0) {
+      final labelCode = _labelCodeOfFirst(res);
+      final hasTemp =
+          labelCode != null && vm.hasTemporaryDataForLabel(labelCode);
+      final suffix = hasTemp
+          ? ' • ${vm.getTemporaryDataSummary(labelCode)}'
+          : '';
+      _showSnack(
+        'Semua item untuk ${labelCode ?? "label ini"} sudah ada.$suffix',
+      );
+      return;
+    }
+
+    vm.clearPicks();
+    vm.pickAllNew(widget.noProduksi);
+    final result = vm.commitPickedToTemp(noProduksi: widget.noProduksi);
+
+    final msg = result.added > 0
+        ? '✅ Auto-added ${result.added} item${result.skipped > 0 ? ' • Duplikat terlewati ${result.skipped}' : ''}'
+        : 'Tidak ada item baru ditambahkan';
+    _showSnack(
+      msg,
+      backgroundColor: result.added > 0 ? Colors.green : Colors.orange,
+    );
+  }
+
+  String? _labelCodeOfFirst(ProductionLabelLookupResult res) {
+    if (res.typedItems.isEmpty) return null;
+    final item = res.typedItems.first;
+    if (item is BrokerItem) return _brokerTitleKey(item);
+    if (item is MixerItem) return _mixerTitleKey(item);
+    if (item is GilinganItem) return _gilinganTitleKey(item);
+    if (item is FurnitureWipItem) return _fwipTitleKey(item);
     return null;
   }
 
@@ -2441,7 +2605,6 @@ class _InjectProductionInputScreenState
                         ? 'Produksi sudah selesai'
                         : null,
                     onGanti: _openSplitTimeDialog,
-
                   ),
                 Expanded(
                   child: Builder(

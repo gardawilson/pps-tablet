@@ -1,3 +1,5 @@
+import '../utils/so_v2_number_format.dart';
+
 /// Baris label pada 1 jenis stock opname.
 ///
 /// Nama field mentah berbeda-beda per kategori (NoBroker, NoWashing,
@@ -44,27 +46,37 @@ class SoV2LabelRow {
 
   /// Entries selain field judul (primaryKey) dan field yang dikecualikan
   /// (NoSO, isScanned), untuk ditampilkan sebagai info tambahan.
-  Iterable<MapEntry<String, dynamic>> get secondaryEntries => raw.entries
-      .where((e) => e.key != primaryKey && !_excludedKeys.contains(e.key));
+  Iterable<MapEntry<String, dynamic>> get secondaryEntries => raw.entries.where(
+    (e) => e.key != primaryKey && !_excludedKeys.contains(e.key),
+  );
 
   static const _weightKeyHints = ['berat'];
   static const _countKeyHints = ['jmlh', 'pcs', 'qty'];
 
   /// Nilai berat atau jumlah pcs/sak untuk ditampilkan di sisi kanan baris,
   /// mis. "225 kg" atau "14 pcs". Mencari field yang namanya mengandung
-  /// "Berat" (prioritas, satuan kg) lalu field "Jmlh"/"Pcs"/"Qty" (satuan
-  /// pcs). Null kalau tidak ada field yang cocok.
-  String? get weightOrCountDisplay {
+  /// "Berat" (prioritas, satuan [weightUnit], default kg — beberapa
+  /// kategori seperti furniturewip memakai UOM pcs meski nama field-nya
+  /// tetap "Berat") lalu field "Jmlh"/"Pcs"/"Qty" (satuan pcs). Null kalau
+  /// tidak ada field yang cocok.
+  String? weightOrCountDisplay({String weightUnit = 'kg'}) {
     for (final e in secondaryEntries) {
       if (e.value == null) continue;
       final key = e.key.toLowerCase();
-      if (_weightKeyHints.any(key.contains)) return '${e.value} kg';
+      if (_weightKeyHints.any(key.contains)) {
+        return '${_formatValue(e.value)} $weightUnit';
+      }
     }
     for (final e in secondaryEntries) {
       if (e.value == null) continue;
       final key = e.key.toLowerCase();
-      if (_countKeyHints.any(key.contains)) return '${e.value} pcs';
+      if (_countKeyHints.any(key.contains)) {
+        return '${_formatValue(e.value)} pcs';
+      }
     }
     return null;
   }
+
+  static String _formatValue(dynamic value) =>
+      value is num ? soV2FormatQty(value) : value.toString();
 }

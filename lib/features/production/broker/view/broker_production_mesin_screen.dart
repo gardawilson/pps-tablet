@@ -367,6 +367,7 @@ class _BrokerProductionMesinScreenState
               child: ProductionOverlayDrawer(
                 isOpen: _isRiwayatExpanded,
                 onClose: () => setState(() => _isRiwayatExpanded = false),
+                onOpen: () => setState(() => _isRiwayatExpanded = true),
                 width: c.maxWidth * 0.4,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -384,8 +385,6 @@ class _BrokerProductionMesinScreenState
                       ],
                       selectedIndex: _sidebarTab,
                       onSelected: (i) => setState(() => _sidebarTab = i),
-                      onToggle: () =>
-                          setState(() => _isRiwayatExpanded = false),
                     ),
                     Expanded(
                       child: _sidebarTab == 0
@@ -396,19 +395,6 @@ class _BrokerProductionMesinScreenState
                 ),
               ),
             ),
-
-            // ── Toggle: buka drawer saat tertutup ────────────────────
-            if (!_isRiwayatExpanded)
-              Positioned(
-                right: 0,
-                top: 0,
-                bottom: 0,
-                child: Center(
-                  child: ProductionOverlayDrawerToggle(
-                    onPressed: () => setState(() => _isRiwayatExpanded = true),
-                  ),
-                ),
-              ),
           ],
         ),
       ),
@@ -425,6 +411,7 @@ class _BrokerProductionMesinScreenState
           label: 'Washing',
           fetchStok: _stokRepo.fetchStok,
           fetchLabel: (item) => _stokRepo.fetchLabel(item.idWashing),
+          showSakColumn: false,
           oldestDateOf: (item) => item.dateCreateTertua,
         ),
         TypedStokItemSource<CrusherStokItem, CrusherStokLabel>(

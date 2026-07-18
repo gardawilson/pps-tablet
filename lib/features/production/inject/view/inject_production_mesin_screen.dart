@@ -413,6 +413,7 @@ class _InjectProductionMesinScreenState
               child: ProductionOverlayDrawer(
                 isOpen: _isRiwayatExpanded,
                 onClose: () => setState(() => _isRiwayatExpanded = false),
+                onOpen: () => setState(() => _isRiwayatExpanded = true),
                 width: c.maxWidth * 0.4,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -430,8 +431,6 @@ class _InjectProductionMesinScreenState
                       ],
                       selectedIndex: _sidebarTab,
                       onSelected: (i) => setState(() => _sidebarTab = i),
-                      onToggle: () =>
-                          setState(() => _isRiwayatExpanded = false),
                     ),
                     Expanded(
                       child: _sidebarTab == 0
@@ -442,19 +441,6 @@ class _InjectProductionMesinScreenState
                 ),
               ),
             ),
-
-            // ── Toggle: buka drawer saat tertutup ────────────────────
-            if (!_isRiwayatExpanded)
-              Positioned(
-                right: 0,
-                top: 0,
-                bottom: 0,
-                child: Center(
-                  child: ProductionOverlayDrawerToggle(
-                    onPressed: () => setState(() => _isRiwayatExpanded = true),
-                  ),
-                ),
-              ),
           ],
         ),
       ),
@@ -473,12 +459,14 @@ class _InjectProductionMesinScreenState
           fetchLabel: (item) =>
               _furnitureWipStokRepo.fetchLabel(item.idCabinetWip),
           sakColumnLabel: 'PCS',
+          showBeratColumn: false,
           oldestDateOf: (item) => item.dateCreateTertua,
         ),
         TypedStokItemSource<MixerStokItem, MixerStokLabel>(
           label: 'Mixer',
           fetchStok: _mixerStokRepo.fetchStok,
           fetchLabel: (item) => _mixerStokRepo.fetchLabel(item.idMixer),
+          showSakColumn: false,
           oldestDateOf: (item) => item.dateCreateTertua,
         ),
       ],

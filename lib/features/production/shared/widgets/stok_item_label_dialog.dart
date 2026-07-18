@@ -17,6 +17,7 @@ class StokItemLabelDialog<T extends StokItemData, L extends StokLabelData>
     required this.fetchLabels,
     this.showSakColumn = true,
     this.sakColumnLabel = 'SAK',
+    this.showBeratColumn = true,
   });
 
   final T item;
@@ -29,6 +30,11 @@ class StokItemLabelDialog<T extends StokItemData, L extends StokLabelData>
   /// Label kolom hitungan — default "SAK", mis. "PCS" untuk furniture WIP.
   final String sakColumnLabel;
 
+  /// Set `false` bila UOM item ini murni satuan ([sakSisa]) dan berat
+  /// tidak relevan — mis. Furniture WIP (Pcs). Menentukan kolom mana yang
+  /// dipakai untuk memfilter label yang masih bersisa.
+  final bool showBeratColumn;
+
   @override
   State<StokItemLabelDialog<T, L>> createState() =>
       _StokItemLabelDialogState<T, L>();
@@ -36,6 +42,7 @@ class StokItemLabelDialog<T extends StokItemData, L extends StokLabelData>
 
 class _StokItemLabelDialogState<T extends StokItemData, L extends StokLabelData>
     extends State<StokItemLabelDialog<T, L>> {
+  static const _tanggalColWidth = 88.0;
   static const _sakColWidth = 64.0;
   static const _beratColWidth = 96.0;
 
@@ -58,7 +65,10 @@ class _StokItemLabelDialogState<T extends StokItemData, L extends StokLabelData>
           future: _future,
           builder: (context, snapshot) {
             final labels = (snapshot.data ?? const <StokLabelData>[])
-                .where((l) => l.beratSisa > 0)
+                .where(
+                  (l) =>
+                      widget.showBeratColumn ? l.beratSisa > 0 : l.sakSisa > 0,
+                )
                 .toList();
             return Column(
               mainAxisSize: MainAxisSize.min,
@@ -189,6 +199,11 @@ class _StokItemLabelDialogState<T extends StokItemData, L extends StokLabelData>
       child: Row(
         children: [
           const Expanded(child: Text('LABEL', style: style)),
+          const SizedBox(
+            width: _tanggalColWidth,
+            child: Text('TANGGAL', style: style, textAlign: TextAlign.right),
+          ),
+          const SizedBox(width: 12),
           if (widget.showSakColumn) ...[
             SizedBox(
               width: _sakColWidth,
@@ -237,48 +252,47 @@ class _StokItemLabelDialogState<T extends StokItemData, L extends StokLabelData>
                 child: InkWell(
                   onTap: () => _copyLabel(context, label.label),
                   borderRadius: BorderRadius.circular(6),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              label.label,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF1F2937),
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          const Icon(
-                            Icons.copy_rounded,
-                            size: 13,
-                            color: Color(0xFFCBD5E1),
-                          ),
-                        ],
-                      ),
-                      if (label.dateCreate != null) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          DateFormat(
-                            'dd MMM yyyy',
-                            'id_ID',
-                          ).format(label.dateCreate!.toLocal()),
+                      Flexible(
+                        child: Text(
+                          label.label,
                           style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF9CA3AF),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1F2937),
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ],
+                      ),
+                      const SizedBox(width: 6),
+                      const Icon(
+                        Icons.copy_rounded,
+                        size: 13,
+                        color: Color(0xFFCBD5E1),
+                      ),
                     ],
                   ),
                 ),
               ),
+              SizedBox(
+                width: _tanggalColWidth,
+                child: Text(
+                  label.dateCreate == null
+                      ? '-'
+                      : DateFormat(
+                          'dd MMM yyyy',
+                          'id_ID',
+                        ).format(label.dateCreate!.toLocal()),
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF334155),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
               if (widget.showSakColumn) ...[
                 SizedBox(
                   width: _sakColWidth,
@@ -333,6 +347,8 @@ class _StokItemLabelDialogState<T extends StokItemData, L extends StokLabelData>
             ),
           ),
           const Spacer(),
+          const SizedBox(width: _tanggalColWidth),
+          const SizedBox(width: 12),
           if (widget.showSakColumn) ...[
             SizedBox(
               width: _sakColWidth,

@@ -306,34 +306,24 @@ class _HomeSidebarState extends State<HomeSidebar> {
 
   Widget _buildHeader() {
     if (_collapsed) {
-      return Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: widget.onToggleCollapse,
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Center(
           child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Image.asset(_logoAsset, width: 30, height: 30),
-                ),
-                const SizedBox(height: 8),
-                const Icon(Icons.chevron_right, color: Colors.white, size: 18),
-              ],
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
             ),
+            child: Image.asset(_logoAsset, width: 30, height: 30),
           ),
         ),
       );
     }
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 20, 8, 16),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -358,17 +348,6 @@ class _HomeSidebarState extends State<HomeSidebar> {
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              IconButton(
-                onPressed: widget.onToggleCollapse,
-                icon: const Icon(
-                  Icons.chevron_left,
-                  color: Colors.white70,
-                  size: 20,
-                ),
-                tooltip: 'Collapse',
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
             ],
           ),
@@ -639,6 +618,55 @@ class _HomeSidebarState extends State<HomeSidebar> {
                           ),
                       ],
                     ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Handle bulat untuk toggle collapse/expand [HomeSidebar] — dipakai oleh
+/// pemanggil (mis. `AppShell`) di dalam `Stack` yang membungkus sidebar dan
+/// area konten, diposisikan menempel di garis tepi sidebar (separuh di
+/// dalam, separuh menonjol ke konten). Sengaja dirender dari luar
+/// [HomeSidebar], bukan dari dalam — bila digambar di dalam sidebar sendiri
+/// (sebagai sibling di `Row` bersama area konten), separuh yang menonjol
+/// akan tertutup karena area konten digambar belakangan dalam urutan `Row`.
+class SidebarToggleHandle extends StatelessWidget {
+  const SidebarToggleHandle({
+    super.key,
+    required this.isCollapsed,
+    required this.onTap,
+  });
+
+  final bool isCollapsed;
+  final VoidCallback onTap;
+
+  static const Color _primaryColor = Color(0xFF0D47A1);
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: isCollapsed ? 'Tampilkan Sidebar' : 'Sembunyikan Sidebar',
+      waitDuration: const Duration(milliseconds: 400),
+      child: Material(
+        color: Colors.white,
+        elevation: 3,
+        shadowColor: Colors.black38,
+        shape: const CircleBorder(
+          side: BorderSide(color: _primaryColor, width: 2),
+        ),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(
+            width: 28,
+            height: 28,
+            child: Icon(
+              isCollapsed ? Icons.chevron_right : Icons.chevron_left,
+              size: 16,
+              color: _primaryColor,
             ),
           ),
         ),

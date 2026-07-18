@@ -1,3 +1,9 @@
+/// Sentinel blok value untuk label yang tidak memiliki Blok tercatat.
+const String kSoV2UnknownBlok = 'TIDAK_DIKETAHUI';
+
+/// Sentinel locationId untuk label yang tidak memiliki lokasi tercatat.
+const int kSoV2UnknownLocationId = 0;
+
 class SoV2Lokasi {
   final int locationId;
   final String description;
@@ -13,6 +19,8 @@ class SoV2Lokasi {
     required this.totalWeight,
   });
 
+  bool get isUnknown => locationId == kSoV2UnknownLocationId;
+
   double get progress => labelCount > 0 ? scannedCount / labelCount : 0;
 
   factory SoV2Lokasi.fromJson(Map<String, dynamic> json) {
@@ -21,7 +29,12 @@ class SoV2Lokasi {
       description: json['description']?.toString() ?? '',
       labelCount: (json['labelCount'] as num?)?.toInt() ?? 0,
       scannedCount: (json['scannedCount'] as num?)?.toInt() ?? 0,
-      totalWeight: (json['totalWeight'] as num?)?.toDouble() ?? 0,
+      // Kategori berbasis pcs (mis. furniturewip) mengirim "totalPcs",
+      // bukan "totalWeight".
+      totalWeight:
+          (json['totalWeight'] as num?)?.toDouble() ??
+          (json['totalPcs'] as num?)?.toDouble() ??
+          0,
     );
   }
 }

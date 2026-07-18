@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../../../core/network/api_client.dart';
+import '../model/so_v2_blok.dart';
 import '../model/so_v2_kategori.dart';
 import '../model/so_v2_lokasi_page.dart';
 import '../model/so_v2_label_page.dart';
@@ -10,31 +11,56 @@ class SoV2Repository {
 
   SoV2Repository({ApiClient? apiClient}) : _api = apiClient ?? ApiClient();
 
-  Future<List<SoV2Kategori>> fetchKategori() async {
-    final body = await _api.getJson('/api/stock-opname-v2/kategori');
+  Future<List<SoV2Kategori>> fetchKategori({int? year, int? month}) async {
+    final body = await _api.getJson(
+      '/api/stock-opname-v2/kategori',
+      query: {
+        if (year != null) 'year': year,
+        if (month != null) 'month': month,
+      },
+    );
     final dataList = (body['data'] ?? []) as List;
     return dataList
         .map((e) => SoV2Kategori.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
   }
 
+  Future<({String message, Map<String, dynamic> data})> previewGenerate({
+    required int categoryId,
+  }) async {
+    final body = await _api.getJson(
+      '/api/stock-opname-v2/transaksi/preview',
+      query: {'categoryId': categoryId},
+    );
+    final data = body['data'] as Map<String, dynamic>?;
+    if (data == null) throw Exception('Response tidak mengandung data');
+    return (message: body['message']?.toString() ?? '', data: data);
+  }
+
   Future<Map<String, dynamic>> generateNoStockOpname({
     required int categoryId,
-    required String date,
   }) async {
     final body = await _api.postJson(
-      '/api/stock-opname-v2/no-stock-opname',
-      body: {'categoryId': categoryId, 'date': date},
+      '/api/stock-opname-v2/transaksi',
+      body: {'categoryId': categoryId},
     );
     final data = body['data'] as Map<String, dynamic>?;
     if (data == null) throw Exception('Response tidak mengandung data');
     return data;
   }
 
-  Future<List<String>> fetchBlok() async {
-    final body = await _api.getJson('/api/stock-opname-v2/blok');
+  Future<void> deleteStockOpname(String stockOpnameNo) async {
+    await _api.deleteJson('/api/stock-opname-v2/transaksi/$stockOpnameNo');
+  }
+
+  Future<List<SoV2Blok>> fetchBlok({required String stockOpnameNo}) async {
+    final body = await _api.getJson(
+      '/api/stock-opname-v2/transaksi/$stockOpnameNo/blok',
+    );
     final dataList = (body['data'] ?? []) as List;
-    return dataList.map((e) => e.toString()).toList();
+    return dataList
+        .map((e) => SoV2Blok.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
   }
 
   Future<SoV2LokasiPage> fetchLokasi({
@@ -42,7 +68,7 @@ class SoV2Repository {
     required String blok,
   }) async {
     final body = await _api.getJson(
-      '/api/stock-opname-v2/no-stock-opname/$stockOpnameNo/blok/$blok/lokasi',
+      '/api/stock-opname-v2/transaksi/$stockOpnameNo/blok/$blok/lokasi',
     );
     final data = body['data'] as Map<String, dynamic>?;
     if (data == null) throw Exception('Response tidak mengandung data');
@@ -64,7 +90,7 @@ class SoV2Repository {
     };
     try {
       final body = await _api.getJson(
-        '/api/stock-opname-v2/no-stock-opname/$stockOpnameNo/blok/$blok/lokasi/$locationId/label',
+        '/api/stock-opname-v2/transaksi/$stockOpnameNo/blok/$blok/lokasi/$locationId/label',
         query: qp,
       );
       final data = body['data'] as Map<String, dynamic>?;
@@ -87,28 +113,9 @@ class SoV2Repository {
     }
   }
 
-  Future<Map<String, dynamic>> submitHasil({
-    required String stockOpnameNo,
-    required String labelNo,
-    int? palletNo,
-  }) async {
-    final body = await _api.postJson(
-      '/api/stock-opname-v2/no-stock-opname/$stockOpnameNo/hasil',
-      body: {
-        'labelNo': labelNo,
-        if (palletNo != null) 'palletNo': palletNo,
-      },
-    );
-    final data = body['data'] as Map<String, dynamic>?;
-    if (data == null) throw Exception('Response tidak mengandung data');
-    return data;
-  }
-
-  Future<Map<String, dynamic>> completeStockOpname(
-    String stockOpnameNo,
-  ) async {
+  Future<Map<String, dynamic>> completeStockOpname(String stockOpnameNo) async {
     final body = await _api.patchJson(
-      '/api/stock-opname-v2/no-stock-opname/$stockOpnameNo/complete',
+      '/api/stock-opname-v2/transaksi/$stockOpnameNo/complete',
     );
     final data = body['data'] as Map<String, dynamic>?;
     return data ?? {};

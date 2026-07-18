@@ -2,44 +2,43 @@ import 'package:flutter/material.dart';
 
 import '../model/so_v2_label_row.dart';
 
-const _kPrimary = Color(0xFF1E6FD9);
 const _kBorder = Color(0xFFE2E6EA);
+const _kSuccess = Color(0xFF0A7349);
 
 class SoV2LabelTile extends StatelessWidget {
   final SoV2LabelRow row;
+  final String weightUnit;
 
-  const SoV2LabelTile({super.key, required this.row});
+  const SoV2LabelTile({super.key, required this.row, this.weightUnit = 'kg'});
 
   @override
   Widget build(BuildContext context) {
     final scanned = row.isScanned;
-    final value = row.weightOrCountDisplay;
+    final value = row.weightOrCountDisplay(weightUnit: weightUnit);
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
       decoration: BoxDecoration(
-        color: scanned ? const Color(0xFFF0FBF6) : Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: scanned ? const Color(0xFF0A7349) : _kBorder,
-        ),
+        color: scanned ? const Color(0xFFF3FBF7) : Colors.white,
+        border: const Border(bottom: BorderSide(color: _kBorder)),
       ),
       child: Row(
         children: [
           Icon(
-            scanned ? Icons.check_circle_rounded : Icons.label_outline_rounded,
+            scanned ? Icons.check_circle_rounded : Icons.circle_outlined,
             size: 15,
-            color: scanned ? const Color(0xFF0A7349) : _kPrimary,
+            color: scanned ? _kSuccess : Colors.grey.shade400,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               row.primaryValue,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF1A1D23),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: scanned ? _kSuccess : const Color(0xFF1A1D23),
               ),
             ),
           ),
@@ -48,9 +47,9 @@ class SoV2LabelTile extends StatelessWidget {
             Text(
               value,
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey.shade700,
+                color: Colors.grey.shade600,
               ),
             ),
           ],

@@ -359,6 +359,7 @@ class _WashingProductionMesinScreenState
               child: ProductionOverlayDrawer(
                 isOpen: _isSidebarExpanded,
                 onClose: () => setState(() => _isSidebarExpanded = false),
+                onOpen: () => setState(() => _isSidebarExpanded = true),
                 width: c.maxWidth * 0.4,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -376,8 +377,6 @@ class _WashingProductionMesinScreenState
                       ],
                       selectedIndex: _sidebarTab,
                       onSelected: (i) => setState(() => _sidebarTab = i),
-                      onToggle: () =>
-                          setState(() => _isSidebarExpanded = false),
                     ),
                     Expanded(
                       child: _sidebarTab == 0
@@ -388,19 +387,6 @@ class _WashingProductionMesinScreenState
                 ),
               ),
             ),
-
-            // ── Toggle: buka drawer saat tertutup ────────────────────
-            if (!_isSidebarExpanded)
-              Positioned(
-                right: 0,
-                top: 0,
-                bottom: 0,
-                child: Center(
-                  child: ProductionOverlayDrawerToggle(
-                    onPressed: () => setState(() => _isSidebarExpanded = true),
-                  ),
-                ),
-              ),
           ],
         ),
       ),
@@ -417,6 +403,7 @@ class _WashingProductionMesinScreenState
           label: 'Bahan Baku Proses',
           fetchStok: _stokRepo.fetchStok,
           fetchLabel: (item) => _stokRepo.fetchLabel(item.idBB),
+          showSakColumn: false,
           oldestDateOf: (item) => item.dateCreateTertua,
         ),
       ],

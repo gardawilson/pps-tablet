@@ -181,7 +181,10 @@ class _BrokerActionDialogState extends State<BrokerActionDialog> {
                   Container(width: 1, color: Colors.grey.shade200),
 
                   // ── Panel kanan: menu aksi ───────────────────────
-                  SizedBox(width: 220, child: _buildActionPanel(canEdit, canDelete)),
+                  SizedBox(
+                    width: 220,
+                    child: _buildActionPanel(canEdit, canDelete),
+                  ),
                 ],
               ),
             ),
@@ -288,29 +291,55 @@ class _BrokerActionDialogState extends State<BrokerActionDialog> {
                     padding: const EdgeInsets.all(10),
                     child: Column(
                       children: [
-                        Row(children: [
-                          _qcCell('Density 1', widget.header.density, 'g/cm³'),
-                          const SizedBox(width: 6),
-                          _qcCell('Density 2', widget.header.density2, 'g/cm³'),
-                          const SizedBox(width: 6),
-                          _qcCell('Density 3', widget.header.density3, 'g/cm³'),
-                        ]),
+                        Row(
+                          children: [
+                            _qcCell(
+                              'Density 1',
+                              widget.header.density,
+                              'g/cm³',
+                            ),
+                            const SizedBox(width: 6),
+                            _qcCell(
+                              'Density 2',
+                              widget.header.density2,
+                              'g/cm³',
+                            ),
+                            const SizedBox(width: 6),
+                            _qcCell(
+                              'Density 3',
+                              widget.header.density3,
+                              'g/cm³',
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 6),
-                        Row(children: [
-                          _qcCell('Moisture 1', widget.header.moisture, '%'),
-                          const SizedBox(width: 6),
-                          _qcCell('Moisture 2', widget.header.moisture2, '%'),
-                          const SizedBox(width: 6),
-                          _qcCell('Moisture 3', widget.header.moisture3, '%'),
-                        ]),
+                        Row(
+                          children: [
+                            _qcCell('Moisture 1', widget.header.moisture, '%'),
+                            const SizedBox(width: 6),
+                            _qcCell('Moisture 2', widget.header.moisture2, '%'),
+                            const SizedBox(width: 6),
+                            _qcCell('Moisture 3', widget.header.moisture3, '%'),
+                          ],
+                        ),
                         const SizedBox(height: 6),
-                        Row(children: [
-                          _qcCell('Max Melt Temp', widget.header.maxMeltTemp, '°C'),
-                          const SizedBox(width: 6),
-                          _qcCell('Min Melt Temp', widget.header.minMeltTemp, '°C'),
-                          const SizedBox(width: 6),
-                          _qcCell('MFI', widget.header.mfi, null),
-                        ]),
+                        Row(
+                          children: [
+                            _qcCell(
+                              'Max Melt Temp',
+                              widget.header.maxMeltTemp,
+                              '°C',
+                            ),
+                            const SizedBox(width: 6),
+                            _qcCell(
+                              'Min Melt Temp',
+                              widget.header.minMeltTemp,
+                              '°C',
+                            ),
+                            const SizedBox(width: 6),
+                            _qcCell('MFI', widget.header.mfi, null),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -320,7 +349,10 @@ class _BrokerActionDialogState extends State<BrokerActionDialog> {
                   Container(
                     width: double.infinity,
                     constraints: const BoxConstraints(minHeight: 80),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.grey.shade50,
                       borderRadius: BorderRadius.circular(10),
@@ -549,8 +581,8 @@ class _BrokerActionDialogState extends State<BrokerActionDialog> {
                     fontWeight: FontWeight.w600,
                     color: enabled
                         ? (label == 'Delete'
-                            ? Colors.red.shade700
-                            : const Color(0xFF172B4D))
+                              ? Colors.red.shade700
+                              : const Color(0xFF172B4D))
                         : Colors.grey.shade400,
                   ),
                 ),
@@ -567,7 +599,10 @@ class _BrokerActionDialogState extends State<BrokerActionDialog> {
     );
 
     if (!enabled && (tooltip?.isNotEmpty ?? false)) {
-      return Tooltip(message: tooltip!, child: Opacity(opacity: 0.6, child: tile));
+      return Tooltip(
+        message: tooltip!,
+        child: Opacity(opacity: 0.6, child: tile),
+      );
     }
     return tile;
   }

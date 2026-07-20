@@ -3,14 +3,20 @@ import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 import 'package:provider/provider.dart';
 
 import '../../../common/widgets/confirm_dialog.dart';
+import '../../../core/view_model/permission_view_model.dart';
+import '../model/so_v2_access_user.dart';
 import '../model/so_v2_label_group.dart';
 import '../model/so_v2_lokasi.dart';
 import '../repository/so_v2_repository.dart';
+import '../repository/so_v2_user_lokasi_access_repository.dart';
 import '../view_model/so_v2_blok_list_view_model.dart';
 import '../view_model/so_v2_label_list_view_model.dart';
 import '../view_model/so_v2_lokasi_list_view_model.dart';
 import '../utils/so_v2_number_format.dart';
 import '../widgets/so_v2_label_group_tile.dart';
+import '../widgets/so_v2_worker_picker_dialog.dart';
+
+const _kAccessManagePermission = 'stockopname:create';
 
 const _kPrimary = Color(0xFF1E6FD9);
 const _kSurface = Color(0xFFF8F9FB);
@@ -37,6 +43,7 @@ class SoV2DetailScreen extends StatefulWidget {
 
 class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
   final _repo = SoV2Repository();
+  final _accessRepo = SoV2UserLokasiAccessRepository();
   late final SoV2BlokListViewModel _blokVm;
   String? _selectedBlok;
   SoV2LokasiListViewModel? _lokasiVm;
@@ -45,6 +52,7 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
   final _searchCtl = TextEditingController();
   bool _completing = false;
   bool _searchOpen = false;
+  final Set<int> _busyLocationIds = {};
 
   /// Furniturewip memakai UOM pcs, bukan kg seperti kategori lain.
   String get _uom => widget.categoryCode == 'furniturewip' ? 'pcs' : 'kg';
@@ -514,75 +522,220 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
               ),
             ),
             padding: const EdgeInsets.fromLTRB(9, 12, 12, 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (lokasi.isUnknown) ...[
-                  Icon(Icons.location_off_rounded, color: baseColor, size: 14),
-                  const SizedBox(width: 6),
-                ],
-                Expanded(
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: lokasi.isUnknown
-                            ? Text(
-                                'Lokasi Tidak Diketahui',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: selected ? baseColor : _kWarning,
-                                ),
-                              )
-                            : Text.rich(
-                                TextSpan(
-                                  children: [
-                                    TextSpan(
-                                      text:
-                                          '$_selectedBlok${lokasi.locationId} ',
-                                      style: TextStyle(
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w700,
-                                        color: selected
-                                            ? baseColor
-                                            : const Color(0xFF1A1D23),
-                                      ),
-                                    ),
-                                    TextSpan(
-                                      text:
-                                          '(${lokasi.scannedCount}/${lokasi.labelCount})',
-                                      style: TextStyle(
-                                        fontSize: 11.5,
-                                        fontWeight: FontWeight.w700,
-                                        color: progressColor,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    if (lokasi.isUnknown) ...[
+                      Icon(
+                        Icons.location_off_rounded,
+                        color: baseColor,
+                        size: 14,
                       ),
-                      if (complete)
-                        const Padding(
-                          padding: EdgeInsets.only(left: 4),
-                          child: Icon(
-                            Icons.check_circle_rounded,
-                            size: 13,
-                            color: Color(0xFF0A7349),
+                      const SizedBox(width: 6),
+                    ],
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: lokasi.isUnknown
+                                ? Text(
+                                    'Lokasi Tidak Diketahui',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: selected ? baseColor : _kWarning,
+                                    ),
+                                  )
+                                : Text.rich(
+                                    TextSpan(
+                                      children: [
+                                        TextSpan(
+                                          text:
+                                              '$_selectedBlok${lokasi.locationId} ',
+                                          style: TextStyle(
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: selected
+                                                ? baseColor
+                                                : const Color(0xFF1A1D23),
+                                          ),
+                                        ),
+                                        TextSpan(
+                                          text:
+                                              '(${lokasi.scannedCount}/${lokasi.labelCount})',
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: progressColor,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                          ),
+                          if (complete)
+                            const Padding(
+                              padding: EdgeInsets.only(left: 4),
+                              child: Icon(
+                                Icons.check_circle_rounded,
+                                size: 13,
+                                color: Color(0xFF0A7349),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (!lokasi.isUnknown &&
+                        context.watch<PermissionViewModel>().can(
+                          _kAccessManagePermission,
+                        ))
+                      _busyLocationIds.contains(lokasi.locationId)
+                          ? const Padding(
+                              padding: EdgeInsets.all(6),
+                              child: SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            )
+                          : IconButton(
+                              onPressed: lokasi.allowedUsers.isEmpty
+                                  ? () => _playLokasi(lokasi)
+                                  : () => _pauseLokasi(lokasi),
+                              icon: Icon(
+                                lokasi.allowedUsers.isEmpty
+                                    ? Icons.play_circle_fill_rounded
+                                    : Icons.pause_circle_filled_rounded,
+                                size: 20,
+                                color: lokasi.allowedUsers.isEmpty
+                                    ? const Color(0xFF0A7349)
+                                    : const Color(0xFFB45309),
+                              ),
+                              tooltip: lokasi.allowedUsers.isEmpty
+                                  ? 'Tugaskan User'
+                                  : 'Lepas User',
+                              splashRadius: 18,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 28,
+                                minHeight: 28,
+                              ),
+                            ),
+                  ],
+                ),
+                if (lokasi.allowedUsers.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 5),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.lock_outline_rounded,
+                          size: 12,
+                          color: Colors.grey.shade500,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            lokasi.allowedUsers
+                                .map((u) => u.displayName)
+                                .join(', '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey.shade600,
+                            ),
                           ),
                         ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
               ],
             ),
           ),
         );
       },
     );
+  }
+
+  Future<void> _playLokasi(SoV2Lokasi lokasi) async {
+    final picked = await showDialog<SoV2AccessUser>(
+      context: context,
+      builder: (_) => SoV2WorkerPickerDialog(repo: _accessRepo),
+    );
+    if (picked == null) return;
+
+    setState(() => _busyLocationIds.add(lokasi.locationId));
+    try {
+      await _accessRepo.assignAccess(
+        blok: _selectedBlok!,
+        idLokasi: lokasi.locationId,
+        idUsername: picked.idUsername,
+      );
+      if (!mounted) return;
+      await _lokasiVm?.load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Gagal menugaskan user'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busyLocationIds.remove(lokasi.locationId));
+    }
+  }
+
+  Future<void> _pauseLokasi(SoV2Lokasi lokasi) async {
+    final activeUser = lokasi.allowedUsers.isEmpty
+        ? null
+        : lokasi.allowedUsers.first;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => ConfirmDialog(
+        title: 'Lepas User',
+        message:
+            'Yakin ingin melepas ${activeUser?.displayName ?? 'user'} dari lokasi ini?',
+        confirmLabel: 'Lepas',
+        confirmIcon: Icons.pause_circle_outline_rounded,
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _busyLocationIds.add(lokasi.locationId));
+    try {
+      for (final user in lokasi.allowedUsers) {
+        await _accessRepo.revokeAccess(
+          blok: _selectedBlok!,
+          idLokasi: lokasi.locationId,
+          idUsername: user.idUsername,
+        );
+      }
+      if (!mounted) return;
+      await _lokasiVm?.load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Gagal melepas user'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busyLocationIds.remove(lokasi.locationId));
+    }
   }
 
   // ── Panel 3: label ──────────────────────────────────────────────────────

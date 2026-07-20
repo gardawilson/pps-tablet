@@ -195,7 +195,6 @@ class _HomeSidebarState extends State<HomeSidebar> {
       subtitle: 'Stock opname per kategori (baru)',
       icon: Icons.fact_check_outlined,
       route: '/shell/stock-opname-v2',
-      enabled: false,
     ),
   ];
 

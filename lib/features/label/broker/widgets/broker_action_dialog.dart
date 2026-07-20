@@ -272,65 +272,73 @@ class _BrokerActionDialogState extends State<BrokerActionDialog> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionLabel('Quality Control', Icons.science_outlined),
-          const SizedBox(height: 8),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            padding: const EdgeInsets.all(10),
-            child: Column(
-              children: [
-                Row(children: [
-                  _qcCell('Density 1', widget.header.density, 'g/cm³'),
-                  const SizedBox(width: 6),
-                  _qcCell('Density 2', widget.header.density2, 'g/cm³'),
-                  const SizedBox(width: 6),
-                  _qcCell('Density 3', widget.header.density3, 'g/cm³'),
-                ]),
-                const SizedBox(height: 6),
-                Row(children: [
-                  _qcCell('Moisture 1', widget.header.moisture, '%'),
-                  const SizedBox(width: 6),
-                  _qcCell('Moisture 2', widget.header.moisture2, '%'),
-                  const SizedBox(width: 6),
-                  _qcCell('Moisture 3', widget.header.moisture3, '%'),
-                ]),
-                const SizedBox(height: 6),
-                Row(children: [
-                  _qcCell('Max Melt Temp', widget.header.maxMeltTemp, '°C'),
-                  const SizedBox(width: 6),
-                  _qcCell('Min Melt Temp', widget.header.minMeltTemp, '°C'),
-                  const SizedBox(width: 6),
-                  _qcCell('MFI', widget.header.mfi, null),
-                ]),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          _sectionLabel('Visual Note', Icons.sticky_note_2_outlined),
-          const SizedBox(height: 6),
           Expanded(
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: Text(
-                (widget.header.visualNote ?? '').trim().isEmpty
-                    ? '—'
-                    : widget.header.visualNote!.trim(),
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey.shade800,
-                  height: 1.4,
-                ),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _sectionLabel('Quality Control', Icons.science_outlined),
+                  const SizedBox(height: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    padding: const EdgeInsets.all(10),
+                    child: Column(
+                      children: [
+                        Row(children: [
+                          _qcCell('Density 1', widget.header.density, 'g/cm³'),
+                          const SizedBox(width: 6),
+                          _qcCell('Density 2', widget.header.density2, 'g/cm³'),
+                          const SizedBox(width: 6),
+                          _qcCell('Density 3', widget.header.density3, 'g/cm³'),
+                        ]),
+                        const SizedBox(height: 6),
+                        Row(children: [
+                          _qcCell('Moisture 1', widget.header.moisture, '%'),
+                          const SizedBox(width: 6),
+                          _qcCell('Moisture 2', widget.header.moisture2, '%'),
+                          const SizedBox(width: 6),
+                          _qcCell('Moisture 3', widget.header.moisture3, '%'),
+                        ]),
+                        const SizedBox(height: 6),
+                        Row(children: [
+                          _qcCell('Max Melt Temp', widget.header.maxMeltTemp, '°C'),
+                          const SizedBox(width: 6),
+                          _qcCell('Min Melt Temp', widget.header.minMeltTemp, '°C'),
+                          const SizedBox(width: 6),
+                          _qcCell('MFI', widget.header.mfi, null),
+                        ]),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _sectionLabel('Visual Note', Icons.sticky_note_2_outlined),
+                  const SizedBox(height: 6),
+                  Container(
+                    width: double.infinity,
+                    constraints: const BoxConstraints(minHeight: 80),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Text(
+                      (widget.header.visualNote ?? '').trim().isEmpty
+                          ? '—'
+                          : widget.header.visualNote!.trim(),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey.shade800,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

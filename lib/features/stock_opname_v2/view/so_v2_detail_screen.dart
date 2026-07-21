@@ -507,38 +507,44 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
         final complete =
             lokasi.labelCount > 0 && lokasi.scannedCount >= lokasi.labelCount;
         final progressColor = complete ? const Color(0xFF0A7349) : baseColor;
-        return InkWell(
-          onTap: () => _selectLokasi(lokasi),
-          child: Container(
-            decoration: BoxDecoration(
-              color: selected
-                  ? baseColor.withValues(alpha: 0.05)
-                  : (lokasi.isUnknown ? _kWarningBg : null),
-              border: Border(
-                left: BorderSide(
-                  color: selected ? baseColor : Colors.transparent,
-                  width: 3,
-                ),
+        final showAssignControl =
+            !lokasi.isUnknown &&
+            context.watch<PermissionViewModel>().can(_kAccessManagePermission);
+
+        return Container(
+          decoration: BoxDecoration(
+            color: selected
+                ? baseColor.withValues(alpha: 0.05)
+                : (lokasi.isUnknown ? _kWarningBg : null),
+            border: Border(
+              left: BorderSide(
+                color: selected ? baseColor : Colors.transparent,
+                width: 3,
               ),
             ),
-            padding: const EdgeInsets.fromLTRB(9, 12, 12, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    if (lokasi.isUnknown) ...[
-                      Icon(
-                        Icons.location_off_rounded,
-                        color: baseColor,
-                        size: 14,
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                    Expanded(
+                // Zona 1: buka panel label — selalu aktif, terlepas dari
+                // status penugasan.
+                Expanded(
+                  child: InkWell(
+                    onTap: () => _selectLokasi(lokasi),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(9, 12, 8, 12),
                       child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
+                          if (lokasi.isUnknown) ...[
+                            Icon(
+                              Icons.location_off_rounded,
+                              color: baseColor,
+                              size: 14,
+                            ),
+                            const SizedBox(width: 6),
+                          ],
                           Expanded(
                             child: lokasi.isUnknown
                                 ? Text(
@@ -574,6 +580,18 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                                             color: progressColor,
                                           ),
                                         ),
+                                        TextSpan(
+                                          text: lokasi.allowedUsers.isNotEmpty
+                                              ? '  ·  ${lokasi.allowedUsers.map((u) => u.displayName).join(', ')}'
+                                              : '  ·  Belum ditugaskan',
+                                          style: TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w500,
+                                            color: lokasi.allowedUsers.isEmpty
+                                                ? Colors.grey.shade400
+                                                : Colors.grey.shade600,
+                                          ),
+                                        ),
                                       ],
                                     ),
                                     maxLines: 1,
@@ -592,20 +610,26 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                         ],
                       ),
                     ),
-                    if (!lokasi.isUnknown &&
-                        context.watch<PermissionViewModel>().can(
-                          _kAccessManagePermission,
-                        ))
-                      _busyLocationIds.contains(lokasi.locationId)
-                          ? const Padding(
-                              padding: EdgeInsets.all(6),
-                              child: SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
+                  ),
+                ),
+                // Zona 2: kontrol penugasan (play/pause) — dipisah dengan
+                // divider supaya jelas bukan bagian dari tap buka lokasi.
+                if (showAssignControl) ...[
+                  VerticalDivider(
+                    width: 1,
+                    thickness: 1,
+                    color: _kBorder,
+                    indent: 8,
+                    endIndent: 8,
+                  ),
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: _busyLocationIds.contains(lokasi.locationId)
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : IconButton(
                               onPressed: lokasi.allowedUsers.isEmpty
@@ -630,37 +654,9 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                                 minHeight: 28,
                               ),
                             ),
-                  ],
-                ),
-                if (lokasi.allowedUsers.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 5),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.lock_outline_rounded,
-                          size: 12,
-                          color: Colors.grey.shade500,
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            lokasi.allowedUsers
-                                .map((u) => u.displayName)
-                                .join(', '),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                        ),
-                      ],
                     ),
                   ),
+                ],
               ],
             ),
           ),
@@ -724,6 +720,15 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
         );
       }
       if (!mounted) return;
+      // Lokasi yang baru dilepas jadi terkunci lagi — tutup panel label
+      // kalau lokasi ini sedang dibuka.
+      if (_selectedLokasi?.locationId == lokasi.locationId) {
+        _labelVm?.dispose();
+        setState(() {
+          _labelVm = null;
+          _selectedLokasi = null;
+        });
+      }
       await _lokasiVm?.load();
     } catch (e) {
       if (!mounted) return;

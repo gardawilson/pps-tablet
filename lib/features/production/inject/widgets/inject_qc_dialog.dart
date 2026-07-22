@@ -483,7 +483,7 @@ class _QcBucketRowState extends State<_QcBucketRow> {
 
   Future<void> _submit() async {
     final jumlahBS = int.tryParse(_jumlahBsCtrl.text.trim());
-    if (jumlahBS == null || jumlahBS < 0) {
+    if (jumlahBS == null || jumlahBS <= 0) {
       setState(() => _error = 'Jumlah BS wajib diisi');
       return;
     }
@@ -522,7 +522,7 @@ class _QcBucketRowState extends State<_QcBucketRow> {
 
   Future<void> _submitEdit(int id) async {
     final jumlahBS = int.tryParse(_jumlahBsCtrl.text.trim());
-    if (jumlahBS == null || jumlahBS < 0) {
+    if (jumlahBS == null || jumlahBS <= 0) {
       setState(() => _error = 'Jumlah BS wajib diisi');
       return;
     }

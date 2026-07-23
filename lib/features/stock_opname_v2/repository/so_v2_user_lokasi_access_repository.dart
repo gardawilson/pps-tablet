@@ -9,7 +9,7 @@ class SoV2UserLokasiAccessRepository {
     : _api = apiClient ?? ApiClient();
 
   Future<List<SoV2AccessUser>> fetchAllUsers() async {
-    final body = await _api.getJson('/api/user-lokasi-access/users');
+    final body = await _api.getJson('/api/stock-opname-v2/lokasi-access/users');
     final dataList = (body['data'] ?? []) as List;
     return dataList
         .map(
@@ -24,7 +24,7 @@ class SoV2UserLokasiAccessRepository {
     required int idUsername,
   }) async {
     await _api.postJson(
-      '/api/user-lokasi-access',
+      '/api/stock-opname-v2/lokasi-access',
       body: {'blok': blok, 'idLokasi': idLokasi, 'idUsername': idUsername},
     );
   }

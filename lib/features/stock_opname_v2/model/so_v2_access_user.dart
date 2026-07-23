@@ -4,12 +4,14 @@ class SoV2AccessUser {
   final String username;
   final String fName;
   final String? lName;
+  final bool isOnline;
 
   SoV2AccessUser({
     required this.idUsername,
     required this.username,
     required this.fName,
     this.lName,
+    this.isOnline = false,
   });
 
   String get fullName =>
@@ -21,6 +23,7 @@ class SoV2AccessUser {
       username: json['Username']?.toString() ?? '',
       fName: json['FName']?.toString() ?? '',
       lName: json['LName']?.toString(),
+      isOnline: json['Status']?.toString().toUpperCase() == 'ONLINE',
     );
   }
 }

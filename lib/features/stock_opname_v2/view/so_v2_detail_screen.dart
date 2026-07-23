@@ -3,6 +3,8 @@ import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 import 'package:provider/provider.dart';
 
 import '../../../common/widgets/confirm_dialog.dart';
+import '../../../core/network/api_client.dart';
+import '../../../core/services/dialog_service.dart';
 import '../../../core/view_model/permission_view_model.dart';
 import '../model/so_v2_access_user.dart';
 import '../model/so_v2_label_group.dart';
@@ -178,30 +180,52 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
             child: Column(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
                   decoration: const BoxDecoration(
                     border: Border(bottom: BorderSide(color: _kBorder)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        widget.stockOpnameNo,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1A1D23),
-                        ),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.inventory_2_rounded,
+                            size: 14,
+                            color: _kPrimary,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              widget.stockOpnameNo,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF1A1D23),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                       SizedBox(
                         width: double.infinity,
-                        child: OutlinedButton.icon(
+                        child: TextButton.icon(
                           onPressed: _completing ? null : _markComplete,
-                          style: OutlinedButton.styleFrom(
+                          style: TextButton.styleFrom(
+                            backgroundColor: const Color(
+                              0xFF0A7349,
+                            ).withValues(alpha: 0.1),
                             foregroundColor: const Color(0xFF0A7349),
-                            side: const BorderSide(color: Color(0xFF0A7349)),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            disabledForegroundColor: const Color(
+                              0xFF0A7349,
+                            ).withValues(alpha: 0.5),
+                            padding: const EdgeInsets.symmetric(vertical: 9),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                           ),
                           icon: _completing
                               ? const SizedBox(
@@ -209,15 +233,19 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                                   height: 12,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
+                                    color: Color(0xFF0A7349),
                                   ),
                                 )
                               : const Icon(
-                                  Icons.check_circle_outline_rounded,
-                                  size: 16,
+                                  Icons.check_circle_rounded,
+                                  size: 14,
                                 ),
-                          label: const Text(
-                            'Selesai',
-                            style: TextStyle(fontSize: 11),
+                          label: Text(
+                            _completing ? 'Memproses...' : 'Tandai Selesai',
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ),
@@ -683,11 +711,12 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
       await _lokasiVm?.load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Gagal menugaskan user'),
-          backgroundColor: Colors.red,
-        ),
+      final message = e is ApiException
+          ? e.friendlyMessage
+          : 'Gagal menugaskan user';
+      await DialogService.instance.showError(
+        title: 'Gagal Menugaskan User',
+        message: message,
       );
     } finally {
       if (mounted) setState(() => _busyLocationIds.remove(lokasi.locationId));
@@ -732,11 +761,12 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
       await _lokasiVm?.load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Gagal melepas user'),
-          backgroundColor: Colors.red,
-        ),
+      final message = e is ApiException
+          ? e.friendlyMessage
+          : 'Gagal melepas user';
+      await DialogService.instance.showError(
+        title: 'Gagal Melepas User',
+        message: message,
       );
     } finally {
       if (mounted) setState(() => _busyLocationIds.remove(lokasi.locationId));

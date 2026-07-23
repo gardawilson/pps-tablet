@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../common/widgets/confirm_dialog.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/services/dialog_service.dart';
+import '../../../core/view/app_shell.dart';
 import '../../../core/view_model/permission_view_model.dart';
 import '../model/so_v2_access_user.dart';
 import '../model/so_v2_label_group.dart';
@@ -32,11 +33,13 @@ const _kWarningBg = Color(0xFFFFF7ED);
 class SoV2DetailScreen extends StatefulWidget {
   final String stockOpnameNo;
   final String categoryCode;
+  final String categoryName;
 
   const SoV2DetailScreen({
     super.key,
     required this.stockOpnameNo,
     required this.categoryCode,
+    required this.categoryName,
   });
 
   @override
@@ -55,6 +58,7 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
   bool _completing = false;
   bool _searchOpen = false;
   final Set<int> _busyLocationIds = {};
+  List<BreadcrumbSegment> _prevBreadcrumb = [];
 
   /// Furniturewip memakai UOM pcs, bukan kg seperti kategori lain.
   String get _uom => widget.categoryCode == 'furniturewip' ? 'pcs' : 'kg';
@@ -64,10 +68,34 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
     super.initState();
     _blokVm = SoV2BlokListViewModel(stockOpnameNo: widget.stockOpnameNo);
     _blokVm.load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
+      AppShell.breadcrumb.value = [
+        ..._prevBreadcrumb.map(
+          (s) => BreadcrumbSegment(
+            s.label,
+            onTap: () {
+              AppShell.breadcrumb.value = _prevBreadcrumb;
+              AppShell.shellNavigatorKey.currentState?.pop();
+            },
+          ),
+        ),
+        BreadcrumbSegment(widget.categoryName),
+      ];
+    });
   }
 
   @override
   void dispose() {
+    final prev = _prevBreadcrumb;
+    final categoryName = widget.categoryName;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final current = AppShell.breadcrumb.value;
+      if (current.isNotEmpty && current.last.label == categoryName) {
+        AppShell.breadcrumb.value = prev;
+      }
+    });
     _blokVm.dispose();
     _lokasiVm?.dispose();
     _labelVm?.dispose();
@@ -180,72 +208,53 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
             child: Column(
               children: [
                 Container(
-                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+                  padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
                   decoration: const BoxDecoration(
                     border: Border(bottom: BorderSide(color: _kBorder)),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.inventory_2_rounded,
-                            size: 14,
-                            color: _kPrimary,
+                      Expanded(
+                        child: Text(
+                          widget.stockOpnameNo,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade500,
                           ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              widget.stockOpnameNo,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF1A1D23),
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                      const SizedBox(height: 10),
-                      SizedBox(
-                        width: double.infinity,
-                        child: TextButton.icon(
-                          onPressed: _completing ? null : _markComplete,
-                          style: TextButton.styleFrom(
-                            backgroundColor: const Color(
-                              0xFF0A7349,
-                            ).withValues(alpha: 0.1),
-                            foregroundColor: const Color(0xFF0A7349),
-                            disabledForegroundColor: const Color(
-                              0xFF0A7349,
-                            ).withValues(alpha: 0.5),
-                            padding: const EdgeInsets.symmetric(vertical: 9),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                      Tooltip(
+                        message: 'Tandai Selesai',
+                        child: InkWell(
+                          onTap: _completing ? null : _markComplete,
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            width: 30,
+                            height: 30,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: const Color(
+                                0xFF0A7349,
+                              ).withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
                             ),
-                          ),
-                          icon: _completing
-                              ? const SizedBox(
-                                  width: 12,
-                                  height: 12,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
+                            child: _completing
+                                ? const SizedBox(
+                                    width: 13,
+                                    height: 13,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Color(0xFF0A7349),
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.check_circle_rounded,
+                                    size: 17,
                                     color: Color(0xFF0A7349),
                                   ),
-                                )
-                              : const Icon(
-                                  Icons.check_circle_rounded,
-                                  size: 14,
-                                ),
-                          label: Text(
-                            _completing ? 'Memproses...' : 'Tandai Selesai',
-                            style: const TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                            ),
                           ),
                         ),
                       ),

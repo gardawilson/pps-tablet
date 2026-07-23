@@ -110,6 +110,7 @@ class _SoV2KategoriListScreenState extends State<SoV2KategoriListScreen> {
             stockOpnameNo: result['stockOpnameNo'].toString(),
             categoryCode:
                 result['categoryCode']?.toString() ?? kategori.categoryCode,
+            categoryName: kategori.categoryName,
           ),
         ),
       );
@@ -120,6 +121,7 @@ class _SoV2KategoriListScreenState extends State<SoV2KategoriListScreen> {
           builder: (_) => SoV2DetailScreen(
             stockOpnameNo: kategori.stockOpnameNo!,
             categoryCode: kategori.categoryCode,
+            categoryName: kategori.categoryName,
           ),
         ),
       );

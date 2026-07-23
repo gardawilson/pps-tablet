@@ -458,6 +458,30 @@ class InjectProductionRepository {
   }
 
   /* =============================
+   * BATCH - DISCARD PENDING PCS-PER-LABEL (target awal defisit)
+   * POST /api/production/inject/:noProduksi/pcs-per-label/discard
+   * ============================= */
+
+  Future<void> discardPcsPerLabelPending({
+    required String noProduksi,
+    required int idJenis,
+  }) async {
+    final encoded = Uri.encodeComponent(noProduksi.trim());
+    try {
+      await api.postJson(
+        '/api/production/inject/$encoded/pcs-per-label/discard',
+        body: {'idJenis': idJenis},
+      );
+    } on ApiException catch (e) {
+      final parsed = _tryDecodeMap(e.responseBody);
+      final msg =
+          (parsed['message'] as String?) ??
+          'Gagal reset target pcs-per-label (HTTP ${e.statusCode})';
+      throw Exception(msg);
+    }
+  }
+
+  /* =============================
    * TERMINATE
    * POST /api/production/inject/:noProduksi/terminate
    * ============================= */

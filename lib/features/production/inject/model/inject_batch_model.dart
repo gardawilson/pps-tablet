@@ -3,10 +3,16 @@ class InjectPcsPerLabelItem {
   final String namaBarang;
   final int pcsPerLabel;
 
+  /// Target pcs untuk label PERTAMA di noProduksi ini, kalau ada sisa
+  /// (defisit) menggantung dari noProduksi sebelumnya di mesin+jenis yang
+  /// sama. Null = tidak ada defisit pending, pakai [pcsPerLabel] dari awal.
+  final int? pcsPerLabelAwal;
+
   const InjectPcsPerLabelItem({
     required this.idJenis,
     required this.namaBarang,
     required this.pcsPerLabel,
+    this.pcsPerLabelAwal,
   });
 
   factory InjectPcsPerLabelItem.fromJson(Map<String, dynamic> j) {
@@ -14,6 +20,7 @@ class InjectPcsPerLabelItem {
       idJenis: (j['idJenis'] as num?)?.toInt() ?? 0,
       namaBarang: j['namaBarang']?.toString() ?? '',
       pcsPerLabel: (j['pcsPerLabel'] as num?)?.toInt() ?? 0,
+      pcsPerLabelAwal: (j['pcsPerLabelAwal'] as num?)?.toInt(),
     );
   }
 }
@@ -45,6 +52,21 @@ class InjectPcsPerLabelResult {
   /// Map of idJenis -> pcsPerLabel (clamped >= 1).
   Map<int, int> get pplByJenis => {
     for (final i in items) i.idJenis: i.pcsPerLabel.clamp(1, 999999),
+  };
+
+  /// Target pcs untuk label pertama di noProduksi ini untuk [idJenis],
+  /// kalau ada defisit pending dari noProduksi sebelumnya. Null = tidak ada.
+  int? initialPplForJenis(int idJenis) {
+    for (final item in items) {
+      if (item.idJenis == idJenis) return item.pcsPerLabelAwal;
+    }
+    return null;
+  }
+
+  /// Map of idJenis -> pcsPerLabelAwal, hanya untuk jenis yang punya defisit pending.
+  Map<int, int> get initialPplByJenis => {
+    for (final i in items)
+      if (i.pcsPerLabelAwal != null) i.idJenis: i.pcsPerLabelAwal!,
   };
 
   factory InjectPcsPerLabelResult.fromJson(Map<String, dynamic> j) {

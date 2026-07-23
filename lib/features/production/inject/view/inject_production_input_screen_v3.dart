@@ -90,6 +90,26 @@ class _InjectProductionInputScreenState
   // ── Batch / pcs-per-label ─────────────────────────────────────────────────
   InjectPcsPerLabelResult? _pcsPerLabelData;
 
+  /// idJenis yang target pcs-per-label AWAL-nya (defisit dari noProduksi
+  /// sebelumnya) sudah terpakai (label pertama sesi ini sudah tercipta) —
+  /// bucket selanjutnya untuk idJenis itu pakai pcsPerLabel standar.
+  final Set<int> _initialTargetConsumedJenis = {};
+
+  /// idJenis yang target awalnya (defisit sesi lalu) di-reset/discard oleh
+  /// operator lewat dialog konfirmasi awal — perlakukan seperti tidak ada
+  /// defisit sama sekali (langsung pakai pcsPerLabel standar).
+  final Set<int> _discardedInitialJenis = {};
+
+  /// [_pcsPerLabelData.initialPplByJenis], dikurangi jenis yang sudah
+  /// di-discard operator.
+  Map<int, int> get _effectiveInitialPplByJenis {
+    final map = Map<int, int>.from(_pcsPerLabelData?.initialPplByJenis ?? {});
+    for (final id in _discardedInitialJenis) {
+      map.remove(id);
+    }
+    return map;
+  }
+
   String get _breadcrumbLabel {
     final mesin = (_header?.namaMesin ?? '').trim();
     if (mesin.isNotEmpty) return '$mesin (${widget.noProduksi})';
@@ -150,13 +170,62 @@ class _InjectProductionInputScreenState
         _recomputeBucketStatuses();
       });
       _updateBreadcrumb();
+      await _promptPendingInitialTargets(batches, pcsPerLabel);
     } catch (_) {}
+  }
+
+  /// Untuk tiap idJenis yang punya target awal (defisit sesi lalu) dan
+  /// belum pernah disentuh sama sekali di sesi ini, tanya operator dulu:
+  /// lanjutkan sisa label sesi lalu, atau reset & langsung pakai standar.
+  Future<void> _promptPendingInitialTargets(
+    List<InjectBatchItem> batches,
+    InjectPcsPerLabelResult pcsPerLabelData,
+  ) async {
+    final touchedJenis = <int>{};
+    for (final b in batches) {
+      for (final ji in b.jenisItems) {
+        touchedJenis.add(ji.idJenis);
+      }
+    }
+    for (final item in pcsPerLabelData.items) {
+      final awal = item.pcsPerLabelAwal;
+      if (awal == null || awal <= 0) continue;
+      if (touchedJenis.contains(item.idJenis)) continue;
+      if (!mounted) return;
+      final continuePending = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => _PendingPcsTargetDialog(
+          namaBarang: item.namaBarang,
+          pcsPerLabelAwal: awal,
+          pcsPerLabelStandar: item.pcsPerLabel,
+        ),
+      );
+      if (!mounted) return;
+      if (continuePending == false) {
+        try {
+          await _prodRepo.discardPcsPerLabelPending(
+            noProduksi: widget.noProduksi,
+            idJenis: item.idJenis,
+          );
+          if (!mounted) return;
+          setState(() => _discardedInitialJenis.add(item.idJenis));
+        } catch (e) {
+          if (!mounted) return;
+          _showSnack(
+            'Gagal reset target awal: $e',
+            backgroundColor: Colors.red,
+          );
+        }
+      }
+    }
   }
 
   void _restoreBucketStatesFromBatches(
     List<InjectBatchItem> batches,
     InjectPcsPerLabelResult pcsPerLabelData,
   ) {
+    final consumedJenis = <int>{};
     for (final batch in batches) {
       final bucketLabel = _bucketLabelOrder.firstWhere(
         (l) => l.startsWith(batch.hourStart),
@@ -180,7 +249,14 @@ class _InjectProductionInputScreenState
           if (isLast) {
             labelsCreated += (totalPcs ~/ ppl) + (totalPcs % ppl > 0 ? 1 : 0);
           } else {
-            labelsCreated += totalPcs ~/ ppl;
+            final split = _splitIntoLabels(
+              totalPcs: totalPcs,
+              standardPpl: ppl,
+              initialPpl: pcsPerLabelData.initialPplForJenis(ji.idJenis),
+              alreadyConsumedInitial: consumedJenis.contains(ji.idJenis),
+            );
+            labelsCreated += split.labelsCreated;
+            if (split.labelsCreated > 0) consumedJenis.add(ji.idJenis);
           }
         }
       } else {
@@ -229,6 +305,9 @@ class _InjectProductionInputScreenState
         labelsReject: batch.labels.reject,
       );
     }
+    _initialTargetConsumedJenis
+      ..clear()
+      ..addAll(consumedJenis);
   }
 
   List<String> _computeHourBucketLabels(InjectProduction header) {
@@ -368,6 +447,7 @@ class _InjectProductionInputScreenState
     if (itemsToSubmit.isEmpty) return;
 
     final carryOutByJenis = <int, int>{};
+    final newlyConsumedJenis = <int>{};
     int totalCarryOverIn = 0;
     int totalPcsInput = 0;
     int totalLabelsCreated = 0;
@@ -376,16 +456,32 @@ class _InjectProductionInputScreenState
     final itemsPayload = itemsToSubmit.map((item) {
       final ppl = pplData?.pplForJenis(item.jenis.idJenis) ?? 100;
       final totalPcs = item.carryOverIn + item.pcs;
-      final carryOut = isLastBucket ? 0 : totalPcs % ppl;
+      final int carryOut;
+      if (isLastBucket) {
+        carryOut = 0;
+        totalLabelsCreated += (totalPcs ~/ ppl) + (totalPcs % ppl > 0 ? 1 : 0);
+      } else {
+        final alreadyConsumed = _initialTargetConsumedJenis.contains(
+          item.jenis.idJenis,
+        );
+        final split = _splitIntoLabels(
+          totalPcs: totalPcs,
+          standardPpl: ppl,
+          initialPpl: _discardedInitialJenis.contains(item.jenis.idJenis)
+              ? null
+              : pplData?.initialPplForJenis(item.jenis.idJenis),
+          alreadyConsumedInitial: alreadyConsumed,
+        );
+        carryOut = split.carryOverOut;
+        totalLabelsCreated += split.labelsCreated;
+        if (!alreadyConsumed && split.labelsCreated > 0) {
+          newlyConsumedJenis.add(item.jenis.idJenis);
+        }
+      }
       carryOutByJenis[item.jenis.idJenis] = carryOut;
       totalCarryOverIn += item.carryOverIn;
       totalPcsInput += item.pcs;
       totalCarryOverOut += carryOut;
-      if (isLastBucket) {
-        totalLabelsCreated += (totalPcs ~/ ppl) + (totalPcs % ppl > 0 ? 1 : 0);
-      } else {
-        totalLabelsCreated += totalPcs ~/ ppl;
-      }
       return <String, dynamic>{
         'idJenis': item.jenis.idJenis,
         'pcsInput': item.pcs,
@@ -421,6 +517,7 @@ class _InjectProductionInputScreenState
     if (!mounted) return;
 
     setState(() {
+      _initialTargetConsumedJenis.addAll(newlyConsumedJenis);
       _bucketStates[label] = _HourlyBucketData(
         status: _HourlyBucketStatus.submitted,
         carryOverIn: totalCarryOverIn,
@@ -2290,6 +2387,8 @@ class _InjectProductionInputScreenState
           data: data,
           headerOutputs: _header?.outputs ?? const [],
           pplByJenis: _pcsPerLabelData?.pplByJenis ?? const {},
+          initialPplByJenis: _effectiveInitialPplByJenis,
+          consumedInitialJenis: _initialTargetConsumedJenis,
           isLastBucket: isLastBucket,
           onSubmit:
               (
@@ -2678,7 +2777,155 @@ class _GantiModeDialog extends StatelessWidget {
   }
 }
 
+// ── Pending pcs-per-label target dialog ─────────────────────────────────────────
+
+/// Ditampilkan sekali di awal sesi kalau ada defisit label dari noProduksi
+/// sebelumnya (mesin+jenis sama). Operator pilih lanjutkan sisa label itu,
+/// atau reset & langsung pakai pcs-per-label standar.
+class _PendingPcsTargetDialog extends StatelessWidget {
+  const _PendingPcsTargetDialog({
+    required this.namaBarang,
+    required this.pcsPerLabelAwal,
+    required this.pcsPerLabelStandar,
+  });
+
+  final String namaBarang;
+  final int pcsPerLabelAwal;
+  final int pcsPerLabelStandar;
+
+  @override
+  Widget build(BuildContext context) {
+    const accent = Color(0xFFB45309);
+    return Dialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.bolt_rounded,
+                      size: 18,
+                      color: accent,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'Ada Sisa Label dari Sesi Lalu',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF111827),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '$namaBarang punya sisa $pcsPerLabelAwal pcs dari mesin ini di '
+                'produksi sebelumnya yang belum jadi label. Lanjutkan sisa itu '
+                'sebagai target label pertama ($pcsPerLabelAwal pcs), atau reset '
+                'dan langsung pakai standar ($pcsPerLabelStandar pcs/label)?',
+                style: const TextStyle(fontSize: 12, color: Color(0xFF4B5563)),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF374151),
+                        side: const BorderSide(color: Color(0xFFD1D5DB)),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text(
+                        'Reset ke Standar\n($pcsPerLabelStandar pcs)',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: accent,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text(
+                        'Lanjutkan Sisa\n($pcsPerLabelAwal pcs)',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
+
+/// Bagi total pcs jadi label, menghormati target awal yang direduksi
+/// (defisit dari sesi sebelumnya di mesin+jenis yang sama) kalau ada dan
+/// belum terpakai. Setelah target awal terpenuhi, sisa lanjut pakai
+/// [standardPpl] seperti biasa (bisa menghasilkan >1 label sekaligus).
+({int labelsCreated, int carryOverOut}) _splitIntoLabels({
+  required int totalPcs,
+  required int standardPpl,
+  required int? initialPpl,
+  required bool alreadyConsumedInitial,
+}) {
+  var remaining = totalPcs;
+  var labels = 0;
+  if (!alreadyConsumedInitial && initialPpl != null && initialPpl > 0) {
+    if (remaining >= initialPpl) {
+      labels += 1;
+      remaining -= initialPpl;
+    } else {
+      return (labelsCreated: 0, carryOverOut: remaining);
+    }
+  }
+  labels += remaining ~/ standardPpl;
+  final carryOverOut = remaining % standardPpl;
+  return (labelsCreated: labels, carryOverOut: carryOverOut);
+}
 
 Map<K, List<T>> _groupBy<K, T>(Iterable<T> items, K Function(T) keyFn) {
   final map = <K, List<T>>{};
@@ -3134,6 +3381,8 @@ class _HourlyPcsSection extends StatefulWidget {
     required this.headerOutputs,
     required this.onSubmit,
     this.pplByJenis = const {},
+    this.initialPplByJenis = const {},
+    this.consumedInitialJenis = const {},
     this.isLastBucket = false,
     this.onPrint,
     this.counterCurrent,
@@ -3144,6 +3393,13 @@ class _HourlyPcsSection extends StatefulWidget {
   final _HourlyBucketData data;
   final List<InjectOutputJenis> headerOutputs;
   final Map<int, int> pplByJenis;
+
+  /// Target pcs untuk label pertama (defisit dari sesi sebelumnya di
+  /// mesin+jenis yang sama), null/tidak ada entry = pakai [pplByJenis].
+  final Map<int, int> initialPplByJenis;
+
+  /// idJenis yang target awalnya sudah terpakai di sesi ini.
+  final Set<int> consumedInitialJenis;
   final bool isLastBucket;
   final void Function(BuildContext ctx)? onPrint;
   final int? counterCurrent;
@@ -3402,44 +3658,117 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
     required String value,
     required IconData icon,
     required Color accent,
+    String? tooltipTitle,
+    String? tooltipBody,
   }) {
+    final tooltip = tooltipTitle != null || tooltipBody != null;
+    final chipBody = Container(
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: accent.withValues(alpha: 0.20)),
+      ),
+      alignment: Alignment.centerLeft,
+      child: Row(
+        children: [
+          Icon(icon, size: 11, color: accent),
+          const SizedBox(width: 5),
+          Expanded(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: accent,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    final labelRow = Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF374151),
+              height: 1.2,
+            ),
+          ),
+        ),
+        if (tooltip) ...[
+          const SizedBox(width: 3),
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(
+              Icons.info_outline_rounded,
+              size: 12,
+              color: accent.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      ],
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF374151),
-          ),
-        ),
-        const SizedBox(height: 3),
-        Container(
-          height: 36,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            color: accent.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: accent.withValues(alpha: 0.20)),
-          ),
-          alignment: Alignment.centerLeft,
-          child: Row(
-            children: [
-              Icon(icon, size: 11, color: accent),
-              const SizedBox(width: 5),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: accent,
+        if (tooltip)
+          Tooltip(
+            richMessage: TextSpan(
+              children: [
+                if (tooltipTitle != null)
+                  TextSpan(
+                    text: '$tooltipTitle\n',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFB45309),
+                    ),
+                  ),
+                if (tooltipBody != null)
+                  TextSpan(
+                    text: tooltipBody,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.black,
+                    ),
+                  ),
+              ],
+            ),
+            triggerMode: TooltipTriggerMode.tap,
+            showDuration: const Duration(seconds: 6),
+            preferBelow: true,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
-              ),
-            ],
-          ),
-        ),
+              ],
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: labelRow,
+          )
+        else
+          labelRow,
+        const SizedBox(height: 3),
+        chipBody,
       ],
     );
   }
@@ -3499,7 +3828,136 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
       final carryIn = _carryInForJenis(jenis.idJenis);
       final pcsTyped = int.tryParse(ctrl.text.trim()) ?? 0;
       final ppl = (widget.pplByJenis[jenis.idJenis] ?? 100).clamp(1, 999999);
-      final carryOut = widget.isLastBucket ? 0 : (carryIn + pcsTyped) % ppl;
+      final alreadyConsumedInitial = widget.consumedInitialJenis.contains(
+        jenis.idJenis,
+      );
+      final initialPpl = alreadyConsumedInitial
+          ? null
+          : widget.initialPplByJenis[jenis.idJenis];
+      // Target label pertama sesi ini (defisit sisa sesi sebelumnya) selama
+      // belum terpakai; setelah itu tampilkan target standar seperti biasa.
+      final isInitialTargetActive = initialPpl != null;
+      final displayTarget = initialPpl ?? ppl;
+      final totalPcs = carryIn + pcsTyped;
+      final carryOut = widget.isLastBucket
+          ? 0
+          : _splitIntoLabels(
+              totalPcs: totalPcs,
+              standardPpl: ppl,
+              initialPpl: initialPpl,
+              alreadyConsumedInitial: alreadyConsumedInitial,
+            ).carryOverOut;
+
+      // ── Rincian live: berapa pcs masuk ke target awal vs siklus standar ──
+      int? stepInitialFilled;
+      int? stepInitialTarget;
+      var stepInitialDone = false;
+      var remainingForStandard = totalPcs;
+      if (isInitialTargetActive) {
+        stepInitialTarget = initialPpl;
+        stepInitialFilled = totalPcs < initialPpl ? totalPcs : initialPpl;
+        stepInitialDone = totalPcs >= initialPpl;
+        remainingForStandard = stepInitialDone ? totalPcs - initialPpl : 0;
+      }
+      final standardCycleActive = !isInitialTargetActive || stepInitialDone;
+      var standardFullLabels = 0;
+      var standardCarryOut = 0;
+      if (standardCycleActive) {
+        if (widget.isLastBucket) {
+          standardFullLabels =
+              (remainingForStandard ~/ ppl) +
+              (remainingForStandard % ppl > 0 ? 1 : 0);
+        } else {
+          standardFullLabels = remainingForStandard ~/ ppl;
+          standardCarryOut = remainingForStandard % ppl;
+        }
+      }
+
+      Widget breakdownRow({
+        required IconData icon,
+        required String text,
+        required Color color,
+      }) {
+        return Padding(
+          padding: const EdgeInsets.only(top: 3),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, size: 11, color: color),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
+      const amber = Color(0xFFB45309);
+      const green = Color(0xFF15803D);
+      const grey = Color(0xFF6B7280);
+
+      final breakdownBox = Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(top: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Rincian $totalPcs pcs (carry $carryIn + input $pcsTyped)',
+              style: const TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF374151),
+              ),
+            ),
+            if (isInitialTargetActive)
+              breakdownRow(
+                icon: stepInitialDone
+                    ? Icons.check_circle
+                    : Icons.hourglass_bottom_rounded,
+                color: stepInitialDone ? green : amber,
+                text: stepInitialDone
+                    ? 'Target Awal: $stepInitialFilled/$stepInitialTarget pcs — selesai (1 label)'
+                    : 'Target Awal: $stepInitialFilled/$stepInitialTarget pcs — kurang ${stepInitialTarget! - stepInitialFilled!} pcs lagi',
+              ),
+            if (standardCycleActive)
+              breakdownRow(
+                icon: Icons.label_outline_rounded,
+                color: standardFullLabels > 0 ? green : grey,
+                text: widget.isLastBucket
+                    ? (standardFullLabels > 0
+                          ? '$standardFullLabels label (bucket terakhir, /$ppl pcs)'
+                          : 'Belum ada pcs untuk dilabeli di bucket terakhir')
+                    : (standardFullLabels > 0
+                          ? 'Siklus Standar: $standardFullLabels label (/$ppl pcs)'
+                                '${standardCarryOut > 0 ? ' + carry $standardCarryOut/$ppl pcs' : ''}'
+                          : 'Siklus Standar: $standardCarryOut/$ppl pcs (belum genap 1 label)'),
+              )
+            else
+              breakdownRow(
+                icon: Icons.info_outline_rounded,
+                color: grey,
+                text:
+                    'Belum masuk siklus standar — selesaikan target awal dulu',
+              ),
+          ],
+        ),
+      );
 
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3529,9 +3987,19 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
               Expanded(
                 child: _readonlyChip(
                   label: 'Carry Over Sebelumnya',
-                  value: '$carryIn / $ppl pcs',
-                  icon: Icons.arrow_forward,
-                  accent: accent,
+                  value: '$carryIn / $displayTarget pcs',
+                  icon: isInitialTargetActive
+                      ? Icons.bolt_rounded
+                      : Icons.arrow_forward,
+                  accent: isInitialTargetActive
+                      ? const Color(0xFFB45309)
+                      : accent,
+                  tooltipTitle: isInitialTargetActive
+                      ? 'Sisa Label Sesi Lalu'
+                      : null,
+                  tooltipBody: isInitialTargetActive
+                      ? 'Target label ini $displayTarget pcs (bukan $ppl pcs seperti biasa) — untuk menutup sisa label dari sesi sebelumnya. Setelah ini, target kembali ke $ppl pcs/label.'
+                      : null,
                 ),
               ),
               const SizedBox(width: 8),
@@ -3604,6 +4072,7 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
               ),
             ],
           ),
+          breakdownBox,
         ],
       );
     }
@@ -4080,6 +4549,17 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
           ? data.carryOverOutByJenis[jenis.idJenis]!
           : (outputs.length == 1 ? data.carryOverOut : 0);
       final ppl = (widget.pplByJenis[jenis.idJenis] ?? 100).clamp(1, 999999);
+      // Samakan dengan bucket available: kalau target awal jenis ini belum
+      // pernah terpakai (masih pending), tampilkan denominatornya, bukan
+      // langsung pcsPerLabel standar — supaya konsisten dengan yang benar-benar
+      // dipakai saat bucket ini disubmit.
+      final alreadyConsumedInitial = widget.consumedInitialJenis.contains(
+        jenis.idJenis,
+      );
+      final initialPpl = alreadyConsumedInitial
+          ? null
+          : widget.initialPplByJenis[jenis.idJenis];
+      final displayTarget = initialPpl ?? ppl;
 
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -4110,7 +4590,7 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
               Expanded(
                 child: _readonlyChip(
                   label: 'Carry Over Sebelumnya',
-                  value: '$carryIn / $ppl pcs',
+                  value: '$carryIn / $displayTarget pcs',
                   icon: Icons.arrow_forward,
                   accent: greenAccent,
                 ),

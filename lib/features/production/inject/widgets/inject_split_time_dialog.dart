@@ -354,10 +354,12 @@ class _InjectSplitTimeDialogState extends State<InjectSplitTimeDialog> {
       final lastHourStart = widget.lastBucketHourStart;
       if (lastHourStart != null) {
         final lastHourStartFull = lastHourStart.length == 5 ? '$lastHourStart:00' : lastHourStart;
+        final ppl = widget.pcsPerLabel.clamp(1, 999999);
+        final carryOverOut = (widget.carryOverIn + (pcsInput ?? 0)) % ppl;
         final item = <String, dynamic>{
           'carryOverIn': widget.carryOverIn,
           'pcsInput': pcsInput ?? 0,
-          'carryOverOut': 0,
+          'carryOverOut': carryOverOut,
           if (jenis != null && jenis.idJenis > 0) 'idJenis': jenis.idJenis,
         };
         batchPayload = <String, dynamic>{

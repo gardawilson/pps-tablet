@@ -6,10 +6,14 @@ import 'package:provider/provider.dart';
 import '../../../core/view_model/permission_view_model.dart';
 import '../model/verifikasi_models.dart';
 import '../view_model/verifikasi_view_model.dart';
-import 'verifikasi_detail_screen.dart';
+import 'verifikasi_detail_dialog.dart';
+import 'verifikasi_theme.dart';
 
-const _kVerifikasiPrimary = Color(0xFF6D28D9);
-
+/// Dua panel bersisian (jenis produksi di kiri, NoProduksi di kanan) —
+/// meniru gaya [SoV2DetailScreen] (stock_opname_v2): tanpa AppBar, tanpa
+/// frame/border-radius luar, panel flush dipisah VerticalDivider, header
+/// panel putih + border bawah, baris list ditandai left-border saat
+/// terpilih. Detail cross-check input/output tetap dialog popup.
 class VerifikasiListScreen extends StatelessWidget {
   const VerifikasiListScreen({super.key});
 
@@ -29,15 +33,10 @@ class _VerifikasiListBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final vm = context.watch<VerifikasiViewModel>();
     final perm = context.watch<PermissionViewModel>();
-    final canRead = perm.can('verifikasi:read');
+    final canRead = perm.can('produksi_washing:read');
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FB),
-      appBar: AppBar(
-        title: const Text('Verifikasi Produksi'),
-        backgroundColor: _kVerifikasiPrimary,
-        foregroundColor: Colors.white,
-      ),
+      backgroundColor: kVerifikasiSurface,
       body: !canRead
           ? const Center(
               child: Padding(
@@ -49,55 +48,139 @@ class _VerifikasiListBody extends StatelessWidget {
                 ),
               ),
             )
-          : Column(
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildFilterBar(context, vm),
-                Expanded(child: _buildBody(context, vm)),
+                SizedBox(width: 220, child: _buildJenisPanel(vm)),
+                const VerticalDivider(width: 1, color: kVerifikasiBorder),
+                Expanded(child: _buildNoProduksiPanel(context, vm)),
               ],
             ),
     );
   }
 
-  Widget _buildFilterBar(BuildContext context, VerifikasiViewModel vm) {
+  // ── Panel 1: jenis produksi ─────────────────────────────────────────────
+  Widget _buildJenisPanel(VerifikasiViewModel vm) {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            _filterChip(context, vm, null, 'Semua'),
-            for (final key in vm.availableJenis)
-              Padding(
-                padding: const EdgeInsets.only(left: 6),
-                child: _filterChip(context, vm, key, vm.jenisLabel(key)),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: kVerifikasiBorder)),
+            ),
+            child: const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Verifikasi Produksi',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: kVerifikasiInk,
+                ),
               ),
-          ],
-        ),
+            ),
+          ),
+          Expanded(
+            child: vm.isLoading && vm.items.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.separated(
+                    itemCount: vm.availableJenis.length,
+                    separatorBuilder: (_, __) =>
+                        const Divider(height: 1, color: kVerifikasiBorder),
+                    itemBuilder: (context, index) {
+                      final key = vm.availableJenis[index];
+                      final selected = vm.selectedJenis == key;
+                      return InkWell(
+                        onTap: () => vm.setJenisFilter(key),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? kVerifikasiAccent.withValues(alpha: 0.05)
+                                : null,
+                            border: Border(
+                              left: BorderSide(
+                                color: selected
+                                    ? kVerifikasiAccent
+                                    : Colors.transparent,
+                                width: 3,
+                              ),
+                            ),
+                          ),
+                          padding: const EdgeInsets.fromLTRB(9, 12, 12, 12),
+                          child: Text(
+                            '${vm.jenisLabel(key)} (${vm.countFor(key)})',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: selected
+                                  ? kVerifikasiAccent
+                                  : kVerifikasiInk,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _filterChip(
+  // ── Panel 2: daftar NoProduksi menunggu verifikasi ───────────────────────
+  Widget _buildNoProduksiPanel(BuildContext context, VerifikasiViewModel vm) {
+    final list = vm.filteredItems;
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(bottom: BorderSide(color: kVerifikasiBorder)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                vm.selectedJenis != null
+                    ? vm.jenisLabel(vm.selectedJenis!)
+                    : '-',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: kVerifikasiInk,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: _HeaderStat(
+                      label: 'MENUNGGU VERIFIKASI',
+                      value: '${list.length}',
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        Expanded(child: _buildBody(context, vm, list)),
+      ],
+    );
+  }
+
+  Widget _buildBody(
     BuildContext context,
     VerifikasiViewModel vm,
-    String? key,
-    String label,
+    List<VerifikasiItem> list,
   ) {
-    final selected = vm.jenisFilter == key;
-    return ChoiceChip(
-      label: Text(label),
-      selected: selected,
-      selectedColor: _kVerifikasiPrimary.withValues(alpha: 0.15),
-      labelStyle: TextStyle(
-        color: selected ? _kVerifikasiPrimary : Colors.grey.shade700,
-        fontWeight: selected ? FontWeight.w700 : FontWeight.normal,
-      ),
-      onSelected: (_) => vm.setJenisFilter(key),
-    );
-  }
-
-  Widget _buildBody(BuildContext context, VerifikasiViewModel vm) {
     if (vm.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -108,15 +191,16 @@ class _VerifikasiListBody extends StatelessWidget {
           child: Text(
             'Gagal memuat data:\n${vm.error}',
             textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.red.shade700),
           ),
         ),
       );
     }
-    if (vm.items.isEmpty) {
+    if (list.isEmpty) {
       return const Center(
         child: Text(
           'Tidak ada produksi yang menunggu verifikasi.',
-          style: TextStyle(color: Colors.grey),
+          style: TextStyle(color: kVerifikasiMuted),
         ),
       );
     }
@@ -124,19 +208,24 @@ class _VerifikasiListBody extends StatelessWidget {
     return RefreshIndicator(
       onRefresh: vm.load,
       child: ListView.separated(
-        padding: const EdgeInsets.all(12),
-        itemCount: vm.items.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
-        itemBuilder: (_, i) => _VerifikasiListTile(item: vm.items[i]),
+        itemCount: list.length,
+        separatorBuilder: (_, __) =>
+            const Divider(height: 1, color: kVerifikasiBorder),
+        itemBuilder: (_, i) => _VerifikasiListRow(
+          item: list[i],
+          onTap: () =>
+              showVerifikasiDetailDialog(context, vm: vm, item: list[i]),
+        ),
       ),
     );
   }
 }
 
-class _VerifikasiListTile extends StatelessWidget {
+class _VerifikasiListRow extends StatelessWidget {
   final VerifikasiItem item;
+  final VoidCallback onTap;
 
-  const _VerifikasiListTile({required this.item});
+  const _VerifikasiListRow({required this.item, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -144,40 +233,89 @@ class _VerifikasiListTile extends StatelessWidget {
         ? DateFormat('dd MMM yyyy', 'id_ID').format(item.tglProduksi!.toLocal())
         : '-';
 
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        onTap: () {
-          final vm = context.read<VerifikasiViewModel>();
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => ChangeNotifierProvider<VerifikasiViewModel>.value(
-                value: vm,
-                child: VerifikasiDetailScreen(item: item),
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 4,
+              child: Text(
+                item.noProduksi,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: kVerifikasiInk,
+                ),
               ),
             ),
-          );
-        },
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: _kVerifikasiPrimary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: const Icon(Icons.fact_check_outlined, color: _kVerifikasiPrimary),
+            Expanded(
+              flex: 4,
+              child: Text(
+                item.namaMesin ?? '-',
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12, color: kVerifikasiMuted),
+              ),
+            ),
+            SizedBox(
+              width: 60,
+              child: Text(
+                'Shift ${item.shift ?? '-'}',
+                style: const TextStyle(fontSize: 11.5, color: kVerifikasiMuted),
+              ),
+            ),
+            SizedBox(
+              width: 100,
+              child: Text(
+                tgl,
+                textAlign: TextAlign.right,
+                style: const TextStyle(fontSize: 12, color: kVerifikasiMuted),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.chevron_right, size: 16, color: kVerifikasiMuted),
+          ],
         ),
-        title: Text(
-          item.noProduksi,
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-        subtitle: Text(
-          '${item.jenisLabel} • ${item.namaMesin ?? '-'} • Shift ${item.shift ?? '-'} • $tgl',
-          style: const TextStyle(fontSize: 12),
-        ),
-        trailing: const Icon(Icons.chevron_right),
       ),
+    );
+  }
+}
+
+/// Statistik header panel: caption kecil di atas, nilai tebal di bawah.
+/// Sama seperti `_HeaderStat` di SoV2DetailScreen.
+class _HeaderStat extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _HeaderStat({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.4,
+            color: Colors.grey.shade500,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: kVerifikasiInk,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -9,6 +9,8 @@ class VerifikasiItem {
   final DateTime? tglProduksi;
   final String? namaMesin;
   final int? shift;
+  final String? hourStart;
+  final String? hourEnd;
   final bool verified;
   final String? verifiedByUsername;
   final DateTime? verifiedAt;
@@ -20,40 +22,79 @@ class VerifikasiItem {
     this.tglProduksi,
     this.namaMesin,
     this.shift,
+    this.hourStart,
+    this.hourEnd,
     this.verified = false,
     this.verifiedByUsername,
     this.verifiedAt,
   });
 }
 
-/// Ringkasan satu jenis output (dikelompokkan per namaJenis) untuk
-/// ditampilkan read-only di layar detail verifikasi.
-class ProductionOutputSummary {
-  final String namaJenis;
-  final int totalSak;
-  final double totalBerat;
+/// Satu label fisik (mis. satu NoWashing / NoBahanBaku / NoBroker) di dalam
+/// satu jenis material — baris paling detail pada tabel cross-check.
+class ProductionLabelDetail {
+  final String labelNo;
+  final int sakCount;
+  final double berat;
 
-  const ProductionOutputSummary({
-    required this.namaJenis,
-    required this.totalSak,
-    required this.totalBerat,
+  const ProductionLabelDetail({
+    required this.labelNo,
+    required this.sakCount,
+    required this.berat,
   });
+}
+
+/// Satu jenis material (namaJenis), berisi satu atau lebih label.
+class ProductionJenisGroup {
+  final String namaJenis;
+  final List<ProductionLabelDetail> labels;
+
+  const ProductionJenisGroup({
+    required this.namaJenis,
+    required this.labels,
+  });
+
+  int get totalSak => labels.fold(0, (s, l) => s + l.sakCount);
+  double get totalBerat => labels.fold(0.0, (s, l) => s + l.berat);
+}
+
+/// Satu kategori (mis. "Bahan Baku", "Washing", "Gilingan" untuk input;
+/// "Output" untuk output), berisi satu atau lebih jenis material.
+class ProductionCategoryGroup {
+  final String categoryLabel;
+  final List<ProductionJenisGroup> jenisGroups;
+
+  const ProductionCategoryGroup({
+    required this.categoryLabel,
+    required this.jenisGroups,
+  });
+
+  int get totalSak => jenisGroups.fold(0, (s, j) => s + j.totalSak);
+  double get totalBerat => jenisGroups.fold(0.0, (s, j) => s + j.totalBerat);
 }
 
 /// Hasil cross-check input vs output untuk satu NoProduksi, dinormalisasi
 /// dari model input/output masing-masing jenis produksi (yang berbeda-beda
-/// bentuknya) menjadi struktur generik untuk ditampilkan di layar detail.
+/// bentuknya) menjadi struktur generik kategori → jenis → label.
 class ProductionCrossCheckSummary {
-  /// Nama kategori input (mis. "bb", "washing", "gilingan") -> jumlah baris.
-  final Map<String, int> inputCounts;
-  final double totalInputBerat;
-  final List<ProductionOutputSummary> outputs;
-  final double totalOutputBerat;
+  final List<ProductionCategoryGroup> inputGroups;
+  final List<ProductionCategoryGroup> outputGroups;
 
   const ProductionCrossCheckSummary({
-    required this.inputCounts,
-    required this.totalInputBerat,
-    required this.outputs,
-    required this.totalOutputBerat,
+    required this.inputGroups,
+    required this.outputGroups,
   });
+
+  double get totalInputBerat =>
+      inputGroups.fold(0.0, (s, g) => s + g.totalBerat);
+
+  double get totalOutputBerat =>
+      outputGroups.fold(0.0, (s, g) => s + g.totalBerat);
+
+  /// Selisih berat output terhadap input (biasanya negatif — susut proses).
+  double get selisihBerat => totalOutputBerat - totalInputBerat;
+
+  /// Persentase rendemen (output / input). Null kalau input 0 (hindari NaN).
+  double? get rendemenPct =>
+      totalInputBerat > 0 ? (totalOutputBerat / totalInputBerat) * 100 : null;
 }

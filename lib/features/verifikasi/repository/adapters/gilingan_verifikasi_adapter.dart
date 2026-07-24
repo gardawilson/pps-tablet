@@ -4,6 +4,9 @@ import '../../../production/gilingan/repository/gilingan_production_input_reposi
 import '../../../production/gilingan/repository/gilingan_production_repository.dart';
 import '../../model/verifikasi_models.dart';
 import '../verifikasi_adapter.dart';
+import 'production_grouping.dart';
+
+String? _s(String? v) => (v == null || v.trim().isEmpty) ? null : v.trim();
 
 class GilinganVerifikasiAdapter implements VerifikasiAdapter {
   final GilinganProductionRepository _repo;
@@ -37,6 +40,8 @@ class GilinganVerifikasiAdapter implements VerifikasiAdapter {
               tglProduksi: p.tglProduksi,
               namaMesin: p.namaMesin,
               shift: p.shift,
+              hourStart: p.hourStart,
+              hourEnd: p.hourEnd,
               verified: p.verified,
               verifiedByUsername: p.verifiedByUsername,
               verifiedAt: p.verifiedAt,
@@ -48,30 +53,52 @@ class GilinganVerifikasiAdapter implements VerifikasiAdapter {
   Future<ProductionCrossCheckSummary> fetchCrossCheck(String noProduksi) async {
     final inputs = await _inputRepo.fetchInputs(noProduksi, force: true);
     final outputs = await _inputRepo.fetchOutputs(noProduksi);
-    final totalInputBerat = inputs.totalBeratBroker() +
-        inputs.totalBeratBonggolan() +
-        inputs.totalBeratCrusher() +
-        inputs.totalBeratReject();
 
-    // GilinganOutput adalah per-label (bukan sudah dikelompokkan), jadi
-    // dikelompokkan dulu per namaJenis untuk ringkasan.
-    final grouped = <String, List<double>>{};
-    for (final o in outputs) {
-      grouped.putIfAbsent(o.namaJenis, () => []).add(o.berat);
-    }
-    final outputSummaries = grouped.entries
-        .map((e) => ProductionOutputSummary(
-              namaJenis: e.key,
-              totalSak: e.value.length,
-              totalBerat: e.value.fold(0.0, (s, b) => s + b),
-            ))
-        .toList();
+    final inputGroups = [
+      buildCategoryGroupFromSakRows(
+        categoryLabel: 'Broker',
+        items: inputs.broker,
+        namaJenisOf: (i) => i.namaJenis,
+        labelNoOf: (i) => _s(i.noBrokerPartial) ?? _s(i.noBroker) ?? '-',
+        beratOf: (i) => i.berat ?? 0.0,
+      ),
+      buildCategoryGroupFromSakRows(
+        categoryLabel: 'Bonggolan',
+        items: inputs.bonggolan,
+        namaJenisOf: (i) => i.namaJenis,
+        labelNoOf: (i) => _s(i.noBonggolan) ?? '-',
+        beratOf: (i) => i.berat ?? 0.0,
+      ),
+      buildCategoryGroupFromSakRows(
+        categoryLabel: 'Crusher',
+        items: inputs.crusher,
+        namaJenisOf: (i) => i.namaJenis,
+        labelNoOf: (i) => _s(i.noCrusher) ?? '-',
+        beratOf: (i) => i.berat ?? 0.0,
+      ),
+      buildCategoryGroupFromSakRows(
+        categoryLabel: 'Reject',
+        items: inputs.reject,
+        namaJenisOf: (i) => i.namaJenis,
+        labelNoOf: (i) => _s(i.noRejectPartial) ?? _s(i.noReject) ?? '-',
+        beratOf: (i) => i.berat ?? 0.0,
+      ),
+    ];
+
+    final outputGroups = [
+      buildCategoryGroupFromLabelRows(
+        categoryLabel: 'Output',
+        items: outputs,
+        namaJenisOf: (o) => o.namaJenis,
+        labelNoOf: (o) => _s(o.noGilingan) ?? '-',
+        sakCountOf: (_) => 1,
+        beratOf: (o) => o.berat,
+      ),
+    ];
 
     return ProductionCrossCheckSummary(
-      inputCounts: inputs.summary,
-      totalInputBerat: totalInputBerat,
-      outputs: outputSummaries,
-      totalOutputBerat: outputSummaries.fold(0.0, (s, o) => s + o.totalBerat),
+      inputGroups: inputGroups,
+      outputGroups: outputGroups,
     );
   }
 

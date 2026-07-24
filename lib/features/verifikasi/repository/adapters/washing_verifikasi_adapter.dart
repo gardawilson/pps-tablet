@@ -4,6 +4,7 @@ import '../../../production/washing/repository/washing_production_input_reposito
 import '../../../production/washing/repository/washing_production_repository.dart';
 import '../../model/verifikasi_models.dart';
 import '../verifikasi_adapter.dart';
+import 'production_grouping.dart';
 
 class WashingVerifikasiAdapter implements VerifikasiAdapter {
   final WashingProductionRepository _repo;
@@ -37,6 +38,8 @@ class WashingVerifikasiAdapter implements VerifikasiAdapter {
               tglProduksi: p.tglProduksi,
               namaMesin: p.namaMesin,
               shift: p.shift,
+              hourStart: p.hourStart,
+              hourEnd: p.hourEnd,
               verified: p.verified,
               verifiedByUsername: p.verifiedByUsername,
               verifiedAt: p.verifiedAt,
@@ -44,24 +47,59 @@ class WashingVerifikasiAdapter implements VerifikasiAdapter {
         .toList();
   }
 
+  static const _categoryLabels = {
+    'washing': 'Washing',
+    'bb': 'Bahan Baku',
+    'gilingan': 'Gilingan',
+  };
+
   @override
   Future<ProductionCrossCheckSummary> fetchCrossCheck(String noProduksi) async {
-    final inputs = await _inputRepo.fetchInputs(noProduksi, force: true);
-    final outputs = await _inputRepo.fetchOutputs(noProduksi);
-    final totalInputBerat = inputs.totalBeratBb() +
-        inputs.totalBeratWashing() +
-        inputs.totalBeratGilingan();
+    final inputsV2 = await _inputRepo.fetchInputsV2(noProduksi);
+    final outputsV2 = await _inputRepo.fetchOutputsV2(noProduksi);
+
+    final inputGroups = [
+      buildCategoryGroupFromLabelRows(
+        categoryLabel: 'Bahan Baku',
+        items: inputsV2.bb,
+        namaJenisOf: (i) => i.namaJenis,
+        labelNoOf: (i) => i.labelNo,
+        sakCountOf: (i) => i.totalSak,
+        beratOf: (i) => i.totalBerat,
+      ),
+      buildCategoryGroupFromLabelRows(
+        categoryLabel: 'Washing',
+        items: inputsV2.washing,
+        namaJenisOf: (i) => i.namaJenis,
+        labelNoOf: (i) => i.labelNo,
+        sakCountOf: (i) => i.totalSak,
+        beratOf: (i) => i.totalBerat,
+      ),
+      buildCategoryGroupFromLabelRows(
+        categoryLabel: 'Gilingan',
+        items: inputsV2.gilingan,
+        namaJenisOf: (i) => i.namaJenis,
+        labelNoOf: (i) => i.labelNo,
+        sakCountOf: (i) => i.totalSak,
+        beratOf: (i) => i.totalBerat,
+      ),
+    ];
+
+    final outputGroups = [
+      for (final entry in outputsV2.categories.entries)
+        buildCategoryGroupFromLabelRows(
+          categoryLabel: _categoryLabels[entry.key] ?? entry.key,
+          items: entry.value,
+          namaJenisOf: (i) => i.namaJenis,
+          labelNoOf: (i) => i.labelNo,
+          sakCountOf: (i) => i.totalSak,
+          beratOf: (i) => i.totalBerat,
+        ),
+    ];
+
     return ProductionCrossCheckSummary(
-      inputCounts: inputs.summary,
-      totalInputBerat: totalInputBerat,
-      outputs: outputs
-          .map((o) => ProductionOutputSummary(
-                namaJenis: o.namaJenis,
-                totalSak: o.totalSak,
-                totalBerat: o.totalBerat,
-              ))
-          .toList(),
-      totalOutputBerat: outputs.fold(0.0, (s, o) => s + o.totalBerat),
+      inputGroups: inputGroups,
+      outputGroups: outputGroups,
     );
   }
 

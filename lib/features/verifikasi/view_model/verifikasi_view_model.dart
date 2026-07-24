@@ -9,12 +9,18 @@ class VerifikasiViewModel extends ChangeNotifier {
   final VerifikasiRepository _repo;
 
   VerifikasiViewModel({VerifikasiRepository? repository})
-      : _repo = repository ?? VerifikasiRepository();
+      : _repo = repository ?? VerifikasiRepository() {
+    selectedJenis = availableJenis.isNotEmpty ? availableJenis.first : null;
+  }
 
   bool isLoading = false;
   String? error;
+
+  /// Semua item pending lintas jenis produksi — dimuat sekali, difilter di
+  /// client per tab supaya ganti tab tidak perlu roundtrip ke server lagi.
   List<VerifikasiItem> items = [];
-  String? jenisFilter;
+
+  String? selectedJenis;
 
   bool isActing = false;
   String? actionError;
@@ -25,12 +31,18 @@ class VerifikasiViewModel extends ChangeNotifier {
   String jenisLabel(String key) =>
       _repo.adapters.firstWhere((a) => a.jenisKey == key).jenisLabel;
 
+  List<VerifikasiItem> get filteredItems =>
+      items.where((i) => i.jenisKey == selectedJenis).toList();
+
+  int countFor(String jenisKey) =>
+      items.where((i) => i.jenisKey == jenisKey).length;
+
   Future<void> load() async {
     isLoading = true;
     error = null;
     notifyListeners();
     try {
-      items = await _repo.fetchPending(jenisKey: jenisFilter);
+      items = await _repo.fetchPending();
     } catch (e) {
       error = e.toString().replaceFirst('Exception: ', '');
     } finally {
@@ -39,10 +51,10 @@ class VerifikasiViewModel extends ChangeNotifier {
     }
   }
 
-  void setJenisFilter(String? jenisKey) {
-    if (jenisFilter == jenisKey) return;
-    jenisFilter = jenisKey;
-    load();
+  void setJenisFilter(String jenisKey) {
+    if (selectedJenis == jenisKey) return;
+    selectedJenis = jenisKey;
+    notifyListeners();
   }
 
   Future<ProductionCrossCheckSummary> fetchCrossCheck(VerifikasiItem item) {

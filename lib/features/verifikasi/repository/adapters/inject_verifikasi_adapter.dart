@@ -5,6 +5,9 @@ import '../../../production/inject/repository/inject_production_input_repository
 import '../../../production/inject/repository/inject_production_repository.dart';
 import '../../model/verifikasi_models.dart';
 import '../verifikasi_adapter.dart';
+import 'production_grouping.dart';
+
+String? _s(String? v) => (v == null || v.trim().isEmpty) ? null : v.trim();
 
 class InjectVerifikasiAdapter implements VerifikasiAdapter {
   final InjectProductionRepository _repo;
@@ -39,6 +42,8 @@ class InjectVerifikasiAdapter implements VerifikasiAdapter {
               tglProduksi: p.tglProduksi,
               namaMesin: p.namaMesin,
               shift: p.shift,
+              hourStart: p.hourStart,
+              hourEnd: p.hourEnd,
               verified: p.verified,
               verifiedByUsername: p.verifiedByUsername,
               verifiedAt: p.verifiedAt,
@@ -51,24 +56,52 @@ class InjectVerifikasiAdapter implements VerifikasiAdapter {
     final inputs = await _inputRepo.fetchInputs(noProduksi, force: true);
     final outputs = await _inputRepo.fetchOutputs(noProduksi, force: true);
 
-    // InjectOutputItem adalah per-label, dikelompokkan per namaJenis.
-    final grouped = <String, List<double>>{};
-    for (final o in outputs) {
-      grouped.putIfAbsent(o.namaJenis, () => []).add(o.berat);
-    }
-    final outputSummaries = grouped.entries
-        .map((e) => ProductionOutputSummary(
-              namaJenis: e.key,
-              totalSak: e.value.length,
-              totalBerat: e.value.fold(0.0, (s, b) => s + b),
-            ))
-        .toList();
+    final inputGroups = [
+      buildCategoryGroupFromSakRows(
+        categoryLabel: 'Broker',
+        items: inputs.broker,
+        namaJenisOf: (i) => i.namaJenis,
+        labelNoOf: (i) => _s(i.noBrokerPartial) ?? _s(i.noBroker) ?? '-',
+        beratOf: (i) => i.berat ?? 0.0,
+      ),
+      buildCategoryGroupFromSakRows(
+        categoryLabel: 'Mixer',
+        items: inputs.mixer,
+        namaJenisOf: (i) => i.namaJenis,
+        labelNoOf: (i) => _s(i.noMixerPartial) ?? _s(i.noMixer) ?? '-',
+        beratOf: (i) => i.berat ?? 0.0,
+      ),
+      buildCategoryGroupFromSakRows(
+        categoryLabel: 'Gilingan',
+        items: inputs.gilingan,
+        namaJenisOf: (i) => i.namaJenis,
+        labelNoOf: (i) => _s(i.noGilinganPartial) ?? _s(i.noGilingan) ?? '-',
+        beratOf: (i) => i.berat ?? 0.0,
+      ),
+      buildCategoryGroupFromSakRows(
+        categoryLabel: 'Furniture WIP',
+        items: inputs.furnitureWip,
+        namaJenisOf: (i) => i.namaJenis,
+        labelNoOf: (i) =>
+            _s(i.noFurnitureWIPPartial) ?? _s(i.noFurnitureWIP) ?? '-',
+        beratOf: (i) => i.berat ?? 0.0,
+      ),
+    ];
+
+    final outputGroups = [
+      buildCategoryGroupFromLabelRows(
+        categoryLabel: 'Output',
+        items: outputs,
+        namaJenisOf: (o) => o.namaJenis,
+        labelNoOf: (o) => _s(o.noFurnitureWip) ?? '-',
+        sakCountOf: (_) => 1,
+        beratOf: (o) => o.berat,
+      ),
+    ];
 
     return ProductionCrossCheckSummary(
-      inputCounts: inputs.summary,
-      totalInputBerat: inputs.totalBerat(),
-      outputs: outputSummaries,
-      totalOutputBerat: outputSummaries.fold(0.0, (s, o) => s + o.totalBerat),
+      inputGroups: inputGroups,
+      outputGroups: outputGroups,
     );
   }
 

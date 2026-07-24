@@ -11,6 +11,7 @@ import '../../../../core/services/token_storage.dart';
 import '../../shared/models/production_label_lookup_result.dart';
 import '../model/washing_formula_model.dart';
 import '../model/washing_inputs_model.dart';
+import '../model/washing_inputs_v2_model.dart';
 import '../model/washing_output_model.dart';
 
 class WashingProductionInputRepository {
@@ -97,6 +98,68 @@ class WashingProductionInputRepository {
       _inputsCache.remove(noProduksi.trim());
 
   void clearCache() => _inputsCache.clear();
+
+  // -----------------------------
+  // GET /api/production/washing/:noProduksi/inputs/v2
+  // Dikelompokkan per header dengan DetailSak bersarang — dipakai untuk
+  // cross-check verifikasi (format konsisten dengan output).
+  // -----------------------------
+  Future<WashingInputsV2> fetchInputsV2(String noProduksi) async {
+    final key = noProduksi.trim();
+    if (key.isEmpty) throw ArgumentError('noProduksi tidak boleh kosong');
+
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/production/washing/$key/inputs/v2');
+
+    http.Response res;
+    try {
+      res = await http.get(url, headers: _headers(token)).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout mengambil washing inputs v2 ($key)');
+    }
+
+    if (res.statusCode != 200) {
+      throw Exception(
+        'Gagal mengambil washing inputs v2 ($key), code ${res.statusCode}',
+      );
+    }
+
+    final decoded = utf8.decode(res.bodyBytes);
+    final body = json.decode(decoded) as Map<String, dynamic>;
+    final data = body['data'] as Map<String, dynamic>? ?? {};
+    return WashingInputsV2.fromJson(data);
+  }
+
+  // -----------------------------
+  // GET /api/production/washing/:noProduksi/outputs/v2
+  // Dikelompokkan per kategori sumber, selaras dengan inputs/v2 — dipakai
+  // untuk cross-check verifikasi.
+  // -----------------------------
+  Future<WashingOutputsV2> fetchOutputsV2(String noProduksi) async {
+    final key = noProduksi.trim();
+    if (key.isEmpty) throw ArgumentError('noProduksi tidak boleh kosong');
+
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/production/washing/$key/outputs/v2');
+
+    http.Response res;
+    try {
+      res = await http.get(url, headers: _headers(token)).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout mengambil washing outputs v2 ($key)');
+    }
+
+    if (res.statusCode != 200) {
+      throw Exception(
+        'Gagal mengambil washing outputs v2 ($key), code ${res.statusCode}',
+      );
+    }
+
+    final decoded = utf8.decode(res.bodyBytes);
+    final body = json.decode(decoded) as Map<String, dynamic>;
+    final data = body['data'] as Map<String, dynamic>? ?? {};
+    return WashingOutputsV2.fromJson(data);
+  }
 
   // -----------------------------
   // GET /api/production/washing/:noProduksi/outputs

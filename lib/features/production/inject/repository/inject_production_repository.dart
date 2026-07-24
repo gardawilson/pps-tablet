@@ -72,6 +72,8 @@ class InjectProductionRepository {
     int pageSize = 20,
     String? search,
     int? idMesin,
+    bool? complete,
+    bool? verified,
   }) async {
     final body = await api.getJson(
       '/api/production/inject',
@@ -80,6 +82,8 @@ class InjectProductionRepository {
         'pageSize': pageSize.toString(),
         if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
         if (idMesin != null) 'idMesin': idMesin.toString(),
+        if (complete != null) 'complete': complete.toString(),
+        if (verified != null) 'verified': verified.toString(),
       },
     );
 
@@ -694,6 +698,42 @@ class InjectProductionRepository {
       final parsed = _tryDecodeMap(e.responseBody);
       final msg = (parsed['message'] as String?) ??
           'Gagal menyetujui penyelesaian (HTTP ${e.statusCode})';
+      throw Exception(msg);
+    }
+  }
+
+  /* =============================
+   * VERIFIKASI SUPERVISOR
+   * PATCH /api/production/inject/:noProduksi/verify
+   * PATCH /api/production/inject/:noProduksi/unverify
+   * ============================= */
+
+  Future<void> verifyProduksi(String noProduksi, {String? note}) async {
+    final encoded = Uri.encodeComponent(noProduksi.trim());
+    try {
+      await api.patchJson(
+        '/api/production/inject/$encoded/verify',
+        body: {if (note != null && note.trim().isNotEmpty) 'note': note.trim()},
+      );
+    } on ApiException catch (e) {
+      final parsed = _tryDecodeMap(e.responseBody);
+      final msg = (parsed['message'] as String?) ??
+          'Gagal memverifikasi produksi (HTTP ${e.statusCode})';
+      throw Exception(msg);
+    }
+  }
+
+  Future<void> unverifyProduksi(String noProduksi, {String? note}) async {
+    final encoded = Uri.encodeComponent(noProduksi.trim());
+    try {
+      await api.patchJson(
+        '/api/production/inject/$encoded/unverify',
+        body: {if (note != null && note.trim().isNotEmpty) 'note': note.trim()},
+      );
+    } on ApiException catch (e) {
+      final parsed = _tryDecodeMap(e.responseBody);
+      final msg = (parsed['message'] as String?) ??
+          'Gagal membatalkan verifikasi produksi (HTTP ${e.statusCode})';
       throw Exception(msg);
     }
   }

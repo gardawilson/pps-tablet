@@ -196,6 +196,12 @@ class _HomeSidebarState extends State<HomeSidebar> {
       icon: Icons.fact_check_outlined,
       route: '/shell/stock-opname-v2',
     ),
+    _MenuItem(
+      title: 'Verifikasi',
+      subtitle: 'Verifikasi produksi selesai (supervisor)',
+      icon: Icons.verified_outlined,
+      route: '/verifikasi',
+    ),
   ];
 
   static List<_MenuItem> get _laporanItems => <_MenuItem>[

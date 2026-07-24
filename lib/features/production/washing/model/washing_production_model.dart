@@ -42,6 +42,13 @@ class WashingProduction {
   final bool isComplete;
   final String? produksiStatus;
 
+  // ✅ Verifikasi supervisor (terpisah dari isComplete/produksiStatus)
+  final bool verified;
+  final int? verifiedBy;
+  final String? verifiedByUsername;
+  final DateTime? verifiedAt;
+  final String? verifyNote;
+
   const WashingProduction({
     required this.noProduksi,
     required this.idOperators,
@@ -69,6 +76,11 @@ class WashingProduction {
     this.namaRegu,
     this.isComplete = false,
     this.produksiStatus,
+    this.verified = false,
+    this.verifiedBy,
+    this.verifiedByUsername,
+    this.verifiedAt,
+    this.verifyNote,
   });
 
   // ── Backward-compat getters ──────────────────────────────────────────────
@@ -204,6 +216,11 @@ class WashingProduction {
           j['status']?.toString() == 'complete',
       produksiStatus: j['status']?.toString() ??
           (_asBool(j['IsComplete'], fallback: false) ? 'complete' : 'pending'),
+      verified: _asBool(j['Verified'], fallback: false),
+      verifiedBy: _asInt(j['VerifiedBy']),
+      verifiedByUsername: j['VerifiedByUsername'] as String?,
+      verifiedAt: _asDateTime(j['VerifiedAt']),
+      verifyNote: j['VerifiedNote'] as String?,
     );
   }
 

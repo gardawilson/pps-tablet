@@ -42,6 +42,7 @@ import 'package:pps_tablet/features/report/view/report_list_screen.dart';
 import 'package:pps_tablet/features/sortir_reject_v2/view/sr_v2_list_screen.dart';
 import 'package:pps_tablet/features/stock_opname/view/stock_opname_list_screen.dart';
 import 'package:pps_tablet/features/stock_opname_v2/view/so_v2_kategori_list_screen.dart';
+import 'package:pps_tablet/features/verifikasi/view/verifikasi_list_screen.dart';
 import 'package:provider/provider.dart';
 
 class BreadcrumbSegment {
@@ -522,6 +523,8 @@ class _AppShellState extends State<AppShell> {
         return const AuditScreen();
       case '/shell/mapping':
         return const MappingScreen();
+      case '/verifikasi':
+        return const VerifikasiListScreen();
       default:
         return const HomeScreen();
     }

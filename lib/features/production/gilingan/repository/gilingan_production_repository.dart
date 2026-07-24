@@ -110,6 +110,8 @@ class GilinganProductionRepository {
     DateTime? dateTo,
     int? idMesin,
     int? idOperator,
+    bool? complete,
+    bool? verified,
   }) async {
     final token = await TokenStorage.getToken();
 
@@ -139,6 +141,8 @@ class GilinganProductionRepository {
       if (dt != null) 'dateTo': dt,
       if (idMesin != null) 'idMesin': '$idMesin',
       if (idOperator != null) 'idOperator': '$idOperator',
+      if (complete != null) 'complete': '$complete',
+      if (verified != null) 'verified': '$verified',
     };
 
     final url =
@@ -214,6 +218,8 @@ class GilinganProductionRepository {
     DateTime? dateTo,
     int? idMesin,
     int? idOperator,
+    bool? complete,
+    bool? verified,
   }) async {
     final r = await fetchAll(
       page: page,
@@ -227,6 +233,8 @@ class GilinganProductionRepository {
       dateTo: dateTo,
       idMesin: idMesin,
       idOperator: idOperator,
+      complete: complete,
+      verified: verified,
     );
     return (r['items'] as List<GilinganProduction>);
   }
@@ -527,6 +535,73 @@ class GilinganProductionRepository {
             'Gagal menyelesaikan produksi (${res.statusCode})';
       } catch (_) {
         msg = 'Gagal menyelesaikan produksi (${res.statusCode})';
+      }
+      throw Exception(msg);
+    }
+  }
+
+  // =========================
+  //  VERIFIKASI SUPERVISOR
+  //  PATCH /api/production/gilingan/:noProduksi/verify
+  //  PATCH /api/production/gilingan/:noProduksi/unverify
+  // =========================
+  Future<void> verifyProduksi(String noProduksi, {String? note}) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/production/gilingan/$noProduksi/verify');
+
+    late http.Response res;
+    try {
+      res = await http
+          .patch(
+            url,
+            headers: {..._headers(token), 'Content-Type': 'application/json'},
+            body: json.encode({if (note != null && note.trim().isNotEmpty) 'note': note.trim()}),
+          )
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout memverifikasi produksi gilingan');
+    }
+
+    if (res.statusCode != 200) {
+      final bodyText = utf8.decode(res.bodyBytes);
+      String msg;
+      try {
+        final decoded = json.decode(bodyText);
+        msg = (decoded is Map ? decoded['message'] : null)?.toString() ??
+            'Gagal memverifikasi produksi (${res.statusCode})';
+      } catch (_) {
+        msg = 'Gagal memverifikasi produksi (${res.statusCode})';
+      }
+      throw Exception(msg);
+    }
+  }
+
+  Future<void> unverifyProduksi(String noProduksi, {String? note}) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/production/gilingan/$noProduksi/unverify');
+
+    late http.Response res;
+    try {
+      res = await http
+          .patch(
+            url,
+            headers: {..._headers(token), 'Content-Type': 'application/json'},
+            body: json.encode({if (note != null && note.trim().isNotEmpty) 'note': note.trim()}),
+          )
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout membatalkan verifikasi produksi gilingan');
+    }
+
+    if (res.statusCode != 200) {
+      final bodyText = utf8.decode(res.bodyBytes);
+      String msg;
+      try {
+        final decoded = json.decode(bodyText);
+        msg = (decoded is Map ? decoded['message'] : null)?.toString() ??
+            'Gagal membatalkan verifikasi produksi (${res.statusCode})';
+      } catch (_) {
+        msg = 'Gagal membatalkan verifikasi produksi (${res.statusCode})';
       }
       throw Exception(msg);
     }

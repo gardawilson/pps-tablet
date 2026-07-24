@@ -35,6 +35,13 @@ class GilinganProduction {
   final bool isComplete;
   final String? produksiStatus;
 
+  // ✅ Verifikasi supervisor (terpisah dari isComplete/produksiStatus)
+  final bool verified;
+  final int? verifiedBy;
+  final String? verifiedByUsername;
+  final DateTime? verifiedAt;
+  final String? verifyNote;
+
   const GilinganProduction({
     required this.noProduksi,
     required this.idOperator,
@@ -60,6 +67,11 @@ class GilinganProduction {
     this.isLocked = false,
     this.isComplete = false,
     this.produksiStatus,
+    this.verified = false,
+    this.verifiedBy,
+    this.verifiedByUsername,
+    this.verifiedAt,
+    this.verifyNote,
   });
 
   // ---------- tolerant parsers ----------
@@ -167,6 +179,11 @@ class GilinganProduction {
           j['status']?.toString() == 'complete',
       produksiStatus: j['status']?.toString() ??
           (_asBool(j['IsComplete'], fallback: false) ? 'complete' : 'pending'),
+      verified: _asBool(j['Verified'], fallback: false),
+      verifiedBy: _asInt(j['VerifiedBy']),
+      verifiedByUsername: j['VerifiedByUsername'] as String?,
+      verifiedAt: _asDateTime(j['VerifiedAt']),
+      verifyNote: j['VerifiedNote'] as String?,
     );
   }
 
@@ -252,6 +269,11 @@ class GilinganProduction {
       isLocked: isLocked,
       isComplete: isComplete ?? this.isComplete,
       produksiStatus: produksiStatus ?? this.produksiStatus,
+      verified: verified,
+      verifiedBy: verifiedBy,
+      verifiedByUsername: verifiedByUsername,
+      verifiedAt: verifiedAt,
+      verifyNote: verifyNote,
     );
   }
 

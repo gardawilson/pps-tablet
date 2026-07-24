@@ -160,6 +160,8 @@ class WashingProductionRepository {
     DateTime? date,
     int? idMesin,
     DateTime? tanggal,
+    bool? complete,
+    bool? verified,
   }) async {
     final token = await TokenStorage.getToken();
 
@@ -171,6 +173,8 @@ class WashingProductionRepository {
       if (date != null) 'date': toDbDateString(date),
       if (idMesin != null) 'idMesin': '$idMesin',
       if (tanggal != null) 'tanggal': toDbDateString(tanggal),
+      if (complete != null) 'complete': '$complete',
+      if (verified != null) 'verified': '$verified',
     };
 
     final url = Uri.parse('$_base/api/production/washing')
@@ -235,6 +239,8 @@ class WashingProductionRepository {
     DateTime? date,
     int? idMesin,
     DateTime? tanggal,
+    bool? complete,
+    bool? verified,
   }) async {
     final r = await fetchAll(
       page: page,
@@ -244,6 +250,8 @@ class WashingProductionRepository {
       date: date,
       idMesin: idMesin,
       tanggal: tanggal,
+      complete: complete,
+      verified: verified,
     );
     return (r['items'] as List<WashingProduction>);
   }
@@ -561,6 +569,71 @@ class WashingProductionRepository {
         throw Exception(msg);
       } catch (_) {
         throw Exception('Gagal menyelesaikan produksi (${res.statusCode})');
+      }
+    }
+  }
+
+  // =========================
+  //  VERIFIKASI SUPERVISOR
+  //  PATCH /api/production/washing/:noProduksi/verify
+  //  PATCH /api/production/washing/:noProduksi/unverify
+  // =========================
+  Future<void> verifyProduksi(String noProduksi, {String? note}) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/production/washing/$noProduksi/verify');
+
+    late http.Response res;
+    try {
+      res = await http
+          .patch(
+            url,
+            headers: {..._headers(token), 'Content-Type': 'application/json'},
+            body: json.encode({if (note != null && note.trim().isNotEmpty) 'note': note.trim()}),
+          )
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout memverifikasi produksi washing');
+    }
+
+    if (res.statusCode != 200) {
+      final bodyText = utf8.decode(res.bodyBytes);
+      try {
+        final decoded = json.decode(bodyText);
+        final msg = (decoded is Map ? decoded['message'] : null) ??
+            'Gagal memverifikasi produksi (${res.statusCode})';
+        throw Exception(msg);
+      } catch (_) {
+        throw Exception('Gagal memverifikasi produksi (${res.statusCode})');
+      }
+    }
+  }
+
+  Future<void> unverifyProduksi(String noProduksi, {String? note}) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/production/washing/$noProduksi/unverify');
+
+    late http.Response res;
+    try {
+      res = await http
+          .patch(
+            url,
+            headers: {..._headers(token), 'Content-Type': 'application/json'},
+            body: json.encode({if (note != null && note.trim().isNotEmpty) 'note': note.trim()}),
+          )
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout membatalkan verifikasi produksi washing');
+    }
+
+    if (res.statusCode != 200) {
+      final bodyText = utf8.decode(res.bodyBytes);
+      try {
+        final decoded = json.decode(bodyText);
+        final msg = (decoded is Map ? decoded['message'] : null) ??
+            'Gagal membatalkan verifikasi produksi (${res.statusCode})';
+        throw Exception(msg);
+      } catch (_) {
+        throw Exception('Gagal membatalkan verifikasi produksi (${res.statusCode})');
       }
     }
   }

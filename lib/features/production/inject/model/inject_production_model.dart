@@ -68,6 +68,13 @@ class InjectProduction {
   final bool isRealtime;
   final String? produksiStatus;
 
+  /// Verifikasi supervisor (terpisah dari completeRequestStatus/isComplete)
+  final bool verified;
+  final int? verifiedBy;
+  final String? verifiedByUsername;
+  final DateTime? verifiedAt;
+  final String? verifyNote;
+
   /// Asal pembuatan produksi (persisted di backend, di-set saat create):
   /// - "realtime" -> input via kartu mesin  -> layar v3
   /// - "backdate" -> input via FAB riwayat  -> layar v1
@@ -122,6 +129,11 @@ class InjectProduction {
     this.completeRejectReason,
     this.isRealtime = false,
     this.produksiStatus,
+    this.verified = false,
+    this.verifiedBy,
+    this.verifiedByUsername,
+    this.verifiedAt,
+    this.verifyNote,
     this.inputMode,
     this.outputCategory,
     this.outputs = const [],
@@ -287,6 +299,11 @@ class InjectProduction {
           j['status']?.toString() == 'pending' ||
           _asBool(j['IsRealtime'], fallback: false),
       produksiStatus: j['status']?.toString(),
+      verified: _asBool(j['Verified'], fallback: false),
+      verifiedBy: (j['VerifiedBy'] as num?)?.toInt(),
+      verifiedByUsername: j['VerifiedByUsername']?.toString(),
+      verifiedAt: _asDateTime(j['VerifiedAt']),
+      verifyNote: j['VerifiedNote']?.toString(),
       inputMode: j['InputMode']?.toString(),
       outputCategory: j['OutputCategory']?.toString(),
       outputs: (j['Outputs'] as List<dynamic>? ?? [])

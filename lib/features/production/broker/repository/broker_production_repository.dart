@@ -200,6 +200,8 @@ class BrokerProductionRepository {
     DateTime? dateTo,
     int? idMesin,
     int? idOperator,
+    bool? complete,
+    bool? verified,
   }) async {
     final token = await TokenStorage.getToken();
 
@@ -228,6 +230,8 @@ class BrokerProductionRepository {
       if (dt != null) 'dateTo': dt,
       if (idMesin != null) 'idMesin': '$idMesin',
       if (idOperator != null) 'idOperator': '$idOperator',
+      if (complete != null) 'complete': '$complete',
+      if (verified != null) 'verified': '$verified',
     };
 
     final url = Uri.parse(
@@ -302,6 +306,8 @@ class BrokerProductionRepository {
     DateTime? dateTo,
     int? idMesin,
     int? idOperator,
+    bool? complete,
+    bool? verified,
   }) async {
     final r = await fetchAll(
       page: page,
@@ -315,6 +321,8 @@ class BrokerProductionRepository {
       dateTo: dateTo,
       idMesin: idMesin,
       idOperator: idOperator,
+      complete: complete,
+      verified: verified,
     );
     return (r['items'] as List<BrokerProduction>);
   }
@@ -853,6 +861,71 @@ class BrokerProductionRepository {
         throw Exception(msg);
       } catch (_) {
         throw Exception('Gagal menyelesaikan produksi (${res.statusCode})');
+      }
+    }
+  }
+
+  // =========================
+  //  VERIFIKASI SUPERVISOR
+  //  PATCH /api/production/broker/:noProduksi/verify
+  //  PATCH /api/production/broker/:noProduksi/unverify
+  // =========================
+  Future<void> verifyProduksi(String noProduksi, {String? note}) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/production/broker/$noProduksi/verify');
+
+    late http.Response res;
+    try {
+      res = await http
+          .patch(
+            url,
+            headers: {..._headers(token), 'Content-Type': 'application/json'},
+            body: json.encode({if (note != null && note.trim().isNotEmpty) 'note': note.trim()}),
+          )
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout memverifikasi produksi broker');
+    }
+
+    if (res.statusCode != 200) {
+      final bodyText = utf8.decode(res.bodyBytes);
+      try {
+        final decoded = json.decode(bodyText);
+        final msg = (decoded is Map ? decoded['message'] : null) ??
+            'Gagal memverifikasi produksi (${res.statusCode})';
+        throw Exception(msg);
+      } catch (_) {
+        throw Exception('Gagal memverifikasi produksi (${res.statusCode})');
+      }
+    }
+  }
+
+  Future<void> unverifyProduksi(String noProduksi, {String? note}) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse('$_base/api/production/broker/$noProduksi/unverify');
+
+    late http.Response res;
+    try {
+      res = await http
+          .patch(
+            url,
+            headers: {..._headers(token), 'Content-Type': 'application/json'},
+            body: json.encode({if (note != null && note.trim().isNotEmpty) 'note': note.trim()}),
+          )
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout membatalkan verifikasi produksi broker');
+    }
+
+    if (res.statusCode != 200) {
+      final bodyText = utf8.decode(res.bodyBytes);
+      try {
+        final decoded = json.decode(bodyText);
+        final msg = (decoded is Map ? decoded['message'] : null) ??
+            'Gagal membatalkan verifikasi produksi (${res.statusCode})';
+        throw Exception(msg);
+      } catch (_) {
+        throw Exception('Gagal membatalkan verifikasi produksi (${res.statusCode})');
       }
     }
   }

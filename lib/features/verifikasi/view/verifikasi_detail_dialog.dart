@@ -357,37 +357,14 @@ class _VerifikasiDetailDialogState extends State<VerifikasiDetailDialog> {
         Container(
           color: const Color(0xFFFAFAFA),
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  g.categoryLabel.toUpperCase(),
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: kVerifikasiInk,
-                    letterSpacing: 0.4,
-                  ),
-                ),
-              ),
-              Text(
-                '${g.totalSak} label',
-                style: const TextStyle(fontSize: 10.5, color: kVerifikasiMuted),
-              ),
-              const SizedBox(width: 10),
-              SizedBox(
-                width: 80,
-                child: Text(
-                  '${g.totalBerat.toStringAsFixed(2)} kg',
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: kVerifikasiInk,
-                  ),
-                ),
-              ),
-            ],
+          child: Text(
+            g.categoryLabel.toUpperCase(),
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: kVerifikasiInk,
+              letterSpacing: 0.4,
+            ),
           ),
         ),
         for (final j in g.jenisGroups) _jenisBlock(j),
@@ -417,7 +394,7 @@ class _VerifikasiDetailDialogState extends State<VerifikasiDetailDialog> {
                 ),
               ),
               Text(
-                '${j.totalSak} label',
+                '${j.totalSak} sak',
                 style: const TextStyle(fontSize: 10.5, color: kVerifikasiMuted),
               ),
               const SizedBox(width: 10),

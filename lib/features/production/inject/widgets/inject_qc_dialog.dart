@@ -482,9 +482,10 @@ class _QcBucketRowState extends State<_QcBucketRow> {
   }
 
   Future<void> _submit() async {
-    final jumlahBS = int.tryParse(_jumlahBsCtrl.text.trim());
-    if (jumlahBS == null || jumlahBS <= 0) {
-      setState(() => _error = 'Jumlah BS wajib diisi');
+    final jumlahBsText = _jumlahBsCtrl.text.trim();
+    final jumlahBS = jumlahBsText.isEmpty ? 0 : int.tryParse(jumlahBsText);
+    if (jumlahBS == null || jumlahBS < 0) {
+      setState(() => _error = 'Jumlah BS tidak valid');
       return;
     }
     final minCounter = widget.counterCurrent;
@@ -521,9 +522,10 @@ class _QcBucketRowState extends State<_QcBucketRow> {
   }
 
   Future<void> _submitEdit(int id) async {
-    final jumlahBS = int.tryParse(_jumlahBsCtrl.text.trim());
-    if (jumlahBS == null || jumlahBS <= 0) {
-      setState(() => _error = 'Jumlah BS wajib diisi');
+    final jumlahBsText = _jumlahBsCtrl.text.trim();
+    final jumlahBS = jumlahBsText.isEmpty ? 0 : int.tryParse(jumlahBsText);
+    if (jumlahBS == null || jumlahBS < 0) {
+      setState(() => _error = 'Jumlah BS tidak valid');
       return;
     }
     setState(() {

@@ -2,14 +2,17 @@
 
 import '../model/verifikasi_models.dart';
 import 'adapters/broker_verifikasi_adapter.dart';
-import 'adapters/gilingan_verifikasi_adapter.dart';
-import 'adapters/inject_verifikasi_adapter.dart';
 import 'adapters/washing_verifikasi_adapter.dart';
 import 'verifikasi_adapter.dart';
 
 /// Orchestrator lintas jenis produksi. Tidak ada endpoint agregat di
 /// backend, jadi setiap jenis produksi punya adapter sendiri dan hasilnya
 /// digabung di sini. Menambah jenis produksi baru = tambah satu adapter.
+///
+/// Gilingan & Inject sudah punya adapter (lihat
+/// `adapters/gilingan_verifikasi_adapter.dart` & `inject_verifikasi_adapter.dart`)
+/// tapi sengaja belum diaktifkan di sini — baru Washing & Broker yang siap
+/// dipakai saat ini. Aktifkan lagi dengan menambah ke list di bawah.
 class VerifikasiRepository {
   final List<VerifikasiAdapter> adapters;
 
@@ -18,8 +21,6 @@ class VerifikasiRepository {
             [
               WashingVerifikasiAdapter(),
               BrokerVerifikasiAdapter(),
-              GilinganVerifikasiAdapter(),
-              InjectVerifikasiAdapter(),
             ];
 
   VerifikasiAdapter _adapterFor(String jenisKey) =>

@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../../common/widgets/error_status_dialog.dart';
 import '../../../core/view_model/permission_view_model.dart';
 import '../model/verifikasi_models.dart';
+import '../services/verifikasi_notification_manager.dart';
 import '../view_model/verifikasi_view_model.dart';
 import 'verifikasi_theme.dart';
 
@@ -90,10 +91,12 @@ class _VerifikasiDetailDialogState extends State<VerifikasiDetailDialog> {
     if (confirmed != true || !mounted) return;
 
     final vm = context.read<VerifikasiViewModel>();
+    final notifMgr = context.read<VerifikasiNotificationManager>();
     final ok = await vm.verify(widget.item, note: noteCtl.text.trim());
     if (!mounted) return;
 
     if (ok) {
+      notifMgr.markVerified(widget.item.jenisKey, widget.item.noProduksi);
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

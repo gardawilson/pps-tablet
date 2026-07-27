@@ -160,6 +160,8 @@ import 'features/production/broker/view/broker_production_screen.dart';
 import 'features/production/gilingan/repository/gilingan_production_input_repository.dart';
 import 'features/shared/lokasi/lokasi_view_model.dart';
 import 'features/stock_opname/view/stock_opname_list_screen.dart';
+import 'package:pps_tablet/core/view_model/notification_center.dart';
+import 'package:pps_tablet/features/verifikasi/services/verifikasi_notification_manager.dart';
 import 'package:pps_tablet/features/verifikasi/view/verifikasi_list_screen.dart';
 import 'core/view/app_shell.dart';
 import 'features/stock_opname/view_model/stock_opname_list_view_model.dart';
@@ -216,6 +218,12 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => SocketManager()),
         ChangeNotifierProvider(
           create: (_) => LabelPrintLockSocketManager()..connect(),
+        ),
+        ChangeNotifierProvider(create: (_) => NotificationCenter()),
+        ChangeNotifierProvider(
+          create: (ctx) => VerifikasiNotificationManager(
+            notificationCenter: ctx.read<NotificationCenter>(),
+          )..connect(),
         ),
         ChangeNotifierProvider(create: (_) => LabelPrintSyncQueue()..start()),
         ChangeNotifierProvider(create: (_) => LabelDetailViewModel()),

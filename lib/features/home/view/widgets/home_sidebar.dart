@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../../verifikasi/services/verifikasi_notification_manager.dart';
 
 class HomeSidebar extends StatefulWidget {
   final GlobalKey<NavigatorState> navigatorKey;
@@ -540,6 +543,49 @@ class _HomeSidebarState extends State<HomeSidebar> {
     );
   }
 
+  /// Badge notifikasi jumlah "menunggu verifikasi" — cuma dipasang di menu
+  /// Verifikasi, bersumber dari [VerifikasiNotificationManager] (event
+  /// socket `production_need_verification`, lihat servicenya untuk detail).
+  Widget _buildIconWithBadge(_MenuItem item, Color iconColor, {required double size}) {
+    final icon = Icon(item.icon, color: iconColor, size: size);
+    if (item.route != '/verifikasi') return icon;
+
+    return Consumer<VerifikasiNotificationManager>(
+      builder: (context, notif, _) {
+        final count = notif.totalCount;
+        if (count <= 0) return icon;
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            icon,
+            Positioned(
+              right: -6,
+              top: -4,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                constraints: const BoxConstraints(minWidth: 15),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDC2626),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: _primaryColor, width: 1.5),
+                ),
+                child: Text(
+                  count > 99 ? '99+' : '$count',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildFlatItem(_MenuItem item) {
     final isSelected = _selectedRoute == item.route;
     final isDisabled = !item.enabled;
@@ -579,10 +625,12 @@ class _HomeSidebarState extends State<HomeSidebar> {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: _collapsed
-                  ? Center(child: Icon(item.icon, color: iconColor, size: 20))
+                  ? Center(
+                      child: _buildIconWithBadge(item, iconColor, size: 20),
+                    )
                   : Row(
                       children: [
-                        Icon(item.icon, color: iconColor, size: 20),
+                        _buildIconWithBadge(item, iconColor, size: 20),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(

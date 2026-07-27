@@ -9,17 +9,17 @@ class VerifikasiViewModel extends ChangeNotifier {
   final VerifikasiRepository _repo;
 
   VerifikasiViewModel({VerifikasiRepository? repository})
-      : _repo = repository ?? VerifikasiRepository() {
-    selectedJenis = availableJenis.isNotEmpty ? availableJenis.first : null;
-  }
+      : _repo = repository ?? VerifikasiRepository();
 
   bool isLoading = false;
   String? error;
 
-  /// Semua item pending lintas jenis produksi — dimuat sekali, difilter di
-  /// client per tab supaya ganti tab tidak perlu roundtrip ke server lagi.
+  /// Semua item pending lintas jenis produksi — digabung jadi satu list
+  /// (tidak per-tab) karena volume harian tiap jenis produksi kecil.
   List<VerifikasiItem> items = [];
 
+  /// null = tampilkan semua jenis. Diisi hanya kalau user memilih chip
+  /// filter jenis tertentu.
   String? selectedJenis;
 
   bool isActing = false;
@@ -31,8 +31,9 @@ class VerifikasiViewModel extends ChangeNotifier {
   String jenisLabel(String key) =>
       _repo.adapters.firstWhere((a) => a.jenisKey == key).jenisLabel;
 
-  List<VerifikasiItem> get filteredItems =>
-      items.where((i) => i.jenisKey == selectedJenis).toList();
+  List<VerifikasiItem> get filteredItems => selectedJenis == null
+      ? items
+      : items.where((i) => i.jenisKey == selectedJenis).toList();
 
   int countFor(String jenisKey) =>
       items.where((i) => i.jenisKey == jenisKey).length;
@@ -51,9 +52,11 @@ class VerifikasiViewModel extends ChangeNotifier {
     }
   }
 
-  void setJenisFilter(String jenisKey) {
-    if (selectedJenis == jenisKey) return;
-    selectedJenis = jenisKey;
+  /// Toggle filter jenis: pilih chip yang sama lagi untuk kembali ke "Semua".
+  void setJenisFilter(String? jenisKey) {
+    final next = selectedJenis == jenisKey ? null : jenisKey;
+    if (selectedJenis == next) return;
+    selectedJenis = next;
     notifyListeners();
   }
 

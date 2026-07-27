@@ -9,11 +9,12 @@ import '../view_model/verifikasi_view_model.dart';
 import 'verifikasi_detail_dialog.dart';
 import 'verifikasi_theme.dart';
 
-/// Dua panel bersisian (jenis produksi di kiri, NoProduksi di kanan) —
-/// meniru gaya [SoV2DetailScreen] (stock_opname_v2): tanpa AppBar, tanpa
-/// frame/border-radius luar, panel flush dipisah VerticalDivider, header
-/// panel putih + border bawah, baris list ditandai left-border saat
-/// terpilih. Detail cross-check input/output tetap dialog popup.
+/// Satu panel: semua jenis produksi digabung jadi satu list (tidak lagi
+/// dipecah per tab) karena volume harian tiap jenis produksi kecil (< 10).
+/// Chip filter jenis di header bersifat opsional, bukan navigasi wajib.
+/// Meniru gaya [SoV2DetailScreen] (stock_opname_v2): tanpa AppBar, header
+/// panel putih + border bawah. Detail cross-check input/output tetap
+/// dialog popup.
 class VerifikasiListScreen extends StatelessWidget {
   const VerifikasiListScreen({super.key});
 
@@ -48,91 +49,12 @@ class _VerifikasiListBody extends StatelessWidget {
                 ),
               ),
             )
-          : Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(width: 220, child: _buildJenisPanel(vm)),
-                const VerticalDivider(width: 1, color: kVerifikasiBorder),
-                Expanded(child: _buildNoProduksiPanel(context, vm)),
-              ],
-            ),
+          : _buildListPanel(context, vm),
     );
   }
 
-  // ── Panel 1: jenis produksi ─────────────────────────────────────────────
-  Widget _buildJenisPanel(VerifikasiViewModel vm) {
-    return Container(
-      color: Colors.white,
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: kVerifikasiBorder)),
-            ),
-            child: const Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Verifikasi Produksi',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: kVerifikasiInk,
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: vm.isLoading && vm.items.isEmpty
-                ? const Center(child: CircularProgressIndicator())
-                : ListView.separated(
-                    itemCount: vm.availableJenis.length,
-                    separatorBuilder: (_, __) =>
-                        const Divider(height: 1, color: kVerifikasiBorder),
-                    itemBuilder: (context, index) {
-                      final key = vm.availableJenis[index];
-                      final selected = vm.selectedJenis == key;
-                      return InkWell(
-                        onTap: () => vm.setJenisFilter(key),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: selected
-                                ? kVerifikasiAccent.withValues(alpha: 0.05)
-                                : null,
-                            border: Border(
-                              left: BorderSide(
-                                color: selected
-                                    ? kVerifikasiAccent
-                                    : Colors.transparent,
-                                width: 3,
-                              ),
-                            ),
-                          ),
-                          padding: const EdgeInsets.fromLTRB(9, 12, 12, 12),
-                          child: Text(
-                            '${vm.jenisLabel(key)} (${vm.countFor(key)})',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: selected
-                                  ? kVerifikasiAccent
-                                  : kVerifikasiInk,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Panel 2: daftar NoProduksi menunggu verifikasi ───────────────────────
-  Widget _buildNoProduksiPanel(BuildContext context, VerifikasiViewModel vm) {
+  // ── Panel: daftar NoProduksi menunggu verifikasi (semua jenis) ──────────
+  Widget _buildListPanel(BuildContext context, VerifikasiViewModel vm) {
     final list = vm.filteredItems;
     return Column(
       children: [
@@ -145,13 +67,9 @@ class _VerifikasiListBody extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                vm.selectedJenis != null
-                    ? vm.jenisLabel(vm.selectedJenis!)
-                    : '-',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+              const Text(
+                'Verifikasi Produksi',
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: kVerifikasiInk,
@@ -168,10 +86,35 @@ class _VerifikasiListBody extends StatelessWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+              _buildJenisChips(vm),
             ],
           ),
         ),
         Expanded(child: _buildBody(context, vm, list)),
+      ],
+    );
+  }
+
+  // ── Chip filter jenis (opsional) ─────────────────────────────────────────
+  Widget _buildJenisChips(VerifikasiViewModel vm) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _JenisChip(
+          label: 'Semua (${vm.items.length})',
+          selected: vm.selectedJenis == null,
+          color: kVerifikasiAccent,
+          onTap: () => vm.setJenisFilter(null),
+        ),
+        for (final key in vm.availableJenis)
+          _JenisChip(
+            label: '${vm.jenisLabel(key)} (${vm.countFor(key)})',
+            selected: vm.selectedJenis == key,
+            color: jenisColor(key, vm.availableJenis),
+            onTap: () => vm.setJenisFilter(key),
+          ),
       ],
     );
   }
@@ -213,6 +156,7 @@ class _VerifikasiListBody extends StatelessWidget {
             const Divider(height: 1, color: kVerifikasiBorder),
         itemBuilder: (_, i) => _VerifikasiListRow(
           item: list[i],
+          jenisBadgeColor: jenisColor(list[i].jenisKey, vm.availableJenis),
           onTap: () =>
               showVerifikasiDetailDialog(context, vm: vm, item: list[i]),
         ),
@@ -223,9 +167,14 @@ class _VerifikasiListBody extends StatelessWidget {
 
 class _VerifikasiListRow extends StatelessWidget {
   final VerifikasiItem item;
+  final Color jenisBadgeColor;
   final VoidCallback onTap;
 
-  const _VerifikasiListRow({required this.item, required this.onTap});
+  const _VerifikasiListRow({
+    required this.item,
+    required this.jenisBadgeColor,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -239,6 +188,28 @@ class _VerifikasiListRow extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
         child: Row(
           children: [
+            SizedBox(
+              width: 76,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: jenisBadgeColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  item.jenisLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: jenisBadgeColor,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
             Expanded(
               flex: 4,
               child: Text(
@@ -275,6 +246,60 @@ class _VerifikasiListRow extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             const Icon(Icons.chevron_right, size: 16, color: kVerifikasiMuted),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Chip filter jenis produksi — opsional, bukan navigasi wajib. Tap ulang
+/// pada chip yang sedang terpilih untuk kembali ke "Semua".
+class _JenisChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _JenisChip({
+    required this.label,
+    required this.selected,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected ? color.withValues(alpha: 0.1) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? color : kVerifikasiBorder,
+            width: selected ? 1.2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: selected ? color : kVerifikasiMuted,
+              ),
+            ),
           ],
         ),
       ),

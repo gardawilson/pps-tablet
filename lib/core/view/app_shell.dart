@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:pps_tablet/core/models/notification_item.dart';
 import 'package:pps_tablet/core/services/permission_storage.dart';
 import 'package:pps_tablet/core/services/token_storage.dart';
 import 'package:pps_tablet/core/services/user_session_storage.dart';
 import 'package:pps_tablet/core/view_model/label_print_lock_socket_manager.dart';
+import 'package:pps_tablet/core/view/widgets/notification_toast_layer.dart';
+import 'package:pps_tablet/core/view_model/notification_center.dart';
 import 'package:pps_tablet/core/view_model/permission_view_model.dart';
 import 'package:pps_tablet/features/audit/view/audit_screen.dart';
 import 'package:pps_tablet/features/bj_jual/view/bj_jual_screen.dart';
@@ -163,6 +167,15 @@ class _AppShellState extends State<AppShell> {
                       setState(() => _sidebarCollapsed = !_sidebarCollapsed),
                 ),
               ),
+              // ── Notif-bar push-style: nempel paling atas di Stack ini
+              // supaya muncul di atas sidebar & konten apa pun yang lagi
+              // dibuka.
+              NotificationToastLayer(
+                onTapItem: (item) {
+                  AppShell.shellNavigatorKey.currentState
+                      ?.pushNamedAndRemoveUntil(item.route, (r) => false);
+                },
+              ),
             ],
           ),
         ),
@@ -211,10 +224,192 @@ class _AppShellState extends State<AppShell> {
             ),
           ),
 
+          _buildNotificationBell(context),
+          const SizedBox(width: 12),
           _buildUserChip(context, username),
         ],
       ),
     );
+  }
+
+  /// Bell notifikasi generik — badge & isinya bersumber dari
+  /// [NotificationCenter], titik agregasi tunggal yang menampung notifikasi
+  /// dari sumber mana pun (saat ini baru verifikasi produksi lewat
+  /// `VerifikasiNotificationManager`, tapi bell ini tidak tahu & tidak
+  /// peduli dari domain mana notifikasinya berasal — sumber baru tinggal
+  /// upsert ke [NotificationCenter], bell otomatis ikut menampilkannya).
+  /// Tap bell membuka dropdown daftar notifikasi; tap satu notifikasi
+  /// membuka route yang menempel di notifikasi itu (`item.route`).
+  Widget _buildNotificationBell(BuildContext context) {
+    return Consumer<NotificationCenter>(
+      builder: (context, center, _) {
+        final items = center.items;
+        final count = items.length;
+        return PopupMenuButton<NotificationItem>(
+          tooltip: 'Notifikasi',
+          offset: const Offset(0, 44),
+          color: Colors.white,
+          elevation: 10,
+          shadowColor: Colors.black.withValues(alpha: 0.18),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: const BorderSide(color: Color(0xFFE2E8F0), width: 0.8),
+          ),
+          onSelected: (item) {
+            AppShell.shellNavigatorKey.currentState
+                ?.pushNamedAndRemoveUntil(item.route, (r) => false);
+          },
+          itemBuilder: (_) => _buildNotificationMenuEntries(items),
+          child: Padding(
+            padding: const EdgeInsets.all(6),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(
+                  Icons.notifications_outlined,
+                  color: Color(0xFF64748B),
+                  size: 22,
+                ),
+                if (count > 0)
+                  Positioned(
+                    right: -4,
+                    top: -4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 1,
+                      ),
+                      constraints: const BoxConstraints(minWidth: 16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDC2626),
+                        borderRadius: BorderRadius.circular(9),
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: Text(
+                        count > 99 ? '99+' : '$count',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  List<PopupMenuEntry<NotificationItem>> _buildNotificationMenuEntries(
+    List<NotificationItem> items,
+  ) {
+    final header = PopupMenuItem<NotificationItem>(
+      enabled: false,
+      height: 40,
+      child: Text(
+        items.isEmpty ? 'Notifikasi' : 'Notifikasi (${items.length})',
+        style: const TextStyle(
+          color: Color(0xFF1E293B),
+          fontSize: 13,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+
+    if (items.isEmpty) {
+      return [
+        header,
+        const PopupMenuDivider(height: 1),
+        const PopupMenuItem<NotificationItem>(
+          enabled: false,
+          height: 56,
+          child: Text(
+            'Tidak ada notifikasi baru',
+            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12.5),
+          ),
+        ),
+      ];
+    }
+
+    return [
+      header,
+      const PopupMenuDivider(height: 1),
+      for (final item in items.take(20))
+        PopupMenuItem<NotificationItem>(
+          value: item,
+          height: 60,
+          child: SizedBox(
+            width: 300,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  margin: const EdgeInsets.only(top: 2),
+                  decoration: BoxDecoration(
+                    color: item.color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(item.icon, color: item.color, size: 16),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        item.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF1E293B),
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        item.subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (item.time != null) ...[
+                  const SizedBox(width: 6),
+                  Text(
+                    _relativeTime(item.time!),
+                    style: const TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+    ];
+  }
+
+  String _relativeTime(DateTime time) {
+    final diff = DateTime.now().difference(time);
+    if (diff.inMinutes < 1) return 'baru saja';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m';
+    if (diff.inHours < 24) return '${diff.inHours}j';
+    if (diff.inDays < 7) return '${diff.inDays}h';
+    return DateFormat('dd MMM', 'id_ID').format(time.toLocal());
   }
 
   Widget _buildUserChip(BuildContext context, String username) {

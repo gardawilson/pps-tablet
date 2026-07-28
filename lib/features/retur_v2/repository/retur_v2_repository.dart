@@ -1,5 +1,4 @@
 import '../../../core/network/api_client.dart';
-import '../../../core/utils/date_formatter.dart';
 import '../model/retur_v2_pending_import.dart';
 import '../model/retur_v2_transaction.dart';
 
@@ -38,17 +37,32 @@ class ReturV2Repository {
     };
   }
 
-  Future<List<ReturV2PendingImport>> fetchPendingImport(DateTime date) async {
-    final dateDb = toDbDateString(date);
+  Future<Map<String, dynamic>> fetchPendingImport({
+    required int page,
+    int pageSize = 20,
+  }) async {
     final body = await _api.getJson(
-      '/api/production/return/import-as-gsu/$dateDb',
+      '/api/production/return/import-as-gsu-after',
+      query: {'page': page, 'pageSize': pageSize},
     );
     final dataList = (body['data'] ?? []) as List;
-    return dataList
+    final items = dataList
         .map(
-          (e) =>
-              ReturV2PendingImport.fromJson(Map<String, dynamic>.from(e as Map)),
+          (e) => ReturV2PendingImportGroup.fromJson(
+            Map<String, dynamic>.from(e as Map),
+          ),
         )
         .toList();
+
+    final meta = (body['meta'] ?? {}) as Map<String, dynamic>;
+    final totalPages = int.tryParse('${meta['totalPages'] ?? 1}') ?? 1;
+    final totalData = int.tryParse('${body['totalData'] ?? 0}') ?? 0;
+
+    return {
+      'items': items,
+      'page': page,
+      'totalPages': totalPages,
+      'total': totalData,
+    };
   }
 }

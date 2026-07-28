@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 import 'package:provider/provider.dart';
 
 import '../../../common/widgets/atlas_data_table.dart';
@@ -26,9 +26,7 @@ class ReturV2Screen extends StatefulWidget {
   State<ReturV2Screen> createState() => _ReturV2ScreenState();
 }
 
-class _ReturV2ScreenState extends State<ReturV2Screen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
+class _ReturV2ScreenState extends State<ReturV2Screen> {
   late final ReturV2Repository _repository;
   late final ReturV2ListViewModel _listVm;
   late final ReturV2PendingViewModel _pendingVm;
@@ -37,20 +35,29 @@ class _ReturV2ScreenState extends State<ReturV2Screen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     _repository = ReturV2Repository();
     _listVm = ReturV2ListViewModel(repository: _repository);
     _pendingVm = ReturV2PendingViewModel(repository: _repository);
     _listVm.refresh();
+    _pendingVm.refresh();
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
     _searchCtl.dispose();
     _listVm.dispose();
     _pendingVm.dispose();
     super.dispose();
+  }
+
+  void _openPendingImportDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => ChangeNotifierProvider<ReturV2PendingViewModel>.value(
+        value: _pendingVm,
+        child: const _PendingImportDialog(),
+      ),
+    );
   }
 
   @override
@@ -64,60 +71,75 @@ class _ReturV2ScreenState extends State<ReturV2Screen>
       ],
       child: Scaffold(
         backgroundColor: _kSurface,
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          foregroundColor: const Color(0xFF1A1D23),
-          elevation: 0,
-          title: const Text(
-            'Retur V2',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-          ),
-          bottom: TabBar(
-            controller: _tabController,
-            labelColor: _kPrimary,
-            unselectedLabelColor: Colors.grey.shade600,
-            indicatorColor: _kPrimary,
-            labelStyle: const TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-            ),
-            tabs: const [
-              Tab(text: 'List Retur'),
-              Tab(text: 'Pending Import'),
-            ],
-          ),
-        ),
-        body: TabBarView(
-          controller: _tabController,
-          children: [
-            _ReturListTab(searchCtl: _searchCtl),
-            const _PendingImportTab(),
-          ],
+        body: _ReturListTab(
+          searchCtl: _searchCtl,
+          onImportTap: _openPendingImportDialog,
         ),
       ),
     );
   }
 }
 
-// ─── Tab 1: List Retur ──────────────────────────────────────────────────────
+// ─── Import Button ──────────────────────────────────────────────────────────
+
+class _ImportButton extends StatelessWidget {
+  final int count;
+  final VoidCallback onTap;
+
+  const _ImportButton({required this.count, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Badge(
+      isLabelVisible: count > 0,
+      label: Text('$count'),
+      backgroundColor: Colors.red.shade600,
+      child: FilledButton.icon(
+        onPressed: onTap,
+        style: FilledButton.styleFrom(backgroundColor: _kPrimary),
+        icon: const Icon(Icons.download_rounded, size: 18),
+        label: const Text('Import'),
+      ),
+    );
+  }
+}
+
+// ─── List Retur ──────────────────────────────────────────────────────────────
 
 class _ReturListTab extends StatelessWidget {
   final TextEditingController searchCtl;
+  final VoidCallback onImportTap;
 
-  const _ReturListTab({required this.searchCtl});
+  const _ReturListTab({required this.searchCtl, required this.onImportTap});
 
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<ReturV2ListViewModel>();
     return Column(
       children: [
-        _SearchBar(
-          controller: searchCtl,
-          onChanged: vm.setSearchDebounced,
-          onClear: () {
-            searchCtl.clear();
-            vm.clearSearch();
-          },
+        Row(
+          children: [
+            Expanded(
+              child: _SearchBar(
+                controller: searchCtl,
+                onChanged: vm.setSearchDebounced,
+                onClear: () {
+                  searchCtl.clear();
+                  vm.clearSearch();
+                },
+              ),
+            ),
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(0, 10, 16, 10),
+              child: Consumer<ReturV2PendingViewModel>(
+                builder: (context, pendingVm, _) => _ImportButton(
+                  count: pendingVm.totalItems,
+                  onTap: onImportTap,
+                ),
+              ),
+            ),
+          ],
         ),
         Expanded(
           child: Padding(
@@ -224,194 +246,236 @@ class _ReturListTab extends StatelessWidget {
   }
 }
 
-// ─── Tab 2: Pending Import ──────────────────────────────────────────────────
+// ─── Pending Import Dialog ───────────────────────────────────────────────────
 
-class _PendingImportTab extends StatefulWidget {
-  const _PendingImportTab();
-
-  @override
-  State<_PendingImportTab> createState() => _PendingImportTabState();
-}
-
-class _PendingImportTabState extends State<_PendingImportTab> {
-  final _dateFormat = DateFormat('dd MMM yyyy', 'id_ID');
-
-  Future<void> _pickDate(BuildContext context) async {
-    final vm = context.read<ReturV2PendingViewModel>();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: vm.date,
-      firstDate: DateTime(2020, 1, 1),
-      lastDate: DateTime.now().add(const Duration(days: 1)),
-      helpText: 'Pilih tanggal',
-      builder: (ctx, child) => Localizations.override(
-        context: ctx,
-        locale: const Locale('id', 'ID'),
-        child: child,
-      ),
-    );
-    if (picked != null) {
-      await vm.setDateAndFetch(picked);
-    }
-  }
+class _PendingImportDialog extends StatelessWidget {
+  const _PendingImportDialog();
 
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<ReturV2PendingViewModel>();
-    return Column(
-      children: [
-        Container(
-          color: Colors.white,
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-          child: Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: () => _pickDate(context),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 11,
+    final size = MediaQuery.of(context).size;
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: SizedBox(
+        width: size.width * 0.85,
+        height: size.height * 0.85,
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
+              decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(color: _kBorder)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.download_rounded,
+                    size: 20,
+                    color: _kPrimary,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Pending Import (${vm.totalItems} item)',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1A1D23),
+                      ),
                     ),
-                    decoration: BoxDecoration(
-                      color: _kSurface,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: _kBorder),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: _PendingImportList(
+                  pagingController: vm.pagingController,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PendingImportList extends StatelessWidget {
+  final PagingController<int, ReturV2PendingImportGroup> pagingController;
+
+  const _PendingImportList({required this.pagingController});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _kBorder),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: PagingListener<int, ReturV2PendingImportGroup>(
+        controller: pagingController,
+        builder: (context, state, fetchNextPage) {
+          return RefreshIndicator(
+            onRefresh: () async => pagingController.refresh(),
+            child: PagedListView<int, ReturV2PendingImportGroup>(
+              state: state,
+              fetchNextPage: fetchNextPage,
+              padding: EdgeInsets.zero,
+              builderDelegate:
+                  PagedChildBuilderDelegate<ReturV2PendingImportGroup>(
+                    itemBuilder: (context, group, index) =>
+                        _InvoiceGroupTile(group: group),
+                    firstPageProgressIndicatorBuilder: (_) => const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: CircularProgressIndicator(),
+                      ),
                     ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.calendar_today_rounded,
-                          size: 16,
-                          color: Colors.grey.shade500,
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          _dateFormat.format(vm.date),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1A1D23),
-                          ),
-                        ),
-                        const Spacer(),
-                        Icon(
-                          Icons.arrow_drop_down_rounded,
-                          color: Colors.grey.shade500,
-                        ),
-                      ],
+                    newPageProgressIndicatorBuilder: (_) => const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Center(child: CircularProgressIndicator()),
                     ),
+                    firstPageErrorIndicatorBuilder: (_) => const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text('Terjadi kesalahan memuat data.'),
+                      ),
+                    ),
+                    newPageErrorIndicatorBuilder: (_) => const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Center(
+                        child: Text('Gagal memuat halaman berikutnya'),
+                      ),
+                    ),
+                    noItemsFoundIndicatorBuilder: (_) => const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text('Tidak ada data pending import.'),
+                      ),
+                    ),
+                  ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _InvoiceGroupTile extends StatelessWidget {
+  final ReturV2PendingImportGroup group;
+
+  const _InvoiceGroupTile({required this.group});
+
+  @override
+  Widget build(BuildContext context) {
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        childrenPadding: EdgeInsets.zero,
+        shape: const Border(bottom: BorderSide(color: Color(0xFFEBECF0))),
+        title: Row(
+          children: [
+            Text(
+              group.invoiceNumber,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1A1D23),
+              ),
+            ),
+            if (group.invoiceType != null) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: _kPrimary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  group.invoiceType!,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: _kPrimary,
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
-              FilledButton.icon(
-                onPressed: vm.loading ? null : () => vm.fetch(),
-                style: FilledButton.styleFrom(backgroundColor: _kPrimary),
-                icon: const Icon(Icons.search_rounded, size: 18),
-                label: const Text('Cari'),
-              ),
             ],
-          ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                group.customerName ?? '-',
+                style: const TextStyle(fontSize: 13, color: Color(0xFF374151)),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Text(
+              '${group.items.length} item · qty ${group.totalQuantity}',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+            ),
+          ],
         ),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: _buildBody(vm),
-          ),
-        ),
-      ],
+        children: [for (final item in group.items) _InvoiceItemRow(item: item)],
+      ),
     );
   }
+}
 
-  Widget _buildBody(ReturV2PendingViewModel vm) {
-    if (!vm.hasFetched && !vm.loading) {
-      return Center(
-        child: Text(
-          'Pilih tanggal lalu tekan "Cari" untuk melihat data pending import dari ERP Ascend.',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
-        ),
-      );
-    }
-    if (vm.error != null && vm.items.isEmpty) {
-      return Center(
-        child: Text(
-          'Gagal memuat data: ${vm.error}',
-          style: TextStyle(fontSize: 13, color: Colors.red.shade600),
-        ),
-      );
-    }
-    return AtlasDataTable<ReturV2PendingImport>(
-      columns: _columns(),
-      items: vm.items,
-      isLoading: vm.loading,
-      errorMessage: vm.error ?? '',
-    );
-  }
+class _InvoiceItemRow extends StatelessWidget {
+  final ReturV2PendingImportItem item;
 
-  List<AtlasTableColumn<ReturV2PendingImport>> _columns() {
-    return [
-      AtlasTableColumn<ReturV2PendingImport>(
-        title: 'INVOICE',
-        width: 130,
-        cellBuilder: (ctx, item, state) => Text(
-          item.invoiceNumber,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF1A1D23),
+  const _InvoiceItemRow({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFFFAFBFC),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 4,
+            child: Text(
+              item.itemName,
+              style: const TextStyle(fontSize: 13, color: Color(0xFF374151)),
+            ),
           ),
-        ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              item.itemCode ?? '-',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              item.stockCategoryName ?? '-',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF4B5563)),
+            ),
+          ),
+          SizedBox(
+            width: 60,
+            child: Text(
+              '${item.quantity}',
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
       ),
-      AtlasTableColumn<ReturV2PendingImport>(
-        title: 'ITEM',
-        width: 320,
-        cellBuilder: (ctx, item, state) => Text(
-          item.itemName,
-          style: const TextStyle(fontSize: 13, color: Color(0xFF374151)),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
-      AtlasTableColumn<ReturV2PendingImport>(
-        title: 'KODE BARANG',
-        width: 160,
-        cellBuilder: (ctx, item, state) => Text(
-          item.itemCode ?? '-',
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-        ),
-      ),
-      AtlasTableColumn<ReturV2PendingImport>(
-        title: 'KATEGORI',
-        width: 170,
-        cellBuilder: (ctx, item, state) => Text(
-          item.stockCategoryName ?? '-',
-          style: const TextStyle(fontSize: 12, color: Color(0xFF4B5563)),
-        ),
-      ),
-      AtlasTableColumn<ReturV2PendingImport>(
-        title: 'CUSTOMER',
-        width: 200,
-        cellBuilder: (ctx, item, state) => Text(
-          item.customerName ?? '-',
-          style: const TextStyle(fontSize: 13, color: Color(0xFF374151)),
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
-      AtlasTableColumn<ReturV2PendingImport>(
-        title: 'QTY',
-        width: 80,
-        headerAlign: TextAlign.center,
-        cellAlignment: Alignment.center,
-        showDivider: false,
-        cellBuilder: (ctx, item, state) => Text(
-          '${item.quantity}',
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-        ),
-      ),
-    ];
+    );
   }
 }
 

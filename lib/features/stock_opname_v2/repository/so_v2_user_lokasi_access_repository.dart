@@ -22,10 +22,16 @@ class SoV2UserLokasiAccessRepository {
     required String blok,
     required int idLokasi,
     required int idUsername,
+    required String stockOpnameNo,
   }) async {
     await _api.postJson(
       '/api/stock-opname-v2/lokasi-access',
-      body: {'blok': blok, 'idLokasi': idLokasi, 'idUsername': idUsername},
+      body: {
+        'blok': blok,
+        'idLokasi': idLokasi,
+        'idUsername': idUsername,
+        'stockOpnameNo': stockOpnameNo,
+      },
     );
   }
 
@@ -33,9 +39,10 @@ class SoV2UserLokasiAccessRepository {
     required String blok,
     required int idLokasi,
     required int idUsername,
+    required String stockOpnameNo,
   }) async {
     await _api.deleteJson(
-      '/api/user-lokasi-access/$blok/$idLokasi/$idUsername',
+      '/api/stock-opname-v2/lokasi-access/$stockOpnameNo/$blok/$idLokasi/$idUsername',
     );
   }
 }

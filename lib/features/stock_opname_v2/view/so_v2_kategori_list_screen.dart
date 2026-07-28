@@ -6,6 +6,7 @@ import '../../../common/widgets/loading_dialog.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../model/so_v2_kategori.dart';
 import '../view_model/so_v2_kategori_list_view_model.dart';
+import '../widgets/so_v2_generate_preview_dialog.dart';
 import '../widgets/so_v2_period_picker_dialog.dart';
 import 'so_v2_detail_screen.dart';
 
@@ -69,7 +70,11 @@ class _SoV2KategoriListScreenState extends State<SoV2KategoriListScreen> {
         categoryId: kategori.categoryId,
       );
       if (!mounted) return;
-      Navigator.pop(context); // close loading
+      // showDialog default-nya push ke root Navigator (useRootNavigator:
+      // true), sementara layar ini sendiri hidup di nested shell Navigator
+      // milik AppShell — Navigator.pop(context) polos bakal salah sasaran
+      // (nge-pop shell Navigator, bukan dialog loading-nya).
+      Navigator.of(context, rootNavigator: true).pop(); // close loading
       if (preview.errorMessage != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -80,15 +85,9 @@ class _SoV2KategoriListScreenState extends State<SoV2KategoriListScreen> {
         return;
       }
 
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (_) => ConfirmDialog(
-          title: 'Generate Stock Opname',
-          message: preview.message!,
-          confirmLabel: 'Generate',
-          confirmIcon: Icons.playlist_add_check_rounded,
-          confirmColor: const Color(0xFF1E6FD9),
-        ),
+      final confirmed = await showSoV2GeneratePreviewDialog(
+        context,
+        preview: preview.preview!,
       );
       if (confirmed != true) return;
 

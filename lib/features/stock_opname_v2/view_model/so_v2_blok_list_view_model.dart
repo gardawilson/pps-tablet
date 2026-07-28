@@ -17,12 +17,20 @@ class SoV2BlokListViewModel extends ChangeNotifier {
   bool isLoading = false;
   String? error;
 
+  /// Status selesai di level stock opname (bukan per-blok) — dari
+  /// `GET .../blok` yang sekarang membawa field ini juga.
+  bool isComplete = false;
+  DateTime? completedAt;
+
   Future<void> load() async {
     isLoading = true;
     error = null;
     notifyListeners();
     try {
-      items = await repository.fetchBlok(stockOpnameNo: stockOpnameNo);
+      final page = await repository.fetchBlok(stockOpnameNo: stockOpnameNo);
+      items = page.data;
+      isComplete = page.isComplete;
+      completedAt = page.completedAt;
     } catch (e) {
       error = apiErrorMessage(e);
     } finally {

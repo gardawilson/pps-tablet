@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_error.dart';
+import '../model/so_v2_generate_preview.dart';
 import '../model/so_v2_kategori.dart';
 import '../repository/so_v2_repository.dart';
 
@@ -49,17 +50,16 @@ class SoV2KategoriListViewModel extends ChangeNotifier {
     }
   }
 
-  /// Return preview message on success, or an error message string.
-  Future<({String? message, String? errorMessage})> previewGenerate({
-    required int categoryId,
-  }) async {
+  /// Return preview breakdown on success, or an error message string.
+  Future<({SoV2GeneratePreview? preview, String? errorMessage})>
+      previewGenerate({required int categoryId}) async {
     try {
-      final preview = await repository.previewGenerate(categoryId: categoryId);
-      return (message: preview.message, errorMessage: null);
+      final res = await repository.previewGenerate(categoryId: categoryId);
+      return (preview: res.preview, errorMessage: null);
     } on ApiException catch (e) {
-      return (message: null, errorMessage: apiErrorMessage(e));
+      return (preview: null, errorMessage: apiErrorMessage(e));
     } catch (e) {
-      return (message: null, errorMessage: e.toString());
+      return (preview: null, errorMessage: e.toString());
     }
   }
 

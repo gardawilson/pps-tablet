@@ -9,6 +9,15 @@ import 'counter_picker_dialog.dart';
 
 const _accent = Color(0xFF0277BD);
 const _green = Color(0xFF15803D);
+const _downtimeColor = Color(0xFFB45309);
+
+// Jeda setelah jam akhir bucket sebelum QC bisa diinput (mis. range
+// 07:00-08:00 langsung bisa diinput mulai jam 08:00, begitu jamnya
+// berakhir). Window bucket berikutnya selalu dimulai tepat saat window
+// bucket ini tertutup, jadi tidak pernah ada 2 hour range yang available
+// bersamaan — sama seperti layar input produksi
+// (inject_production_input_screen_v3.dart).
+const _kQcInputOpenDelay = Duration.zero;
 
 class InjectQcDialog extends StatefulWidget {
   const InjectQcDialog({
@@ -44,6 +53,8 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
   List<String> _bucketLabels = [];
   final Map<String, DateTime> _bucketStartTimes = {};
   final Map<String, DateTime> _bucketEndTimes = {};
+  // Waktu window QC bucket ini terbuka (endDt + _kQcInputOpenDelay).
+  final Map<String, DateTime> _bucketOpensAt = {};
   final Map<String, InjectQcItem?> _submitted = {};
   bool _isLoadingHistory = true;
   int? _counterCurrent;
@@ -59,7 +70,8 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
     );
     _populateBucketTimes(widget.hourStart, widget.tglProduksi);
     _loadHistory();
-    _statusTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+    // Tick tiap detik supaya countdown buka/tutup window responsif (mm:ss).
+    _statusTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
   }
@@ -127,32 +139,52 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
       final s = _parseMinutes(parts[0].trim());
       final e = _parseMinutes(parts[1].trim());
       if (s == null || e == null) continue;
-      final sOffset = s - startMin;
-      final eOffset = e > s ? e - startMin : e - startMin + 24 * 60;
+
+      // Jam setelah tengah malam harus ditempatkan pada hari berikutnya.
+      // Contoh shift 23:00-07:00:
+      // 00:00 => offset 60 menit, bukan -1380 menit (hari sebelumnya).
+      var sOffset = s - startMin;
+      if (sOffset < 0) sOffset += 24 * 60;
+      var eOffset = e - startMin;
+      if (eOffset <= sOffset) eOffset += 24 * 60;
+
       _bucketStartTimes[label] = startDt.add(Duration(minutes: sOffset));
-      _bucketEndTimes[label] = startDt.add(Duration(minutes: eOffset));
+      final endDt = startDt.add(Duration(minutes: eOffset));
+      _bucketEndTimes[label] = endDt;
+      _bucketOpensAt[label] = endDt.add(_kQcInputOpenDelay);
     }
+  }
+
+  // Waktu window bucket ini tertutup = waktu window bucket berikutnya
+  // terbuka. Bucket terakhir tidak pernah tertutup otomatis (null).
+  DateTime? _closesAtFor(String label) {
+    final idx = _bucketLabels.indexOf(label);
+    if (idx == -1 || idx + 1 >= _bucketLabels.length) return null;
+    return _bucketOpensAt[_bucketLabels[idx + 1]];
+  }
+
+  bool _isWithinInputWindow(String label) {
+    final opensAt = _bucketOpensAt[label];
+    if (opensAt == null) return false;
+    final now = DateTime.now();
+    if (now.isBefore(opensAt)) return false;
+    final closesAt = _closesAtFor(label);
+    if (closesAt != null && !now.isBefore(closesAt)) return false;
+    return true;
   }
 
   _QcBucketStatus _statusFor(String label) {
     if (_submitted[label] != null) return _QcBucketStatus.submitted;
-    final startDt = _bucketStartTimes[label];
-    final endDt = _bucketEndTimes[label];
-    if (startDt == null || endDt == null) return _QcBucketStatus.locked;
+    final opensAt = _bucketOpensAt[label];
+    if (opensAt == null) return _QcBucketStatus.locked;
+    if (_isWithinInputWindow(label)) return _QcBucketStatus.available;
     final now = DateTime.now();
-    if (now.isBefore(startDt)) return _QcBucketStatus.locked;
-    if (!now.isBefore(endDt)) return _QcBucketStatus.expired;
-    return _QcBucketStatus.available;
+    if (now.isBefore(opensAt)) return _QcBucketStatus.locked;
+    return _QcBucketStatus.expired;
   }
 
-  // Edit hanya boleh selama waktu sekarang masih di dalam rentang bucket
-  bool _canEditBucket(String label) {
-    final startDt = _bucketStartTimes[label];
-    final endDt = _bucketEndTimes[label];
-    if (startDt == null || endDt == null) return false;
-    final now = DateTime.now();
-    return !now.isBefore(startDt) && now.isBefore(endDt);
-  }
+  // Edit hanya boleh selama window input bucket ini masih terbuka.
+  bool _canEditBucket(String label) => _isWithinInputWindow(label);
 
   Future<void> _loadHistory() async {
     setState(() => _isLoadingHistory = true);
@@ -232,6 +264,8 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
                           status: _statusFor(label),
                           canEdit: _canEditBucket(label),
                           counterCurrent: _counterCurrent,
+                          windowOpensAt: _bucketOpensAt[label],
+                          windowClosesAt: _closesAtFor(label),
                           onSubmitted: (item) => _onSubmitted(label, item),
                         );
                       },
@@ -430,6 +464,8 @@ class _QcBucketRow extends StatefulWidget {
     required this.onSubmitted,
     this.submittedItem,
     this.counterCurrent,
+    this.windowOpensAt,
+    this.windowClosesAt,
   });
 
   final String label;
@@ -439,6 +475,10 @@ class _QcBucketRow extends StatefulWidget {
   final bool canEdit;
   final InjectQcItem? submittedItem;
   final int? counterCurrent;
+  // Waktu window bucket ini terbuka — dipakai untuk countdown saat locked.
+  final DateTime? windowOpensAt;
+  // Waktu window bucket ini tertutup — dipakai untuk countdown saat available.
+  final DateTime? windowClosesAt;
   final ValueChanged<InjectQcItem> onSubmitted;
 
   @override
@@ -450,9 +490,11 @@ class _QcBucketRowState extends State<_QcBucketRow> {
   final _jumlahBsCtrl = TextEditingController();
   final _beratCtrl = TextEditingController();
   final _cycleCtrl = TextEditingController();
+  final _keteranganCtrl = TextEditingController();
   int _counterValue = 0;
   bool _isSubmitting = false;
   bool _isEditing = false;
+  bool _isDowntime = false;
   String? _error;
 
   @override
@@ -467,6 +509,7 @@ class _QcBucketRowState extends State<_QcBucketRow> {
     _jumlahBsCtrl.dispose();
     _beratCtrl.dispose();
     _cycleCtrl.dispose();
+    _keteranganCtrl.dispose();
     super.dispose();
   }
 
@@ -475,40 +518,63 @@ class _QcBucketRowState extends State<_QcBucketRow> {
     _beratCtrl.text = item.berat?.toString() ?? '';
     _cycleCtrl.text = item.cycleTime?.toString() ?? '';
     _counterValue = item.counter ?? 0;
+    _keteranganCtrl.text = item.keterangan ?? '';
     setState(() {
       _isEditing = true;
+      _isDowntime = item.isDowntime;
       _error = null;
     });
   }
 
-  Future<void> _submit() async {
-    final jumlahBsText = _jumlahBsCtrl.text.trim();
-    final jumlahBS = jumlahBsText.isEmpty ? 0 : int.tryParse(jumlahBsText);
-    if (jumlahBS == null || jumlahBS < 0) {
-      setState(() => _error = 'Jumlah BS tidak valid');
-      return;
+  Map<String, dynamic>? _buildDowntimePayload() {
+    final keterangan = _keteranganCtrl.text.trim();
+    if (keterangan.isEmpty) {
+      setState(() => _error = 'Keterangan wajib diisi untuk downtime');
+      return null;
     }
-    final minCounter = widget.counterCurrent;
-    if (minCounter != null && _counterValue < minCounter) {
-      setState(() => _error = 'Counter minimal $minCounter');
-      return;
+    return <String, dynamic>{
+      'noProduksi': widget.noProduksi,
+      'hourStart': widget.hourStart,
+      'isDowntime': true,
+      'keterangan': keterangan,
+    };
+  }
+
+  Future<void> _submit() async {
+    final Map<String, dynamic> payload;
+    if (_isDowntime) {
+      final downtimePayload = _buildDowntimePayload();
+      if (downtimePayload == null) return;
+      payload = downtimePayload;
+    } else {
+      final jumlahBsText = _jumlahBsCtrl.text.trim();
+      final jumlahBS = jumlahBsText.isEmpty ? 0 : int.tryParse(jumlahBsText);
+      if (jumlahBS == null || jumlahBS < 0) {
+        setState(() => _error = 'Jumlah BS tidak valid');
+        return;
+      }
+      final minCounter = widget.counterCurrent;
+      if (minCounter != null && _counterValue < minCounter) {
+        setState(() => _error = 'Counter minimal $minCounter');
+        return;
+      }
+      payload = <String, dynamic>{
+        'noProduksi': widget.noProduksi,
+        'hourStart': widget.hourStart,
+        'jumlahBS': jumlahBS,
+        'counter': _counterValue,
+        'isDowntime': false,
+      };
+      final berat = double.tryParse(_beratCtrl.text.replaceAll(',', '.'));
+      final cycle = double.tryParse(_cycleCtrl.text.replaceAll(',', '.'));
+      if (berat != null) payload['berat'] = berat;
+      if (cycle != null) payload['cycleTime'] = cycle;
     }
     setState(() {
       _isSubmitting = true;
       _error = null;
     });
     try {
-      final payload = <String, dynamic>{
-        'noProduksi': widget.noProduksi,
-        'hourStart': widget.hourStart,
-        'jumlahBS': jumlahBS,
-        'counter': _counterValue,
-      };
-      final berat = double.tryParse(_beratCtrl.text.replaceAll(',', '.'));
-      final cycle = double.tryParse(_cycleCtrl.text.replaceAll(',', '.'));
-      if (berat != null) payload['berat'] = berat;
-      if (cycle != null) payload['cycleTime'] = cycle;
-
       final result = await _repo.submitQc(payload);
       if (!mounted) return;
       widget.onSubmitted(result);
@@ -522,33 +588,44 @@ class _QcBucketRowState extends State<_QcBucketRow> {
   }
 
   Future<void> _submitEdit(int id) async {
-    final jumlahBsText = _jumlahBsCtrl.text.trim();
-    final jumlahBS = jumlahBsText.isEmpty ? 0 : int.tryParse(jumlahBsText);
-    if (jumlahBS == null || jumlahBS < 0) {
-      setState(() => _error = 'Jumlah BS tidak valid');
-      return;
+    final Map<String, dynamic> payload;
+    if (_isDowntime) {
+      final downtimePayload = _buildDowntimePayload();
+      if (downtimePayload == null) return;
+      payload = downtimePayload;
+    } else {
+      final jumlahBsText = _jumlahBsCtrl.text.trim();
+      final jumlahBS = jumlahBsText.isEmpty ? 0 : int.tryParse(jumlahBsText);
+      if (jumlahBS == null || jumlahBS < 0) {
+        setState(() => _error = 'Jumlah BS tidak valid');
+        return;
+      }
+      payload = <String, dynamic>{
+        'noProduksi': widget.noProduksi,
+        'hourStart': widget.hourStart,
+        'jumlahBS': jumlahBS,
+        'counter': _counterValue,
+        'isDowntime': false,
+        'keterangan': null,
+      };
+      final berat = double.tryParse(_beratCtrl.text.replaceAll(',', '.'));
+      final cycle = double.tryParse(_cycleCtrl.text.replaceAll(',', '.'));
+      payload['berat'] = berat;
+      payload['cycleTime'] = cycle;
     }
     setState(() {
       _isSubmitting = true;
       _error = null;
     });
     try {
-      final payload = <String, dynamic>{
-        'jumlahBS': jumlahBS,
-        'counter': _counterValue,
-      };
-      final berat = double.tryParse(_beratCtrl.text.replaceAll(',', '.'));
-      final cycle = double.tryParse(_cycleCtrl.text.replaceAll(',', '.'));
-      if (berat != null) payload['berat'] = berat;
-      if (cycle != null) payload['cycleTime'] = cycle;
-
       final result = await _repo.updateQc(id, payload);
       if (!mounted) return;
       setState(() => _isEditing = false);
       widget.onSubmitted(result);
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -559,6 +636,7 @@ class _QcBucketRowState extends State<_QcBucketRow> {
     final submitted = widget.submittedItem;
     final status = widget.status;
     final isSubmitted = status == _QcBucketStatus.submitted;
+    final isSubmittedDowntime = isSubmitted && submitted?.isDowntime == true;
     final isExpired = status == _QcBucketStatus.expired;
     final isLocked = status == _QcBucketStatus.locked;
 
@@ -566,7 +644,11 @@ class _QcBucketRowState extends State<_QcBucketRow> {
     final Color bgColor;
     final Color borderColor;
     final Color labelColor;
-    if (isSubmitted) {
+    if (isSubmittedDowntime) {
+      bgColor = const Color(0xFFFFFBEB);
+      borderColor = _downtimeColor.withValues(alpha: 0.30);
+      labelColor = _downtimeColor;
+    } else if (isSubmitted) {
       bgColor = const Color(0xFFF0FDF4);
       borderColor = _green.withValues(alpha: 0.30);
       labelColor = _green;
@@ -586,7 +668,13 @@ class _QcBucketRowState extends State<_QcBucketRow> {
 
     // Badge status ditaruh sebaris dengan label jam (bukan bertumpuk).
     Widget? statusBadge;
-    if (isSubmitted) {
+    if (isSubmittedDowntime) {
+      statusBadge = _statusChip(
+        Icons.playlist_remove_rounded,
+        'Downtime',
+        _downtimeColor,
+      );
+    } else if (isSubmitted) {
       statusBadge = _statusChip(
         Icons.check_circle_outline,
         'Tersimpan',
@@ -647,9 +735,10 @@ class _QcBucketRowState extends State<_QcBucketRow> {
                   )
                 : const SizedBox(width: 52)
           else if (isSubmitted && _isEditing)
-            // Cancel + Save (edit mode)
+            // Downtime + Simpan sejajar; Batal tetap terpisah di mode edit.
             Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 _actionBtn(
                   icon: Icons.close,
@@ -663,25 +752,39 @@ class _QcBucketRowState extends State<_QcBucketRow> {
                         }),
                 ),
                 const SizedBox(height: 4),
-                _actionBtn(
-                  icon: Icons.save_outlined,
-                  label: 'Simpan',
-                  color: _green,
-                  onTap: _isSubmitting
-                      ? null
-                      : () => _submitEdit(submitted!.id),
-                  isLoading: _isSubmitting,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildDowntimeAction(),
+                    const SizedBox(width: 5),
+                    _actionBtn(
+                      icon: Icons.save_outlined,
+                      label: 'Simpan',
+                      color: _green,
+                      onTap: _isSubmitting
+                          ? null
+                          : () => _submitEdit(submitted!.id),
+                      isLoading: _isSubmitting,
+                    ),
+                  ],
                 ),
               ],
             )
           else if (!isLocked && !isExpired)
             // New submit button — hanya saat available
-            _actionBtn(
-              icon: Icons.save_outlined,
-              label: 'Simpan',
-              color: _accent,
-              onTap: _isSubmitting ? null : _submit,
-              isLoading: _isSubmitting,
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildDowntimeAction(),
+                const SizedBox(width: 6),
+                _actionBtn(
+                  icon: Icons.save_outlined,
+                  label: 'Simpan',
+                  color: _accent,
+                  onTap: _isSubmitting ? null : _submit,
+                  isLoading: _isSubmitting,
+                ),
+              ],
             )
           else
             const SizedBox(width: 44),
@@ -742,71 +845,253 @@ class _QcBucketRowState extends State<_QcBucketRow> {
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.lock_outline, size: 13, color: Colors.grey.shade400),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              'Selesaikan range jam sebelumnya terlebih dahulu',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-            ),
+          Row(
+            children: [
+              Icon(Icons.lock_outline, size: 13, color: Colors.grey.shade400),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Belum waktunya input untuk jam ini',
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                ),
+              ),
+            ],
           ),
+          if (widget.windowOpensAt != null) ...[
+            const SizedBox(height: 6),
+            _QcWindowCountdown(
+              targetTime: widget.windowOpensAt!,
+              label: 'Terbuka dalam',
+              icon: Icons.hourglass_bottom_rounded,
+              color: const Color(0xFF64748B),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDowntimeAction() {
+    final active = _isDowntime;
+    final label = active ? 'Batalkan downtime' : 'Catat downtime QC';
+
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        toggled: active,
+        label: label,
+        child: SizedBox(
+          height: 30,
+          child: OutlinedButton.icon(
+            onPressed: () => setState(() {
+              _isDowntime = !active;
+              _error = null;
+            }),
+            style: OutlinedButton.styleFrom(
+              backgroundColor: active
+                  ? _downtimeColor.withValues(alpha: 0.12)
+                  : Colors.white.withValues(alpha: 0.75),
+              foregroundColor: active ? _downtimeColor : Colors.grey.shade600,
+              side: BorderSide(
+                color: active
+                    ? _downtimeColor.withValues(alpha: 0.50)
+                    : const Color(0xFFE2E8F0),
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(7),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(0, 30),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              textStyle: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            icon: Icon(
+              active ? Icons.undo_rounded : Icons.playlist_remove_rounded,
+              size: 15,
+            ),
+            label: Text(active ? 'Batalkan' : 'Downtime'),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDowntimeKeteranganField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text(
+          'Keterangan (wajib)',
+          style: TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF6B7280),
+          ),
+        ),
+        const SizedBox(height: 2),
+        TextField(
+          controller: _keteranganCtrl,
+          maxLength: 500,
+          maxLines: 2,
+          minLines: 1,
+          autofocus: true,
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+          onChanged: (_) {
+            if (_error != null) setState(() => _error = null);
+          },
+          decoration: InputDecoration(
+            hintText: 'Alasan downtime, mis. listrik padam...',
+            hintStyle: const TextStyle(fontSize: 10, color: Color(0xFF9CA3AF)),
+            isDense: true,
+            counterStyle: const TextStyle(fontSize: 9),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 7,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(6),
+              borderSide: BorderSide(
+                color: _downtimeColor.withValues(alpha: 0.35),
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(6),
+              borderSide: BorderSide(
+                color: _downtimeColor.withValues(alpha: 0.35),
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(6),
+              borderSide: const BorderSide(color: _downtimeColor, width: 1.5),
+            ),
+            filled: true,
+            fillColor: Colors.white,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSubmittedDowntime(InjectQcItem submitted) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+      decoration: BoxDecoration(
+        color: _downtimeColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: _downtimeColor.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.playlist_remove_rounded,
+                size: 13,
+                color: _downtimeColor,
+              ),
+              SizedBox(width: 5),
+              Text(
+                'Downtime',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: _downtimeColor,
+                ),
+              ),
+            ],
+          ),
+          if ((submitted.keterangan ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              submitted.keterangan!.trim(),
+              style: const TextStyle(fontSize: 10, color: Color(0xFF374151)),
+            ),
+          ],
         ],
       ),
     );
   }
 
   Widget _buildFields(InjectQcItem? submitted) {
+    final isReadOnly = submitted != null;
+    if (submitted?.isDowntime == true) {
+      return _buildSubmittedDowntime(submitted!);
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: _field(
-                'Jumlah BS (pcs)',
-                _jumlahBsCtrl,
-                '0',
-                false,
-                readOnly: submitted != null,
-                readOnlyValue: submitted?.jumlahBS.toString(),
+        if (_isDowntime && !isReadOnly)
+          _buildDowntimeKeteranganField()
+        else
+          Row(
+            children: [
+              Expanded(
+                child: _field(
+                  'Jumlah BS (pcs)',
+                  _jumlahBsCtrl,
+                  '0',
+                  false,
+                  readOnly: isReadOnly,
+                  readOnlyValue: submitted?.jumlahBS.toString(),
+                ),
               ),
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: _field(
-                'Berat (gr)',
-                _beratCtrl,
-                '0.0',
-                true,
-                readOnly: submitted != null,
-                readOnlyValue: submitted?.berat?.toStringAsFixed(1),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _field(
+                  'Berat (gr)',
+                  _beratCtrl,
+                  '0.0',
+                  true,
+                  readOnly: isReadOnly,
+                  readOnlyValue: submitted?.berat?.toStringAsFixed(1),
+                ),
               ),
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: _field(
-                'Cycle (s)',
-                _cycleCtrl,
-                '0.0',
-                true,
-                readOnly: submitted != null,
-                readOnlyValue: submitted?.cycleTime?.toStringAsFixed(1),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _field(
+                  'Cycle (s)',
+                  _cycleCtrl,
+                  '0.0',
+                  true,
+                  readOnly: isReadOnly,
+                  readOnlyValue: submitted?.cycleTime?.toStringAsFixed(1),
+                ),
               ),
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: _buildCounterField(readOnlyValue: submitted?.counter),
-            ),
-          ],
-        ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _buildCounterField(readOnlyValue: submitted?.counter),
+              ),
+            ],
+          ),
         if (_error != null) ...[
           const SizedBox(height: 4),
           Text(
             _error!,
             style: const TextStyle(fontSize: 10, color: Color(0xFFDC2626)),
+          ),
+        ],
+        if (widget.status == _QcBucketStatus.available &&
+            widget.windowClosesAt != null) ...[
+          const SizedBox(height: 4),
+          _QcWindowCountdown(
+            targetTime: widget.windowClosesAt!,
+            label: 'Tertutup dalam',
+            icon: Icons.timer_outlined,
+            color: const Color(0xFFB45309),
           ),
         ],
       ],
@@ -947,8 +1232,9 @@ class _QcBucketRowState extends State<_QcBucketRow> {
                       minValue: widget.counterCurrent,
                     ),
                   );
-                  if (picked != null && mounted)
+                  if (picked != null && mounted) {
                     setState(() => _counterValue = picked);
+                  }
                 },
           child: Container(
             height: 30,
@@ -985,6 +1271,61 @@ class _QcBucketRowState extends State<_QcBucketRow> {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── Window countdown ───────────────────────────────────────────────────────
+
+/// Hitung mundur generik menuju [targetTime] (buka/tutup window QC).
+/// Rebuild tiap detik dibawa oleh `_statusTimer` di parent dialog — widget
+/// ini hanya membaca `DateTime.now()` di tiap build agar HH:MM:SS responsif.
+class _QcWindowCountdown extends StatelessWidget {
+  const _QcWindowCountdown({
+    required this.targetTime,
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+
+  final DateTime targetTime;
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  String _formatRemaining(Duration d) {
+    final clamped = d.isNegative ? Duration.zero : d;
+    final hours = clamped.inHours;
+    final minutes = clamped.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = clamped.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return hours > 0 ? '$hours:$minutes:$seconds' : '$minutes:$seconds';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final remaining = targetTime.difference(DateTime.now());
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.30)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: color),
+          const SizedBox(width: 4),
+          Text(
+            '$label ${_formatRemaining(remaining)}',
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

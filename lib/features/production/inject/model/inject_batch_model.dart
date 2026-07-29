@@ -213,6 +213,8 @@ class InjectBatchItem {
   final double? cycleTime;
   final int? counter;
   final DateTime? dateTimeCreate;
+  final String? keterangan;
+  final bool isDowntime;
   final InjectBatchLabels labels;
   final List<InjectBatchJenisItem> jenisItems;
 
@@ -227,6 +229,8 @@ class InjectBatchItem {
     this.cycleTime,
     this.counter,
     this.dateTimeCreate,
+    this.keterangan,
+    this.isDowntime = false,
     this.labels = InjectBatchLabels.empty,
     this.jenisItems = const [],
   });
@@ -288,6 +292,8 @@ class InjectBatchItem {
       dateTimeCreate: DateTime.tryParse(
         j['dateTimeCreate']?.toString() ?? '',
       )?.toLocal(),
+      keterangan: j['keterangan']?.toString(),
+      isDowntime: j['isDowntime'] == true,
       labels: labels,
       jenisItems: jenisItems,
     );
@@ -301,6 +307,8 @@ class InjectBatchSubmitResult {
   final List<InjectBatchLabelItem> barangJadi;
   final InjectBatchLabelItem? bonggolan;
   final InjectBatchLabelItem? reject;
+  final String? keterangan;
+  final bool isDowntime;
 
   const InjectBatchSubmitResult({
     required this.batchId,
@@ -309,6 +317,8 @@ class InjectBatchSubmitResult {
     required this.barangJadi,
     this.bonggolan,
     this.reject,
+    this.keterangan,
+    this.isDowntime = false,
   });
 
   factory InjectBatchSubmitResult.fromJson(Map<String, dynamic> j) {
@@ -335,6 +345,8 @@ class InjectBatchSubmitResult {
       barangJadi: parseList(j['barangJadi']),
       bonggolan: parseSingle(j['bonggolan']),
       reject: parseSingle(j['reject']),
+      keterangan: batch['keterangan']?.toString(),
+      isDowntime: batch['isDowntime'] == true,
     );
   }
 }

@@ -6,6 +6,8 @@ class InjectQcItem {
   final double? cycleTime;
   final int? counter;
   final double? berat;
+  final String? keterangan;
+  final bool isDowntime;
   final DateTime? dateTimeCreate;
 
   const InjectQcItem({
@@ -16,6 +18,8 @@ class InjectQcItem {
     this.cycleTime,
     this.counter,
     this.berat,
+    this.keterangan,
+    this.isDowntime = false,
     this.dateTimeCreate,
   });
 
@@ -42,6 +46,8 @@ class InjectQcItem {
       cycleTime: asNullableDouble(j['cycleTime']),
       counter: asNullableInt(j['counter']),
       berat: asNullableDouble(j['berat']),
+      keterangan: j['keterangan']?.toString(),
+      isDowntime: j['isDowntime'] == true,
       dateTimeCreate: DateTime.tryParse(
         j['dateTimeCreate']?.toString() ?? '',
       )?.toLocal(),

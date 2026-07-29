@@ -45,6 +45,14 @@ import '../../../../core/services/label_print_sync_queue.dart';
 import '../../../../core/utils/pdf_print_service.dart';
 import '../../../../core/view_model/label_print_lock_socket_manager.dart';
 
+// Jeda setelah jam akhir bucket sebelum input-nya terbuka (mis. range
+// 07:00-08:00 langsung bisa diinput mulai jam 08:00, begitu jamnya
+// berakhir), dan lama window input itu terbuka sebelum tertutup lagi.
+// Window bucket berikutnya selalu dimulai tepat saat window bucket ini
+// tertutup, jadi tidak pernah ada 2 hour range yang available bersamaan.
+const _kInputOpenDelay = Duration.zero;
+const _kInputWindowDuration = Duration(hours: 1);
+
 // ── Colour palette ─────────────────────────────────────────────────────────────
 const _kInjectPrimary = Color(0xFF0277BD); // biru — input
 const _kInjectOutput = Color(0xFF00695C); // darker teal — output
@@ -116,10 +124,15 @@ class _InjectProductionInputScreenState
     return widget.noProduksi;
   }
 
-  // Terminate hanya boleh ketika ada bucket available (range jam sekarang belum diinput)
-  bool get _canTerminate => _bucketLabelOrder.any(
-    (l) => _bucketStates[l]?.status == _HourlyBucketStatus.available,
-  );
+  // Terminate/Ganti hanya boleh selama bucket jam sekarang (terakhir) belum
+  // disubmit — tidak terikat pada window input (yang baru terbuka 1 jam
+  // setelah jam itu berakhir), supaya operator tetap bisa ganti cetakan
+  // atau terminate produksi di tengah jam berjalan.
+  bool get _canTerminate {
+    if (_bucketLabelOrder.isEmpty) return false;
+    final lastStatus = _bucketStates[_bucketLabelOrder.last]?.status;
+    return lastStatus != _HourlyBucketStatus.submitted;
+  }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -128,7 +141,9 @@ class _InjectProductionInputScreenState
     super.initState();
     _cachedBreadcrumbLabel = widget.noProduksi;
     _loadHeader();
-    _statusTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+    // Tick tiap detik supaya hitung mundur toleransi (mm:ss) di bucket
+    // available responsif — bukan cuma update tiap menit.
+    _statusTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(_recomputeBucketStatuses);
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -239,7 +254,11 @@ class _InjectProductionInputScreenState
       final carryOutByJenis = <int, int>{};
       int labelsCreated = 0;
 
-      if (batch.jenisItems.isNotEmpty) {
+      if (batch.isDowntime) {
+        // Batch downtime tidak pernah membuat label — abaikan perhitungan
+        // label dari sisa carry-over supaya tidak muncul angka label palsu.
+        labelsCreated = 0;
+      } else if (batch.jenisItems.isNotEmpty) {
         for (final ji in batch.jenisItems) {
           carryInByJenis[ji.idJenis] = ji.carryOverIn;
           pcsInByJenis[ji.idJenis] = ji.pcsInput;
@@ -299,6 +318,8 @@ class _InjectProductionInputScreenState
         namaReject: rejectLabel != null && rejectLabel.namaJenis.isNotEmpty
             ? rejectLabel.namaJenis
             : null,
+        keterangan: batch.keterangan,
+        isDowntime: batch.isDowntime,
         labelsFwip: batch.labels.furnitureWip,
         labelsBarangJadi: batch.labels.barangJadi,
         labelsBonggolan: batch.labels.bonggolan,
@@ -379,10 +400,21 @@ class _InjectProductionInputScreenState
     int lastSubmittedCarryOut = 0;
     var lastCarryOutByJenis = <int, int>{};
 
-    for (final label in _bucketLabelOrder) {
+    // Waktu bukanya window input tiap bucket: [_kInputOpenDelay] setelah
+    // jam bucket itu berakhir. Window bucket ke-i tertutup persis saat
+    // window bucket ke-(i+1) terbuka, sehingga hanya 1 hour range yang
+    // bisa available di waktu bersamaan.
+    final opensAtByIndex = List<DateTime?>.generate(
+      _bucketLabelOrder.length,
+      (i) => _bucketEndTimes[_bucketLabelOrder[i]]?.add(_kInputOpenDelay),
+    );
+
+    for (var i = 0; i < _bucketLabelOrder.length; i++) {
+      final label = _bucketLabelOrder[i];
       final startDt = _bucketStartTimes[label];
       final endDt = _bucketEndTimes[label];
-      if (startDt == null || endDt == null) continue;
+      final opensAt = opensAtByIndex[i];
+      if (startDt == null || endDt == null || opensAt == null) continue;
 
       final current = _bucketStates[label];
       if (current?.status == _HourlyBucketStatus.submitted) {
@@ -393,19 +425,33 @@ class _InjectProductionInputScreenState
 
       // Bucket terakhir & produksi belum selesai → tidak expired meski jam sudah lewat
       final isLastAndIncomplete = !isComplete && label == lastLabel;
-      final isPastEnd = !now.isBefore(endDt);
+      final closesAt = (i + 1 < opensAtByIndex.length)
+          ? opensAtByIndex[i + 1]
+          : null;
 
       final _HourlyBucketStatus newStatus;
-      if (isPastEnd && !isLastAndIncomplete) {
+      if (closesAt != null && !now.isBefore(closesAt) && !isLastAndIncomplete) {
         newStatus = _HourlyBucketStatus.expired;
-      } else if (!now.isBefore(startDt)) {
+      } else if (!now.isBefore(opensAt)) {
         newStatus = _HourlyBucketStatus.available;
       } else {
         newStatus = _HourlyBucketStatus.locked;
       }
 
-      // Overdue: bucket terakhir yang belum selesai tapi sudah lewat jam akhirnya
-      final isOverdue = isLastAndIncomplete && isPastEnd;
+      // Overdue: bucket terakhir yang belum selesai tapi sudah melewati
+      // durasi window normal tanpa disubmit (tidak dipaksa expired).
+      final nominalClosesAt = closesAt ?? opensAt.add(_kInputWindowDuration);
+      final isOverdue = isLastAndIncomplete && !now.isBefore(nominalClosesAt);
+
+      // Countdown "terbuka dalam ..." saat masih terkunci menunggu window,
+      // atau "tertutup dalam ..." saat sedang available (non-bucket terakhir).
+      final windowOpensAt = newStatus == _HourlyBucketStatus.locked
+          ? opensAt
+          : null;
+      final windowClosesAt =
+          (newStatus == _HourlyBucketStatus.available && closesAt != null)
+          ? closesAt
+          : null;
 
       final isActive =
           newStatus == _HourlyBucketStatus.available ||
@@ -413,6 +459,8 @@ class _InjectProductionInputScreenState
       _bucketStates[label] = _HourlyBucketData(
         status: newStatus,
         isOverdue: isOverdue,
+        windowOpensAt: windowOpensAt,
+        windowClosesAt: windowClosesAt,
         carryOverIn: isActive ? lastSubmittedCarryOut : 0,
         carryOverInByJenis: isActive ? Map.from(lastCarryOutByJenis) : {},
         pcsInput: 0,
@@ -420,6 +468,55 @@ class _InjectProductionInputScreenState
         carryOverOut: 0,
       );
     }
+  }
+
+  /// Submit batch downtime (mesin berhenti, tanpa produksi) — hanya kirim
+  /// noProduksi/hourStart/isDowntime/keterangan, tanpa berat/cycleTime/
+  /// counter/items. Carry-over diteruskan apa adanya (tidak ada pcs
+  /// terkonsumsi) supaya bucket berikutnya tetap dapat carry-in yang benar.
+  Future<void> _submitDowntimeBucket({
+    required String label,
+    required String hourStart,
+    required _HourlyBucketData currentData,
+    required String? keterangan,
+  }) async {
+    final trimmedKeterangan = (keterangan ?? '').trim();
+    if (trimmedKeterangan.isEmpty) return;
+
+    final payload = <String, dynamic>{
+      'noProduksi': widget.noProduksi,
+      'hourStart': hourStart,
+      'isDowntime': true,
+      'keterangan': trimmedKeterangan,
+      'items': const [],
+    };
+
+    final InjectBatchSubmitResult result;
+    try {
+      result = await _prodRepo.submitBatch(payload);
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack('Gagal menyimpan: $e', backgroundColor: Colors.red);
+      return;
+    }
+    if (!mounted) return;
+
+    setState(() {
+      _bucketStates[label] = _HourlyBucketData(
+        status: _HourlyBucketStatus.submitted,
+        carryOverIn: currentData.carryOverIn,
+        carryOverInByJenis: currentData.carryOverInByJenis,
+        pcsInput: 0,
+        carryOverOut: currentData.carryOverIn,
+        carryOverOutByJenis: currentData.carryOverInByJenis,
+        labelsCreated: 0,
+        keterangan: result.keterangan ?? trimmedKeterangan,
+        isDowntime: true,
+      );
+      _recomputeBucketStatuses();
+    });
+
+    _showSnack('✅ Downtime tercatat', backgroundColor: Colors.orange);
   }
 
   Future<void> _onBucketSubmit(
@@ -434,12 +531,26 @@ class _InjectProductionInputScreenState
     int? idRejectReject, {
     String? namaBonggolan,
     String? namaReject,
+    String? keterangan,
     bool isLastBucket = false,
+    bool isDowntime = false,
   }) async {
-    if (_bucketStates[label] == null) return;
+    final currentData = _bucketStates[label];
+    if (currentData == null) return;
+
+    final hourStart = label.split(' - ').first.trim();
+
+    if (isDowntime) {
+      await _submitDowntimeBucket(
+        label: label,
+        hourStart: hourStart,
+        currentData: currentData,
+        keterangan: keterangan,
+      );
+      return;
+    }
 
     final pplData = _pcsPerLabelData;
-    final hourStart = label.split(' - ').first.trim();
 
     final itemsToSubmit = jenisItems
         .where((i) => i.pcs > 0 || i.carryOverIn > 0)
@@ -504,6 +615,8 @@ class _InjectProductionInputScreenState
         },
       if (isLastBucket && idRejectReject != null && beratReject != null)
         'reject': {'idReject': idRejectReject, 'berat': beratReject},
+      if (keterangan != null && keterangan.trim().isNotEmpty)
+        'keterangan': keterangan.trim(),
     };
 
     final InjectBatchSubmitResult result;
@@ -542,6 +655,7 @@ class _InjectProductionInputScreenState
         namaReject: (result.reject?.namaJenis.isNotEmpty == true)
             ? result.reject!.namaJenis
             : namaReject,
+        keterangan: result.keterangan ?? keterangan,
         labelsFwip: result.furnitureWIP,
         labelsBarangJadi: result.barangJadi,
         labelsBonggolan: result.bonggolan != null ? [result.bonggolan!] : [],
@@ -2402,6 +2516,8 @@ class _InjectProductionInputScreenState
                 idRejectReject,
                 namaBonggolan,
                 namaReject,
+                keterangan,
+                isDowntime,
               ) => _onBucketSubmit(
                 label,
                 jenisItems,
@@ -2414,7 +2530,9 @@ class _InjectProductionInputScreenState
                 idRejectReject,
                 namaBonggolan: namaBonggolan,
                 namaReject: namaReject,
+                keterangan: keterangan,
                 isLastBucket: isLastBucket,
+                isDowntime: isDowntime,
               ),
           onPrint: (ctx) => _openBucketPrintDialog(ctx, label),
           counterCurrent: _pcsPerLabelData?.counterCurrent,
@@ -3323,6 +3441,8 @@ class _HourlyBucketData {
     required this.labelsCreated,
     required this.carryOverOut,
     this.isOverdue = false,
+    this.windowOpensAt,
+    this.windowClosesAt,
     this.berat,
     this.cycleTime,
     this.counter,
@@ -3330,6 +3450,8 @@ class _HourlyBucketData {
     this.namaBonggolan,
     this.beratReject,
     this.namaReject,
+    this.keterangan,
+    this.isDowntime = false,
     this.carryOverInByJenis = const {},
     this.pcsInputByJenis = const {},
     this.carryOverOutByJenis = const {},
@@ -3342,6 +3464,13 @@ class _HourlyBucketData {
   final _HourlyBucketStatus status;
   // true when bucket is the last incomplete bucket and current time has passed hourEnd
   final bool isOverdue;
+  // Waktu window input bucket ini terbuka — hanya diisi saat status masih
+  // locked (dipakai untuk countdown "terbuka dalam ...").
+  final DateTime? windowOpensAt;
+  // Waktu window input bucket ini tertutup — hanya diisi saat status
+  // available & bukan bucket terakhir (dipakai untuk countdown
+  // "tertutup dalam ...").
+  final DateTime? windowClosesAt;
   final int carryOverIn;
   final int pcsInput;
   final int labelsCreated;
@@ -3353,6 +3482,9 @@ class _HourlyBucketData {
   final String? namaBonggolan;
   final double? beratReject;
   final String? namaReject;
+  final String? keterangan;
+  // true = batch ini menandai mesin berhenti (tanpa produksi), bukan input pcs normal.
+  final bool isDowntime;
   final Map<int, int> carryOverInByJenis;
   final Map<int, int> pcsInputByJenis;
   final Map<int, int> carryOverOutByJenis;
@@ -3416,6 +3548,8 @@ class _HourlyPcsSection extends StatefulWidget {
     int? idRejectReject,
     String? namaBonggolan,
     String? namaReject,
+    String? keterangan,
+    bool isDowntime,
   )
   onSubmit;
 
@@ -3429,6 +3563,7 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
   final _cycleCtrl = TextEditingController();
   final _beratBonggolanCtrl = TextEditingController();
   final _beratRejectCtrl = TextEditingController();
+  final _keteranganCtrl = TextEditingController();
   int? _counterValue;
   JenisBonggolan? _bonggolanJenis;
   RejectType? _rejectJenis;
@@ -3436,6 +3571,8 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
   bool _beratError = false;
   bool _cycleError = false;
   bool _counterError = false;
+  bool _isDowntime = false;
+  bool _keteranganError = false;
 
   @override
   void initState() {
@@ -3475,6 +3612,7 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
     _cycleCtrl.dispose();
     _beratBonggolanCtrl.dispose();
     _beratRejectCtrl.dispose();
+    _keteranganCtrl.dispose();
     super.dispose();
   }
 
@@ -3489,7 +3627,39 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
     );
   }
 
+  Future<void> _handleSubmitDowntime() async {
+    final keterangan = _keteranganCtrl.text.trim();
+    if (keterangan.isEmpty) {
+      setState(() => _keteranganError = true);
+      _showValidationError('Keterangan wajib diisi untuk downtime');
+      return;
+    }
+    setState(() {
+      _keteranganError = false;
+      _isSubmitting = true;
+    });
+    try {
+      await widget.onSubmit(
+        const [],
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        keterangan,
+        true,
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
   Future<void> _handleSubmit() async {
+    if (_isDowntime) return _handleSubmitDowntime();
     if (widget.headerOutputs.isEmpty) return;
 
     final jenisItems = <_JenisSubmitItem>[];
@@ -3613,6 +3783,8 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
         idRejectReject,
         _bonggolanJenis?.namaBonggolan,
         _rejectJenis?.namaReject,
+        null,
+        false,
       );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -3794,26 +3966,93 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
     ),
   );
 
-  Widget _buildLocked() => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    decoration: BoxDecoration(
-      color: const Color(0xFFF9FAFB),
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(color: const Color(0xFFE5E7EB)),
-    ),
-    child: Row(
-      children: [
-        Icon(Icons.lock_outline, size: 14, color: Colors.grey.shade400),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            'Selesaikan range jam sebelumnya terlebih dahulu',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+  Widget _buildLocked() {
+    final opensAt = widget.data.windowOpensAt;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.lock_outline, size: 14, color: Colors.grey.shade400),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Belum waktunya input untuk jam ini',
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                ),
+              ),
+            ],
+          ),
+          if (opensAt != null) ...[
+            const SizedBox(height: 6),
+            _WindowCountdown(
+              targetTime: opensAt,
+              label: 'Terbuka dalam',
+              icon: Icons.hourglass_bottom_rounded,
+              color: const Color(0xFF64748B),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ── Aksi downtime jarang dipakai, jadi ditempatkan sebagai ikon di header.
+  static const _kDowntimeColor = Color(0xFFB45309);
+
+  Widget _buildDowntimeAction() {
+    final active = _isDowntime;
+    final label = active ? 'Batalkan downtime' : 'Catat downtime produksi';
+
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        toggled: active,
+        label: label,
+        child: SizedBox(
+          height: 30,
+          child: OutlinedButton.icon(
+            onPressed: () => setState(() => _isDowntime = !active),
+            style: OutlinedButton.styleFrom(
+              backgroundColor: active
+                  ? _kDowntimeColor.withValues(alpha: 0.12)
+                  : Colors.white.withValues(alpha: 0.75),
+              foregroundColor: active ? _kDowntimeColor : Colors.grey.shade600,
+              side: BorderSide(
+                color: active
+                    ? _kDowntimeColor.withValues(alpha: 0.50)
+                    : const Color(0xFFE2E8F0),
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(7),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(0, 30),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              textStyle: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            icon: Icon(
+              active ? Icons.undo_rounded : Icons.playlist_remove_rounded,
+              size: 15,
+            ),
+            label: Text(active ? 'Batalkan' : 'Downtime'),
           ),
         ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 
   Widget _buildAvailable() {
     final isOverdue = widget.data.isOverdue;
@@ -4107,113 +4346,203 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
                   color: accent,
                 ),
               ),
+              const Spacer(),
+              _buildDowntimeAction(),
             ],
           ),
-          const SizedBox(height: 8),
-          // ── Per-jenis input rows ──
-          for (int i = 0; i < outputs.length; i++) ...[
-            if (i > 0) const SizedBox(height: 10),
-            buildJenisRow(outputs[i], showLabel: multiJenis),
-          ],
-          // ── Sisa Akhir Shift (last bucket only) ──────────────────
-          if (widget.isLastBucket) ...[
-            const SizedBox(height: 10),
-            // Bonggolan: jenis (flex 3) + berat (flex 2) — pilih jenis dulu
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: _buildJenisPicker(
-                    label: 'Jenis Bonggolan',
-                    selectedName: _bonggolanJenis?.namaBonggolan,
-                    onTap: () async {
-                      final picked = await _showBonggolanJenisPicker();
-                      if (picked != null && mounted) {
-                        setState(() => _bonggolanJenis = picked);
-                      }
-                    },
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  flex: 2,
-                  child: _qcField(
-                    label: 'Berat Bonggolan (kg)',
-                    ctrl: _beratBonggolanCtrl,
-                    hint: '0.0',
-                    decimal: true,
-                    enabled: _bonggolanJenis != null,
-                  ),
-                ),
-              ],
-            ),
+          if (widget.data.windowClosesAt != null) ...[
             const SizedBox(height: 6),
-            // Reject: jenis (flex 3) + berat (flex 2) — pilih jenis dulu
+            _WindowCountdown(
+              targetTime: widget.data.windowClosesAt!,
+              label: 'Waktu input tertutup dalam',
+              icon: Icons.timer_outlined,
+              color: const Color(0xFFB45309),
+            ),
+          ],
+          if (!_isDowntime) ...[
+            const SizedBox(height: 8),
+            // ── Per-jenis input rows ──
+            for (int i = 0; i < outputs.length; i++) ...[
+              if (i > 0) const SizedBox(height: 10),
+              buildJenisRow(outputs[i], showLabel: multiJenis),
+            ],
+            // ── Sisa Akhir Shift (last bucket only) ──────────────────
+            if (widget.isLastBucket) ...[
+              const SizedBox(height: 10),
+              // Bonggolan: jenis (flex 3) + berat (flex 2) — pilih jenis dulu
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: _buildJenisPicker(
+                      label: 'Jenis Bonggolan',
+                      selectedName: _bonggolanJenis?.namaBonggolan,
+                      onTap: () async {
+                        final picked = await _showBonggolanJenisPicker();
+                        if (picked != null && mounted) {
+                          setState(() => _bonggolanJenis = picked);
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    flex: 2,
+                    child: _qcField(
+                      label: 'Berat Bonggolan (kg)',
+                      ctrl: _beratBonggolanCtrl,
+                      hint: '0.0',
+                      decimal: true,
+                      enabled: _bonggolanJenis != null,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              // Reject: jenis (flex 3) + berat (flex 2) — pilih jenis dulu
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: _buildJenisPicker(
+                      label: 'Jenis Reject',
+                      selectedName: _rejectJenis?.namaReject,
+                      onTap: () async {
+                        final picked = await _showRejectTypePicker(
+                          'Jenis Reject',
+                        );
+                        if (picked != null && mounted) {
+                          setState(() => _rejectJenis = picked);
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    flex: 2,
+                    child: _qcField(
+                      label: 'Berat Reject (kg)',
+                      ctrl: _beratRejectCtrl,
+                      hint: '0.0',
+                      decimal: true,
+                      enabled: _rejectJenis != null,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 10),
             Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Expanded(
-                  flex: 3,
-                  child: _buildJenisPicker(
-                    label: 'Jenis Reject',
-                    selectedName: _rejectJenis?.namaReject,
-                    onTap: () async {
-                      final picked = await _showRejectTypePicker(
-                        'Jenis Reject',
-                      );
-                      if (picked != null && mounted) {
-                        setState(() => _rejectJenis = picked);
-                      }
+                  child: _qcField(
+                    label: 'Berat (gr)',
+                    ctrl: _beratCtrl,
+                    hint: '0.0',
+                    decimal: true,
+                    isError: _beratError,
+                    onChanged: () {
+                      if (_beratError) setState(() => _beratError = false);
                     },
                   ),
                 ),
                 const SizedBox(width: 6),
                 Expanded(
-                  flex: 2,
                   child: _qcField(
-                    label: 'Berat Reject (kg)',
-                    ctrl: _beratRejectCtrl,
+                    label: 'Cycle Time (sec)',
+                    ctrl: _cycleCtrl,
                     hint: '0.0',
                     decimal: true,
-                    enabled: _rejectJenis != null,
+                    isError: _cycleError,
+                    onChanged: () {
+                      if (_cycleError) setState(() => _cycleError = false);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(child: _buildCounterField()),
+              ],
+            ),
+          ] else ...[
+            const SizedBox(height: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Keterangan (wajib)',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: _keteranganError
+                        ? const Color(0xFFDC2626)
+                        : const Color(0xFF374151),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                TextField(
+                  controller: _keteranganCtrl,
+                  maxLength: 500,
+                  maxLines: 2,
+                  minLines: 1,
+                  autofocus: true,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  onChanged: (_) {
+                    if (_keteranganError) {
+                      setState(() => _keteranganError = false);
+                    }
+                  },
+                  decoration: InputDecoration(
+                    hintText: 'Alasan mesin berhenti, mis. listrik padam...',
+                    hintStyle: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF9CA3AF),
+                    ),
+                    isDense: true,
+                    counterStyle: const TextStyle(fontSize: 9),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(
+                        color: _keteranganError
+                            ? const Color(0xFFDC2626)
+                            : accent.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(
+                        color: _keteranganError
+                            ? const Color(0xFFDC2626)
+                            : accent.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(
+                        color: _keteranganError
+                            ? const Color(0xFFDC2626)
+                            : accent,
+                        width: 1.5,
+                      ),
+                    ),
+                    filled: true,
+                    fillColor: _keteranganError
+                        ? const Color(0xFFFEF2F2)
+                        : Colors.white,
                   ),
                 ),
               ],
             ),
           ],
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _qcField(
-                  label: 'Berat (gr)',
-                  ctrl: _beratCtrl,
-                  hint: '0.0',
-                  decimal: true,
-                  isError: _beratError,
-                  onChanged: () {
-                    if (_beratError) setState(() => _beratError = false);
-                  },
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: _qcField(
-                  label: 'Cycle Time (sec)',
-                  ctrl: _cycleCtrl,
-                  hint: '0.0',
-                  decimal: true,
-                  isError: _cycleError,
-                  onChanged: () {
-                    if (_cycleError) setState(() => _cycleError = false);
-                  },
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(child: _buildCounterField()),
-            ],
-          ),
           const SizedBox(height: 10),
           // ── Step 3/4: Simpan ──────────────────────────────────────
           SizedBox(
@@ -4221,7 +4550,7 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
             height: 36,
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                backgroundColor: accent,
+                backgroundColor: _isDowntime ? const Color(0xFFB45309) : accent,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(7),
@@ -4242,8 +4571,17 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
                         color: Colors.white,
                       ),
                     )
-                  : const Icon(Icons.check_rounded, size: 16),
-              label: Text(_isSubmitting ? 'Menyimpan...' : 'Simpan'),
+                  : Icon(
+                      _isDowntime
+                          ? Icons.power_settings_new_rounded
+                          : Icons.check_rounded,
+                      size: 16,
+                    ),
+              label: Text(
+                _isSubmitting
+                    ? 'Menyimpan...'
+                    : (_isDowntime ? 'Simpan Downtime' : 'Simpan'),
+              ),
             ),
           ),
         ],
@@ -4531,8 +4869,53 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
     );
   }
 
+  Widget _buildSubmittedDowntime() {
+    final data = widget.data;
+    const amber = Color(0xFFB45309);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: amber.withValues(alpha: 0.30)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.power_settings_new_rounded,
+                size: 13,
+                color: amber,
+              ),
+              const SizedBox(width: 5),
+              const Text(
+                'Downtime — Mesin Berhenti',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: amber,
+                ),
+              ),
+            ],
+          ),
+          if ((data.keterangan ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              data.keterangan!.trim(),
+              style: const TextStyle(fontSize: 11, color: Color(0xFF374151)),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildSubmitted() {
     final data = widget.data;
+    if (data.isDowntime) return _buildSubmittedDowntime();
     final hasLabels = data.labelsCreated > 0;
     const greenAccent = Color(0xFF15803D);
     final outputs = widget.headerOutputs;
@@ -4795,6 +5178,50 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
               Expanded(child: _buildCounterDisplay(data.counter)),
             ],
           ),
+          if ((data.keterangan ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: greenAccent.withValues(alpha: 0.25)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.sticky_note_2_outlined,
+                        size: 11,
+                        color: greenAccent,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Keterangan',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: greenAccent,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    data.keterangan!.trim(),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF374151),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (hasLabels && widget.onPrint != null) ...[
             const SizedBox(height: 10),
             SizedBox(
@@ -4858,6 +5285,61 @@ class _HourlyPcsSectionState extends State<_HourlyPcsSection> {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── Window countdown ───────────────────────────────────────────────────────
+
+/// Hitung mundur generik menuju [targetTime] (buka/tutup window input).
+/// Rebuild tiap detik dibawa oleh `_statusTimer` di parent — widget ini
+/// hanya membaca `DateTime.now()` di tiap build agar HH:MM:SS responsif.
+class _WindowCountdown extends StatelessWidget {
+  const _WindowCountdown({
+    required this.targetTime,
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+
+  final DateTime targetTime;
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  String _formatRemaining(Duration d) {
+    final clamped = d.isNegative ? Duration.zero : d;
+    final hours = clamped.inHours;
+    final minutes = clamped.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = clamped.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return hours > 0 ? '$hours:$minutes:$seconds' : '$minutes:$seconds';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final remaining = targetTime.difference(DateTime.now());
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.30)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 5),
+          Text(
+            '$label ${_formatRemaining(remaining)}',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

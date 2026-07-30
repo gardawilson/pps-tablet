@@ -22,7 +22,7 @@ import '../widgets/inject_production_delete_dialog.dart';
 import '../widgets/inject_production_form_dialog.dart';
 import '../widgets/inject_production_header_table.dart';
 import '../widgets/inject_production_row_popover.dart';
-import 'inject_production_input_router.dart';
+import 'inject_production_input_screen.dart';
 
 class InjectProductionScreen extends StatefulWidget {
   const InjectProductionScreen({super.key});
@@ -84,9 +84,8 @@ class _InjectProductionScreenState extends State<InjectProductionScreen> {
                   Future.microtask(() {
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) => InjectProductionInputRouter(
+                        builder: (_) => InjectProductionInputScreen(
                           noProduksi: row.noProduksi,
-                          isRealtimeHint: row.isRealtimeInput,
                         ),
                       ),
                     );

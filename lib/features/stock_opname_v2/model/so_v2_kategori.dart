@@ -40,6 +40,56 @@ enum SoV2Status {
   }
 }
 
+/// User yang sedang aktif scan di satu lokasi kerja.
+class SoV2WorkingLocationUser {
+  final int idUsername;
+  final String username;
+  final String fullName;
+
+  SoV2WorkingLocationUser({
+    required this.idUsername,
+    required this.username,
+    required this.fullName,
+  });
+
+  String get displayName => fullName.isNotEmpty ? fullName : username;
+
+  factory SoV2WorkingLocationUser.fromJson(Map<String, dynamic> json) {
+    return SoV2WorkingLocationUser(
+      idUsername: (json['idUsername'] as num?)?.toInt() ?? 0,
+      username: json['username']?.toString() ?? '',
+      fullName: json['fullName']?.toString() ?? '',
+    );
+  }
+}
+
+/// Lokasi yang sedang ditugaskan/dikerjakan dalam satu kategori.
+class SoV2KategoriWorkingLocation {
+  final String lokasi;
+  final String description;
+  final List<SoV2WorkingLocationUser> users;
+
+  SoV2KategoriWorkingLocation({
+    required this.lokasi,
+    required this.description,
+    required this.users,
+  });
+
+  factory SoV2KategoriWorkingLocation.fromJson(Map<String, dynamic> json) {
+    return SoV2KategoriWorkingLocation(
+      lokasi: json['lokasi']?.toString() ?? '',
+      description: json['description']?.toString().trim() ?? '',
+      users: (json['users'] as List? ?? [])
+          .map(
+            (e) => SoV2WorkingLocationUser.fromJson(
+              Map<String, dynamic>.from(e as Map),
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
 class SoV2Kategori {
   final int categoryId;
   final String categoryCode;
@@ -50,6 +100,8 @@ class SoV2Kategori {
   final int scannedCount;
   final DateTime? startDate;
   final DateTime? completedAt;
+  final int workingLocationCount;
+  final List<SoV2KategoriWorkingLocation> workingLocations;
 
   SoV2Kategori({
     required this.categoryId,
@@ -61,6 +113,8 @@ class SoV2Kategori {
     required this.scannedCount,
     this.startDate,
     this.completedAt,
+    this.workingLocationCount = 0,
+    this.workingLocations = const [],
   });
 
   double get progress => labelCount > 0 ? scannedCount / labelCount : 0;
@@ -76,6 +130,15 @@ class SoV2Kategori {
       scannedCount: (json['scannedCount'] as num?)?.toInt() ?? 0,
       startDate: DateTime.tryParse(json['startDate']?.toString() ?? ''),
       completedAt: DateTime.tryParse(json['completedAt']?.toString() ?? ''),
+      workingLocationCount:
+          (json['workingLocationCount'] as num?)?.toInt() ?? 0,
+      workingLocations: (json['workingLocations'] as List? ?? [])
+          .map(
+            (e) => SoV2KategoriWorkingLocation.fromJson(
+              Map<String, dynamic>.from(e as Map),
+            ),
+          )
+          .toList(),
     );
   }
 }

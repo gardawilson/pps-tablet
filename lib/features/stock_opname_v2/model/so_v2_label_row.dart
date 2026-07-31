@@ -31,15 +31,30 @@ class SoV2LabelRow {
   });
 
   factory SoV2LabelRow.fromJson(Map<String, dynamic> json) {
+    final scannedValue = json['isScanned'];
+    final isScanned = scannedValue == 1 || scannedValue == true;
+
+    // Kategori bahan baku punya NoBahanBaku dan NoPallet sebagai field
+    // terpisah, tapi label fisiknya adalah gabungan keduanya.
+    if (json.containsKey('NoBahanBaku') && json.containsKey('NoPallet')) {
+      final noBahanBaku = json['NoBahanBaku']?.toString() ?? '';
+      final noPallet = json['NoPallet']?.toString() ?? '';
+      return SoV2LabelRow(
+        primaryKey: 'NoBahanBaku',
+        primaryValue: '$noBahanBaku-$noPallet',
+        isScanned: isScanned,
+        raw: json,
+      );
+    }
+
     final entry = json.entries.firstWhere(
       (e) => !_excludedKeys.contains(e.key),
       orElse: () => json.entries.first,
     );
-    final scannedValue = json['isScanned'];
     return SoV2LabelRow(
       primaryKey: entry.key,
       primaryValue: entry.value?.toString() ?? '',
-      isScanned: scannedValue == 1 || scannedValue == true,
+      isScanned: isScanned,
       raw: json,
     );
   }
@@ -47,7 +62,10 @@ class SoV2LabelRow {
   /// Entries selain field judul (primaryKey) dan field yang dikecualikan
   /// (NoSO, isScanned), untuk ditampilkan sebagai info tambahan.
   Iterable<MapEntry<String, dynamic>> get secondaryEntries => raw.entries.where(
-    (e) => e.key != primaryKey && !_excludedKeys.contains(e.key),
+    (e) =>
+        e.key != primaryKey &&
+        !_excludedKeys.contains(e.key) &&
+        !(primaryKey == 'NoBahanBaku' && e.key == 'NoPallet'),
   );
 
   static const _weightKeyHints = ['berat'];

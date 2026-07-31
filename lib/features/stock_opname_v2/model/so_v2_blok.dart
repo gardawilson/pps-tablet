@@ -4,6 +4,7 @@ class SoV2Blok {
   final int labelCount;
   final int scannedCount;
   final double totalWeight;
+  final int workingLocationCount;
 
   SoV2Blok({
     required this.blok,
@@ -11,6 +12,7 @@ class SoV2Blok {
     required this.labelCount,
     required this.scannedCount,
     required this.totalWeight,
+    this.workingLocationCount = 0,
   });
 
   double get progress => labelCount > 0 ? scannedCount / labelCount : 0;
@@ -27,6 +29,8 @@ class SoV2Blok {
           (json['totalWeight'] as num?)?.toDouble() ??
           (json['totalPcs'] as num?)?.toDouble() ??
           0,
+      workingLocationCount:
+          (json['workingLocationCount'] as num?)?.toInt() ?? 0,
     );
   }
 }

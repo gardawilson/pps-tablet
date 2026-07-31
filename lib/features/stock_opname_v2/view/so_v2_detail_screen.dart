@@ -30,6 +30,7 @@ const _kSurface = Color(0xFFF8F9FB);
 const _kBorder = Color(0xFFE2E6EA);
 const _kWarning = Color(0xFFB45309);
 const _kWarningBg = Color(0xFFFFF7ED);
+const _kSuccessBg = Color(0xFFE9F6EF);
 
 /// Screen gabungan: panel blok, panel lokasi (dalam blok terpilih), panel
 /// label (dalam lokasi terpilih). Tidak memakai AppBar sendiri karena sudah
@@ -532,6 +533,42 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                     ),
                   ),
                 ),
+                if (blokItem.workingLocationCount > 0) ...[
+                  const SizedBox(width: 6),
+                  Tooltip(
+                    message:
+                        '${blokItem.workingLocationCount} lokasi sedang dikerjakan',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0A7349).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.bolt_rounded,
+                            size: 11,
+                            color: Color(0xFF0A7349),
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            '${blokItem.workingLocationCount}',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF0A7349),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -695,10 +732,14 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
           decoration: BoxDecoration(
             color: selected
                 ? baseColor.withValues(alpha: 0.05)
-                : (lokasi.isUnknown ? _kWarningBg : null),
+                : (complete
+                      ? _kSuccessBg
+                      : (lokasi.isUnknown ? _kWarningBg : null)),
             border: Border(
               left: BorderSide(
-                color: selected ? baseColor : Colors.transparent,
+                color: selected
+                    ? baseColor
+                    : (complete ? const Color(0xFF0A7349) : Colors.transparent),
                 width: 3,
               ),
             ),
@@ -724,6 +765,21 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                               size: 14,
                             ),
                             const SizedBox(width: 6),
+                          ] else if (complete) ...[
+                            Container(
+                              width: 18,
+                              height: 18,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF0A7349),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.check_rounded,
+                                size: 12,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
                           ],
                           Expanded(
                             child: lokasi.isUnknown
@@ -748,7 +804,11 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                                             fontWeight: FontWeight.w700,
                                             color: selected
                                                 ? baseColor
-                                                : const Color(0xFF1A1D23),
+                                                : (complete
+                                                      ? const Color(0xFF0A7349)
+                                                      : const Color(
+                                                          0xFF1A1D23,
+                                                        )),
                                           ),
                                         ),
                                         TextSpan(
@@ -760,33 +820,50 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                                             color: progressColor,
                                           ),
                                         ),
-                                        TextSpan(
-                                          text: lokasi.allowedUsers.isNotEmpty
-                                              ? '  ·  ${lokasi.allowedUsers.map((u) => u.displayName).join(', ')}'
-                                              : '  ·  Belum ditugaskan',
-                                          style: TextStyle(
-                                            fontSize: 10.5,
-                                            fontWeight: FontWeight.w500,
-                                            color: lokasi.allowedUsers.isEmpty
-                                                ? Colors.grey.shade400
-                                                : Colors.grey.shade600,
+                                        if (!complete)
+                                          TextSpan(
+                                            text: lokasi.allowedUsers.isNotEmpty
+                                                ? '  ·  ${lokasi.allowedUsers.map((u) => u.displayName).join(', ')}'
+                                                : '  ·  Belum ditugaskan',
+                                            style: TextStyle(
+                                              fontSize: 10.5,
+                                              fontWeight:
+                                                  lokasi.allowedUsers.isEmpty
+                                                  ? FontWeight.w500
+                                                  : FontWeight.w700,
+                                              color: lokasi.allowedUsers.isEmpty
+                                                  ? Colors.grey.shade400
+                                                  : const Color(0xFF1A1D23),
+                                            ),
                                           ),
-                                        ),
                                       ],
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                           ),
-                          if (complete)
-                            const Padding(
-                              padding: EdgeInsets.only(left: 4),
-                              child: Icon(
-                                Icons.check_circle_rounded,
-                                size: 13,
-                                color: Color(0xFF0A7349),
+                          if (complete) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0A7349),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Text(
+                                'Selesai',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                  letterSpacing: 0.2,
+                                ),
                               ),
                             ),
+                          ],
                         ],
                       ),
                     ),

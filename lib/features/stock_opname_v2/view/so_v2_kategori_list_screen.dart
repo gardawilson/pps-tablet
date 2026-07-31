@@ -360,6 +360,11 @@ class _KategoriTile extends StatelessWidget {
                         : _kMuted,
                   ),
                 ],
+                if (kategori.status == SoV2Status.inProgress &&
+                    kategori.workingLocations.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  _WorkingLocationsRow(locations: kategori.workingLocations),
+                ],
                 const Spacer(),
                 const SizedBox(height: 6),
                 Row(
@@ -397,6 +402,48 @@ class _KategoriTile extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Baris ringkas lokasi yang sedang aktif dikerjakan pada kategori yang
+/// berjalan — detail lokasi & user ditampilkan lewat tooltip karena kartu
+/// grid ruangnya sempit.
+class _WorkingLocationsRow extends StatelessWidget {
+  final List<SoV2KategoriWorkingLocation> locations;
+
+  const _WorkingLocationsRow({required this.locations});
+
+  @override
+  Widget build(BuildContext context) {
+    final codes = locations.map((l) => l.lokasi).join(', ');
+    final tooltip = locations
+        .map((l) {
+          final users = l.users.map((u) => u.displayName).join(', ');
+          return users.isEmpty ? l.lokasi : '${l.lokasi} · $users';
+        })
+        .join('\n');
+
+    return Tooltip(
+      message: tooltip,
+      child: Row(
+        children: [
+          const Icon(Icons.bolt_rounded, size: 11, color: Color(0xFF0A7349)),
+          const SizedBox(width: 3),
+          Expanded(
+            child: Text(
+              codes,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 9.5,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0A7349),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -202,6 +202,7 @@ class BrokerProductionRepository {
     int? idOperator,
     bool? complete,
     bool? verified,
+    bool includeRendemen = false,
   }) async {
     final token = await TokenStorage.getToken();
 
@@ -232,6 +233,7 @@ class BrokerProductionRepository {
       if (idOperator != null) 'idOperator': '$idOperator',
       if (complete != null) 'complete': '$complete',
       if (verified != null) 'verified': '$verified',
+      if (includeRendemen) 'includeRendemen': 'true',
     };
 
     final url = Uri.parse(
@@ -308,6 +310,7 @@ class BrokerProductionRepository {
     int? idOperator,
     bool? complete,
     bool? verified,
+    bool includeRendemen = false,
   }) async {
     final r = await fetchAll(
       page: page,
@@ -323,6 +326,7 @@ class BrokerProductionRepository {
       idOperator: idOperator,
       complete: complete,
       verified: verified,
+      includeRendemen: includeRendemen,
     );
     return (r['items'] as List<BrokerProduction>);
   }
@@ -866,13 +870,13 @@ class BrokerProductionRepository {
   }
 
   // =========================
-  //  VERIFIKASI SUPERVISOR
-  //  PATCH /api/production/broker/:noProduksi/verify
-  //  PATCH /api/production/broker/:noProduksi/unverify
+  //  VERIFIKASI STOCK CONTROLLER
+  //  PATCH /api/production/broker/:noProduksi/verify-sc
+  //  PATCH /api/production/broker/:noProduksi/unverify-sc
   // =========================
   Future<void> verifyProduksi(String noProduksi, {String? note}) async {
     final token = await TokenStorage.getToken();
-    final url = Uri.parse('$_base/api/production/broker/$noProduksi/verify');
+    final url = Uri.parse('$_base/api/production/broker/$noProduksi/verify-sc');
 
     late http.Response res;
     try {
@@ -902,7 +906,7 @@ class BrokerProductionRepository {
 
   Future<void> unverifyProduksi(String noProduksi, {String? note}) async {
     final token = await TokenStorage.getToken();
-    final url = Uri.parse('$_base/api/production/broker/$noProduksi/unverify');
+    final url = Uri.parse('$_base/api/production/broker/$noProduksi/unverify-sc');
 
     late http.Response res;
     try {
@@ -928,5 +932,155 @@ class BrokerProductionRepository {
         throw Exception('Gagal membatalkan verifikasi produksi (${res.statusCode})');
       }
     }
+  }
+
+  // =========================
+  //  VERIFIKASI PRODUCTION CONTROLLER
+  //  PATCH /api/production/broker/:noProduksi/verify-pc
+  // =========================
+  Future<void> verifyOperator(String noProduksi, {String? note}) async {
+    final token = await TokenStorage.getToken();
+    final url =
+        Uri.parse('$_base/api/production/broker/$noProduksi/verify-pc');
+
+    late http.Response res;
+    try {
+      res = await http
+          .patch(
+            url,
+            headers: {..._headers(token), 'Content-Type': 'application/json'},
+            body: json.encode({if (note != null && note.trim().isNotEmpty) 'note': note.trim()}),
+          )
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout memverifikasi operator broker');
+    }
+
+    if (res.statusCode != 200) {
+      final bodyText = utf8.decode(res.bodyBytes);
+      try {
+        final decoded = json.decode(bodyText);
+        final msg = (decoded is Map ? decoded['message'] : null) ??
+            'Gagal memverifikasi operator (${res.statusCode})';
+        throw Exception(msg);
+      } catch (_) {
+        throw Exception('Gagal memverifikasi operator (${res.statusCode})');
+      }
+    }
+  }
+
+  // =========================
+  //  VERIFIKASI KADEPT (final)
+  //  PATCH /api/production/broker/:noProduksi/verify-depthead
+  //  PATCH /api/production/broker/:noProduksi/unverify-depthead
+  //  Backend menolak (409) kalau produksi belum IsComplete, belum
+  //  diverifikasi Stock Controller (SCVerifiedAt), belum diverifikasi
+  //  Production Controller (PCVerifiedAt), atau sudah diverifikasi
+  //  Kadept sebelumnya.
+  // =========================
+  Future<void> verifyDepartment(String noProduksi, {String? note}) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse(
+      '$_base/api/production/broker/$noProduksi/verify-depthead',
+    );
+
+    late http.Response res;
+    try {
+      res = await http
+          .patch(
+            url,
+            headers: {..._headers(token), 'Content-Type': 'application/json'},
+            body: json.encode({if (note != null && note.trim().isNotEmpty) 'note': note.trim()}),
+          )
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout memverifikasi department broker');
+    }
+
+    if (res.statusCode != 200) {
+      final bodyText = utf8.decode(res.bodyBytes);
+      try {
+        final decoded = json.decode(bodyText);
+        final msg = (decoded is Map ? decoded['message'] : null) ??
+            'Gagal memverifikasi department (${res.statusCode})';
+        throw Exception(msg);
+      } catch (_) {
+        throw Exception('Gagal memverifikasi department (${res.statusCode})');
+      }
+    }
+  }
+
+  Future<void> unverifyDepartment(String noProduksi, {String? note}) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse(
+      '$_base/api/production/broker/$noProduksi/unverify-depthead',
+    );
+
+    late http.Response res;
+    try {
+      res = await http
+          .patch(
+            url,
+            headers: {..._headers(token), 'Content-Type': 'application/json'},
+            body: json.encode({if (note != null && note.trim().isNotEmpty) 'note': note.trim()}),
+          )
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout membatalkan verifikasi department broker');
+    }
+
+    if (res.statusCode != 200) {
+      final bodyText = utf8.decode(res.bodyBytes);
+      try {
+        final decoded = json.decode(bodyText);
+        final msg = (decoded is Map ? decoded['message'] : null) ??
+            'Gagal membatalkan verifikasi department (${res.statusCode})';
+        throw Exception(msg);
+      } catch (_) {
+        throw Exception(
+          'Gagal membatalkan verifikasi department (${res.statusCode})',
+        );
+      }
+    }
+  }
+
+  // =========================
+  //  VERIFICATION SUMMARY (header saja)
+  //  GET /api/production/broker/:noProduksi/verification-summary
+  //  Dipakai dialog Production Controller & Kadept untuk info penugasan &
+  //  status SC/PC/Kadept. Cross-check input/output tetap pakai
+  //  fetchInputs/fetchOutputs yang sudah ada (lewat BrokerVerifikasiAdapter
+  //  .fetchCrossCheck) supaya konsisten dengan dialog Stock Controller dan
+  //  tidak perlu re-parse bentuk inputs/outputs verification-summary yang
+  //  beda-beda per kategori (mis. "bonggolan" tidak punya DetailSak).
+  //  Return raw Map `header` — parsing ke model generik dilakukan di layer
+  //  adapter (lib/features/verifikasi) supaya repository ini tidak perlu
+  //  bergantung pada model fitur verifikasi.
+  // =========================
+  Future<Map<String, dynamic>> fetchVerificationHeader(
+    String noProduksi,
+  ) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse(
+      '$_base/api/production/broker/$noProduksi/verification-summary',
+    );
+
+    http.Response res;
+    try {
+      res = await http.get(url, headers: _headers(token)).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout mengambil verification summary broker ($noProduksi)');
+    }
+
+    if (res.statusCode != 200) {
+      throw Exception(
+        'Gagal mengambil verification summary broker ($noProduksi), code ${res.statusCode}',
+      );
+    }
+
+    final decoded = utf8.decode(res.bodyBytes);
+    final body = json.decode(decoded) as Map<String, dynamic>;
+    final data = body['data'] as Map<String, dynamic>? ?? {};
+    return data['header'] as Map<String, dynamic>? ?? {};
   }
 }

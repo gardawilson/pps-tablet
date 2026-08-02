@@ -4,6 +4,7 @@ import '../../../production/inject/model/inject_production_model.dart';
 import '../../../production/inject/repository/inject_production_input_repository.dart';
 import '../../../production/inject/repository/inject_production_repository.dart';
 import '../../model/verifikasi_models.dart';
+import '../../model/verifikasi_operator_summary_model.dart';
 import '../verifikasi_adapter.dart';
 import 'production_grouping.dart';
 
@@ -26,6 +27,12 @@ class InjectVerifikasiAdapter implements VerifikasiAdapter {
   String get jenisLabel => 'Inject';
 
   @override
+  bool get hasOperatorVerification => false;
+
+  @override
+  bool get hasDepartmentVerification => false;
+
+  @override
   Future<List<VerifikasiItem>> fetchPending() async {
     final result = await _repo.fetchAll(
       page: 1,
@@ -44,6 +51,7 @@ class InjectVerifikasiAdapter implements VerifikasiAdapter {
               shift: p.shift,
               hourStart: p.hourStart,
               hourEnd: p.hourEnd,
+              outputJenisNama: p.namaJenis,
               verified: p.verified,
               verifiedByUsername: p.verifiedByUsername,
               verifiedAt: p.verifiedAt,
@@ -112,4 +120,20 @@ class InjectVerifikasiAdapter implements VerifikasiAdapter {
   @override
   Future<void> unverify(String noProduksi, {String? note}) =>
       _repo.unverifyProduksi(noProduksi, note: note);
+
+  @override
+  Future<VerifikasiOperatorHeader> fetchOperatorHeader(String noProduksi) =>
+      throw UnimplementedError(
+        'Inject tidak men-support verifikasi Production Controller/Kadept',
+      );
+
+  @override
+  Future<void> verifyOperator(String noProduksi, {String? note}) =>
+      throw UnimplementedError(
+        'Inject tidak men-support verifikasi Production Controller',
+      );
+
+  @override
+  Future<void> verifyDepartment(String noProduksi, {String? note}) =>
+      throw UnimplementedError('Inject tidak men-support verifikasi Kadept');
 }

@@ -35,12 +35,32 @@ class BrokerProduction {
   final bool isComplete;
   final String? produksiStatus;
 
-  // ✅ Verifikasi supervisor (terpisah dari isComplete/produksiStatus)
+  // ✅ Verifikasi Stock Controller (terpisah dari isComplete/produksiStatus)
   final bool verified;
   final int? verifiedBy;
   final String? verifiedByUsername;
   final DateTime? verifiedAt;
   final String? verifyNote;
+
+  // ✅ Verifikasi Production Controller — independen dari Stock Controller
+  final bool verifiedOperator;
+  final int? operatorVerifiedBy;
+  final String? operatorVerifiedByUsername;
+  final DateTime? operatorVerifiedAt;
+  final String? operatorVerifyNote;
+
+  // ✅ Verifikasi Kadept (final) — setelah Stock Controller & Production
+  // Controller tuntas
+  final bool verifiedDepartment;
+  final int? departmentVerifiedBy;
+  final String? departmentVerifiedByUsername;
+  final DateTime? departmentVerifiedAt;
+  final String? departmentVerifyNote;
+
+  // ✅ Rendemen — hanya terisi kalau di-request dengan ?includeRendemen=true
+  final double? totalInputBerat;
+  final double? totalOutputBerat;
+  final double? rendemen;
 
   const BrokerProduction({
     required this.noProduksi,
@@ -73,6 +93,19 @@ class BrokerProduction {
     this.verifiedByUsername,
     this.verifiedAt,
     this.verifyNote,
+    this.verifiedOperator = false,
+    this.operatorVerifiedBy,
+    this.operatorVerifiedByUsername,
+    this.operatorVerifiedAt,
+    this.operatorVerifyNote,
+    this.verifiedDepartment = false,
+    this.departmentVerifiedBy,
+    this.departmentVerifiedByUsername,
+    this.departmentVerifiedAt,
+    this.departmentVerifyNote,
+    this.totalInputBerat,
+    this.totalOutputBerat,
+    this.rendemen,
   });
 
   // ── Backward-compat getters ──────────────────────────────────────────────
@@ -95,6 +128,23 @@ class BrokerProduction {
     if (v is double) return v.toInt();
     if (v is String) return int.tryParse(v);
     return null;
+  }
+
+  static double? _asDouble(dynamic v) {
+    if (v == null) return null;
+    if (v is double) return v;
+    if (v is int) return v.toDouble();
+    if (v is String) return double.tryParse(v);
+    return null;
+  }
+
+  /// Beberapa field (mis. VerifiedByUsername) kadang dikirim backend
+  /// sebagai int (user id) alih-alih string — jangan cast langsung
+  /// `as String?`, selalu lewat sini supaya tidak crash type-cast.
+  static String? _asStringOrNull(dynamic v) {
+    if (v == null) return null;
+    final s = v.toString().trim();
+    return s.isEmpty ? null : s;
   }
 
   static DateTime? _asDateTime(dynamic v) {
@@ -149,6 +199,11 @@ class BrokerProduction {
   }
 
   factory BrokerProduction.fromJson(Map<String, dynamic> j) {
+    final scVerifiedAt = _asDateTime(j['SCVerifiedAt'] ?? j['VerifiedAt']);
+    final pcVerifiedAt = _asDateTime(j['PCVerifiedAt'] ?? j['OperatorVerifiedAt']);
+    final deptHeadVerifiedAt =
+        _asDateTime(j['DeptHeadVerifiedAt'] ?? j['DepartmentVerifiedAt']);
+
     return BrokerProduction(
       noProduksi: _asString(j['NoProduksi']),
       idOperators: (j['IdOperators'] as List?)
@@ -183,11 +238,42 @@ class BrokerProduction {
           j['status']?.toString() == 'complete',
       produksiStatus: j['status']?.toString() ??
           (_asBool(j['IsComplete'], fallback: false) ? 'complete' : 'pending'),
-      verified: _asBool(j['Verified'], fallback: false),
-      verifiedBy: _asInt(j['VerifiedBy']),
-      verifiedByUsername: j['VerifiedByUsername'] as String?,
-      verifiedAt: _asDateTime(j['VerifiedAt']),
-      verifyNote: j['VerifiedNote'] as String?,
+      // Nama field backend pakai prefix SC/PC/DeptHead — tetap fallback ke
+      // nama lama (Verified*/Operator*/Department*) supaya kompatibel
+      // kalau ada endpoint lain yang belum ikut berubah. Sebagian respons
+      // (mis. ?verified=0) juga tidak mengirim flag boolean sama sekali —
+      // kalau key-nya absen, derive dari *VerifiedAt (non-null = sudah
+      // diverifikasi) alih-alih fallback ke false begitu saja.
+      verified: j.containsKey('Verified')
+          ? _asBool(j['Verified'], fallback: false)
+          : scVerifiedAt != null,
+      verifiedBy: _asInt(j['SCVerifiedBy'] ?? j['VerifiedBy']),
+      verifiedByUsername:
+          _asStringOrNull(j['SCVerifiedByUsername'] ?? j['VerifiedByUsername']),
+      verifiedAt: scVerifiedAt,
+      verifyNote: _asStringOrNull(j['SCVerifiedNote'] ?? j['VerifiedNote']),
+      verifiedOperator: j.containsKey('VerifiedOperator')
+          ? _asBool(j['VerifiedOperator'], fallback: false)
+          : pcVerifiedAt != null,
+      operatorVerifiedBy: _asInt(j['PCVerifiedBy'] ?? j['OperatorVerifiedBy']),
+      operatorVerifiedByUsername: _asStringOrNull(
+          j['PCVerifiedByUsername'] ?? j['OperatorVerifiedByUsername']),
+      operatorVerifiedAt: pcVerifiedAt,
+      operatorVerifyNote:
+          _asStringOrNull(j['PCVerifiedNote'] ?? j['OperatorVerifiedNote']),
+      verifiedDepartment: j.containsKey('VerifiedDepartment')
+          ? _asBool(j['VerifiedDepartment'], fallback: false)
+          : deptHeadVerifiedAt != null,
+      departmentVerifiedBy:
+          _asInt(j['DeptHeadVerifiedBy'] ?? j['DepartmentVerifiedBy']),
+      departmentVerifiedByUsername: _asStringOrNull(
+          j['DeptHeadVerifiedByUsername'] ?? j['DepartmentVerifiedByUsername']),
+      departmentVerifiedAt: deptHeadVerifiedAt,
+      departmentVerifyNote: _asStringOrNull(
+          j['DeptHeadVerifiedNote'] ?? j['DepartmentVerifiedNote']),
+      totalInputBerat: _asDouble(j['TotalInputBerat']),
+      totalOutputBerat: _asDouble(j['TotalOutputBerat']),
+      rendemen: _asDouble(j['Rendemen']),
     );
   }
 

@@ -162,6 +162,7 @@ class WashingProductionRepository {
     DateTime? tanggal,
     bool? complete,
     bool? verified,
+    bool includeRendemen = false,
   }) async {
     final token = await TokenStorage.getToken();
 
@@ -175,6 +176,7 @@ class WashingProductionRepository {
       if (tanggal != null) 'tanggal': toDbDateString(tanggal),
       if (complete != null) 'complete': '$complete',
       if (verified != null) 'verified': '$verified',
+      if (includeRendemen) 'includeRendemen': 'true',
     };
 
     final url = Uri.parse('$_base/api/production/washing')
@@ -241,6 +243,7 @@ class WashingProductionRepository {
     DateTime? tanggal,
     bool? complete,
     bool? verified,
+    bool includeRendemen = false,
   }) async {
     final r = await fetchAll(
       page: page,
@@ -252,6 +255,7 @@ class WashingProductionRepository {
       tanggal: tanggal,
       complete: complete,
       verified: verified,
+      includeRendemen: includeRendemen,
     );
     return (r['items'] as List<WashingProduction>);
   }
@@ -574,13 +578,13 @@ class WashingProductionRepository {
   }
 
   // =========================
-  //  VERIFIKASI SUPERVISOR
-  //  PATCH /api/production/washing/:noProduksi/verify
-  //  PATCH /api/production/washing/:noProduksi/unverify
+  //  VERIFIKASI STOCK CONTROLLER
+  //  PATCH /api/production/washing/:noProduksi/verify-sc
+  //  PATCH /api/production/washing/:noProduksi/unverify-sc
   // =========================
   Future<void> verifyProduksi(String noProduksi, {String? note}) async {
     final token = await TokenStorage.getToken();
-    final url = Uri.parse('$_base/api/production/washing/$noProduksi/verify');
+    final url = Uri.parse('$_base/api/production/washing/$noProduksi/verify-sc');
 
     late http.Response res;
     try {
@@ -610,7 +614,7 @@ class WashingProductionRepository {
 
   Future<void> unverifyProduksi(String noProduksi, {String? note}) async {
     final token = await TokenStorage.getToken();
-    final url = Uri.parse('$_base/api/production/washing/$noProduksi/unverify');
+    final url = Uri.parse('$_base/api/production/washing/$noProduksi/unverify-sc');
 
     late http.Response res;
     try {
@@ -634,6 +638,116 @@ class WashingProductionRepository {
         throw Exception(msg);
       } catch (_) {
         throw Exception('Gagal membatalkan verifikasi produksi (${res.statusCode})');
+      }
+    }
+  }
+
+  // =========================
+  //  VERIFIKASI PRODUCTION CONTROLLER
+  //  PATCH /api/production/washing/:noProduksi/verify-pc
+  // =========================
+  Future<void> verifyOperator(String noProduksi, {String? note}) async {
+    final token = await TokenStorage.getToken();
+    final url =
+        Uri.parse('$_base/api/production/washing/$noProduksi/verify-pc');
+
+    late http.Response res;
+    try {
+      res = await http
+          .patch(
+            url,
+            headers: {..._headers(token), 'Content-Type': 'application/json'},
+            body: json.encode({if (note != null && note.trim().isNotEmpty) 'note': note.trim()}),
+          )
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout memverifikasi operator washing');
+    }
+
+    if (res.statusCode != 200) {
+      final bodyText = utf8.decode(res.bodyBytes);
+      try {
+        final decoded = json.decode(bodyText);
+        final msg = (decoded is Map ? decoded['message'] : null) ??
+            'Gagal memverifikasi operator (${res.statusCode})';
+        throw Exception(msg);
+      } catch (_) {
+        throw Exception('Gagal memverifikasi operator (${res.statusCode})');
+      }
+    }
+  }
+
+  // =========================
+  //  VERIFIKASI KADEPT (final)
+  //  PATCH /api/production/washing/:noProduksi/verify-depthead
+  //  PATCH /api/production/washing/:noProduksi/unverify-depthead
+  //  Backend menolak (409) kalau produksi belum IsComplete, belum
+  //  diverifikasi Stock Controller (SCVerifiedAt), belum diverifikasi
+  //  Production Controller (PCVerifiedAt), atau sudah diverifikasi
+  //  Kadept sebelumnya.
+  // =========================
+  Future<void> verifyDepartment(String noProduksi, {String? note}) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse(
+      '$_base/api/production/washing/$noProduksi/verify-depthead',
+    );
+
+    late http.Response res;
+    try {
+      res = await http
+          .patch(
+            url,
+            headers: {..._headers(token), 'Content-Type': 'application/json'},
+            body: json.encode({if (note != null && note.trim().isNotEmpty) 'note': note.trim()}),
+          )
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout memverifikasi department washing');
+    }
+
+    if (res.statusCode != 200) {
+      final bodyText = utf8.decode(res.bodyBytes);
+      try {
+        final decoded = json.decode(bodyText);
+        final msg = (decoded is Map ? decoded['message'] : null) ??
+            'Gagal memverifikasi department (${res.statusCode})';
+        throw Exception(msg);
+      } catch (_) {
+        throw Exception('Gagal memverifikasi department (${res.statusCode})');
+      }
+    }
+  }
+
+  Future<void> unverifyDepartment(String noProduksi, {String? note}) async {
+    final token = await TokenStorage.getToken();
+    final url = Uri.parse(
+      '$_base/api/production/washing/$noProduksi/unverify-depthead',
+    );
+
+    late http.Response res;
+    try {
+      res = await http
+          .patch(
+            url,
+            headers: {..._headers(token), 'Content-Type': 'application/json'},
+            body: json.encode({if (note != null && note.trim().isNotEmpty) 'note': note.trim()}),
+          )
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout membatalkan verifikasi department washing');
+    }
+
+    if (res.statusCode != 200) {
+      final bodyText = utf8.decode(res.bodyBytes);
+      try {
+        final decoded = json.decode(bodyText);
+        final msg = (decoded is Map ? decoded['message'] : null) ??
+            'Gagal membatalkan verifikasi department (${res.statusCode})';
+        throw Exception(msg);
+      } catch (_) {
+        throw Exception(
+          'Gagal membatalkan verifikasi department (${res.statusCode})',
+        );
       }
     }
   }

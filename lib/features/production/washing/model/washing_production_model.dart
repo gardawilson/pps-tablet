@@ -42,12 +42,32 @@ class WashingProduction {
   final bool isComplete;
   final String? produksiStatus;
 
-  // ✅ Verifikasi supervisor (terpisah dari isComplete/produksiStatus)
+  // ✅ Verifikasi kepala stok (terpisah dari isComplete/produksiStatus)
   final bool verified;
   final int? verifiedBy;
   final String? verifiedByUsername;
   final DateTime? verifiedAt;
   final String? verifyNote;
+
+  // ✅ Verifikasi operator — terpisah dari verifikasi kepala stok di atas
+  final bool verifiedOperator;
+  final int? operatorVerifiedBy;
+  final String? operatorVerifiedByUsername;
+  final DateTime? operatorVerifiedAt;
+  final String? operatorVerifyNote;
+
+  // ✅ Verifikasi department (final) — tahap ketiga, setelah kepala stok
+  // & operator tuntas
+  final bool verifiedDepartment;
+  final int? departmentVerifiedBy;
+  final String? departmentVerifiedByUsername;
+  final DateTime? departmentVerifiedAt;
+  final String? departmentVerifyNote;
+
+  // ✅ Rendemen — hanya terisi kalau di-request dengan ?includeRendemen=true
+  final double? totalInputBerat;
+  final double? totalOutputBerat;
+  final double? rendemen;
 
   const WashingProduction({
     required this.noProduksi,
@@ -81,6 +101,19 @@ class WashingProduction {
     this.verifiedByUsername,
     this.verifiedAt,
     this.verifyNote,
+    this.verifiedOperator = false,
+    this.operatorVerifiedBy,
+    this.operatorVerifiedByUsername,
+    this.operatorVerifiedAt,
+    this.operatorVerifyNote,
+    this.verifiedDepartment = false,
+    this.departmentVerifiedBy,
+    this.departmentVerifiedByUsername,
+    this.departmentVerifiedAt,
+    this.departmentVerifyNote,
+    this.totalInputBerat,
+    this.totalOutputBerat,
+    this.rendemen,
   });
 
   // ── Backward-compat getters ──────────────────────────────────────────────
@@ -89,6 +122,15 @@ class WashingProduction {
 
   // ---------- Tolerant parsers ----------
   static String _asString(dynamic v) => v?.toString() ?? '';
+
+  /// Beberapa field (mis. VerifiedByUsername) kadang dikirim backend
+  /// sebagai int (user id) alih-alih string — jangan cast langsung
+  /// `as String?`, selalu lewat sini supaya tidak crash type-cast.
+  static String? _asStringOrNull(dynamic v) {
+    if (v == null) return null;
+    final s = v.toString().trim();
+    return s.isEmpty ? null : s;
+  }
 
   static int _asIntRequired(dynamic v, {int fallback = 0}) {
     final r = _asInt(v);
@@ -182,6 +224,11 @@ class WashingProduction {
     final idOperators = parseIdOperators(j['IdOperators'] ?? j['IdOperator']);
     final namaOperators = _asString(j['NamaOperators'] ?? j['NamaOperator']);
 
+    final scVerifiedAt = _asDateTime(j['SCVerifiedAt'] ?? j['VerifiedAt']);
+    final pcVerifiedAt = _asDateTime(j['PCVerifiedAt'] ?? j['OperatorVerifiedAt']);
+    final deptHeadVerifiedAt =
+        _asDateTime(j['DeptHeadVerifiedAt'] ?? j['DepartmentVerifiedAt']);
+
     return WashingProduction(
       noProduksi: _asString(j['NoProduksi']),
       idOperators: idOperators,
@@ -211,16 +258,48 @@ class WashingProduction {
       isLocked: _asBool(j['IsLocked'], fallback: false),
       lastClosedDate: _asDateTime(j['LastClosedDate']),
       idRegu: _asInt(j['IdRegu']),
-      namaRegu: j['NamaRegu'] as String?,
+      namaRegu: _asStringOrNull(j['NamaRegu']),
       isComplete: _asBool(j['IsComplete'], fallback: false) ||
           j['status']?.toString() == 'complete',
       produksiStatus: j['status']?.toString() ??
           (_asBool(j['IsComplete'], fallback: false) ? 'complete' : 'pending'),
-      verified: _asBool(j['Verified'], fallback: false),
-      verifiedBy: _asInt(j['VerifiedBy']),
-      verifiedByUsername: j['VerifiedByUsername'] as String?,
-      verifiedAt: _asDateTime(j['VerifiedAt']),
-      verifyNote: j['VerifiedNote'] as String?,
+      // Nama field backend berubah jadi prefix SC/PC/DeptHead — tetap
+      // fallback ke nama lama (Verified*/Operator*/Department*) supaya
+      // kompatibel kalau ada endpoint lain yang belum ikut berubah. Selain
+      // itu, sebagian respons (mis. ?verified=1) tidak lagi mengirim flag
+      // boolean Verified/VerifiedOperator/VerifiedDepartment sama sekali —
+      // kalau key-nya absen, derive dari *VerifiedAt (non-null = sudah
+      // diverifikasi) alih-alih fallback ke false begitu saja.
+      verified: j.containsKey('Verified')
+          ? _asBool(j['Verified'], fallback: false)
+          : scVerifiedAt != null,
+      verifiedBy: _asInt(j['SCVerifiedBy'] ?? j['VerifiedBy']),
+      verifiedByUsername:
+          _asStringOrNull(j['SCVerifiedByUsername'] ?? j['VerifiedByUsername']),
+      verifiedAt: scVerifiedAt,
+      verifyNote: _asStringOrNull(j['SCVerifiedNote'] ?? j['VerifiedNote']),
+      verifiedOperator: j.containsKey('VerifiedOperator')
+          ? _asBool(j['VerifiedOperator'], fallback: false)
+          : pcVerifiedAt != null,
+      operatorVerifiedBy: _asInt(j['PCVerifiedBy'] ?? j['OperatorVerifiedBy']),
+      operatorVerifiedByUsername: _asStringOrNull(
+          j['PCVerifiedByUsername'] ?? j['OperatorVerifiedByUsername']),
+      operatorVerifiedAt: pcVerifiedAt,
+      operatorVerifyNote:
+          _asStringOrNull(j['PCVerifiedNote'] ?? j['OperatorVerifiedNote']),
+      verifiedDepartment: j.containsKey('VerifiedDepartment')
+          ? _asBool(j['VerifiedDepartment'], fallback: false)
+          : deptHeadVerifiedAt != null,
+      departmentVerifiedBy:
+          _asInt(j['DeptHeadVerifiedBy'] ?? j['DepartmentVerifiedBy']),
+      departmentVerifiedByUsername: _asStringOrNull(
+          j['DeptHeadVerifiedByUsername'] ?? j['DepartmentVerifiedByUsername']),
+      departmentVerifiedAt: deptHeadVerifiedAt,
+      departmentVerifyNote: _asStringOrNull(
+          j['DeptHeadVerifiedNote'] ?? j['DepartmentVerifiedNote']),
+      totalInputBerat: _asDouble(j['TotalInputBerat']),
+      totalOutputBerat: _asDouble(j['TotalOutputBerat']),
+      rendemen: _asDouble(j['Rendemen']),
     );
   }
 

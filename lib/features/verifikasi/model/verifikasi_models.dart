@@ -11,9 +11,30 @@ class VerifikasiItem {
   final int? shift;
   final String? hourStart;
   final String? hourEnd;
+  final String? outputJenisNama;
+
+  /// Persentase rendemen (output/input) — hanya terisi untuk jenis produksi
+  /// yang endpoint list-nya mendukung `?includeRendemen=true` (saat ini
+  /// hanya washing). Null kalau tidak tersedia/belum ada data input-output.
+  final double? rendemen;
+
   final bool verified;
   final String? verifiedByUsername;
   final DateTime? verifiedAt;
+
+  /// Verifikasi Production Controller — independen dari verifikasi Stock
+  /// Controller di atas. Null/false untuk jenis produksi yang belum punya
+  /// alur verifikasi ini (saat ini hanya washing yang punya).
+  final bool verifiedOperator;
+  final String? operatorVerifiedByUsername;
+  final DateTime? operatorVerifiedAt;
+
+  /// Verifikasi Kadept (Kepala Department) — baru bisa dilakukan setelah
+  /// Stock Controller & Production Controller tuntas. Null/false untuk
+  /// jenis produksi yang belum punya tahap ini.
+  final bool verifiedDepartment;
+  final String? departmentVerifiedByUsername;
+  final DateTime? departmentVerifiedAt;
 
   const VerifikasiItem({
     required this.noProduksi,
@@ -24,10 +45,54 @@ class VerifikasiItem {
     this.shift,
     this.hourStart,
     this.hourEnd,
+    this.outputJenisNama,
+    this.rendemen,
     this.verified = false,
     this.verifiedByUsername,
     this.verifiedAt,
+    this.verifiedOperator = false,
+    this.operatorVerifiedByUsername,
+    this.operatorVerifiedAt,
+    this.verifiedDepartment = false,
+    this.departmentVerifiedByUsername,
+    this.departmentVerifiedAt,
   });
+
+  VerifikasiItem copyWith({
+    bool? verified,
+    String? verifiedByUsername,
+    DateTime? verifiedAt,
+    bool? verifiedOperator,
+    String? operatorVerifiedByUsername,
+    DateTime? operatorVerifiedAt,
+    bool? verifiedDepartment,
+    String? departmentVerifiedByUsername,
+    DateTime? departmentVerifiedAt,
+  }) {
+    return VerifikasiItem(
+      noProduksi: noProduksi,
+      jenisKey: jenisKey,
+      jenisLabel: jenisLabel,
+      tglProduksi: tglProduksi,
+      namaMesin: namaMesin,
+      shift: shift,
+      hourStart: hourStart,
+      hourEnd: hourEnd,
+      outputJenisNama: outputJenisNama,
+      rendemen: rendemen,
+      verified: verified ?? this.verified,
+      verifiedByUsername: verifiedByUsername ?? this.verifiedByUsername,
+      verifiedAt: verifiedAt ?? this.verifiedAt,
+      verifiedOperator: verifiedOperator ?? this.verifiedOperator,
+      operatorVerifiedByUsername:
+          operatorVerifiedByUsername ?? this.operatorVerifiedByUsername,
+      operatorVerifiedAt: operatorVerifiedAt ?? this.operatorVerifiedAt,
+      verifiedDepartment: verifiedDepartment ?? this.verifiedDepartment,
+      departmentVerifiedByUsername:
+          departmentVerifiedByUsername ?? this.departmentVerifiedByUsername,
+      departmentVerifiedAt: departmentVerifiedAt ?? this.departmentVerifiedAt,
+    );
+  }
 }
 
 /// Satu label fisik (mis. satu NoWashing / NoBahanBaku / NoBroker) di dalam

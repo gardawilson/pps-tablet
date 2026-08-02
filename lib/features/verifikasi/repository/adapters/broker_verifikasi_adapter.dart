@@ -3,6 +3,7 @@
 import '../../../production/broker/repository/broker_production_input_repository.dart';
 import '../../../production/broker/repository/broker_production_repository.dart';
 import '../../model/verifikasi_models.dart';
+import '../../model/verifikasi_operator_summary_model.dart';
 import '../verifikasi_adapter.dart';
 import 'production_grouping.dart';
 
@@ -25,14 +26,27 @@ class BrokerVerifikasiAdapter implements VerifikasiAdapter {
   String get jenisLabel => 'Broker';
 
   @override
+  bool get hasOperatorVerification => true;
+
+  @override
+  bool get hasDepartmentVerification => true;
+
+  @override
   Future<List<VerifikasiItem>> fetchPending() async {
+    // verified: false → server hanya kirim yang belum tuntas verifikasi.
+    // Client-side where() di bawah tetap dipertahankan sebagai pengaman
+    // kalau backend suatu saat mengembalikan item yang ternyata sudah
+    // tuntas semua tahap (SC/PC/Kadept).
     final items = await _repo.fetchAllList(
       page: 1,
       pageSize: 100,
       complete: true,
       verified: false,
+      includeRendemen: true,
     );
     return items
+        .where((p) =>
+            !(p.verified && p.verifiedOperator && p.verifiedDepartment))
         .map((p) => VerifikasiItem(
               noProduksi: p.noProduksi,
               jenisKey: jenisKey,
@@ -42,9 +56,17 @@ class BrokerVerifikasiAdapter implements VerifikasiAdapter {
               shift: p.shift,
               hourStart: p.hourStart,
               hourEnd: p.hourEnd,
+              outputJenisNama: p.outputJenisNama,
+              rendemen: p.rendemen,
               verified: p.verified,
               verifiedByUsername: p.verifiedByUsername,
               verifiedAt: p.verifiedAt,
+              verifiedOperator: p.verifiedOperator,
+              operatorVerifiedByUsername: p.operatorVerifiedByUsername,
+              operatorVerifiedAt: p.operatorVerifiedAt,
+              verifiedDepartment: p.verifiedDepartment,
+              departmentVerifiedByUsername: p.departmentVerifiedByUsername,
+              departmentVerifiedAt: p.departmentVerifiedAt,
             ))
         .toList();
   }
@@ -136,4 +158,20 @@ class BrokerVerifikasiAdapter implements VerifikasiAdapter {
   @override
   Future<void> unverify(String noProduksi, {String? note}) =>
       _repo.unverifyProduksi(noProduksi, note: note);
+
+  @override
+  Future<VerifikasiOperatorHeader> fetchOperatorHeader(
+    String noProduksi,
+  ) async {
+    final header = await _repo.fetchVerificationHeader(noProduksi);
+    return VerifikasiOperatorHeader.fromJson(header);
+  }
+
+  @override
+  Future<void> verifyOperator(String noProduksi, {String? note}) =>
+      _repo.verifyOperator(noProduksi, note: note);
+
+  @override
+  Future<void> verifyDepartment(String noProduksi, {String? note}) =>
+      _repo.verifyDepartment(noProduksi, note: note);
 }

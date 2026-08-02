@@ -3,6 +3,7 @@
 import '../../../production/gilingan/repository/gilingan_production_input_repository.dart';
 import '../../../production/gilingan/repository/gilingan_production_repository.dart';
 import '../../model/verifikasi_models.dart';
+import '../../model/verifikasi_operator_summary_model.dart';
 import '../verifikasi_adapter.dart';
 import 'production_grouping.dart';
 
@@ -25,6 +26,12 @@ class GilinganVerifikasiAdapter implements VerifikasiAdapter {
   String get jenisLabel => 'Gilingan';
 
   @override
+  bool get hasOperatorVerification => false;
+
+  @override
+  bool get hasDepartmentVerification => false;
+
+  @override
   Future<List<VerifikasiItem>> fetchPending() async {
     final items = await _repo.fetchAllList(
       page: 1,
@@ -42,6 +49,7 @@ class GilinganVerifikasiAdapter implements VerifikasiAdapter {
               shift: p.shift,
               hourStart: p.hourStart,
               hourEnd: p.hourEnd,
+              outputJenisNama: p.outputJenisNama,
               verified: p.verified,
               verifiedByUsername: p.verifiedByUsername,
               verifiedAt: p.verifiedAt,
@@ -109,4 +117,20 @@ class GilinganVerifikasiAdapter implements VerifikasiAdapter {
   @override
   Future<void> unverify(String noProduksi, {String? note}) =>
       _repo.unverifyProduksi(noProduksi, note: note);
+
+  @override
+  Future<VerifikasiOperatorHeader> fetchOperatorHeader(String noProduksi) =>
+      throw UnimplementedError(
+        'Gilingan tidak men-support verifikasi Production Controller/Kadept',
+      );
+
+  @override
+  Future<void> verifyOperator(String noProduksi, {String? note}) =>
+      throw UnimplementedError(
+        'Gilingan tidak men-support verifikasi Production Controller',
+      );
+
+  @override
+  Future<void> verifyDepartment(String noProduksi, {String? note}) =>
+      throw UnimplementedError('Gilingan tidak men-support verifikasi Kadept');
 }

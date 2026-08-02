@@ -1,6 +1,7 @@
 // lib/features/verifikasi/repository/verifikasi_repository.dart
 
 import '../model/verifikasi_models.dart';
+import '../model/verifikasi_operator_summary_model.dart';
 import 'adapters/broker_verifikasi_adapter.dart';
 import 'adapters/washing_verifikasi_adapter.dart';
 import 'verifikasi_adapter.dart';
@@ -25,6 +26,12 @@ class VerifikasiRepository {
 
   VerifikasiAdapter _adapterFor(String jenisKey) =>
       adapters.firstWhere((a) => a.jenisKey == jenisKey);
+
+  bool hasOperatorVerification(String jenisKey) =>
+      _adapterFor(jenisKey).hasOperatorVerification;
+
+  bool hasDepartmentVerification(String jenisKey) =>
+      _adapterFor(jenisKey).hasDepartmentVerification;
 
   Future<List<VerifikasiItem>> fetchPending({String? jenisKey}) async {
     final selected = jenisKey == null
@@ -65,5 +72,28 @@ class VerifikasiRepository {
 
   Future<void> unverify(String jenisKey, String noProduksi, {String? note}) {
     return _adapterFor(jenisKey).unverify(noProduksi, note: note);
+  }
+
+  Future<VerifikasiOperatorHeader> fetchOperatorHeader(
+    String jenisKey,
+    String noProduksi,
+  ) {
+    return _adapterFor(jenisKey).fetchOperatorHeader(noProduksi);
+  }
+
+  Future<void> verifyOperator(
+    String jenisKey,
+    String noProduksi, {
+    String? note,
+  }) {
+    return _adapterFor(jenisKey).verifyOperator(noProduksi, note: note);
+  }
+
+  Future<void> verifyDepartment(
+    String jenisKey,
+    String noProduksi, {
+    String? note,
+  }) {
+    return _adapterFor(jenisKey).verifyDepartment(noProduksi, note: note);
   }
 }

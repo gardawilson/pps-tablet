@@ -13,6 +13,7 @@ import '../model/washing_formula_model.dart';
 import '../model/washing_inputs_model.dart';
 import '../model/washing_inputs_v2_model.dart';
 import '../model/washing_output_model.dart';
+import '../model/washing_verification_summary_model.dart';
 
 class WashingProductionInputRepository {
   static const _timeout = Duration(seconds: 25);
@@ -159,6 +160,41 @@ class WashingProductionInputRepository {
     final body = json.decode(decoded) as Map<String, dynamic>;
     final data = body['data'] as Map<String, dynamic>? ?? {};
     return WashingOutputsV2.fromJson(data);
+  }
+
+  // -----------------------------
+  // GET /api/production/washing/:noProduksi/verification-summary
+  // Dipakai dialog "Verifikasi Operator" — sama seperti inputs/v2 +
+  // outputs/v2 tapi dibundel jadi satu response bersama info penugasan
+  // (operator, regu, kehadiran) yang jadi dasar verifikasi operator.
+  // -----------------------------
+  Future<WashingVerificationSummary> fetchVerificationSummary(
+    String noProduksi,
+  ) async {
+    final key = noProduksi.trim();
+    if (key.isEmpty) throw ArgumentError('noProduksi tidak boleh kosong');
+
+    final token = await TokenStorage.getToken();
+    final url =
+        Uri.parse('$_base/api/production/washing/$key/verification-summary');
+
+    http.Response res;
+    try {
+      res = await http.get(url, headers: _headers(token)).timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('Timeout mengambil verification summary ($key)');
+    }
+
+    if (res.statusCode != 200) {
+      throw Exception(
+        'Gagal mengambil verification summary ($key), code ${res.statusCode}',
+      );
+    }
+
+    final decoded = utf8.decode(res.bodyBytes);
+    final body = json.decode(decoded) as Map<String, dynamic>;
+    final data = body['data'] as Map<String, dynamic>? ?? {};
+    return WashingVerificationSummary.fromJson(data);
   }
 
   // -----------------------------

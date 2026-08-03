@@ -650,6 +650,30 @@ class InjectProductionRepository {
     }
   }
 
+  /// POST :7500/api/production/inject/qc/counter/:idMesin/reset
+  ///
+  /// Reset counter/odometer mesin ke 0. Mengembalikan nilai counter terbaru
+  /// setelah reset (fallback 0 jika server tidak mengirimkan nilainya).
+  Future<int> resetQcCounter(int idMesin) async {
+    try {
+      final body = await api.postJson(
+        '/api/production/inject/qc/counter/$idMesin/reset',
+        body: const <String, dynamic>{},
+      );
+      final data = body['data'] as Map<String, dynamic>?;
+      final raw = data?['counterCurrent'];
+      if (raw == null) return 0;
+      if (raw is int) return raw;
+      if (raw is num) return raw.toInt();
+      return int.tryParse(raw.toString()) ?? 0;
+    } on ApiException catch (e) {
+      final parsed = _tryDecodeMap(e.responseBody);
+      final msg = (parsed['message'] as String?) ??
+          'Gagal reset counter mesin (HTTP ${e.statusCode})';
+      throw Exception(msg);
+    }
+  }
+
   Future<InjectQcItem> updateQc(int id, Map<String, dynamic> payload) async {
     try {
       final body = await api.putJson(

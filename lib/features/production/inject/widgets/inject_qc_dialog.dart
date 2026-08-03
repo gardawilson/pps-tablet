@@ -58,6 +58,7 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
   final Map<String, InjectQcItem?> _submitted = {};
   bool _isLoadingHistory = true;
   int? _counterCurrent;
+  bool _isResettingCounter = false;
   Timer? _statusTimer;
 
   @override
@@ -213,6 +214,54 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
     setState(() => _submitted[label] = item);
   }
 
+  Future<void> _confirmResetCounter() async {
+    final idMesin = widget.idMesin;
+    if (idMesin == null || _isResettingCounter) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reset Counter Mesin'),
+        content: Text(
+          'Counter mesin${(widget.namaMesin ?? '').trim().isNotEmpty ? ' "${widget.namaMesin}"' : ''} '
+          'saat ini ${_counterCurrent != null ? "adalah $_counterCurrent dan " : ""}'
+          'akan direset ke 0. Tindakan ini tidak dapat dibatalkan. Lanjutkan?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: _downtimeColor),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Reset'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isResettingCounter = true);
+    try {
+      final newCounter = await _repo.resetQcCounter(idMesin);
+      if (!mounted) return;
+      setState(() => _counterCurrent = newCounter);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Counter mesin berhasil direset')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isResettingCounter = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -327,16 +376,28 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      machineName.isNotEmpty ? machineName : 'Quality Control',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        height: 1.1,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            machineName.isNotEmpty
+                                ? machineName
+                                : 'Quality Control',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              height: 1.1,
+                            ),
+                          ),
+                        ),
+                        if (widget.idMesin != null) ...[
+                          const SizedBox(width: 8),
+                          _buildResetCounterButton(),
+                        ],
+                      ],
                     ),
                   ],
                 ),
@@ -432,6 +493,58 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Tombol reset counter/odometer mesin, ditaruh sejajar dengan nama mesin
+  // di header karena aksi ini terikat langsung ke mesin tsb, bukan ke jam
+  // atau produk yang sedang di-QC.
+  Widget _buildResetCounterButton() {
+    return Tooltip(
+      message: _counterCurrent != null
+          ? 'Counter mesin saat ini: $_counterCurrent. Ketuk untuk reset ke 0.'
+          : 'Reset counter mesin ke 0',
+      child: Material(
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: _isResettingCounter ? null : _confirmResetCounter,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _isResettingCounter
+                    ? const SizedBox(
+                        width: 11,
+                        height: 11,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.5,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(
+                        Icons.restart_alt_rounded,
+                        size: 13,
+                        color: Colors.white,
+                      ),
+                const SizedBox(width: 4),
+                Text(
+                  _counterCurrent != null
+                      ? 'Counter: $_counterCurrent'
+                      : 'Reset Counter',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

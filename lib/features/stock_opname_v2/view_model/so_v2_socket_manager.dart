@@ -59,6 +59,32 @@ class SoV2HasilInsertedEvent {
   }
 }
 
+/// Payload realtime yang dikirim server setiap hasil scan dihapus (event
+/// `stock_opname_hasil_deleted`) — mis. dipakai buat perbaiki label yang
+/// salah lokasi (isLocationMismatch) supaya bisa discan ulang.
+class SoV2HasilDeletedEvent {
+  final String stockOpnameNo;
+  final String categoryCode;
+  final String labelNo;
+  final String? deletedByUsername;
+
+  const SoV2HasilDeletedEvent({
+    required this.stockOpnameNo,
+    required this.categoryCode,
+    required this.labelNo,
+    this.deletedByUsername,
+  });
+
+  factory SoV2HasilDeletedEvent.fromJson(Map<String, dynamic> json) {
+    return SoV2HasilDeletedEvent(
+      stockOpnameNo: (json['stockOpnameNo'] ?? '').toString(),
+      categoryCode: (json['categoryCode'] ?? '').toString(),
+      labelNo: (json['labelNo'] ?? '').toString(),
+      deletedByUsername: json['deletedByUsername']?.toString(),
+    );
+  }
+}
+
 /// Socket.IO client global untuk fitur Stock Opname v2 — connect sekali per
 /// sesi app (didaftarkan di main.dart), lalu screen aktif join/leave room
 /// sesuai `stockOpnameNo` yang sedang dibuka.
@@ -66,7 +92,8 @@ class SoV2SocketManager extends ChangeNotifier with WidgetsBindingObserver {
   io.Socket? _socket;
   bool _isInitialized = false;
   final Set<String> _joinedRooms = <String>{};
-  final List<void Function(SoV2HasilInsertedEvent)> _listeners = [];
+  final List<void Function(SoV2HasilInsertedEvent)> _insertedListeners = [];
+  final List<void Function(SoV2HasilDeletedEvent)> _deletedListeners = [];
 
   bool get isConnected => _socket?.connected ?? false;
 
@@ -101,10 +128,21 @@ class SoV2SocketManager extends ChangeNotifier with WidgetsBindingObserver {
     _socket!.onConnectError((_) => notifyListeners());
 
     _socket!.on('stock_opname_hasil_inserted', (data) {
+      print('🔌 stock_opname_hasil_inserted: $data');
       if (data is! Map) return;
       final event = SoV2HasilInsertedEvent.fromJson(data.cast<String, dynamic>());
       if (event.stockOpnameNo.isEmpty) return;
-      for (final listener in List.of(_listeners)) {
+      for (final listener in List.of(_insertedListeners)) {
+        listener(event);
+      }
+    });
+
+    _socket!.on('stock_opname_hasil_deleted', (data) {
+      print('🔌 stock_opname_hasil_deleted: $data');
+      if (data is! Map) return;
+      final event = SoV2HasilDeletedEvent.fromJson(data.cast<String, dynamic>());
+      if (event.stockOpnameNo.isEmpty) return;
+      for (final listener in List.of(_deletedListeners)) {
         listener(event);
       }
     });
@@ -130,8 +168,17 @@ class SoV2SocketManager extends ChangeNotifier with WidgetsBindingObserver {
   VoidCallback addHasilInsertedListener(
     void Function(SoV2HasilInsertedEvent event) listener,
   ) {
-    _listeners.add(listener);
-    return () => _listeners.remove(listener);
+    _insertedListeners.add(listener);
+    return () => _insertedListeners.remove(listener);
+  }
+
+  /// Daftarkan callback untuk event `stock_opname_hasil_deleted`. Panggil
+  /// hasil (unsubscribe function) saat dispose.
+  VoidCallback addHasilDeletedListener(
+    void Function(SoV2HasilDeletedEvent event) listener,
+  ) {
+    _deletedListeners.add(listener);
+    return () => _deletedListeners.remove(listener);
   }
 
   @override
@@ -148,7 +195,8 @@ class SoV2SocketManager extends ChangeNotifier with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _isInitialized = false;
     _joinedRooms.clear();
-    _listeners.clear();
+    _insertedListeners.clear();
+    _deletedListeners.clear();
     _socket?.disconnect();
     _socket?.dispose();
     _socket = null;

@@ -12,6 +12,13 @@ class SoV2LabelRow {
   final String primaryKey;
   final String primaryValue;
   final bool isScanned;
+
+  /// True kalau label ini discan di lokasi yang berbeda dari lokasi acuan
+  /// sistem (Blok/IdLokasi) — lihat [scannedBlok]/[scannedLocationId] untuk
+  /// lokasi aktual hasil scan.
+  final bool isLocationMismatch;
+  final String? scannedBlok;
+  final int? scannedLocationId;
   final Map<String, dynamic> raw;
 
   static const _excludedKeys = {
@@ -21,18 +28,31 @@ class SoV2LabelRow {
     'IdLokasi',
     'Blok',
     'IdBonggolan',
+    'ScannedBlok',
+    'ScannedIdLokasi',
+    'isLocationMismatch',
   };
 
   SoV2LabelRow({
     required this.primaryKey,
     required this.primaryValue,
     required this.isScanned,
+    this.isLocationMismatch = false,
+    this.scannedBlok,
+    this.scannedLocationId,
     required this.raw,
   });
 
   factory SoV2LabelRow.fromJson(Map<String, dynamic> json) {
     final scannedValue = json['isScanned'];
     final isScanned = scannedValue == 1 || scannedValue == true;
+    final mismatchValue = json['isLocationMismatch'];
+    final isLocationMismatch = mismatchValue == 1 || mismatchValue == true;
+    final scannedBlok = json['ScannedBlok']?.toString();
+    final scannedLocationIdRaw = json['ScannedIdLokasi'];
+    final scannedLocationId = scannedLocationIdRaw is num
+        ? scannedLocationIdRaw.toInt()
+        : int.tryParse('$scannedLocationIdRaw');
 
     // Kategori bahan baku punya NoBahanBaku dan NoPallet sebagai field
     // terpisah, tapi label fisiknya adalah gabungan keduanya.
@@ -43,6 +63,9 @@ class SoV2LabelRow {
         primaryKey: 'NoBahanBaku',
         primaryValue: '$noBahanBaku-$noPallet',
         isScanned: isScanned,
+        isLocationMismatch: isLocationMismatch,
+        scannedBlok: scannedBlok,
+        scannedLocationId: scannedLocationId,
         raw: json,
       );
     }
@@ -55,6 +78,9 @@ class SoV2LabelRow {
       primaryKey: entry.key,
       primaryValue: entry.value?.toString() ?? '',
       isScanned: isScanned,
+      isLocationMismatch: isLocationMismatch,
+      scannedBlok: scannedBlok,
+      scannedLocationId: scannedLocationId,
       raw: json,
     );
   }
@@ -98,12 +124,31 @@ class SoV2LabelRow {
   static String _formatValue(dynamic value) =>
       value is num ? soV2FormatQty(value) : value.toString();
 
-  SoV2LabelRow markScanned() {
+  SoV2LabelRow markScanned({
+    bool isLocationMismatch = false,
+    String? scannedBlok,
+    int? scannedLocationId,
+  }) {
     if (isScanned) return this;
     return SoV2LabelRow(
       primaryKey: primaryKey,
       primaryValue: primaryValue,
       isScanned: true,
+      isLocationMismatch: isLocationMismatch,
+      scannedBlok: scannedBlok,
+      scannedLocationId: scannedLocationId,
+      raw: raw,
+    );
+  }
+
+  /// Kebalikan dari [markScanned] — dipakai setelah hasil scan dihapus
+  /// (mis. untuk perbaiki label yang salah lokasi lalu discan ulang).
+  SoV2LabelRow unmarkScanned() {
+    if (!isScanned) return this;
+    return SoV2LabelRow(
+      primaryKey: primaryKey,
+      primaryValue: primaryValue,
+      isScanned: false,
       raw: raw,
     );
   }

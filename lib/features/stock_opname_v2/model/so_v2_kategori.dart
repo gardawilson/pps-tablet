@@ -119,6 +119,22 @@ class SoV2Kategori {
 
   double get progress => labelCount > 0 ? scannedCount / labelCount : 0;
 
+  SoV2Kategori copyWith({int? scannedCount}) {
+    return SoV2Kategori(
+      categoryId: categoryId,
+      categoryCode: categoryCode,
+      categoryName: categoryName,
+      stockOpnameNo: stockOpnameNo,
+      status: status,
+      labelCount: labelCount,
+      scannedCount: scannedCount ?? this.scannedCount,
+      startDate: startDate,
+      completedAt: completedAt,
+      workingLocationCount: workingLocationCount,
+      workingLocations: workingLocations,
+    );
+  }
+
   factory SoV2Kategori.fromJson(Map<String, dynamic> json) {
     return SoV2Kategori(
       categoryId: json['categoryId'] as int,

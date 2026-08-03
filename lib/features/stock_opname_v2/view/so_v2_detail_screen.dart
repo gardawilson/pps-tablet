@@ -11,6 +11,7 @@ import '../../../core/view_model/permission_view_model.dart';
 import '../model/so_v2_access_user.dart';
 import '../model/so_v2_complete_summary.dart';
 import '../model/so_v2_label_group.dart';
+import '../model/so_v2_label_row.dart';
 import '../model/so_v2_lokasi.dart';
 import '../repository/so_v2_repository.dart';
 import '../repository/so_v2_user_lokasi_access_repository.dart';
@@ -65,8 +66,10 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
   bool _loadingScanSummary = false;
   bool _searchOpen = false;
   final Set<int> _busyLocationIds = {};
+  final Set<String> _busyLabelNos = {};
   List<BreadcrumbSegment> _prevBreadcrumb = [];
   VoidCallback? _unsubscribeHasilInserted;
+  VoidCallback? _unsubscribeHasilDeleted;
 
   /// Furniturewip memakai UOM pcs, bukan kg seperti kategori lain.
   String get _uom => widget.categoryCode == 'furniturewip' ? 'pcs' : 'kg';
@@ -80,6 +83,9 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
     socketVm.joinStockOpname(widget.stockOpnameNo);
     _unsubscribeHasilInserted = socketVm.addHasilInsertedListener(
       _onHasilInserted,
+    );
+    _unsubscribeHasilDeleted = socketVm.addHasilDeletedListener(
+      _onHasilDeleted,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -110,6 +116,7 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
       }
     });
     _unsubscribeHasilInserted?.call();
+    _unsubscribeHasilDeleted?.call();
     context.read<SoV2SocketManager>().leaveStockOpname(widget.stockOpnameNo);
     _blokVm.dispose();
     _lokasiVm?.dispose();
@@ -135,15 +142,7 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
     final referenceBlok = event.referenceBlok;
     if (referenceBlok == null) return;
 
-    // furniturewip pakai UOM pcs (pieceCount), kategori lain pakai kg (weight).
-    final weightDelta = widget.categoryCode == 'furniturewip'
-        ? (event.pieceCount?.toDouble() ?? 0)
-        : (event.weight ?? 0);
-
-    final blokPatched = _blokVm.applyScan(
-      blok: referenceBlok,
-      weightDelta: weightDelta,
-    );
+    final blokPatched = _blokVm.applyScan(blok: referenceBlok);
     if (!blokPatched) _blokVm.load();
 
     final lokasiVm = _lokasiVm;
@@ -151,10 +150,7 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
     if (lokasiVm != null &&
         lokasiVm.blok == referenceBlok &&
         referenceLocationId != null) {
-      final lokasiPatched = lokasiVm.applyScan(
-        locationId: referenceLocationId,
-        weightDelta: weightDelta,
-      );
+      final lokasiPatched = lokasiVm.applyScan(locationId: referenceLocationId);
       if (!lokasiPatched) lokasiVm.load();
     }
 
@@ -164,7 +160,91 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
         selectedLokasi != null &&
         labelVm.blok == referenceBlok &&
         selectedLokasi.locationId == referenceLocationId) {
-      labelVm.applyScan(labelNo: event.labelNo, weightDelta: weightDelta);
+      labelVm.applyScan(
+        labelNo: event.labelNo,
+        isLocationMismatch: event.isLocationMismatch,
+        scannedBlok: event.scannedBlok,
+        scannedLocationId: event.scannedLocationId,
+      );
+    }
+  }
+
+  /// Realtime handler: hasil scan dihapus (mis. label yang salah lokasi
+  /// dibersihkan supaya bisa discan ulang) — dari device manapun, termasuk
+  /// device sendiri (lihat [_deleteMismatchLabel]). Server tidak mengirim
+  /// referenceBlok/referenceLocationId di payload delete, jadi kita hanya
+  /// bisa patch panel yang labelnya kebetulan sedang termuat di panel label
+  /// yang terbuka saat ini — cukup untuk kasus umum (user memperbaiki label
+  /// di lokasi yang lagi dia kerjakan). Kalau tidak match, cukup dibiarkan
+  /// stale sampai reload manual — event ini jarang terjadi.
+  void _onHasilDeleted(SoV2HasilDeletedEvent event) {
+    if (!mounted) return;
+    if (event.stockOpnameNo != widget.stockOpnameNo) return;
+
+    final labelVm = _labelVm;
+    if (labelVm == null) return;
+    if (!labelVm.applyUnscan(event.labelNo)) return;
+
+    final blokPatched = _blokVm.applyUnscan(blok: labelVm.blok);
+    if (!blokPatched) _blokVm.load();
+
+    final lokasiVm = _lokasiVm;
+    if (lokasiVm != null && lokasiVm.blok == labelVm.blok) {
+      final lokasiPatched = lokasiVm.applyUnscan(
+        locationId: labelVm.locationId,
+      );
+      if (!lokasiPatched) lokasiVm.load();
+    }
+  }
+
+  /// Hapus hasil scan satu label yang salah lokasi (isLocationMismatch)
+  /// supaya bisa discan ulang di lokasi yang benar. Dipicu dari tombol
+  /// "Hapus & scan ulang" pada [SoV2LabelTile].
+  Future<void> _deleteMismatchLabel(SoV2LabelRow row) async {
+    final labelVm = _labelVm;
+    if (labelVm == null) return;
+    final labelNo = row.primaryValue;
+    if (_busyLabelNos.contains(labelNo)) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => ConfirmDialog(
+        title: 'Hapus Hasil Scan',
+        message:
+            'Label $labelNo tercatat discan di lokasi ${row.scannedBlok ?? ''}${row.scannedLocationId ?? ''}, '
+            'bukan lokasi acuan. Hapus hasil scan ini supaya bisa discan ulang di lokasi yang benar?',
+        confirmLabel: 'Hapus',
+        confirmIcon: Icons.delete_outline_rounded,
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _busyLabelNos.add(labelNo));
+    try {
+      await _repo.deleteHasilLabel(
+        stockOpnameNo: widget.stockOpnameNo,
+        labelNo: labelNo,
+      );
+      if (!mounted) return;
+      labelVm.applyUnscan(labelNo);
+      if (!_blokVm.applyUnscan(blok: labelVm.blok)) _blokVm.load();
+      final lokasiVm = _lokasiVm;
+      if (lokasiVm != null && lokasiVm.blok == labelVm.blok) {
+        if (!lokasiVm.applyUnscan(locationId: labelVm.locationId)) {
+          lokasiVm.load();
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      final message = e is ApiException
+          ? e.friendlyMessage
+          : 'Gagal menghapus hasil scan';
+      await DialogService.instance.showError(
+        title: 'Gagal Menghapus',
+        message: message,
+      );
+    } finally {
+      if (mounted) setState(() => _busyLabelNos.remove(labelNo));
     }
   }
 
@@ -550,13 +630,17 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
         final isUnknown = blokItem.blok == kSoV2UnknownBlok;
         final selected = _selectedBlok == blokItem.blok;
         final baseColor = isUnknown ? _kWarning : _kPrimary;
+        final complete =
+            blokItem.labelCount > 0 &&
+            blokItem.scannedCount >= blokItem.labelCount;
+        final progressColor = complete ? const Color(0xFF0A7349) : baseColor;
         return InkWell(
           onTap: () => _selectBlok(blokItem.blok),
           child: Container(
             decoration: BoxDecoration(
               color: selected
                   ? baseColor.withValues(alpha: 0.05)
-                  : (isUnknown ? _kWarningBg : null),
+                  : (complete ? _kSuccessBg : (isUnknown ? _kWarningBg : null)),
               border: Border(
                 left: BorderSide(
                   color: selected ? baseColor : Colors.transparent,
@@ -577,19 +661,36 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                   const SizedBox(width: 6),
                 ],
                 Expanded(
-                  child: Text(
-                    isUnknown
-                        ? 'Tanpa Blok (${blokItem.locationCount})'
-                        : 'Blok ${blokItem.blok} (${blokItem.locationCount})',
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: isUnknown
+                              ? 'Tanpa Blok (${blokItem.locationCount}) '
+                              : 'Blok ${blokItem.blok} (${blokItem.locationCount}) ',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: selected
+                                ? baseColor
+                                : (isUnknown
+                                      ? _kWarning
+                                      : const Color(0xFF1A1D23)),
+                          ),
+                        ),
+                        TextSpan(
+                          text:
+                              '${blokItem.scannedCount}/${blokItem.labelCount}',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: progressColor,
+                          ),
+                        ),
+                      ],
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                      color: selected
-                          ? baseColor
-                          : (isUnknown ? _kWarning : const Color(0xFF1A1D23)),
-                    ),
                   ),
                 ),
                 if (blokItem.workingLocationCount > 0) ...[
@@ -1088,6 +1189,11 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
       value: vm,
       child: Consumer<SoV2LabelListViewModel>(
         builder: (context, vm, _) {
+          final canManage =
+              !_blokVm.isComplete &&
+              context.watch<PermissionViewModel>().can(
+                _kAccessManagePermission,
+              );
           return Column(
             children: [
               Container(
@@ -1240,6 +1346,10 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                                   SoV2LabelGroupTile(
                                     group: group,
                                     weightUnit: _uom,
+                                    onDeleteMismatch: canManage
+                                        ? _deleteMismatchLabel
+                                        : null,
+                                    deletingLabelNos: _busyLabelNos,
                                   ),
                               noItemsFoundIndicatorBuilder: (context) =>
                                   const Center(

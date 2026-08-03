@@ -63,40 +63,83 @@ class SoV2LabelListViewModel extends ChangeNotifier {
 
   /// Update optimistik lokal setelah event realtime `stock_opname_hasil_inserted`
   /// — patch checklist baris label yang sudah termuat di halaman saat ini
-  /// tanpa memicu refetch/loading indicator. Total header selalu di-update
-  /// (server sudah konfirmasi insert-nya) walau barisnya belum termuat di
-  /// halaman yang sedang dibuka (mis. masih di halaman berikutnya / sedang
-  /// difilter search).
-  void applyScan({required String labelNo, required double weightDelta}) {
+  /// tanpa memicu refetch/loading indicator. `totalScanned` selalu
+  /// di-update (server sudah konfirmasi insert-nya) walau barisnya belum
+  /// termuat di halaman yang sedang dibuka (mis. masih di halaman
+  /// berikutnya / sedang difilter search). `totalWeight` tidak ikut
+  /// di-update — itu total berat SELURUH label lokasi (target), bukan
+  /// akumulasi berat yang sudah discan.
+  void applyScan({
+    required String labelNo,
+    bool isLocationMismatch = false,
+    String? scannedBlok,
+    int? scannedLocationId,
+  }) {
+    _patchRow(
+      labelNo,
+      (row) => row.markScanned(
+        isLocationMismatch: isLocationMismatch,
+        scannedBlok: scannedBlok,
+        scannedLocationId: scannedLocationId,
+      ),
+      matchScanned: false,
+    );
+    totalScanned += 1;
+    notifyListeners();
+  }
+
+  /// Kebalikan dari [applyScan], dipanggil setelah hasil scan dihapus (baik
+  /// oleh device sendiri lewat [SoV2Repository.deleteHasilLabel], maupun
+  /// dari device lain lewat event realtime `stock_opname_hasil_deleted`).
+  /// Return true kalau barisnya termuat di halaman saat ini (state
+  /// tercentang berhasil di-patch); caller tidak perlu fallback reload
+  /// kalau false — cukup biarkan stale sampai user refresh manual, karena
+  /// event ini jarang terjadi.
+  bool applyUnscan(String labelNo) {
+    final patched = _patchRow(
+      labelNo,
+      (row) => row.unmarkScanned(),
+      matchScanned: true,
+    );
+    if (patched) {
+      totalScanned = (totalScanned - 1).clamp(0, totalRecords);
+      notifyListeners();
+    }
+    return patched;
+  }
+
+  bool _patchRow(
+    String labelNo,
+    SoV2LabelRow Function(SoV2LabelRow row) transform, {
+    required bool matchScanned,
+  }) {
     final state = _pagingController.value;
     final pages = state.pages;
-    if (pages != null) {
-      var patched = false;
-      final newPages = <List<SoV2LabelGroup>>[];
-      for (final page in pages) {
-        final newPage = <SoV2LabelGroup>[];
-        for (final group in page) {
-          final idx = group.labels.indexWhere(
-            (l) => l.primaryValue == labelNo && !l.isScanned,
-          );
-          if (idx == -1) {
-            newPage.add(group);
-            continue;
-          }
-          final newLabels = List<SoV2LabelRow>.from(group.labels);
-          newLabels[idx] = newLabels[idx].markScanned();
-          newPage.add(group.copyWithLabels(newLabels));
-          patched = true;
+    if (pages == null) return false;
+
+    var patched = false;
+    final newPages = <List<SoV2LabelGroup>>[];
+    for (final page in pages) {
+      final newPage = <SoV2LabelGroup>[];
+      for (final group in page) {
+        final idx = group.labels.indexWhere(
+          (l) => l.primaryValue == labelNo && l.isScanned == matchScanned,
+        );
+        if (idx == -1) {
+          newPage.add(group);
+          continue;
         }
-        newPages.add(newPage);
+        final newLabels = List<SoV2LabelRow>.from(group.labels);
+        newLabels[idx] = transform(newLabels[idx]);
+        newPage.add(group.copyWithLabels(newLabels));
+        patched = true;
       }
-      if (patched) {
-        _pagingController.value = state.copyWith(pages: newPages);
-      }
+      newPages.add(newPage);
     }
-    totalScanned += 1;
-    totalWeight += weightDelta;
-    notifyListeners();
+    if (patched) {
+      _pagingController.value = state.copyWith(pages: newPages);
+    }
+    return patched;
   }
 
   Timer? _debounce;

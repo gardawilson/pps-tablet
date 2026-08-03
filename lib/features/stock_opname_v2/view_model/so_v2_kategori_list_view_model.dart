@@ -50,6 +50,31 @@ class SoV2KategoriListViewModel extends ChangeNotifier {
     }
   }
 
+  /// Update optimistik lokal setelah event realtime `stock_opname_hasil_inserted`
+  /// — naikkan progress kartu kategori yang sesuai tanpa reload penuh.
+  void applyScan(String stockOpnameNo) {
+    final index = items.indexWhere((k) => k.stockOpnameNo == stockOpnameNo);
+    if (index == -1) return;
+    final current = items[index];
+    items = [...items]
+      ..[index] = current.copyWith(
+        scannedCount: (current.scannedCount + 1).clamp(0, current.labelCount),
+      );
+    notifyListeners();
+  }
+
+  /// Kebalikan dari [applyScan] — dipakai setelah hasil scan dihapus.
+  void applyUnscan(String stockOpnameNo) {
+    final index = items.indexWhere((k) => k.stockOpnameNo == stockOpnameNo);
+    if (index == -1) return;
+    final current = items[index];
+    items = [...items]
+      ..[index] = current.copyWith(
+        scannedCount: (current.scannedCount - 1).clamp(0, current.labelCount),
+      );
+    notifyListeners();
+  }
+
   /// Return preview breakdown on success, or an error message string.
   Future<({SoV2GeneratePreview? preview, String? errorMessage})>
       previewGenerate({required int categoryId}) async {

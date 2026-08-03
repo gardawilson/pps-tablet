@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../model/so_v2_label_group.dart';
+import '../model/so_v2_label_row.dart';
 import '../utils/so_v2_number_format.dart';
 import 'so_v2_label_tile.dart';
 
@@ -17,10 +18,20 @@ class SoV2LabelGroupTile extends StatelessWidget {
   final SoV2LabelGroup group;
   final String weightUnit;
 
+  /// Diteruskan ke [SoV2LabelTile.onDeleteMismatch] per baris — null kalau
+  /// user tidak boleh menghapus hasil scan mismatch (lihat dokumentasi di
+  /// sana).
+  final void Function(SoV2LabelRow row)? onDeleteMismatch;
+
+  /// Nomor label yang lagi diproses hapus (untuk spinner per-baris).
+  final Set<String> deletingLabelNos;
+
   const SoV2LabelGroupTile({
     super.key,
     required this.group,
     this.weightUnit = 'kg',
+    this.onDeleteMismatch,
+    this.deletingLabelNos = const {},
   });
 
   @override
@@ -74,7 +85,14 @@ class SoV2LabelGroupTile extends StatelessWidget {
           ),
         ),
         for (final row in group.labels)
-          SoV2LabelTile(row: row, weightUnit: weightUnit),
+          SoV2LabelTile(
+            row: row,
+            weightUnit: weightUnit,
+            onDeleteMismatch: onDeleteMismatch == null
+                ? null
+                : () => onDeleteMismatch!(row),
+            isDeleting: deletingLabelNos.contains(row.primaryValue),
+          ),
       ],
     );
   }

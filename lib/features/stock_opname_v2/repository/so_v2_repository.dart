@@ -137,6 +137,17 @@ class SoV2Repository {
     return SoV2CompleteSummary.fromJson(data);
   }
 
+  /// Hapus hasil scan satu label (mis. label yang salah lokasi/isLocationMismatch)
+  /// supaya bisa discan ulang dengan lokasi yang benar.
+  Future<void> deleteHasilLabel({
+    required String stockOpnameNo,
+    required String labelNo,
+  }) async {
+    await _api.deleteJson(
+      '/api/stock-opname-v2/transaksi/$stockOpnameNo/hasil/${Uri.encodeComponent(labelNo)}',
+    );
+  }
+
   Future<SoV2ScanSummary> fetchScanSummary(String stockOpnameNo) async {
     final body = await _api.getJson(
       '/api/stock-opname-v2/transaksi/$stockOpnameNo/scan-summary',

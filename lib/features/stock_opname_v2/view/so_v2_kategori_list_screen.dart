@@ -6,6 +6,7 @@ import '../../../common/widgets/loading_dialog.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../model/so_v2_kategori.dart';
 import '../view_model/so_v2_kategori_list_view_model.dart';
+import '../view_model/so_v2_socket_manager.dart';
 import '../widgets/so_v2_generate_preview_dialog.dart';
 import '../widgets/so_v2_period_picker_dialog.dart';
 import 'so_v2_detail_screen.dart';
@@ -24,18 +25,71 @@ class SoV2KategoriListScreen extends StatefulWidget {
 
 class _SoV2KategoriListScreenState extends State<SoV2KategoriListScreen> {
   late final SoV2KategoriListViewModel _vm;
+  final Set<String> _joinedRooms = {};
+  VoidCallback? _unsubscribeHasilInserted;
+  VoidCallback? _unsubscribeHasilDeleted;
 
   @override
   void initState() {
     super.initState();
     _vm = SoV2KategoriListViewModel();
+    _vm.addListener(_syncSocketRooms);
     _vm.load();
+
+    final socketVm = context.read<SoV2SocketManager>();
+    _unsubscribeHasilInserted = socketVm.addHasilInsertedListener(
+      _onHasilInserted,
+    );
+    _unsubscribeHasilDeleted = socketVm.addHasilDeletedListener(
+      _onHasilDeleted,
+    );
   }
 
   @override
   void dispose() {
+    _unsubscribeHasilInserted?.call();
+    _unsubscribeHasilDeleted?.call();
+    final socketVm = context.read<SoV2SocketManager>();
+    for (final room in _joinedRooms) {
+      socketVm.leaveStockOpname(room);
+    }
+    _vm.removeListener(_syncSocketRooms);
     _vm.dispose();
     super.dispose();
+  }
+
+  /// Kartu di grid ini menampilkan progress scan dari banyak SO sekaligus
+  /// (satu per kategori), jadi — beda dari [SoV2DetailScreen] yang cuma
+  /// join 1 room — di sini kita join room utk SEMUA SO yang sedang punya
+  /// nomor (notStarted belum punya stockOpnameNo, jadi otomatis dilewati).
+  /// Dipanggil ulang tiap [_vm] berubah (reload/riwayat) supaya room selalu
+  /// sinkron dengan SO yang lagi ditampilkan.
+  void _syncSocketRooms() {
+    final socketVm = context.read<SoV2SocketManager>();
+    final current = _vm.items
+        .map((k) => k.stockOpnameNo)
+        .whereType<String>()
+        .toSet();
+
+    for (final room in current.difference(_joinedRooms)) {
+      socketVm.joinStockOpname(room);
+    }
+    for (final room in _joinedRooms.difference(current)) {
+      socketVm.leaveStockOpname(room);
+    }
+    _joinedRooms
+      ..clear()
+      ..addAll(current);
+  }
+
+  void _onHasilInserted(SoV2HasilInsertedEvent event) {
+    if (!mounted) return;
+    _vm.applyScan(event.stockOpnameNo);
+  }
+
+  void _onHasilDeleted(SoV2HasilDeletedEvent event) {
+    if (!mounted) return;
+    _vm.applyUnscan(event.stockOpnameNo);
   }
 
   Future<void> _openRiwayat() async {

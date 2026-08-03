@@ -36,4 +36,14 @@ class SoV2LabelGroup {
   }
 
   int get scannedCount => labels.where((l) => l.isScanned).length;
+
+  SoV2LabelGroup copyWithLabels(List<SoV2LabelRow> labels) {
+    return SoV2LabelGroup(
+      typeId: typeId,
+      typeName: typeName,
+      labelCount: labelCount,
+      totalWeight: totalWeight,
+      labels: labels,
+    );
+  }
 }

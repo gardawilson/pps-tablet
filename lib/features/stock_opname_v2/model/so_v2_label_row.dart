@@ -97,4 +97,14 @@ class SoV2LabelRow {
 
   static String _formatValue(dynamic value) =>
       value is num ? soV2FormatQty(value) : value.toString();
+
+  SoV2LabelRow markScanned() {
+    if (isScanned) return this;
+    return SoV2LabelRow(
+      primaryKey: primaryKey,
+      primaryValue: primaryValue,
+      isScanned: true,
+      raw: raw,
+    );
+  }
 }

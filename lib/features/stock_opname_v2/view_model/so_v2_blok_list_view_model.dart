@@ -22,6 +22,24 @@ class SoV2BlokListViewModel extends ChangeNotifier {
   bool isComplete = false;
   DateTime? completedAt;
 
+  /// Update optimistik lokal setelah event realtime `stock_opname_hasil_inserted`
+  /// — hindari reload penuh (yang memicu flicker loading) untuk kasus umum
+  /// scan baru pada blok yang sudah termuat. Return false kalau bloknya
+  /// belum ada di [items] (mis. baru pertama kali kena scan), supaya
+  /// caller bisa fallback ke [load] penuh.
+  bool applyScan({required String blok, required double weightDelta}) {
+    final index = items.indexWhere((b) => b.blok == blok);
+    if (index == -1) return false;
+    final current = items[index];
+    items = [...items]
+      ..[index] = current.copyWith(
+        scannedCount: current.scannedCount + 1,
+        totalWeight: current.totalWeight + weightDelta,
+      );
+    notifyListeners();
+    return true;
+  }
+
   Future<void> load() async {
     isLoading = true;
     error = null;

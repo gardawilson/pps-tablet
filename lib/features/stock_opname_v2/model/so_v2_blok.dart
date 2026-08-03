@@ -17,6 +17,21 @@ class SoV2Blok {
 
   double get progress => labelCount > 0 ? scannedCount / labelCount : 0;
 
+  SoV2Blok copyWith({
+    int? scannedCount,
+    double? totalWeight,
+    int? workingLocationCount,
+  }) {
+    return SoV2Blok(
+      blok: blok,
+      locationCount: locationCount,
+      labelCount: labelCount,
+      scannedCount: scannedCount ?? this.scannedCount,
+      totalWeight: totalWeight ?? this.totalWeight,
+      workingLocationCount: workingLocationCount ?? this.workingLocationCount,
+    );
+  }
+
   factory SoV2Blok.fromJson(Map<String, dynamic> json) {
     return SoV2Blok(
       blok: json['blok']?.toString() ?? '',

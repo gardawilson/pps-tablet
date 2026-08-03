@@ -49,6 +49,17 @@ class SoV2Lokasi {
 
   double get progress => labelCount > 0 ? scannedCount / labelCount : 0;
 
+  SoV2Lokasi copyWith({int? scannedCount, double? totalWeight}) {
+    return SoV2Lokasi(
+      locationId: locationId,
+      description: description,
+      labelCount: labelCount,
+      scannedCount: scannedCount ?? this.scannedCount,
+      totalWeight: totalWeight ?? this.totalWeight,
+      allowedUsers: allowedUsers,
+    );
+  }
+
   factory SoV2Lokasi.fromJson(Map<String, dynamic> json) {
     final allowedUsersList = (json['allowedUsers'] as List?) ?? const [];
     return SoV2Lokasi(

@@ -17,6 +17,7 @@ import '../repository/so_v2_user_lokasi_access_repository.dart';
 import '../view_model/so_v2_blok_list_view_model.dart';
 import '../view_model/so_v2_label_list_view_model.dart';
 import '../view_model/so_v2_lokasi_list_view_model.dart';
+import '../view_model/so_v2_socket_manager.dart';
 import '../utils/so_v2_number_format.dart';
 import '../widgets/so_v2_complete_summary_dialog.dart';
 import '../widgets/so_v2_label_group_tile.dart';
@@ -65,6 +66,7 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
   bool _searchOpen = false;
   final Set<int> _busyLocationIds = {};
   List<BreadcrumbSegment> _prevBreadcrumb = [];
+  VoidCallback? _unsubscribeHasilInserted;
 
   /// Furniturewip memakai UOM pcs, bukan kg seperti kategori lain.
   String get _uom => widget.categoryCode == 'furniturewip' ? 'pcs' : 'kg';
@@ -74,6 +76,11 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
     super.initState();
     _blokVm = SoV2BlokListViewModel(stockOpnameNo: widget.stockOpnameNo);
     _blokVm.load();
+    final socketVm = context.read<SoV2SocketManager>();
+    socketVm.joinStockOpname(widget.stockOpnameNo);
+    _unsubscribeHasilInserted = socketVm.addHasilInsertedListener(
+      _onHasilInserted,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
@@ -102,11 +109,63 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
         AppShell.breadcrumb.value = prev;
       }
     });
+    _unsubscribeHasilInserted?.call();
+    context.read<SoV2SocketManager>().leaveStockOpname(widget.stockOpnameNo);
     _blokVm.dispose();
     _lokasiVm?.dispose();
     _labelVm?.dispose();
     _searchCtl.dispose();
     super.dispose();
+  }
+
+  /// Realtime handler: setiap ada scan hasil baru masuk untuk SO ini (dari
+  /// device manapun), patch panel blok/lokasi/label secara optimistik
+  /// (tanpa refetch ke API) supaya terasa realtime — bukan seperti polling
+  /// dengan loading indicator berkedip tiap event masuk. Fallback ke reload
+  /// penuh hanya kalau blok/lokasinya belum pernah termuat sama sekali.
+  ///
+  /// Panel blok/lokasi/label selalu difilter berdasarkan lokasi ACUAN milik
+  /// label (referenceBlok/referenceLocationId) — bukan lokasi hasil scan
+  /// (scannedBlok/scannedLocationId), yang bisa berbeda kalau ada
+  /// isLocationMismatch. Cocokkan ke field acuan supaya centang label tetap
+  /// update walau scan dilakukan di lokasi lain.
+  void _onHasilInserted(SoV2HasilInsertedEvent event) {
+    if (!mounted) return;
+    if (event.stockOpnameNo != widget.stockOpnameNo) return;
+    final referenceBlok = event.referenceBlok;
+    if (referenceBlok == null) return;
+
+    // furniturewip pakai UOM pcs (pieceCount), kategori lain pakai kg (weight).
+    final weightDelta = widget.categoryCode == 'furniturewip'
+        ? (event.pieceCount?.toDouble() ?? 0)
+        : (event.weight ?? 0);
+
+    final blokPatched = _blokVm.applyScan(
+      blok: referenceBlok,
+      weightDelta: weightDelta,
+    );
+    if (!blokPatched) _blokVm.load();
+
+    final lokasiVm = _lokasiVm;
+    final referenceLocationId = event.referenceLocationId;
+    if (lokasiVm != null &&
+        lokasiVm.blok == referenceBlok &&
+        referenceLocationId != null) {
+      final lokasiPatched = lokasiVm.applyScan(
+        locationId: referenceLocationId,
+        weightDelta: weightDelta,
+      );
+      if (!lokasiPatched) lokasiVm.load();
+    }
+
+    final labelVm = _labelVm;
+    final selectedLokasi = _selectedLokasi;
+    if (labelVm != null &&
+        selectedLokasi != null &&
+        labelVm.blok == referenceBlok &&
+        selectedLokasi.locationId == referenceLocationId) {
+      labelVm.applyScan(labelNo: event.labelNo, weightDelta: weightDelta);
+    }
   }
 
   void _selectBlok(String blok) {

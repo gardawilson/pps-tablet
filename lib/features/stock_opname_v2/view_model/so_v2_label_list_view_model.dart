@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 
 import '../model/so_v2_label_group.dart';
+import '../model/so_v2_label_row.dart';
 import '../repository/so_v2_repository.dart';
 
 class SoV2LabelListViewModel extends ChangeNotifier {
@@ -58,6 +59,44 @@ class SoV2LabelListViewModel extends ChangeNotifier {
     notifyListeners();
     if (pageKey > page.totalPages) return [];
     return page.data;
+  }
+
+  /// Update optimistik lokal setelah event realtime `stock_opname_hasil_inserted`
+  /// — patch checklist baris label yang sudah termuat di halaman saat ini
+  /// tanpa memicu refetch/loading indicator. Total header selalu di-update
+  /// (server sudah konfirmasi insert-nya) walau barisnya belum termuat di
+  /// halaman yang sedang dibuka (mis. masih di halaman berikutnya / sedang
+  /// difilter search).
+  void applyScan({required String labelNo, required double weightDelta}) {
+    final state = _pagingController.value;
+    final pages = state.pages;
+    if (pages != null) {
+      var patched = false;
+      final newPages = <List<SoV2LabelGroup>>[];
+      for (final page in pages) {
+        final newPage = <SoV2LabelGroup>[];
+        for (final group in page) {
+          final idx = group.labels.indexWhere(
+            (l) => l.primaryValue == labelNo && !l.isScanned,
+          );
+          if (idx == -1) {
+            newPage.add(group);
+            continue;
+          }
+          final newLabels = List<SoV2LabelRow>.from(group.labels);
+          newLabels[idx] = newLabels[idx].markScanned();
+          newPage.add(group.copyWithLabels(newLabels));
+          patched = true;
+        }
+        newPages.add(newPage);
+      }
+      if (patched) {
+        _pagingController.value = state.copyWith(pages: newPages);
+      }
+    }
+    totalScanned += 1;
+    totalWeight += weightDelta;
+    notifyListeners();
   }
 
   Timer? _debounce;

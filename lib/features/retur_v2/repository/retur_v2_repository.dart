@@ -1,5 +1,5 @@
 import '../../../core/network/api_client.dart';
-import '../model/retur_v2_pending_import.dart';
+import '../model/retur_v2_output.dart';
 import '../model/retur_v2_transaction.dart';
 
 class ReturV2Repository {
@@ -37,32 +37,23 @@ class ReturV2Repository {
     };
   }
 
-  Future<Map<String, dynamic>> fetchPendingImport({
-    required int page,
-    int pageSize = 20,
-  }) async {
+  Future<List<ReturV2Output>> fetchFurnitureWipOutputs(String noRetur) async {
     final body = await _api.getJson(
-      '/api/production/return/import-as-gsu-after',
-      query: {'page': page, 'pageSize': pageSize},
+      '/api/production/return/$noRetur/outputs/furniture-wip',
     );
     final dataList = (body['data'] ?? []) as List;
-    final items = dataList
-        .map(
-          (e) => ReturV2PendingImportGroup.fromJson(
-            Map<String, dynamic>.from(e as Map),
-          ),
-        )
+    return dataList
+        .map((e) => ReturV2Output.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
+  }
 
-    final meta = (body['meta'] ?? {}) as Map<String, dynamic>;
-    final totalPages = int.tryParse('${meta['totalPages'] ?? 1}') ?? 1;
-    final totalData = int.tryParse('${body['totalData'] ?? 0}') ?? 0;
-
-    return {
-      'items': items,
-      'page': page,
-      'totalPages': totalPages,
-      'total': totalData,
-    };
+  Future<List<ReturV2Output>> fetchBarangJadiOutputs(String noRetur) async {
+    final body = await _api.getJson(
+      '/api/production/return/$noRetur/outputs/barang-jadi',
+    );
+    final dataList = (body['data'] ?? []) as List;
+    return dataList
+        .map((e) => ReturV2Output.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
   }
 }

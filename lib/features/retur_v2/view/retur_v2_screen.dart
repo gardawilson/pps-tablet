@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 import 'package:provider/provider.dart';
 
 import '../../../common/widgets/atlas_data_table.dart';
 import '../../../common/widgets/atlas_paged_data_table.dart';
 import '../../../core/utils/date_formatter.dart';
-import '../model/retur_v2_pending_import.dart';
 import '../model/retur_v2_transaction.dart';
 import '../repository/retur_v2_repository.dart';
 import '../view_model/retur_v2_list_view_model.dart';
-import '../view_model/retur_v2_pending_view_model.dart';
+import 'retur_v2_detail_screen.dart';
 
 // ─── Theme ─────────────────────────────────────────────────────────────────
 
@@ -27,78 +25,30 @@ class ReturV2Screen extends StatefulWidget {
 }
 
 class _ReturV2ScreenState extends State<ReturV2Screen> {
-  late final ReturV2Repository _repository;
   late final ReturV2ListViewModel _listVm;
-  late final ReturV2PendingViewModel _pendingVm;
   final TextEditingController _searchCtl = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _repository = ReturV2Repository();
-    _listVm = ReturV2ListViewModel(repository: _repository);
-    _pendingVm = ReturV2PendingViewModel(repository: _repository);
+    _listVm = ReturV2ListViewModel(repository: ReturV2Repository());
     _listVm.refresh();
-    _pendingVm.refresh();
   }
 
   @override
   void dispose() {
     _searchCtl.dispose();
     _listVm.dispose();
-    _pendingVm.dispose();
     super.dispose();
   }
 
-  void _openPendingImportDialog() {
-    showDialog(
-      context: context,
-      builder: (_) => ChangeNotifierProvider<ReturV2PendingViewModel>.value(
-        value: _pendingVm,
-        child: const _PendingImportDialog(),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider<ReturV2ListViewModel>.value(value: _listVm),
-        ChangeNotifierProvider<ReturV2PendingViewModel>.value(
-          value: _pendingVm,
-        ),
-      ],
+    return ChangeNotifierProvider<ReturV2ListViewModel>.value(
+      value: _listVm,
       child: Scaffold(
         backgroundColor: _kSurface,
-        body: _ReturListTab(
-          searchCtl: _searchCtl,
-          onImportTap: _openPendingImportDialog,
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Import Button ──────────────────────────────────────────────────────────
-
-class _ImportButton extends StatelessWidget {
-  final int count;
-  final VoidCallback onTap;
-
-  const _ImportButton({required this.count, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Badge(
-      isLabelVisible: count > 0,
-      label: Text('$count'),
-      backgroundColor: Colors.red.shade600,
-      child: FilledButton.icon(
-        onPressed: onTap,
-        style: FilledButton.styleFrom(backgroundColor: _kPrimary),
-        icon: const Icon(Icons.download_rounded, size: 18),
-        label: const Text('Import'),
+        body: _ReturListTab(searchCtl: _searchCtl),
       ),
     );
   }
@@ -108,38 +58,21 @@ class _ImportButton extends StatelessWidget {
 
 class _ReturListTab extends StatelessWidget {
   final TextEditingController searchCtl;
-  final VoidCallback onImportTap;
 
-  const _ReturListTab({required this.searchCtl, required this.onImportTap});
+  const _ReturListTab({required this.searchCtl});
 
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<ReturV2ListViewModel>();
     return Column(
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: _SearchBar(
-                controller: searchCtl,
-                onChanged: vm.setSearchDebounced,
-                onClear: () {
-                  searchCtl.clear();
-                  vm.clearSearch();
-                },
-              ),
-            ),
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.fromLTRB(0, 10, 16, 10),
-              child: Consumer<ReturV2PendingViewModel>(
-                builder: (context, pendingVm, _) => _ImportButton(
-                  count: pendingVm.totalItems,
-                  onTap: onImportTap,
-                ),
-              ),
-            ),
-          ],
+        _SearchBar(
+          controller: searchCtl,
+          onChanged: vm.setSearchDebounced,
+          onClear: () {
+            searchCtl.clear();
+            vm.clearSearch();
+          },
         ),
         Expanded(
           child: Padding(
@@ -149,6 +82,11 @@ class _ReturListTab extends StatelessWidget {
               columns: _columns(),
               rowColorBuilder: (row) =>
                   row.isLocked ? Colors.red.shade50 : null,
+              onRowTap: (row) => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ReturV2DetailScreen(noRetur: row.noRetur),
+                ),
+              ),
             ),
           ),
         ),
@@ -243,239 +181,6 @@ class _ReturListTab extends StatelessWidget {
         },
       ),
     ];
-  }
-}
-
-// ─── Pending Import Dialog ───────────────────────────────────────────────────
-
-class _PendingImportDialog extends StatelessWidget {
-  const _PendingImportDialog();
-
-  @override
-  Widget build(BuildContext context) {
-    final vm = context.watch<ReturV2PendingViewModel>();
-    final size = MediaQuery.of(context).size;
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: SizedBox(
-        width: size.width * 0.85,
-        height: size.height * 0.85,
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: _kBorder)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.download_rounded,
-                    size: 20,
-                    color: _kPrimary,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Pending Import (${vm.totalItems} item)',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF1A1D23),
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: _PendingImportList(
-                  pagingController: vm.pagingController,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PendingImportList extends StatelessWidget {
-  final PagingController<int, ReturV2PendingImportGroup> pagingController;
-
-  const _PendingImportList({required this.pagingController});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _kBorder),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: PagingListener<int, ReturV2PendingImportGroup>(
-        controller: pagingController,
-        builder: (context, state, fetchNextPage) {
-          return RefreshIndicator(
-            onRefresh: () async => pagingController.refresh(),
-            child: PagedListView<int, ReturV2PendingImportGroup>(
-              state: state,
-              fetchNextPage: fetchNextPage,
-              padding: EdgeInsets.zero,
-              builderDelegate:
-                  PagedChildBuilderDelegate<ReturV2PendingImportGroup>(
-                    itemBuilder: (context, group, index) =>
-                        _InvoiceGroupTile(group: group),
-                    firstPageProgressIndicatorBuilder: (_) => const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(24),
-                        child: CircularProgressIndicator(),
-                      ),
-                    ),
-                    newPageProgressIndicatorBuilder: (_) => const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: Center(child: CircularProgressIndicator()),
-                    ),
-                    firstPageErrorIndicatorBuilder: (_) => const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Text('Terjadi kesalahan memuat data.'),
-                      ),
-                    ),
-                    newPageErrorIndicatorBuilder: (_) => const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: Center(
-                        child: Text('Gagal memuat halaman berikutnya'),
-                      ),
-                    ),
-                    noItemsFoundIndicatorBuilder: (_) => const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Text('Tidak ada data pending import.'),
-                      ),
-                    ),
-                  ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _InvoiceGroupTile extends StatelessWidget {
-  final ReturV2PendingImportGroup group;
-
-  const _InvoiceGroupTile({required this.group});
-
-  @override
-  Widget build(BuildContext context) {
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: ExpansionTile(
-        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        childrenPadding: EdgeInsets.zero,
-        shape: const Border(bottom: BorderSide(color: Color(0xFFEBECF0))),
-        title: Row(
-          children: [
-            Text(
-              group.invoiceNumber,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF1A1D23),
-              ),
-            ),
-            if (group.invoiceType != null) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: _kPrimary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  group.invoiceType!,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: _kPrimary,
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                group.customerName ?? '-',
-                style: const TextStyle(fontSize: 13, color: Color(0xFF374151)),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            Text(
-              '${group.items.length} item · qty ${group.totalQuantity}',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-            ),
-          ],
-        ),
-        children: [for (final item in group.items) _InvoiceItemRow(item: item)],
-      ),
-    );
-  }
-}
-
-class _InvoiceItemRow extends StatelessWidget {
-  final ReturV2PendingImportItem item;
-
-  const _InvoiceItemRow({required this.item});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFFFAFBFC),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 4,
-            child: Text(
-              item.itemName,
-              style: const TextStyle(fontSize: 13, color: Color(0xFF374151)),
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Text(
-              item.itemCode ?? '-',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Text(
-              item.stockCategoryName ?? '-',
-              style: const TextStyle(fontSize: 12, color: Color(0xFF4B5563)),
-            ),
-          ),
-          SizedBox(
-            width: 60,
-            child: Text(
-              '${item.quantity}',
-              textAlign: TextAlign.right,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 

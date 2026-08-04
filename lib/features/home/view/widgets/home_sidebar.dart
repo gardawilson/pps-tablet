@@ -172,6 +172,11 @@ class _HomeSidebarState extends State<HomeSidebar> {
           icon: Icons.sell_outlined,
           route: '/shell/bj-jual',
         ),
+        _SubItem(
+          title: 'Trade-In',
+          icon: Icons.swap_horiz_outlined,
+          route: '/shell/trade-in',
+        ),
       ],
     ),
   ];

@@ -4,10 +4,19 @@ import 'package:provider/provider.dart';
 import '../../../common/widgets/atlas_data_table.dart';
 import '../../../common/widgets/atlas_paged_data_table.dart';
 import '../../../common/widgets/confirm_dialog.dart';
+import '../../../core/network/api_client.dart';
+import '../../../core/network/endpoints.dart';
+import '../../../core/network/label_print_lock_api.dart';
 import '../../../core/services/dialog_service.dart';
+import '../../../core/services/label_print_sync_queue.dart';
+import '../../../core/utils/pdf_print_service.dart';
+import '../../../core/view_model/label_print_lock_socket_manager.dart';
+import '../../label/reject/repository/reject_repository.dart';
+import '../model/trade_in_reject_detail.dart';
 import '../model/trade_in_transaction.dart';
 import '../view_model/trade_in_list_view_model.dart';
 import 'trade_in_form_dialog.dart';
+import 'trade_in_preview_dialog.dart';
 
 const _kPrimary = Color(0xFF1E6FD9);
 const _kSurface = Color(0xFFF8F9FB);
@@ -38,15 +47,28 @@ class _TradeInScreenState extends State<TradeInScreen> {
     super.dispose();
   }
 
-  Future<void> _openForm({String? noPenerimaan}) async {
+  Future<void> _openForm() async {
     final saved = await showDialog<bool>(
       context: context,
-      builder: (_) => TradeInFormDialog(noPenerimaan: noPenerimaan),
+      builder: (_) => const TradeInFormDialog(),
     );
     if (saved == true && mounted) _vm.refresh();
   }
 
-  Future<void> _onDelete(TradeInTransaction item) async {
+  void _openPreview(TradeInTransaction item) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => TradeInPreviewDialog(
+        item: item,
+        onPrintReject: _printReject,
+        onDelete: () => _onDelete(item),
+      ),
+    );
+  }
+
+  /// Konfirmasi + hapus 1 penerimaan trade-in. Return `true` kalau berhasil
+  /// dihapus, supaya caller (dialog preview) tahu kapan harus menutup diri.
+  Future<bool> _onDelete(TradeInTransaction item) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => ConfirmDialog(
@@ -59,16 +81,16 @@ class _TradeInScreenState extends State<TradeInScreen> {
         confirmIcon: Icons.delete_outline_rounded,
       ),
     );
-    if (confirmed != true) return;
+    if (confirmed != true) return false;
 
     final errorMessage = await _vm.deleteItem(item.noPenerimaan);
-    if (!mounted) return;
+    if (!mounted) return false;
     if (errorMessage != null) {
       await DialogService.instance.showError(
         title: 'Gagal Menghapus',
         message: errorMessage,
       );
-      return;
+      return false;
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -76,6 +98,81 @@ class _TradeInScreenState extends State<TradeInScreen> {
         backgroundColor: Colors.green.shade700,
       ),
     );
+    return true;
+  }
+
+  /// Cetak label reject terkait 1 penerimaan trade-in — pola sama dengan
+  /// `_printEntries` di ReturV2DetailScreen: lock label, preview PDF,
+  /// tandai HasBeenPrinted & lepas lock setelah user selesai print, dengan
+  /// fallback ke [LabelPrintSyncQueue] kalau mark/lepas lock gagal.
+  Future<void> _printReject(TradeInRejectDetail reject) async {
+    final noReject = reject.noReject;
+    if (noReject.isEmpty) return;
+
+    final lockApi = LabelPrintLockApi();
+    final repo = RejectRepository(api: ApiClient());
+    final lockVm = context.read<LabelPrintLockSocketManager>();
+    final queue = context.read<LabelPrintSyncQueue>();
+    final rootCtx = Navigator.of(context, rootNavigator: true).context;
+
+    var isLockAcquired = false;
+    var isPrinted = false;
+
+    try {
+      await lockApi.acquire(noReject);
+      isLockAcquired = true;
+
+      await PdfPrintService(defaultSystem: 'pps').previewFromUrl(
+        context: rootCtx,
+        pdfUrl: Uri.parse(ApiConstants.rejectLabelPdf(noReject)),
+        title: noReject,
+        onPrinted: () {
+          isPrinted = true;
+          () async {
+            var needsIncrement = false;
+            var needsRelease = false;
+            try {
+              final count = await repo.markAsPrinted(noReject);
+              if (count != null) lockVm.setPrintCount(noReject, count);
+            } catch (_) {
+              needsIncrement = true;
+            }
+            try {
+              await lockApi.release(noReject);
+            } catch (_) {
+              needsRelease = true;
+            }
+            if (needsIncrement || needsRelease) {
+              await queue.enqueue(
+                feature: 'reject',
+                noLabel: noReject,
+                needsIncrement: needsIncrement,
+                needsReleaseLock: needsRelease,
+              );
+            }
+          }().ignore();
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } finally {
+      if (isLockAcquired && !isPrinted) {
+        () async {
+          try {
+            await lockApi.release(noReject);
+          } catch (_) {
+            await queue.enqueue(
+              feature: 'reject',
+              noLabel: noReject,
+              needsReleaseLock: true,
+            );
+          }
+        }().ignore();
+      }
+      if (mounted) _vm.refresh();
+    }
   }
 
   @override
@@ -85,7 +182,7 @@ class _TradeInScreenState extends State<TradeInScreen> {
       child: Scaffold(
         backgroundColor: _kSurface,
         floatingActionButton: FloatingActionButton(
-          onPressed: () => _openForm(),
+          onPressed: _openForm,
           backgroundColor: _kPrimary,
           foregroundColor: Colors.white,
           child: const Icon(Icons.add_rounded),
@@ -102,8 +199,7 @@ class _TradeInScreenState extends State<TradeInScreen> {
                     child: AtlasPagedDataTable<TradeInTransaction>(
                       pagingController: vm.pagingController,
                       columns: _columns(),
-                      onRowTap: (item) =>
-                          _openForm(noPenerimaan: item.noPenerimaan),
+                      onRowTap: _openPreview,
                     ),
                   ),
                 ),
@@ -174,10 +270,10 @@ class _TradeInScreenState extends State<TradeInScreen> {
   List<AtlasTableColumn<TradeInTransaction>> _columns() {
     return [
       AtlasTableColumn<TradeInTransaction>(
-        title: 'NO. PENERIMAAN',
-        width: 140,
+        title: 'TANGGAL',
+        width: 130,
         cellBuilder: (ctx, item, state) => Text(
-          item.noPenerimaan,
+          item.tanggal,
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w700,
@@ -188,16 +284,17 @@ class _TradeInScreenState extends State<TradeInScreen> {
         ),
       ),
       AtlasTableColumn<TradeInTransaction>(
-        title: 'TANGGAL',
-        width: 110,
+        title: 'SALES PERSON',
+        width: 200,
         cellBuilder: (ctx, item, state) => Text(
-          item.tanggal,
+          item.salesPersonName.isEmpty ? '-' : item.salesPersonName,
           style: const TextStyle(fontSize: 13, color: Color(0xFF4B5563)),
+          overflow: TextOverflow.ellipsis,
         ),
       ),
       AtlasTableColumn<TradeInTransaction>(
         title: 'SUPPLIER',
-        width: 180,
+        width: 220,
         cellBuilder: (ctx, item, state) => Text(
           item.supplier.isEmpty ? '-' : item.supplier,
           style: const TextStyle(
@@ -209,29 +306,8 @@ class _TradeInScreenState extends State<TradeInScreen> {
         ),
       ),
       AtlasTableColumn<TradeInTransaction>(
-        title: 'SALES PERSON',
-        width: 160,
-        cellBuilder: (ctx, item, state) => Text(
-          item.salesPersonName.isEmpty ? '-' : item.salesPersonName,
-          style: const TextStyle(fontSize: 13, color: Color(0xFF4B5563)),
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
-      AtlasTableColumn<TradeInTransaction>(
-        title: 'NO. REJECT',
-        width: 120,
-        cellBuilder: (ctx, item, state) {
-          final reject = item.reject;
-          return Text(
-            reject == null || reject.noReject.isEmpty ? '-' : reject.noReject,
-            style: const TextStyle(fontSize: 13, color: Color(0xFF4B5563)),
-            overflow: TextOverflow.ellipsis,
-          );
-        },
-      ),
-      AtlasTableColumn<TradeInTransaction>(
         title: 'REJECT',
-        width: 220,
+        width: 260,
         cellBuilder: (ctx, item, state) {
           final reject = item.reject;
           if (reject == null) {
@@ -246,19 +322,6 @@ class _TradeInScreenState extends State<TradeInScreen> {
             overflow: TextOverflow.ellipsis,
           );
         },
-      ),
-      AtlasTableColumn<TradeInTransaction>(
-        title: '',
-        width: 60,
-        showDivider: false,
-        cellAlignment: Alignment.center,
-        cellBuilder: (ctx, item, state) => IconButton(
-          icon: const Icon(Icons.delete_outline_rounded, size: 18),
-          color: Colors.red.shade400,
-          splashRadius: 18,
-          padding: EdgeInsets.zero,
-          onPressed: () => _onDelete(item),
-        ),
       ),
     ];
   }

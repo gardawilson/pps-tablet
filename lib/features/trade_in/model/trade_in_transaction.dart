@@ -1,4 +1,4 @@
-import 'trade_in_detail.dart';
+import 'trade_in_reject_detail.dart';
 
 /// Satu baris penerimaan trade-in pada list — field-field ini sudah
 /// diformat oleh backend (Tanggal jadi "DD MMM YYYY" atau "-", field

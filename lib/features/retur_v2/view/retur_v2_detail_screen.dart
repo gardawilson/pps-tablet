@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/network/api_client.dart';
@@ -14,10 +15,12 @@ import '../model/retur_v2_output.dart';
 import '../view_model/retur_v2_detail_view_model.dart';
 
 const _kPrimary = Color(0xFF1E6FD9);
-const _kSurface = Color(0xFFF8F9FB);
+const _kSurface = Color(0xFFF3F5F8);
 const _kBorder = Color(0xFFE2E6EA);
 const _kSuccess = Color(0xFF0A7349);
 const _kSuccessBg = Color(0xFFE9F6EF);
+const _kMuted = Color(0xFF6B7280);
+const _kText = Color(0xFF1A1D23);
 
 const _kKodeKategoriFurnitureWip = 'furniturewip';
 
@@ -38,7 +41,9 @@ Future<int?> _markAsPrinted(ReturV2Output o) =>
 /// retur tsb, bisa dipilih & dicetak sekaligus (multi-print) — pola yang
 /// sama dengan bucket print dialog di InjectProductionInputScreenV3. Tidak
 /// memakai AppBar sendiri karena sudah ada compact app bar global dari
-/// AppShell (lihat pola yang sama di SoV2DetailScreen).
+/// AppShell (lihat pola yang sama di SoV2DetailScreen). Layout dirancang
+/// untuk tablet landscape: 2 kolom kategori berdampingan di bawah 1 header
+/// ringkasan.
 class ReturV2DetailScreen extends StatefulWidget {
   final String noRetur;
 
@@ -89,15 +94,18 @@ class _ReturV2DetailScreenState extends State<ReturV2DetailScreen> {
     super.dispose();
   }
 
-  void _openPrintDialog(String sectionTitle, List<ReturV2Output> items) {
-    if (items.isEmpty) return;
+  void _openPrintDialog() {
+    final groups = <_PrintGroup>[
+      if (_vm.furnitureWipItems.isNotEmpty)
+        _PrintGroup(title: 'Furniture WIP', items: _vm.furnitureWipItems),
+      if (_vm.barangJadiItems.isNotEmpty)
+        _PrintGroup(title: 'Barang Jadi', items: _vm.barangJadiItems),
+    ];
+    if (groups.isEmpty) return;
     showDialog<void>(
       context: context,
-      builder: (_) => _ReturPrintPickerDialog(
-        sectionTitle: sectionTitle,
-        items: items,
-        onPrint: _printEntries,
-      ),
+      builder: (_) =>
+          _ReturPrintPickerDialog(groups: groups, onPrint: _printEntries),
     );
   }
 
@@ -196,8 +204,18 @@ class _ReturV2DetailScreenState extends State<ReturV2DetailScreen> {
       value: _vm,
       child: Consumer<ReturV2DetailViewModel>(
         builder: (context, vm, _) {
+          final totalItems =
+              vm.furnitureWipItems.length + vm.barangJadiItems.length;
           return Scaffold(
             backgroundColor: _kSurface,
+            floatingActionButton: FloatingActionButton(
+              onPressed: totalItems == 0 ? null : _openPrintDialog,
+              backgroundColor: totalItems == 0
+                  ? Colors.grey.shade300
+                  : _kPrimary,
+              foregroundColor: Colors.white,
+              child: const Icon(Icons.print_rounded),
+            ),
             body: RefreshIndicator(onRefresh: vm.load, child: _buildBody(vm)),
           );
         },
@@ -232,29 +250,32 @@ class _ReturV2DetailScreenState extends State<ReturV2DetailScreen> {
         ],
       );
     }
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          child: _OutputSection(
-            title: 'Furniture WIP',
-            icon: Icons.chair_alt_rounded,
-            items: vm.furnitureWipItems,
-            onPrintTap: () =>
-                _openPrintDialog('Furniture WIP', vm.furnitureWipItems),
+
+    final furniture = vm.furnitureWipItems;
+    final barangJadi = vm.barangJadiItems;
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: _OutputSection(
+              title: 'Furniture WIP',
+              icon: Icons.chair_alt_rounded,
+              items: furniture,
+            ),
           ),
-        ),
-        const VerticalDivider(width: 1, color: _kBorder),
-        Expanded(
-          child: _OutputSection(
-            title: 'Barang Jadi',
-            icon: Icons.inventory_2_rounded,
-            items: vm.barangJadiItems,
-            onPrintTap: () =>
-                _openPrintDialog('Barang Jadi', vm.barangJadiItems),
+          const SizedBox(width: 14),
+          Expanded(
+            child: _OutputSection(
+              title: 'Barang Jadi',
+              icon: Icons.inventory_2_rounded,
+              items: barangJadi,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -263,88 +284,81 @@ class _OutputSection extends StatelessWidget {
   final String title;
   final IconData icon;
   final List<ReturV2Output> items;
-  final VoidCallback onPrintTap;
 
   const _OutputSection({
     required this.title,
     required this.icon,
     required this.items,
-    required this.onPrintTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final total = items.length;
     final printedCount = items.where((o) => o.hasBeenPrinted).length;
-    return Column(
-      children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(bottom: BorderSide(color: _kBorder)),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, size: 18, color: _kPrimary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF1A1D23),
-                      ),
-                    ),
-                    Text(
-                      '$printedCount/${items.length} dicetak',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              FilledButton.icon(
-                onPressed: items.isEmpty ? null : onPrintTap,
-                style: FilledButton.styleFrom(
-                  backgroundColor: _kPrimary,
-                  disabledBackgroundColor: Colors.grey.shade300,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  visualDensity: VisualDensity.compact,
-                ),
-                icon: const Icon(Icons.print_rounded, size: 16),
-                label: const Text(
-                  'Cetak',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: items.isEmpty
-              ? Center(
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _kBorder),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            decoration: const BoxDecoration(
+              color: Color(0xFFFAFBFC),
+              border: Border(bottom: BorderSide(color: _kBorder)),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, size: 17, color: _kMuted),
+                const SizedBox(width: 8),
+                Expanded(
                   child: Text(
-                    'Belum ada output $title',
-                    style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                    title,
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: _kText,
+                    ),
                   ),
-                )
-              : ListView.separated(
-                  padding: EdgeInsets.zero,
-                  itemCount: items.length,
-                  separatorBuilder: (_, __) =>
-                      const Divider(height: 1, color: _kBorder),
-                  itemBuilder: (context, index) =>
-                      _OutputTile(output: items[index]),
                 ),
-        ),
-      ],
+                Text(
+                  '$printedCount/$total dicetak',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: _kMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: items.isEmpty
+                ? Center(
+                    child: Text(
+                      'Belum ada output $title',
+                      style: TextStyle(
+                        color: Colors.grey.shade500,
+                        fontSize: 13,
+                      ),
+                    ),
+                  )
+                : ListView.separated(
+                    padding: EdgeInsets.zero,
+                    itemCount: items.length,
+                    separatorBuilder: (_, __) =>
+                        const Divider(height: 1, color: _kBorder),
+                    itemBuilder: (context, index) =>
+                        _OutputTile(output: items[index]),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -358,65 +372,84 @@ class _OutputTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final printed = output.hasBeenPrinted;
     final lokasi = output.lokasiLabel;
-    final subtitleParts = [
-      output.labelCode,
-      '${output.qty} ${output.uom}'.trim(),
-      if (lokasi != null) lokasi,
-      if (output.dateCreate != null && output.dateCreate!.isNotEmpty)
-        output.dateCreate!,
-    ];
     final title = output.namaJenis != null && output.namaJenis!.isNotEmpty
         ? output.namaJenis!
         : output.labelCode;
 
     return Container(
-      color: printed ? _kSuccessBg : Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            printed ? Icons.check_circle_rounded : Icons.circle_outlined,
-            size: 15,
-            color: printed ? _kSuccess : Colors.grey.shade400,
-          ),
-          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: printed ? _kSuccess : const Color(0xFF1A1D23),
+                    color: _kText,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitleParts.join(' · '),
-                  style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 4,
+                  children: [
+                    _InfoChip(
+                      icon: Icons.label_outline_rounded,
+                      text: output.labelCode,
+                    ),
+                    _InfoChip(
+                      icon: Icons.inventory_2_outlined,
+                      text: '${output.qty} ${output.uom}'.trim(),
+                    ),
+                    if (lokasi != null)
+                      _InfoChip(icon: Icons.location_on_outlined, text: lokasi),
+                    if (output.dateCreate != null)
+                      _InfoChip(
+                        icon: Icons.event_outlined,
+                        text: DateFormat(
+                          'dd MMM yyyy',
+                          'id_ID',
+                        ).format(output.dateCreate!),
+                      ),
+                  ],
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: printed
-                  ? _kSuccess.withValues(alpha: 0.12)
-                  : Colors.grey.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              printed ? 'Sudah Dicetak' : 'Belum Dicetak',
-              style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: FontWeight.w700,
-                color: printed ? _kSuccess : Colors.grey.shade600,
+              color: printed ? _kSuccessBg : const Color(0xFFF3F4F6),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(
+                color: printed ? _kSuccess.withValues(alpha: 0.3) : _kBorder,
               ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.print_rounded,
+                  size: 12,
+                  color: printed ? _kSuccess : Colors.grey.shade600,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '${output.printCount}x',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: printed ? _kSuccess : Colors.grey.shade600,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -425,20 +458,48 @@ class _OutputTile extends StatelessWidget {
   }
 }
 
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _InfoChip({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 12.5, color: Colors.grey.shade500),
+        const SizedBox(width: 3),
+        Text(
+          text,
+          style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+        ),
+      ],
+    );
+  }
+}
+
 // ─── Print picker dialog (multi-select) ─────────────────────────────────────
 
-/// Dialog pilih label untuk dicetak sekaligus — desain & alur seleksi sama
-/// dengan `_BucketPrintDialog` di InjectProductionInputScreenV3.
-class _ReturPrintPickerDialog extends StatefulWidget {
-  final String sectionTitle;
+/// Satu grup label pada picker cetak gabungan, mis. "Furniture WIP" atau
+/// "Barang Jadi" — ditampilkan sebagai header + daftar checkbox di bawahnya.
+class _PrintGroup {
+  final String title;
   final List<ReturV2Output> items;
+
+  const _PrintGroup({required this.title, required this.items});
+}
+
+/// Dialog pilih label untuk dicetak sekaligus, digrup per kategori — desain
+/// & alur seleksi sama dengan `_BucketPrintDialog` di
+/// InjectProductionInputScreenV3, tapi menggabungkan seluruh grup ke dalam
+/// satu picker supaya cukup 1 tombol "Cetak" di layar utama.
+class _ReturPrintPickerDialog extends StatefulWidget {
+  final List<_PrintGroup> groups;
   final void Function(List<ReturV2Output> selected) onPrint;
 
-  const _ReturPrintPickerDialog({
-    required this.sectionTitle,
-    required this.items,
-    required this.onPrint,
-  });
+  const _ReturPrintPickerDialog({required this.groups, required this.onPrint});
 
   @override
   State<_ReturPrintPickerDialog> createState() =>
@@ -446,27 +507,29 @@ class _ReturPrintPickerDialog extends StatefulWidget {
 }
 
 class _ReturPrintPickerDialogState extends State<_ReturPrintPickerDialog> {
+  late final List<ReturV2Output> _allItems;
   late final Set<String> _selected;
 
   @override
   void initState() {
     super.initState();
-    _selected = widget.items.map((e) => e.labelCode).toSet();
+    _allItems = widget.groups.expand((g) => g.items).toList();
+    _selected = _allItems.map((e) => e.labelCode).toSet();
   }
 
-  bool get _allSelected => _selected.length == widget.items.length;
+  bool get _allSelected => _selected.length == _allItems.length;
 
   void _toggleAll() => setState(() {
     if (_allSelected) {
       _selected.clear();
     } else {
-      _selected.addAll(widget.items.map((e) => e.labelCode));
+      _selected.addAll(_allItems.map((e) => e.labelCode));
     }
   });
 
   @override
   Widget build(BuildContext context) {
-    final selectedItems = widget.items
+    final selectedItems = _allItems
         .where((e) => _selected.contains(e.labelCode))
         .toList();
     final selectedCount = selectedItems.length;
@@ -477,7 +540,7 @@ class _ReturPrintPickerDialogState extends State<_ReturPrintPickerDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420, maxHeight: 600),
+        constraints: const BoxConstraints(maxWidth: 440, maxHeight: 620),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -508,15 +571,12 @@ class _ReturPrintPickerDialogState extends State<_ReturPrintPickerDialog> {
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFF1A1D23),
+                            color: _kText,
                           ),
                         ),
                         Text(
-                          widget.sectionTitle,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFF6B7280),
-                          ),
+                          '${_allItems.length} label · ${widget.groups.map((g) => g.title).join(' & ')}',
+                          style: const TextStyle(fontSize: 11, color: _kMuted),
                         ),
                       ],
                     ),
@@ -554,25 +614,40 @@ class _ReturPrintPickerDialogState extends State<_ReturPrintPickerDialog> {
             ),
             const Divider(height: 1, color: _kBorder),
             Flexible(
-              child: ListView.separated(
+              child: ListView(
                 padding: const EdgeInsets.all(12),
                 shrinkWrap: true,
-                itemCount: widget.items.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 4),
-                itemBuilder: (context, index) {
-                  final item = widget.items[index];
-                  return _ReturLabelCheckTile(
-                    item: item,
-                    isSelected: _selected.contains(item.labelCode),
-                    onToggle: () => setState(() {
-                      if (_selected.contains(item.labelCode)) {
-                        _selected.remove(item.labelCode);
-                      } else {
-                        _selected.add(item.labelCode);
-                      }
-                    }),
-                  );
-                },
+                children: [
+                  for (final group in widget.groups) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 4, 4, 6),
+                      child: Text(
+                        group.title.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.3,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                    ),
+                    for (final item in group.items) ...[
+                      _ReturLabelCheckTile(
+                        item: item,
+                        isSelected: _selected.contains(item.labelCode),
+                        onToggle: () => setState(() {
+                          if (_selected.contains(item.labelCode)) {
+                            _selected.remove(item.labelCode);
+                          } else {
+                            _selected.add(item.labelCode);
+                          }
+                        }),
+                      ),
+                      const SizedBox(height: 4),
+                    ],
+                    const SizedBox(height: 8),
+                  ],
+                ],
               ),
             ),
             const Divider(height: 1, color: _kBorder),

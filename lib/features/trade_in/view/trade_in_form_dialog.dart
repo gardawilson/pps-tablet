@@ -10,14 +10,11 @@ const _kPrimary = Color(0xFF1E6FD9);
 const _kSurface = Color(0xFFF8F9FB);
 const _kBorder = Color(0xFFE2E6EA);
 
-/// Dialog tambah/edit satu penerimaan trade-in (header + 1 label reject
-/// terkait). Null [noPenerimaan] → mode tambah, non-null → mode edit.
-/// Return `true` lewat `Navigator.pop` kalau berhasil disimpan, supaya
-/// caller tahu kapan harus refresh list.
+/// Dialog tambah 1 penerimaan trade-in baru (header + 1 label reject
+/// terkait). Return `true` lewat `Navigator.pop` kalau berhasil disimpan,
+/// supaya caller tahu kapan harus refresh list.
 class TradeInFormDialog extends StatefulWidget {
-  final String? noPenerimaan;
-
-  const TradeInFormDialog({super.key, this.noPenerimaan});
+  const TradeInFormDialog({super.key});
 
   @override
   State<TradeInFormDialog> createState() => _TradeInFormDialogState();
@@ -31,49 +28,17 @@ class _TradeInFormDialogState extends State<TradeInFormDialog> {
   DateTime _tanggal = DateTime.now();
   String? _salesPersonCode;
   int? _idReject;
-  bool _prefilled = false;
   bool _submitting = false;
-
-  bool get _isEditMode => widget.noPenerimaan != null;
 
   @override
   void initState() {
     super.initState();
-    _vm = TradeInFormViewModel(noPenerimaan: widget.noPenerimaan);
-    _vm.addListener(_onVmChanged);
+    _vm = TradeInFormViewModel();
     _vm.load();
-  }
-
-  void _onVmChanged() {
-    if (_prefilled || _vm.isLoading || _vm.error != null || !mounted) return;
-    final detail = _vm.detail;
-    if (detail != null) {
-      _supplierCtl.text = detail.supplier;
-      _jenisCtl.text = detail.jenis;
-      _tanggal = detail.tanggal ?? DateTime.now();
-      _salesPersonCode = detail.salesPersonCode;
-      _idReject = detail.reject?.idReject;
-      _beratCtl.text = detail.reject == null
-          ? ''
-          : _formatBerat(detail.reject!.berat);
-    }
-    _prefilled = true;
-    setState(() {});
-  }
-
-  String _formatBerat(double value) {
-    // Tampilkan tanpa trailing zero yang tidak perlu, pakai koma (format
-    // lokal Indonesia) supaya konsisten sama contoh input di dokumentasi.
-    final text = value
-        .toStringAsFixed(2)
-        .replaceFirst(RegExp(r'0+$'), '')
-        .replaceFirst(RegExp(r'\.$'), '');
-    return text.replaceFirst('.', ',');
   }
 
   @override
   void dispose() {
-    _vm.removeListener(_onVmChanged);
     _vm.dispose();
     _supplierCtl.dispose();
     _jenisCtl.dispose();
@@ -174,9 +139,7 @@ class _TradeInFormDialogState extends State<TradeInFormDialog> {
   }
 
   Widget _buildHeader(TradeInFormViewModel vm) {
-    final noPenerimaanLabel = _isEditMode
-        ? widget.noPenerimaan!
-        : (vm.previewNoPenerimaan ?? '...');
+    final noPenerimaanLabel = vm.previewNoPenerimaan ?? '...';
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
       child: Row(
@@ -198,9 +161,9 @@ class _TradeInFormDialogState extends State<TradeInFormDialog> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  _isEditMode ? 'Edit Penerimaan' : 'Penerimaan Baru',
-                  style: const TextStyle(
+                const Text(
+                  'Penerimaan Baru',
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
                     color: Color(0xFF1A1D23),
@@ -281,12 +244,6 @@ class _TradeInFormDialogState extends State<TradeInFormDialog> {
             ),
           ),
           const SizedBox(height: 16),
-          _fieldLabel('Supplier'),
-          TextField(
-            controller: _supplierCtl,
-            decoration: _inputDecoration(hint: 'Nama supplier'),
-          ),
-          const SizedBox(height: 16),
           _fieldLabel('Sales Person'),
           DropdownButtonFormField<String>(
             initialValue: _salesPersonCode,
@@ -302,7 +259,13 @@ class _TradeInFormDialogState extends State<TradeInFormDialog> {
             onChanged: (v) => setState(() => _salesPersonCode = v),
           ),
           const SizedBox(height: 16),
-          _fieldLabel('Jenis'),
+          _fieldLabel('Supplier'),
+          TextField(
+            controller: _supplierCtl,
+            decoration: _inputDecoration(hint: 'Nama supplier'),
+          ),
+          const SizedBox(height: 16),
+          _fieldLabel('Keterangan'),
           TextField(
             controller: _jenisCtl,
             decoration: _inputDecoration(hint: 'Mis. plastik, kardus'),
@@ -319,38 +282,42 @@ class _TradeInFormDialogState extends State<TradeInFormDialog> {
             ),
           ),
           const SizedBox(height: 12),
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: RejectTypeDropdown(
-                    preselectId: _idReject,
-                    onChanged: (rt) => setState(() => _idReject = rt?.idReject),
-                  ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _fieldLabel('Jenis Reject'),
+                    RejectTypeDropdown(
+                      label: '',
+                      preselectId: _idReject,
+                      onChanged: (rt) =>
+                          setState(() => _idReject = rt?.idReject),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 1,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _fieldLabel('Berat (kg)'),
-                      Expanded(
-                        child: TextField(
-                          controller: _beratCtl,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          decoration: _inputDecoration(hint: '5,25'),
-                        ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 1,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _fieldLabel('Berat (kg)'),
+                    TextField(
+                      controller: _beratCtl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
                       ),
-                    ],
-                  ),
+                      decoration: _inputDecoration(hint: '5,25'),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
           const SizedBox(height: 24),
           SizedBox(
@@ -373,9 +340,9 @@ class _TradeInFormDialogState extends State<TradeInFormDialog> {
                         color: Colors.white,
                       ),
                     )
-                  : Text(
-                      _isEditMode ? 'Simpan Perubahan' : 'Simpan',
-                      style: const TextStyle(
+                  : const Text(
+                      'Simpan',
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                       ),

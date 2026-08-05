@@ -2,30 +2,25 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_error.dart';
-import '../model/trade_in_detail.dart';
 import '../model/trade_in_salesperson.dart';
 import '../repository/trade_in_repository.dart';
 
+/// Form tambah 1 penerimaan trade-in baru (header + 1 label reject
+/// terkait) — tidak ada mode edit, penerimaan yang sudah tersimpan hanya
+/// bisa dilihat lewat preview.
 class TradeInFormViewModel extends ChangeNotifier {
-  /// Null → mode tambah baru. Non-null → mode edit penerimaan tsb.
-  final String? noPenerimaan;
   final TradeInRepository repository;
 
-  TradeInFormViewModel({this.noPenerimaan, TradeInRepository? repository})
+  TradeInFormViewModel({TradeInRepository? repository})
     : repository = repository ?? TradeInRepository();
-
-  bool get isEditMode => noPenerimaan != null;
 
   bool isLoading = false;
   String? error;
 
   List<TradeInSalesPerson> salesPersons = [];
 
-  /// Preview nomor penerimaan berikutnya — hanya terisi di mode tambah.
+  /// Preview nomor penerimaan berikutnya.
   String? previewNoPenerimaan;
-
-  /// Data existing — hanya terisi di mode edit, dipakai untuk prefill form.
-  TradeInDetail? detail;
 
   Future<void> load() async {
     isLoading = true;
@@ -34,14 +29,10 @@ class TradeInFormViewModel extends ChangeNotifier {
     try {
       final results = await Future.wait([
         repository.fetchSalesPersons(),
-        isEditMode ? repository.fetchDetail(noPenerimaan!) : repository.fetchNextNo(),
+        repository.fetchNextNo(),
       ]);
       salesPersons = results[0] as List<TradeInSalesPerson>;
-      if (isEditMode) {
-        detail = results[1] as TradeInDetail;
-      } else {
-        previewNoPenerimaan = results[1] as String;
-      }
+      previewNoPenerimaan = results[1] as String;
     } catch (e) {
       error = apiErrorMessage(e);
     } finally {
@@ -51,7 +42,7 @@ class TradeInFormViewModel extends ChangeNotifier {
   }
 
   /// Return (noPenerimaan, null) on success, or (null, errorMessage) on
-  /// failure — dipakai baik untuk create maupun update.
+  /// failure.
   Future<({String? noPenerimaan, String? errorMessage})> submit({
     required String supplier,
     required String salesPersonCode,
@@ -65,28 +56,14 @@ class TradeInFormViewModel extends ChangeNotifier {
         '${tanggal.month.toString().padLeft(2, '0')}-'
         '${tanggal.day.toString().padLeft(2, '0')}';
     try {
-      final String result;
-      if (isEditMode) {
-        result = await repository.update(
-          noPenerimaan!,
-          supplier: supplier,
-          salesPersonCode: salesPersonCode,
-          jenis: jenis,
-          tanggal: tanggalStr,
-          idReject: idReject,
-          berat: berat,
-          noReject: detail?.reject?.noReject ?? '',
-        );
-      } else {
-        result = await repository.create(
-          supplier: supplier,
-          salesPersonCode: salesPersonCode,
-          jenis: jenis,
-          tanggal: tanggalStr,
-          idReject: idReject,
-          berat: berat,
-        );
-      }
+      final result = await repository.create(
+        supplier: supplier,
+        salesPersonCode: salesPersonCode,
+        jenis: jenis,
+        tanggal: tanggalStr,
+        idReject: idReject,
+        berat: berat,
+      );
       return (noPenerimaan: result, errorMessage: null);
     } on ApiException catch (e) {
       return (noPenerimaan: null, errorMessage: apiErrorMessage(e));

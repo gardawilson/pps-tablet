@@ -27,6 +27,32 @@ class SoV2LokasiListViewModel extends ChangeNotifier {
   double get totalWeight =>
       items.fold(0.0, (sum, item) => sum + item.totalWeight);
 
+  /// Update optimistik lokal setelah event realtime `stock_opname_hasil_inserted`
+  /// — lihat [SoV2BlokListViewModel.applyScan]. Return false kalau
+  /// lokasinya belum termuat, supaya caller fallback ke [load] penuh.
+  bool applyScan({required int locationId}) {
+    final index = items.indexWhere((l) => l.locationId == locationId);
+    if (index == -1) return false;
+    final current = items[index];
+    items = [...items]
+      ..[index] = current.copyWith(scannedCount: current.scannedCount + 1);
+    notifyListeners();
+    return true;
+  }
+
+  /// Kebalikan dari [applyScan] — lihat [SoV2BlokListViewModel.applyUnscan].
+  bool applyUnscan({required int locationId}) {
+    final index = items.indexWhere((l) => l.locationId == locationId);
+    if (index == -1) return false;
+    final current = items[index];
+    items = [...items]
+      ..[index] = current.copyWith(
+        scannedCount: (current.scannedCount - 1).clamp(0, current.labelCount),
+      );
+    notifyListeners();
+    return true;
+  }
+
   Future<void> load() async {
     isLoading = true;
     error = null;

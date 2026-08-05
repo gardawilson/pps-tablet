@@ -9,7 +9,7 @@ class SoV2UserLokasiAccessRepository {
     : _api = apiClient ?? ApiClient();
 
   Future<List<SoV2AccessUser>> fetchAllUsers() async {
-    final body = await _api.getJson('/api/user-lokasi-access/users');
+    final body = await _api.getJson('/api/stock-opname-v2/lokasi-access/users');
     final dataList = (body['data'] ?? []) as List;
     return dataList
         .map(
@@ -22,10 +22,16 @@ class SoV2UserLokasiAccessRepository {
     required String blok,
     required int idLokasi,
     required int idUsername,
+    required String stockOpnameNo,
   }) async {
     await _api.postJson(
-      '/api/user-lokasi-access',
-      body: {'blok': blok, 'idLokasi': idLokasi, 'idUsername': idUsername},
+      '/api/stock-opname-v2/lokasi-access',
+      body: {
+        'blok': blok,
+        'idLokasi': idLokasi,
+        'idUsername': idUsername,
+        'stockOpnameNo': stockOpnameNo,
+      },
     );
   }
 
@@ -33,9 +39,10 @@ class SoV2UserLokasiAccessRepository {
     required String blok,
     required int idLokasi,
     required int idUsername,
+    required String stockOpnameNo,
   }) async {
     await _api.deleteJson(
-      '/api/user-lokasi-access/$blok/$idLokasi/$idUsername',
+      '/api/stock-opname-v2/lokasi-access/$stockOpnameNo/$blok/$idLokasi/$idUsername',
     );
   }
 }

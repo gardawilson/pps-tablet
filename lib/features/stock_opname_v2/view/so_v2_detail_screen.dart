@@ -1,19 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../common/widgets/confirm_dialog.dart';
+import '../../../core/network/api_client.dart';
+import '../../../core/services/dialog_service.dart';
+import '../../../core/view/app_shell.dart';
 import '../../../core/view_model/permission_view_model.dart';
 import '../model/so_v2_access_user.dart';
+import '../model/so_v2_complete_summary.dart';
 import '../model/so_v2_label_group.dart';
+import '../model/so_v2_label_row.dart';
 import '../model/so_v2_lokasi.dart';
 import '../repository/so_v2_repository.dart';
 import '../repository/so_v2_user_lokasi_access_repository.dart';
 import '../view_model/so_v2_blok_list_view_model.dart';
 import '../view_model/so_v2_label_list_view_model.dart';
 import '../view_model/so_v2_lokasi_list_view_model.dart';
+import '../view_model/so_v2_socket_manager.dart';
 import '../utils/so_v2_number_format.dart';
+import '../widgets/so_v2_complete_summary_dialog.dart';
 import '../widgets/so_v2_label_group_tile.dart';
+import '../widgets/so_v2_scan_summary_dialog.dart';
 import '../widgets/so_v2_worker_picker_dialog.dart';
 
 const _kAccessManagePermission = 'stockopname:create';
@@ -23,6 +32,7 @@ const _kSurface = Color(0xFFF8F9FB);
 const _kBorder = Color(0xFFE2E6EA);
 const _kWarning = Color(0xFFB45309);
 const _kWarningBg = Color(0xFFFFF7ED);
+const _kSuccessBg = Color(0xFFE9F6EF);
 
 /// Screen gabungan: panel blok, panel lokasi (dalam blok terpilih), panel
 /// label (dalam lokasi terpilih). Tidak memakai AppBar sendiri karena sudah
@@ -30,11 +40,13 @@ const _kWarningBg = Color(0xFFFFF7ED);
 class SoV2DetailScreen extends StatefulWidget {
   final String stockOpnameNo;
   final String categoryCode;
+  final String categoryName;
 
   const SoV2DetailScreen({
     super.key,
     required this.stockOpnameNo,
     required this.categoryCode,
+    required this.categoryName,
   });
 
   @override
@@ -51,8 +63,13 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
   SoV2LabelListViewModel? _labelVm;
   final _searchCtl = TextEditingController();
   bool _completing = false;
+  bool _loadingScanSummary = false;
   bool _searchOpen = false;
   final Set<int> _busyLocationIds = {};
+  final Set<String> _busyLabelNos = {};
+  List<BreadcrumbSegment> _prevBreadcrumb = [];
+  VoidCallback? _unsubscribeHasilInserted;
+  VoidCallback? _unsubscribeHasilDeleted;
 
   /// Furniturewip memakai UOM pcs, bukan kg seperti kategori lain.
   String get _uom => widget.categoryCode == 'furniturewip' ? 'pcs' : 'kg';
@@ -62,15 +79,173 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
     super.initState();
     _blokVm = SoV2BlokListViewModel(stockOpnameNo: widget.stockOpnameNo);
     _blokVm.load();
+    final socketVm = context.read<SoV2SocketManager>();
+    socketVm.joinStockOpname(widget.stockOpnameNo);
+    _unsubscribeHasilInserted = socketVm.addHasilInsertedListener(
+      _onHasilInserted,
+    );
+    _unsubscribeHasilDeleted = socketVm.addHasilDeletedListener(
+      _onHasilDeleted,
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _prevBreadcrumb = List<BreadcrumbSegment>.from(AppShell.breadcrumb.value);
+      AppShell.breadcrumb.value = [
+        ..._prevBreadcrumb.map(
+          (s) => BreadcrumbSegment(
+            s.label,
+            onTap: () {
+              AppShell.breadcrumb.value = _prevBreadcrumb;
+              AppShell.shellNavigatorKey.currentState?.pop();
+            },
+          ),
+        ),
+        BreadcrumbSegment(widget.categoryName),
+      ];
+    });
   }
 
   @override
   void dispose() {
+    final prev = _prevBreadcrumb;
+    final categoryName = widget.categoryName;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final current = AppShell.breadcrumb.value;
+      if (current.isNotEmpty && current.last.label == categoryName) {
+        AppShell.breadcrumb.value = prev;
+      }
+    });
+    _unsubscribeHasilInserted?.call();
+    _unsubscribeHasilDeleted?.call();
+    context.read<SoV2SocketManager>().leaveStockOpname(widget.stockOpnameNo);
     _blokVm.dispose();
     _lokasiVm?.dispose();
     _labelVm?.dispose();
     _searchCtl.dispose();
     super.dispose();
+  }
+
+  /// Realtime handler: setiap ada scan hasil baru masuk untuk SO ini (dari
+  /// device manapun), patch panel blok/lokasi/label secara optimistik
+  /// (tanpa refetch ke API) supaya terasa realtime — bukan seperti polling
+  /// dengan loading indicator berkedip tiap event masuk. Fallback ke reload
+  /// penuh hanya kalau blok/lokasinya belum pernah termuat sama sekali.
+  ///
+  /// Panel blok/lokasi/label selalu difilter berdasarkan lokasi ACUAN milik
+  /// label (referenceBlok/referenceLocationId) — bukan lokasi hasil scan
+  /// (scannedBlok/scannedLocationId), yang bisa berbeda kalau ada
+  /// isLocationMismatch. Cocokkan ke field acuan supaya centang label tetap
+  /// update walau scan dilakukan di lokasi lain.
+  void _onHasilInserted(SoV2HasilInsertedEvent event) {
+    if (!mounted) return;
+    if (event.stockOpnameNo != widget.stockOpnameNo) return;
+    final referenceBlok = event.referenceBlok;
+    if (referenceBlok == null) return;
+
+    final blokPatched = _blokVm.applyScan(blok: referenceBlok);
+    if (!blokPatched) _blokVm.load();
+
+    final lokasiVm = _lokasiVm;
+    final referenceLocationId = event.referenceLocationId;
+    if (lokasiVm != null &&
+        lokasiVm.blok == referenceBlok &&
+        referenceLocationId != null) {
+      final lokasiPatched = lokasiVm.applyScan(locationId: referenceLocationId);
+      if (!lokasiPatched) lokasiVm.load();
+    }
+
+    final labelVm = _labelVm;
+    final selectedLokasi = _selectedLokasi;
+    if (labelVm != null &&
+        selectedLokasi != null &&
+        labelVm.blok == referenceBlok &&
+        selectedLokasi.locationId == referenceLocationId) {
+      labelVm.applyScan(
+        labelNo: event.labelNo,
+        isLocationMismatch: event.isLocationMismatch,
+        scannedBlok: event.scannedBlok,
+        scannedLocationId: event.scannedLocationId,
+      );
+    }
+  }
+
+  /// Realtime handler: hasil scan dihapus (mis. label yang salah lokasi
+  /// dibersihkan supaya bisa discan ulang) — dari device manapun, termasuk
+  /// device sendiri (lihat [_deleteMismatchLabel]). Server tidak mengirim
+  /// referenceBlok/referenceLocationId di payload delete, jadi kita hanya
+  /// bisa patch panel yang labelnya kebetulan sedang termuat di panel label
+  /// yang terbuka saat ini — cukup untuk kasus umum (user memperbaiki label
+  /// di lokasi yang lagi dia kerjakan). Kalau tidak match, cukup dibiarkan
+  /// stale sampai reload manual — event ini jarang terjadi.
+  void _onHasilDeleted(SoV2HasilDeletedEvent event) {
+    if (!mounted) return;
+    if (event.stockOpnameNo != widget.stockOpnameNo) return;
+
+    final labelVm = _labelVm;
+    if (labelVm == null) return;
+    if (!labelVm.applyUnscan(event.labelNo)) return;
+
+    final blokPatched = _blokVm.applyUnscan(blok: labelVm.blok);
+    if (!blokPatched) _blokVm.load();
+
+    final lokasiVm = _lokasiVm;
+    if (lokasiVm != null && lokasiVm.blok == labelVm.blok) {
+      final lokasiPatched = lokasiVm.applyUnscan(
+        locationId: labelVm.locationId,
+      );
+      if (!lokasiPatched) lokasiVm.load();
+    }
+  }
+
+  /// Hapus hasil scan satu label yang salah lokasi (isLocationMismatch)
+  /// supaya bisa discan ulang di lokasi yang benar. Dipicu dari tombol
+  /// "Hapus & scan ulang" pada [SoV2LabelTile].
+  Future<void> _deleteMismatchLabel(SoV2LabelRow row) async {
+    final labelVm = _labelVm;
+    if (labelVm == null) return;
+    final labelNo = row.primaryValue;
+    if (_busyLabelNos.contains(labelNo)) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => ConfirmDialog(
+        title: 'Hapus Hasil Scan',
+        message:
+            'Label $labelNo tercatat discan di lokasi ${row.scannedBlok ?? ''}${row.scannedLocationId ?? ''}, '
+            'bukan lokasi acuan. Hapus hasil scan ini supaya bisa discan ulang di lokasi yang benar?',
+        confirmLabel: 'Hapus',
+        confirmIcon: Icons.delete_outline_rounded,
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _busyLabelNos.add(labelNo));
+    try {
+      await _repo.deleteHasilLabel(
+        stockOpnameNo: widget.stockOpnameNo,
+        labelNo: labelNo,
+      );
+      if (!mounted) return;
+      labelVm.applyUnscan(labelNo);
+      if (!_blokVm.applyUnscan(blok: labelVm.blok)) _blokVm.load();
+      final lokasiVm = _lokasiVm;
+      if (lokasiVm != null && lokasiVm.blok == labelVm.blok) {
+        if (!lokasiVm.applyUnscan(locationId: labelVm.locationId)) {
+          lokasiVm.load();
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      final message = e is ApiException
+          ? e.friendlyMessage
+          : 'Gagal menghapus hasil scan';
+      await DialogService.instance.showError(
+        title: 'Gagal Menghapus',
+        message: message,
+      );
+    } finally {
+      if (mounted) setState(() => _busyLabelNos.remove(labelNo));
+    }
   }
 
   void _selectBlok(String blok) {
@@ -108,20 +283,39 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
   }
 
   Future<void> _markComplete() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => const ConfirmDialog(
-        title: 'Tandai Selesai',
-        message:
-            'Yakin ingin menandai stock opname ini selesai? Setelah selesai, scan label tidak dapat dilakukan lagi.',
-        confirmLabel: 'Selesai',
-        confirmIcon: Icons.check_circle_outline_rounded,
-        confirmColor: Color(0xFF0A7349),
-      ),
-    );
-    if (confirmed != true) return;
-
     setState(() => _completing = true);
+
+    final summary = await _fetchSummaryForComplete();
+    if (!mounted) return;
+
+    final bool? confirmed;
+    if (summary != null) {
+      confirmed = await showSoV2CompleteSummaryDialog(
+        context,
+        summary: summary,
+        weightUnit: _uom,
+      );
+    } else {
+      // Gagal ambil ringkasan (mis. server error) — tetap kasih jalur
+      // konfirmasi fallback biar supervisor tidak buntu, cuma tanpa detail.
+      confirmed = await showDialog<bool>(
+        context: context,
+        builder: (_) => const ConfirmDialog(
+          title: 'Tandai Selesai',
+          message:
+              'Yakin ingin menandai stock opname ini selesai? Setelah selesai, scan label tidak dapat dilakukan lagi.',
+          confirmLabel: 'Selesai',
+          confirmIcon: Icons.check_circle_outline_rounded,
+          confirmColor: Color(0xFF0A7349),
+        ),
+      );
+    }
+
+    if (confirmed != true) {
+      if (mounted) setState(() => _completing = false);
+      return;
+    }
+
     try {
       await _repo.completeStockOpname(widget.stockOpnameNo);
     } catch (_) {
@@ -137,6 +331,42 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
       ),
     );
     Navigator.of(context).pop();
+  }
+
+  Future<SoV2CompleteSummary?> _fetchSummaryForComplete() async {
+    try {
+      return await _repo.fetchCompleteSummary(widget.stockOpnameNo);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _openScanSummary() async {
+    if (_loadingScanSummary) return;
+    setState(() => _loadingScanSummary = true);
+    try {
+      final summary = await _repo.fetchScanSummary(widget.stockOpnameNo);
+      if (!mounted) return;
+      final totalLabelCount = _blokVm.items.fold<int>(
+        0,
+        (sum, b) => sum + b.labelCount,
+      );
+      await showSoV2ScanSummaryDialog(
+        context,
+        summary: summary,
+        totalLabelCount: totalLabelCount,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal memuat ringkasan scan: $e'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loadingScanSummary = false);
+    }
   }
 
   void _toggleSearch(SoV2LabelListViewModel vm) {
@@ -156,7 +386,7 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(width: 160, child: _buildBlokPanel()),
+          SizedBox(width: 200, child: _buildBlokPanel()),
           const VerticalDivider(width: 1, color: _kBorder),
           SizedBox(width: 320, child: _buildLokasiPanel()),
           const VerticalDivider(width: 1, color: _kBorder),
@@ -178,49 +408,164 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
             child: Column(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
                   decoration: const BoxDecoration(
                     border: Border(bottom: BorderSide(color: _kBorder)),
                   ),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
                         widget.stockOpnameNo,
-                        style: const TextStyle(
-                          fontSize: 13,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF1A1D23),
+                          color: Colors.grey.shade600,
                         ),
                       ),
                       const SizedBox(height: 8),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: _completing ? null : _markComplete,
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF0A7349),
-                            side: const BorderSide(color: Color(0xFF0A7349)),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                          ),
-                          icon: _completing
-                              ? const SizedBox(
-                                  width: 12,
-                                  height: 12,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons.check_circle_outline_rounded,
-                                  size: 16,
+                      if (vm.isComplete)
+                        Tooltip(
+                          message: vm.completedAt != null
+                              ? 'Selesai ${DateFormat('dd MMM yyyy, HH:mm', 'id_ID').format(vm.completedAt!.toLocal())}'
+                              : 'Sudah ditandai selesai',
+                          // Sengaja TANPA background pill/InkWell — kalau
+                          // dibikin mirip tombol, user sulit bedain ini
+                          // status (non-interaktif) vs tombol "Tandai
+                          // Selesai" (interaktif) di state sebaliknya.
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.check_circle_rounded,
+                                color: Colors.green.shade700,
+                                size: 14,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                'Selesai',
+                                style: TextStyle(
+                                  color: Colors.green.shade700,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
                                 ),
-                          label: const Text(
-                            'Selesai',
-                            style: TextStyle(fontSize: 11),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
+                      if (vm.isComplete) ...[
+                        const SizedBox(height: 6),
+                        SizedBox(
+                          width: double.infinity,
+                          child: Material(
+                            color: _kPrimary.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(20),
+                            child: InkWell(
+                              onTap: _loadingScanSummary
+                                  ? null
+                                  : _openScanSummary,
+                              borderRadius: BorderRadius.circular(20),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 7,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (_loadingScanSummary)
+                                      const SizedBox(
+                                        width: 13,
+                                        height: 13,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: _kPrimary,
+                                        ),
+                                      )
+                                    else
+                                      const Icon(
+                                        Icons.leaderboard_rounded,
+                                        size: 15,
+                                        color: _kPrimary,
+                                      ),
+                                    const SizedBox(width: 6),
+                                    const Flexible(
+                                      child: Text(
+                                        'Ringkasan Scan',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: _kPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ] else
+                        SizedBox(
+                          width: double.infinity,
+                          child: Material(
+                            color: const Color(
+                              0xFF0A7349,
+                            ).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            child: InkWell(
+                              onTap: _completing ? null : _markComplete,
+                              borderRadius: BorderRadius.circular(20),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 7,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (_completing)
+                                      const SizedBox(
+                                        width: 13,
+                                        height: 13,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Color(0xFF0A7349),
+                                        ),
+                                      )
+                                    else
+                                      const Icon(
+                                        Icons.check_circle_rounded,
+                                        size: 15,
+                                        color: Color(0xFF0A7349),
+                                      ),
+                                    const SizedBox(width: 6),
+                                    const Flexible(
+                                      child: Text(
+                                        'Tandai Selesai',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF0A7349),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -285,13 +630,17 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
         final isUnknown = blokItem.blok == kSoV2UnknownBlok;
         final selected = _selectedBlok == blokItem.blok;
         final baseColor = isUnknown ? _kWarning : _kPrimary;
+        final complete =
+            blokItem.labelCount > 0 &&
+            blokItem.scannedCount >= blokItem.labelCount;
+        final progressColor = complete ? const Color(0xFF0A7349) : baseColor;
         return InkWell(
           onTap: () => _selectBlok(blokItem.blok),
           child: Container(
             decoration: BoxDecoration(
               color: selected
                   ? baseColor.withValues(alpha: 0.05)
-                  : (isUnknown ? _kWarningBg : null),
+                  : (complete ? _kSuccessBg : (isUnknown ? _kWarningBg : null)),
               border: Border(
                 left: BorderSide(
                   color: selected ? baseColor : Colors.transparent,
@@ -312,21 +661,74 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                   const SizedBox(width: 6),
                 ],
                 Expanded(
-                  child: Text(
-                    isUnknown
-                        ? 'Tanpa Blok (${blokItem.locationCount})'
-                        : 'Blok ${blokItem.blok} (${blokItem.locationCount})',
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: isUnknown
+                              ? 'Tanpa Blok (${blokItem.locationCount}) '
+                              : 'Blok ${blokItem.blok} (${blokItem.locationCount}) ',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: selected
+                                ? baseColor
+                                : (isUnknown
+                                      ? _kWarning
+                                      : const Color(0xFF1A1D23)),
+                          ),
+                        ),
+                        TextSpan(
+                          text:
+                              '${blokItem.scannedCount}/${blokItem.labelCount}',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: progressColor,
+                          ),
+                        ),
+                      ],
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                      color: selected
-                          ? baseColor
-                          : (isUnknown ? _kWarning : const Color(0xFF1A1D23)),
-                    ),
                   ),
                 ),
+                if (blokItem.workingLocationCount > 0) ...[
+                  const SizedBox(width: 6),
+                  Tooltip(
+                    message:
+                        '${blokItem.workingLocationCount} lokasi sedang dikerjakan',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0A7349).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.bolt_rounded,
+                            size: 11,
+                            color: Color(0xFF0A7349),
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            '${blokItem.workingLocationCount}',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF0A7349),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -363,44 +765,19 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              _selectedBlok == kSoV2UnknownBlok
-                                  ? 'Tanpa Blok'
-                                  : 'Blok $_selectedBlok',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: _selectedBlok == kSoV2UnknownBlok
-                                    ? _kWarning
-                                    : const Color(0xFF1A1D23),
-                              ),
-                            ),
-                          ),
-                          if (vm.isComplete)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.green.shade50,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                'Selesai',
-                                style: TextStyle(
-                                  color: Colors.green.shade700,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                        ],
+                      Text(
+                        _selectedBlok == kSoV2UnknownBlok
+                            ? 'Tanpa Blok'
+                            : 'Blok $_selectedBlok',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: _selectedBlok == kSoV2UnknownBlok
+                              ? _kWarning
+                              : const Color(0xFF1A1D23),
+                        ),
                       ),
                       const SizedBox(height: 10),
                       Row(
@@ -515,10 +892,14 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
           decoration: BoxDecoration(
             color: selected
                 ? baseColor.withValues(alpha: 0.05)
-                : (lokasi.isUnknown ? _kWarningBg : null),
+                : (complete
+                      ? _kSuccessBg
+                      : (lokasi.isUnknown ? _kWarningBg : null)),
             border: Border(
               left: BorderSide(
-                color: selected ? baseColor : Colors.transparent,
+                color: selected
+                    ? baseColor
+                    : (complete ? const Color(0xFF0A7349) : Colors.transparent),
                 width: 3,
               ),
             ),
@@ -544,6 +925,21 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                               size: 14,
                             ),
                             const SizedBox(width: 6),
+                          ] else if (complete) ...[
+                            Container(
+                              width: 18,
+                              height: 18,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF0A7349),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.check_rounded,
+                                size: 12,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
                           ],
                           Expanded(
                             child: lokasi.isUnknown
@@ -568,7 +964,11 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                                             fontWeight: FontWeight.w700,
                                             color: selected
                                                 ? baseColor
-                                                : const Color(0xFF1A1D23),
+                                                : (complete
+                                                      ? const Color(0xFF0A7349)
+                                                      : const Color(
+                                                          0xFF1A1D23,
+                                                        )),
                                           ),
                                         ),
                                         TextSpan(
@@ -580,33 +980,50 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                                             color: progressColor,
                                           ),
                                         ),
-                                        TextSpan(
-                                          text: lokasi.allowedUsers.isNotEmpty
-                                              ? '  ·  ${lokasi.allowedUsers.map((u) => u.displayName).join(', ')}'
-                                              : '  ·  Belum ditugaskan',
-                                          style: TextStyle(
-                                            fontSize: 10.5,
-                                            fontWeight: FontWeight.w500,
-                                            color: lokasi.allowedUsers.isEmpty
-                                                ? Colors.grey.shade400
-                                                : Colors.grey.shade600,
+                                        if (!complete)
+                                          TextSpan(
+                                            text: lokasi.allowedUsers.isNotEmpty
+                                                ? '  ·  ${lokasi.allowedUsers.map((u) => u.displayName).join(', ')}'
+                                                : '  ·  Belum ditugaskan',
+                                            style: TextStyle(
+                                              fontSize: 10.5,
+                                              fontWeight:
+                                                  lokasi.allowedUsers.isEmpty
+                                                  ? FontWeight.w500
+                                                  : FontWeight.w700,
+                                              color: lokasi.allowedUsers.isEmpty
+                                                  ? Colors.grey.shade400
+                                                  : const Color(0xFF1A1D23),
+                                            ),
                                           ),
-                                        ),
                                       ],
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                           ),
-                          if (complete)
-                            const Padding(
-                              padding: EdgeInsets.only(left: 4),
-                              child: Icon(
-                                Icons.check_circle_rounded,
-                                size: 13,
-                                color: Color(0xFF0A7349),
+                          if (complete) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0A7349),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Text(
+                                'Selesai',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                  letterSpacing: 0.2,
+                                ),
                               ),
                             ),
+                          ],
                         ],
                       ),
                     ),
@@ -632,21 +1049,30 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : IconButton(
-                              onPressed: lokasi.allowedUsers.isEmpty
-                                  ? () => _playLokasi(lokasi)
-                                  : () => _pauseLokasi(lokasi),
+                              // SO yang sudah ditandai selesai mengunci
+                              // semua penugasan — tidak boleh ada
+                              // play/pause lagi, scan pun sudah tidak bisa.
+                              onPressed: _blokVm.isComplete
+                                  ? null
+                                  : (lokasi.allowedUsers.isEmpty
+                                        ? () => _playLokasi(lokasi)
+                                        : () => _pauseLokasi(lokasi)),
                               icon: Icon(
                                 lokasi.allowedUsers.isEmpty
                                     ? Icons.play_circle_fill_rounded
                                     : Icons.pause_circle_filled_rounded,
                                 size: 20,
-                                color: lokasi.allowedUsers.isEmpty
-                                    ? const Color(0xFF0A7349)
-                                    : const Color(0xFFB45309),
+                                color: _blokVm.isComplete
+                                    ? Colors.grey.shade400
+                                    : (lokasi.allowedUsers.isEmpty
+                                          ? const Color(0xFF0A7349)
+                                          : const Color(0xFFB45309)),
                               ),
-                              tooltip: lokasi.allowedUsers.isEmpty
-                                  ? 'Tugaskan User'
-                                  : 'Lepas User',
+                              tooltip: _blokVm.isComplete
+                                  ? 'Stock opname sudah selesai'
+                                  : (lokasi.allowedUsers.isEmpty
+                                        ? 'Tugaskan User'
+                                        : 'Lepas User'),
                               splashRadius: 18,
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(
@@ -678,16 +1104,18 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
         blok: _selectedBlok!,
         idLokasi: lokasi.locationId,
         idUsername: picked.idUsername,
+        stockOpnameNo: widget.stockOpnameNo,
       );
       if (!mounted) return;
       await _lokasiVm?.load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Gagal menugaskan user'),
-          backgroundColor: Colors.red,
-        ),
+      final message = e is ApiException
+          ? e.friendlyMessage
+          : 'Gagal menugaskan user';
+      await DialogService.instance.showError(
+        title: 'Gagal Menugaskan User',
+        message: message,
       );
     } finally {
       if (mounted) setState(() => _busyLocationIds.remove(lokasi.locationId));
@@ -717,6 +1145,7 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
           blok: _selectedBlok!,
           idLokasi: lokasi.locationId,
           idUsername: user.idUsername,
+          stockOpnameNo: widget.stockOpnameNo,
         );
       }
       if (!mounted) return;
@@ -732,11 +1161,12 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
       await _lokasiVm?.load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Gagal melepas user'),
-          backgroundColor: Colors.red,
-        ),
+      final message = e is ApiException
+          ? e.friendlyMessage
+          : 'Gagal melepas user';
+      await DialogService.instance.showError(
+        title: 'Gagal Melepas User',
+        message: message,
       );
     } finally {
       if (mounted) setState(() => _busyLocationIds.remove(lokasi.locationId));
@@ -759,6 +1189,11 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
       value: vm,
       child: Consumer<SoV2LabelListViewModel>(
         builder: (context, vm, _) {
+          final canManage =
+              !_blokVm.isComplete &&
+              context.watch<PermissionViewModel>().can(
+                _kAccessManagePermission,
+              );
           return Column(
             children: [
               Container(
@@ -818,38 +1253,6 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                                   ],
                                 ),
                         ),
-                        if (!_searchOpen && vm.isComplete) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.check_circle_rounded,
-                                  color: Colors.green.shade700,
-                                  size: 14,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Selesai',
-                                  style: TextStyle(
-                                    color: Colors.green.shade700,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                        ],
                         IconButton(
                           onPressed: () => _toggleSearch(vm),
                           icon: Icon(
@@ -943,6 +1346,10 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                                   SoV2LabelGroupTile(
                                     group: group,
                                     weightUnit: _uom,
+                                    onDeleteMismatch: canManage
+                                        ? _deleteMismatchLabel
+                                        : null,
+                                    deletingLabelNos: _busyLabelNos,
                                   ),
                               noItemsFoundIndicatorBuilder: (context) =>
                                   const Center(

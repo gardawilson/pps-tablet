@@ -1,10 +1,13 @@
 import 'dart:convert';
 
 import '../../../core/network/api_client.dart';
-import '../model/so_v2_blok.dart';
+import '../model/so_v2_blok_page.dart';
+import '../model/so_v2_complete_summary.dart';
+import '../model/so_v2_generate_preview.dart';
 import '../model/so_v2_kategori.dart';
 import '../model/so_v2_lokasi_page.dart';
 import '../model/so_v2_label_page.dart';
+import '../model/so_v2_scan_summary.dart';
 
 class SoV2Repository {
   final ApiClient _api;
@@ -25,7 +28,7 @@ class SoV2Repository {
         .toList();
   }
 
-  Future<({String message, Map<String, dynamic> data})> previewGenerate({
+  Future<({String message, SoV2GeneratePreview preview})> previewGenerate({
     required int categoryId,
   }) async {
     final body = await _api.getJson(
@@ -34,7 +37,10 @@ class SoV2Repository {
     );
     final data = body['data'] as Map<String, dynamic>?;
     if (data == null) throw Exception('Response tidak mengandung data');
-    return (message: body['message']?.toString() ?? '', data: data);
+    return (
+      message: body['message']?.toString() ?? '',
+      preview: SoV2GeneratePreview.fromJson(data),
+    );
   }
 
   Future<Map<String, dynamic>> generateNoStockOpname({
@@ -53,14 +59,13 @@ class SoV2Repository {
     await _api.deleteJson('/api/stock-opname-v2/transaksi/$stockOpnameNo');
   }
 
-  Future<List<SoV2Blok>> fetchBlok({required String stockOpnameNo}) async {
+  Future<SoV2BlokPage> fetchBlok({required String stockOpnameNo}) async {
     final body = await _api.getJson(
       '/api/stock-opname-v2/transaksi/$stockOpnameNo/blok',
     );
-    final dataList = (body['data'] ?? []) as List;
-    return dataList
-        .map((e) => SoV2Blok.fromJson(Map<String, dynamic>.from(e as Map)))
-        .toList();
+    final data = body['data'] as Map<String, dynamic>?;
+    if (data == null) throw Exception('Response tidak mengandung data');
+    return SoV2BlokPage.fromJson(data);
   }
 
   Future<SoV2LokasiPage> fetchLokasi({
@@ -119,5 +124,36 @@ class SoV2Repository {
     );
     final data = body['data'] as Map<String, dynamic>?;
     return data ?? {};
+  }
+
+  Future<SoV2CompleteSummary> fetchCompleteSummary(
+    String stockOpnameNo,
+  ) async {
+    final body = await _api.getJson(
+      '/api/stock-opname-v2/transaksi/$stockOpnameNo/complete-summary',
+    );
+    final data = body['data'] as Map<String, dynamic>?;
+    if (data == null) throw Exception('Response tidak mengandung data');
+    return SoV2CompleteSummary.fromJson(data);
+  }
+
+  /// Hapus hasil scan satu label (mis. label yang salah lokasi/isLocationMismatch)
+  /// supaya bisa discan ulang dengan lokasi yang benar.
+  Future<void> deleteHasilLabel({
+    required String stockOpnameNo,
+    required String labelNo,
+  }) async {
+    await _api.deleteJson(
+      '/api/stock-opname-v2/transaksi/$stockOpnameNo/hasil/${Uri.encodeComponent(labelNo)}',
+    );
+  }
+
+  Future<SoV2ScanSummary> fetchScanSummary(String stockOpnameNo) async {
+    final body = await _api.getJson(
+      '/api/stock-opname-v2/transaksi/$stockOpnameNo/scan-summary',
+    );
+    final data = body['data'] as Map<String, dynamic>?;
+    if (data == null) throw Exception('Response tidak mengandung data');
+    return SoV2ScanSummary.fromJson(data);
   }
 }

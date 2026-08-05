@@ -6,6 +6,8 @@ import '../../../common/widgets/loading_dialog.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../model/so_v2_kategori.dart';
 import '../view_model/so_v2_kategori_list_view_model.dart';
+import '../view_model/so_v2_socket_manager.dart';
+import '../widgets/so_v2_generate_preview_dialog.dart';
 import '../widgets/so_v2_period_picker_dialog.dart';
 import 'so_v2_detail_screen.dart';
 
@@ -23,18 +25,71 @@ class SoV2KategoriListScreen extends StatefulWidget {
 
 class _SoV2KategoriListScreenState extends State<SoV2KategoriListScreen> {
   late final SoV2KategoriListViewModel _vm;
+  final Set<String> _joinedRooms = {};
+  VoidCallback? _unsubscribeHasilInserted;
+  VoidCallback? _unsubscribeHasilDeleted;
 
   @override
   void initState() {
     super.initState();
     _vm = SoV2KategoriListViewModel();
+    _vm.addListener(_syncSocketRooms);
     _vm.load();
+
+    final socketVm = context.read<SoV2SocketManager>();
+    _unsubscribeHasilInserted = socketVm.addHasilInsertedListener(
+      _onHasilInserted,
+    );
+    _unsubscribeHasilDeleted = socketVm.addHasilDeletedListener(
+      _onHasilDeleted,
+    );
   }
 
   @override
   void dispose() {
+    _unsubscribeHasilInserted?.call();
+    _unsubscribeHasilDeleted?.call();
+    final socketVm = context.read<SoV2SocketManager>();
+    for (final room in _joinedRooms) {
+      socketVm.leaveStockOpname(room);
+    }
+    _vm.removeListener(_syncSocketRooms);
     _vm.dispose();
     super.dispose();
+  }
+
+  /// Kartu di grid ini menampilkan progress scan dari banyak SO sekaligus
+  /// (satu per kategori), jadi — beda dari [SoV2DetailScreen] yang cuma
+  /// join 1 room — di sini kita join room utk SEMUA SO yang sedang punya
+  /// nomor (notStarted belum punya stockOpnameNo, jadi otomatis dilewati).
+  /// Dipanggil ulang tiap [_vm] berubah (reload/riwayat) supaya room selalu
+  /// sinkron dengan SO yang lagi ditampilkan.
+  void _syncSocketRooms() {
+    final socketVm = context.read<SoV2SocketManager>();
+    final current = _vm.items
+        .map((k) => k.stockOpnameNo)
+        .whereType<String>()
+        .toSet();
+
+    for (final room in current.difference(_joinedRooms)) {
+      socketVm.joinStockOpname(room);
+    }
+    for (final room in _joinedRooms.difference(current)) {
+      socketVm.leaveStockOpname(room);
+    }
+    _joinedRooms
+      ..clear()
+      ..addAll(current);
+  }
+
+  void _onHasilInserted(SoV2HasilInsertedEvent event) {
+    if (!mounted) return;
+    _vm.applyScan(event.stockOpnameNo);
+  }
+
+  void _onHasilDeleted(SoV2HasilDeletedEvent event) {
+    if (!mounted) return;
+    _vm.applyUnscan(event.stockOpnameNo);
   }
 
   Future<void> _openRiwayat() async {
@@ -69,7 +124,11 @@ class _SoV2KategoriListScreenState extends State<SoV2KategoriListScreen> {
         categoryId: kategori.categoryId,
       );
       if (!mounted) return;
-      Navigator.pop(context); // close loading
+      // showDialog default-nya push ke root Navigator (useRootNavigator:
+      // true), sementara layar ini sendiri hidup di nested shell Navigator
+      // milik AppShell — Navigator.pop(context) polos bakal salah sasaran
+      // (nge-pop shell Navigator, bukan dialog loading-nya).
+      Navigator.of(context, rootNavigator: true).pop(); // close loading
       if (preview.errorMessage != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -80,15 +139,9 @@ class _SoV2KategoriListScreenState extends State<SoV2KategoriListScreen> {
         return;
       }
 
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (_) => ConfirmDialog(
-          title: 'Generate Stock Opname',
-          message: preview.message!,
-          confirmLabel: 'Generate',
-          confirmIcon: Icons.playlist_add_check_rounded,
-          confirmColor: const Color(0xFF1E6FD9),
-        ),
+      final confirmed = await showSoV2GeneratePreviewDialog(
+        context,
+        preview: preview.preview!,
       );
       if (confirmed != true) return;
 
@@ -110,6 +163,7 @@ class _SoV2KategoriListScreenState extends State<SoV2KategoriListScreen> {
             stockOpnameNo: result['stockOpnameNo'].toString(),
             categoryCode:
                 result['categoryCode']?.toString() ?? kategori.categoryCode,
+            categoryName: kategori.categoryName,
           ),
         ),
       );
@@ -120,6 +174,7 @@ class _SoV2KategoriListScreenState extends State<SoV2KategoriListScreen> {
           builder: (_) => SoV2DetailScreen(
             stockOpnameNo: kategori.stockOpnameNo!,
             categoryCode: kategori.categoryCode,
+            categoryName: kategori.categoryName,
           ),
         ),
       );
@@ -359,6 +414,11 @@ class _KategoriTile extends StatelessWidget {
                         : _kMuted,
                   ),
                 ],
+                if (kategori.status == SoV2Status.inProgress &&
+                    kategori.workingLocations.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  _WorkingLocationsRow(locations: kategori.workingLocations),
+                ],
                 const Spacer(),
                 const SizedBox(height: 6),
                 Row(
@@ -396,6 +456,48 @@ class _KategoriTile extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Baris ringkas lokasi yang sedang aktif dikerjakan pada kategori yang
+/// berjalan — detail lokasi & user ditampilkan lewat tooltip karena kartu
+/// grid ruangnya sempit.
+class _WorkingLocationsRow extends StatelessWidget {
+  final List<SoV2KategoriWorkingLocation> locations;
+
+  const _WorkingLocationsRow({required this.locations});
+
+  @override
+  Widget build(BuildContext context) {
+    final codes = locations.map((l) => l.lokasi).join(', ');
+    final tooltip = locations
+        .map((l) {
+          final users = l.users.map((u) => u.displayName).join(', ');
+          return users.isEmpty ? l.lokasi : '${l.lokasi} · $users';
+        })
+        .join('\n');
+
+    return Tooltip(
+      message: tooltip,
+      child: Row(
+        children: [
+          const Icon(Icons.bolt_rounded, size: 11, color: Color(0xFF0A7349)),
+          const SizedBox(width: 3),
+          Expanded(
+            child: Text(
+              codes,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 9.5,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0A7349),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

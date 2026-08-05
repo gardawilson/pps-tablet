@@ -60,16 +60,14 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
   int? _counterCurrent;
   bool _isResettingCounter = false;
   Timer? _statusTimer;
+  // Tanggal produksi terkini (dari endpoint QC), fallback ke nilai awal dari
+  // pemanggil selama data belum dimuat.
+  DateTime? _tglProduksi;
 
   @override
   void initState() {
     super.initState();
-    _bucketLabels = _computeBuckets(
-      widget.hourStart,
-      widget.hourEnd,
-      widget.tglProduksi,
-    );
-    _populateBucketTimes(widget.hourStart, widget.tglProduksi);
+    _tglProduksi = widget.tglProduksi;
     _loadHistory();
     // Tick tiap detik supaya countdown buka/tutup window responsif (mm:ss).
     _statusTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -157,11 +155,15 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
   }
 
   // Waktu window bucket ini tertutup = waktu window bucket berikutnya
-  // terbuka. Bucket terakhir tidak pernah tertutup otomatis (null).
+  // terbuka. Bucket terakhir tidak punya bucket berikutnya, jadi ditutup
+  // 1 jam setelah terbuka — durasi yang sama dengan window bucket lain.
   DateTime? _closesAtFor(String label) {
     final idx = _bucketLabels.indexOf(label);
-    if (idx == -1 || idx + 1 >= _bucketLabels.length) return null;
-    return _bucketOpensAt[_bucketLabels[idx + 1]];
+    if (idx == -1) return null;
+    if (idx + 1 < _bucketLabels.length) {
+      return _bucketOpensAt[_bucketLabels[idx + 1]];
+    }
+    return _bucketOpensAt[label]?.add(const Duration(hours: 1));
   }
 
   bool _isWithinInputWindow(String label) {
@@ -196,15 +198,31 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
           _counterCurrent = await _repo.fetchQcCounter(widget.idMesin!);
         } catch (_) {}
       }
-      final items = await _repo.fetchQc(widget.noProduksi);
+      final detail = await _repo.fetchQcDetail(widget.noProduksi);
       if (!mounted) return;
+      _tglProduksi = detail.header.tglProduksi ?? widget.tglProduksi;
+      // createdAt mencerminkan tanggal kalender sebenarnya saat bucket jam
+      // ini berjalan (tidak seperti tglProduksi yang tetap di tanggal awal
+      // shift), jadi dipakai sebagai acuan anchor tanggal bucket.
+      final anchor = detail.header.createdAt ?? _tglProduksi;
+      _bucketLabels = _computeBuckets(widget.hourStart, widget.hourEnd, anchor);
+      _populateBucketTimes(widget.hourStart, anchor);
       final map = <String, InjectQcItem?>{};
       for (final label in _bucketLabels) {
         final bucketHour = label.split(' - ').first.trim();
-        map[label] = items.where((i) => i.hourStart == bucketHour).firstOrNull;
+        map[label] = detail.items
+            .where((i) => i.hourStart == bucketHour)
+            .firstOrNull;
       }
       setState(() => _submitted.addAll(map));
     } catch (_) {
+      // Fallback: tetap tampilkan bucket dari data awal bila endpoint gagal.
+      _bucketLabels = _computeBuckets(
+        widget.hourStart,
+        widget.hourEnd,
+        widget.tglProduksi,
+      );
+      _populateBucketTimes(widget.hourStart, widget.tglProduksi);
     } finally {
       if (mounted) setState(() => _isLoadingHistory = false);
     }
@@ -328,7 +346,7 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
   // Header: judul + data berlabel (Tanggal · Shift · Jam) dalam panel accent.
   Widget _buildHeader() {
     final machineName = (widget.namaMesin ?? '').trim();
-    final tgl = widget.tglProduksi;
+    final tgl = _tglProduksi;
     final tglStr = tgl != null
         ? DateFormat('dd MMM yyyy', 'id_ID').format(tgl)
         : '-';

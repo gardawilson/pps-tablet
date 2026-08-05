@@ -158,12 +158,7 @@ class _HomeSidebarState extends State<HomeSidebar> {
       icon: Icons.warehouse_outlined,
       children: [
         _SubItem(
-          title: 'Return',
-          icon: Icons.undo_outlined,
-          route: '/shell/return',
-        ),
-        _SubItem(
-          title: 'Retur V2',
+          title: 'Retur',
           icon: Icons.assignment_return_outlined,
           route: '/shell/retur-v2',
         ),
@@ -196,13 +191,7 @@ class _HomeSidebarState extends State<HomeSidebar> {
     ),
     _MenuItem(
       title: 'Stock Opname',
-      subtitle: 'Kelola stok item',
-      icon: Icons.checklist_rtl_rounded,
-      route: '/stockopname',
-    ),
-    _MenuItem(
-      title: 'Stock Opname V2',
-      subtitle: 'Stock opname per kategori (baru)',
+      subtitle: 'Stock opname per kategori',
       icon: Icons.fact_check_outlined,
       route: '/shell/stock-opname-v2',
     ),

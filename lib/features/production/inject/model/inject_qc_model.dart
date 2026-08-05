@@ -54,3 +54,50 @@ class InjectQcItem {
     );
   }
 }
+
+class InjectQcHeader {
+  final String noProduksi;
+  final DateTime? tglProduksi;
+  // Timestamp server saat header ini dibuat — dipakai sebagai acuan tanggal
+  // "current" untuk perhitungan bucket jam QC, karena tglProduksi hanya
+  // mencatat tanggal mulai shift (bisa beda hari dengan jam-jam setelah
+  // tengah malam pada shift yang melewati tengah malam).
+  final DateTime? createdAt;
+
+  const InjectQcHeader({
+    required this.noProduksi,
+    this.tglProduksi,
+    this.createdAt,
+  });
+
+  factory InjectQcHeader.fromJson(Map<String, dynamic> j) {
+    return InjectQcHeader(
+      noProduksi: j['noProduksi']?.toString() ?? '',
+      tglProduksi: DateTime.tryParse(
+        j['tglProduksi']?.toString() ?? '',
+      )?.toLocal(),
+      createdAt: DateTime.tryParse(
+        j['createdAt']?.toString() ?? '',
+      )?.toLocal(),
+    );
+  }
+}
+
+class InjectQcDetail {
+  final InjectQcHeader header;
+  final List<InjectQcItem> items;
+
+  const InjectQcDetail({required this.header, required this.items});
+
+  factory InjectQcDetail.fromJson(Map<String, dynamic> j) {
+    final headerJson = j['header'] as Map<String, dynamic>? ?? {};
+    final itemsJson = j['items'] as List<dynamic>? ?? [];
+    return InjectQcDetail(
+      header: InjectQcHeader.fromJson(headerJson),
+      items: itemsJson
+          .whereType<Map>()
+          .map((e) => InjectQcItem.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+    );
+  }
+}

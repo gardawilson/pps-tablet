@@ -615,15 +615,13 @@ class InjectProductionRepository {
     }
   }
 
-  Future<List<InjectQcItem>> fetchQc(String noProduksi) async {
+  Future<InjectQcDetail> fetchQcDetail(String noProduksi) async {
     try {
       final body = await api.getJson(
         '/api/production/inject/qc/$noProduksi',
       );
-      final raw = body['data'] as List<dynamic>? ?? [];
-      return raw
-          .map((e) => InjectQcItem.fromJson(e as Map<String, dynamic>))
-          .toList();
+      final data = body['data'] as Map<String, dynamic>? ?? {};
+      return InjectQcDetail.fromJson(data);
     } on ApiException catch (e) {
       throw Exception('Gagal memuat QC (HTTP ${e.statusCode})');
     }

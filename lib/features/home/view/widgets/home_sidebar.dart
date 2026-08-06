@@ -195,6 +195,12 @@ class _HomeSidebarState extends State<HomeSidebar> {
       icon: Icons.fact_check_outlined,
       route: '/shell/stock-opname-v2',
     ),
+    _MenuItem(
+      title: 'Stock Opname (Old)',
+      subtitle: 'Stock opname versi lama',
+      icon: Icons.fact_check_outlined,
+      route: '/stockopname',
+    ),
   ];
 
   static List<_MenuItem> get _laporanItems => <_MenuItem>[

@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -120,13 +121,13 @@ class StokItemList<T extends StokItemData> extends StatelessWidget {
       );
     }
 
-    final sortedItems = [...items]
-      ..sort((a, b) {
-        final aEmpty = _isEmpty(a);
-        final bEmpty = _isEmpty(b);
-        if (aEmpty == bEmpty) return 0;
-        return aEmpty ? 1 : -1;
-      });
+    final sortedItems = [...items];
+    mergeSort(sortedItems, compare: (a, b) {
+      final aEmpty = _isEmpty(a);
+      final bEmpty = _isEmpty(b);
+      if (aEmpty == bEmpty) return 0;
+      return aEmpty ? 1 : -1;
+    });
 
     return ListView.separated(
       padding: const EdgeInsets.all(10),

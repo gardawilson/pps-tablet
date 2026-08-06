@@ -1,13 +1,18 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../common/widgets/error_status_dialog.dart';
 import '../../../../common/widgets/success_status_dialog.dart';
+import '../../shared/models/furniture_wip_stok_item.dart';
+import '../../shared/models/furniture_wip_stok_label.dart';
+import '../../shared/repository/furniture_wip_stok_repository.dart';
 import '../../shared/widgets/mesin_section_header.dart';
 import '../../shared/widgets/production_mesin_card.dart';
 import '../../shared/widgets/production_produksi_list.dart';
+import '../../shared/widgets/production_overlay_drawer.dart';
 import '../../shared/widgets/production_riwayat_header.dart';
-import '../../shared/widgets/riwayat_animated_panel.dart';
+import '../../shared/widgets/sidebar_tab_switcher.dart';
+import '../../shared/widgets/stok_item_section.dart';
 import '../../../mesin/model/mesin_model.dart';
 import '../../../shift/repository/shift_repository.dart';
 import '../model/spanner_production_model.dart';
@@ -28,6 +33,8 @@ class SpannerProductionMesinScreen extends StatefulWidget {
 class _SpannerProductionMesinScreenState
     extends State<SpannerProductionMesinScreen> {
   final _repo = SpannerProductionRepository();
+  final _furnitureWipStokRepo = FurnitureWipStokRepository();
+  final _stokSectionController = StokItemSectionController();
   late final SpannerProductionViewModel _editVmPool;
 
   Future<List<SpannerMesinInfo>> _mesinFuture = Future.value(
@@ -43,7 +50,8 @@ class _SpannerProductionMesinScreenState
   final _produksiScrollCtl = ScrollController();
   int? _filterIdMesin;
   SpannerMesinInfo? _selectedMesinInfo;
-  bool _isRiwayatExpanded = true;
+  bool _isRiwayatExpanded = false;
+  int _sidebarTab = 0; // 0 = Riwayat Produksi, 1 = Stok Item
 
   @override
   void initState() {
@@ -121,6 +129,7 @@ class _SpannerProductionMesinScreenState
   void _refreshAll() {
     _loadMesin();
     _loadProduksiPage();
+    _stokSectionController.refreshAll();
   }
 
   // ── Card / row data converters ────────────────────────────────────────────
@@ -225,11 +234,10 @@ class _SpannerProductionMesinScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       body: LayoutBuilder(
-        builder: (_, c) => Row(
+        builder: (_, c) => Stack(
           children: [
-            // ── LEFT: mesin grid (3/5) ──────────────────────────────
-            Expanded(
-              flex: 3,
+            // ── Mesin grid (selalu full width) ──────────────────────
+            Positioned.fill(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -308,147 +316,185 @@ class _SpannerProductionMesinScreenState
               ),
             ),
 
-            // ── RIGHT: riwayat produksi ──────────────────────────
-            RiwayatAnimatedPanel(
-              expandedWidth: c.maxWidth * 0.4,
-              isExpanded: _isRiwayatExpanded,
-              onToggle: () =>
-                  setState(() => _isRiwayatExpanded = !_isRiwayatExpanded),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  FutureBuilder<List<SpannerMesinInfo>>(
-                    future: _mesinFuture,
-                    builder: (context, snapshot) {
-                      return ProductionRiwayatHeader(
-                        mesinList: (snapshot.data ?? [])
-                            .map(
-                              (m) => MesinFilterItem(
-                                idMesin: m.idMesin,
-                                namaMesin: m.namaMesin,
-                              ),
-                            )
-                            .toList(),
-                        selectedIdMesin: _filterIdMesin,
-                        onFilterChanged: (id) {
-                          final mesinData = snapshot.data ?? [];
-                          setState(() {
-                            _filterIdMesin = id;
-                            _selectedMesinInfo = id == null
-                                ? null
-                                : mesinData
-                                      .where((m) => m.idMesin == id)
-                                      .firstOrNull;
-                          });
-                          _loadProduksiPage();
-                        },
-                        onToggle: () => setState(
-                          () => _isRiwayatExpanded = !_isRiwayatExpanded,
+            // ── Overlay drawer: Riwayat Produksi / Stok Item ────────
+            Positioned.fill(
+              child: ProductionOverlayDrawer(
+                isOpen: _isRiwayatExpanded,
+                onClose: () => setState(() => _isRiwayatExpanded = false),
+                onOpen: () => setState(() => _isRiwayatExpanded = true),
+                width: c.maxWidth * 0.4,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SidebarTabSwitcher(
+                      tabs: const [
+                        SidebarTabItem(
+                          label: 'Riwayat Produksi',
+                          icon: Icons.history_rounded,
                         ),
-                        isExpanded: _isRiwayatExpanded,
-                      );
-                    },
-                  ),
-                  Expanded(
-                    child: Stack(
-                      children: [
-                        RefreshIndicator(
-                          onRefresh: _loadProduksiPage,
-                          child: ProductionProduksiList<SpannerProduction>(
-                            items: _produksiItems,
-                            dataOf: _toRowData,
-                            isLoading: _produksiLoading,
-                            isFetchingMore: _produksiFetchingMore,
-                            scrollController: _produksiScrollCtl,
-                            showMesin: _filterIdMesin == null,
-                            onTap: (row) async {
-                              await Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => SpannerProductionInputScreen(
-                                    noProduksi: row.noProduksi,
-                                  ),
-                                ),
-                              );
-                              if (mounted) _refreshAll();
-                            },
-                            onEdit: (row) async {
-                              await showDialog<void>(
-                                context: context,
-                                barrierDismissible: false,
-                                builder: (_) => ChangeNotifierProvider.value(
-                                  value: _editVmPool,
-                                  child: SpannerProductionFormDialog(
-                                    header: row,
-                                  ),
-                                ),
-                              );
-                              if (mounted) _refreshAll();
-                            },
-                            onDelete: (row) async {
-                              final screenCtx = context;
-                              await showDialog<void>(
-                                context: screenCtx,
-                                barrierDismissible: false,
-                                builder: (ctx) => SpannerProductionDeleteDialog(
-                                  header: row,
-                                  onConfirm: () async {
-                                    final success = await _editVmPool
-                                        .deleteProduksi(row.noProduksi);
-                                    final errMsg = _editVmPool.saveError;
-                                    if (ctx.mounted) Navigator.of(ctx).pop();
-                                    if (!screenCtx.mounted) return;
-                                    if (success) {
-                                      showDialog(
-                                        context: screenCtx,
-                                        builder: (_) => SuccessStatusDialog(
-                                          title: 'Berhasil Menghapus',
-                                          message:
-                                              'No. Produksi ${row.noProduksi} berhasil dihapus.',
-                                        ),
-                                      );
-                                    } else {
-                                      showDialog(
-                                        context: screenCtx,
-                                        builder: (_) => ErrorStatusDialog(
-                                          title: 'Gagal Menghapus!',
-                                          message:
-                                              errMsg ?? 'Gagal menghapus data',
-                                        ),
-                                      );
-                                    }
-                                    _refreshAll();
-                                  },
-                                ),
-                              );
-                            },
-                          ),
+                        SidebarTabItem(
+                          label: 'Stok Item',
+                          icon: Icons.inventory_2_rounded,
                         ),
-                        if (_selectedMesinInfo != null)
-                          Positioned(
-                            right: 16,
-                            bottom: 16,
-                            child: FloatingActionButton.small(
-                              heroTag: 'fab_add_spanner',
-                              onPressed: _selectedMesinInfo == null
-                                  ? null
-                                  : () => _openCreateDialog(
-                                      mesin: _selectedMesinInfo!,
-                                    ),
-                              backgroundColor: const Color(0xFF1D4ED8),
-                              foregroundColor: Colors.white,
-                              tooltip: 'Tambah Produksi',
-                              child: const Icon(Icons.add),
-                            ),
-                          ),
                       ],
+                      selectedIndex: _sidebarTab,
+                      onSelected: (i) => setState(() => _sidebarTab = i),
                     ),
-                  ),
-                ],
+                    Expanded(
+                      child: _sidebarTab == 0
+                          ? _buildRiwayatContent()
+                          : _buildStokItemContent(),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  // ── Stok Item: chip kategori (Furniture WIP) ────────────────────────────────
+
+  Widget _buildStokItemContent() {
+    return StokItemSection(
+      controller: _stokSectionController,
+      sources: [
+        TypedStokItemSource<FurnitureWipStokItem, FurnitureWipStokLabel>(
+          label: 'Furniture WIP',
+          fetchStok: _furnitureWipStokRepo.fetchStok,
+          fetchLabel: (item) =>
+              _furnitureWipStokRepo.fetchLabel(item.idCabinetWip),
+          sakColumnLabel: 'PCS',
+          showBeratColumn: false,
+          oldestDateOf: (item) => item.dateCreateTertua,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRiwayatContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FutureBuilder<List<SpannerMesinInfo>>(
+          future: _mesinFuture,
+          builder: (context, snapshot) {
+            return ProductionRiwayatHeader(
+              showTitle: false,
+              mesinList: (snapshot.data ?? [])
+                  .map(
+                    (m) => MesinFilterItem(
+                      idMesin: m.idMesin,
+                      namaMesin: m.namaMesin,
+                    ),
+                  )
+                  .toList(),
+              selectedIdMesin: _filterIdMesin,
+              onFilterChanged: (id) {
+                final mesinData = snapshot.data ?? [];
+                setState(() {
+                  _filterIdMesin = id;
+                  _selectedMesinInfo = id == null
+                      ? null
+                      : mesinData.where((m) => m.idMesin == id).firstOrNull;
+                });
+                _loadProduksiPage();
+              },
+            );
+          },
+        ),
+        Expanded(
+          child: Stack(
+            children: [
+              RefreshIndicator(
+                onRefresh: _loadProduksiPage,
+                child: ProductionProduksiList<SpannerProduction>(
+                  items: _produksiItems,
+                  dataOf: _toRowData,
+                  isLoading: _produksiLoading,
+                  isFetchingMore: _produksiFetchingMore,
+                  scrollController: _produksiScrollCtl,
+                  showMesin: _filterIdMesin == null,
+                  onTap: (row) async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => SpannerProductionInputScreen(
+                          noProduksi: row.noProduksi,
+                        ),
+                      ),
+                    );
+                    if (mounted) _refreshAll();
+                  },
+                  onEdit: (row) async {
+                    await showDialog<void>(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (_) => ChangeNotifierProvider.value(
+                        value: _editVmPool,
+                        child: SpannerProductionFormDialog(header: row),
+                      ),
+                    );
+                    if (mounted) _refreshAll();
+                  },
+                  onDelete: (row) async {
+                    final screenCtx = context;
+                    await showDialog<void>(
+                      context: screenCtx,
+                      barrierDismissible: false,
+                      builder: (ctx) => SpannerProductionDeleteDialog(
+                        header: row,
+                        onConfirm: () async {
+                          final success = await _editVmPool.deleteProduksi(
+                            row.noProduksi,
+                          );
+                          final errMsg = _editVmPool.saveError;
+                          if (ctx.mounted) Navigator.of(ctx).pop();
+                          if (!screenCtx.mounted) return;
+                          if (success) {
+                            showDialog(
+                              context: screenCtx,
+                              builder: (_) => SuccessStatusDialog(
+                                title: 'Berhasil Menghapus',
+                                message:
+                                    'No. Produksi ${row.noProduksi} berhasil dihapus.',
+                              ),
+                            );
+                          } else {
+                            showDialog(
+                              context: screenCtx,
+                              builder: (_) => ErrorStatusDialog(
+                                title: 'Gagal Menghapus!',
+                                message: errMsg ?? 'Gagal menghapus data',
+                              ),
+                            );
+                          }
+                          _refreshAll();
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+              if (_selectedMesinInfo != null)
+                Positioned(
+                  right: 16,
+                  bottom: 16,
+                  child: FloatingActionButton.small(
+                    heroTag: 'fab_add_spanner',
+                    onPressed: () =>
+                        _openCreateDialog(mesin: _selectedMesinInfo!),
+                    backgroundColor: const Color(0xFF1D4ED8),
+                    foregroundColor: Colors.white,
+                    tooltip: 'Tambah Produksi',
+                    child: const Icon(Icons.add),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

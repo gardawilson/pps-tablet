@@ -81,10 +81,35 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
     super.dispose();
   }
 
+  // Pilih hari (hari ini atau kemarin) yang membuat window shift
+  // [hourStart, hourEnd + 1 jam grace bucket terakhir] benar-benar
+  // mencakup waktu sekarang. Perlu untuk shift yang melewati tengah malam
+  // (mis. 23:00-07:00): begitu lewat tengah malam, shift yang sedang
+  // berjalan sebenarnya mulai KEMARIN, bukan hari ini — kalau anchor selalu
+  // dipaksa "hari ini", startDt-nya jadi 23:00 nanti malam (di masa depan)
+  // dan semua bucket terlihat "Terkunci" padahal harusnya sudah terbuka.
+  static DateTime _resolveAnchor(String hourStart, String hourEnd) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final startMin = _parseMinutes(hourStart);
+    final endMin = _parseMinutes(hourEnd);
+    if (startMin == null || endMin == null) return today;
+    var duration = endMin - startMin;
+    if (duration <= 0) duration += 24 * 60;
+    for (final anchor in [today, today.subtract(const Duration(days: 1))]) {
+      final startDt = anchor.add(Duration(minutes: startMin));
+      final windowEnd = startDt.add(Duration(minutes: duration + 60));
+      if (!now.isBefore(startDt) && now.isBefore(windowEnd)) {
+        return anchor;
+      }
+    }
+    return today;
+  }
+
   static List<String> _computeBuckets(
     String hourStart,
     String hourEnd,
-    DateTime? tgl,
+    DateTime anchor,
   ) {
     final startMin = _parseMinutes(hourStart);
     final endMin = _parseMinutes(hourEnd);
@@ -92,9 +117,6 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
     var duration = endMin - startMin;
     if (duration <= 0) duration += 24 * 60;
     if (duration <= 0) return [];
-    final anchor = tgl != null
-        ? DateTime(tgl.year, tgl.month, tgl.day)
-        : DateTime.now();
     final startDt = anchor.add(Duration(minutes: startMin));
     final labels = <String>[];
     final startRem = startMin % 60;
@@ -125,12 +147,9 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
   static String _fmt(DateTime v) =>
       '${v.hour.toString().padLeft(2, '0')}:${v.minute.toString().padLeft(2, '0')}';
 
-  void _populateBucketTimes(String hourStart, DateTime? tgl) {
+  void _populateBucketTimes(String hourStart, DateTime anchor) {
     final startMin = _parseMinutes(hourStart);
     if (startMin == null) return;
-    final anchor = tgl != null
-        ? DateTime(tgl.year, tgl.month, tgl.day)
-        : DateTime.now();
     final startDt = anchor.add(Duration(minutes: startMin));
     for (final label in _bucketLabels) {
       final parts = label.split(' - ');
@@ -200,11 +219,14 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
       }
       final detail = await _repo.fetchQcDetail(widget.noProduksi);
       if (!mounted) return;
+      // tglProduksi dari server hanya dipakai untuk tampilan (chip tanggal
+      // di header) — tidak reliable untuk hitungan jam buka/tutup bucket
+      // (format tanggalnya kadang bukan UTC asli walau diberi akhiran "Z").
+      // Anchor bucket selalu dihitung dari jam device (_resolveAnchor)
+      // supaya konsisten dengan waktu nyata di tablet, termasuk saat shift
+      // melewati tengah malam.
       _tglProduksi = detail.header.tglProduksi ?? widget.tglProduksi;
-      // createdAt mencerminkan tanggal kalender sebenarnya saat bucket jam
-      // ini berjalan (tidak seperti tglProduksi yang tetap di tanggal awal
-      // shift), jadi dipakai sebagai acuan anchor tanggal bucket.
-      final anchor = detail.header.createdAt ?? _tglProduksi;
+      final anchor = _resolveAnchor(widget.hourStart, widget.hourEnd);
       _bucketLabels = _computeBuckets(widget.hourStart, widget.hourEnd, anchor);
       _populateBucketTimes(widget.hourStart, anchor);
       final map = <String, InjectQcItem?>{};
@@ -216,13 +238,10 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
       }
       setState(() => _submitted.addAll(map));
     } catch (_) {
-      // Fallback: tetap tampilkan bucket dari data awal bila endpoint gagal.
-      _bucketLabels = _computeBuckets(
-        widget.hourStart,
-        widget.hourEnd,
-        widget.tglProduksi,
-      );
-      _populateBucketTimes(widget.hourStart, widget.tglProduksi);
+      // Fallback: tetap tampilkan bucket dari jam device bila endpoint gagal.
+      final anchor = _resolveAnchor(widget.hourStart, widget.hourEnd);
+      _bucketLabels = _computeBuckets(widget.hourStart, widget.hourEnd, anchor);
+      _populateBucketTimes(widget.hourStart, anchor);
     } finally {
       if (mounted) setState(() => _isLoadingHistory = false);
     }

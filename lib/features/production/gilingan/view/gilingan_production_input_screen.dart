@@ -36,10 +36,7 @@ const _kGilinganBorder = Color(0xFFE2E6EA);
 class GilinganProductionInputScreen extends StatefulWidget {
   final String noProduksi;
 
-  const GilinganProductionInputScreen({
-    super.key,
-    required this.noProduksi,
-  });
+  const GilinganProductionInputScreen({super.key, required this.noProduksi});
 
   @override
   State<GilinganProductionInputScreen> createState() =>
@@ -1086,9 +1083,8 @@ class _GilinganProductionInputScreenState
         final newProd = splitResult.prod;
         await Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (_) => GilinganProductionInputScreen(
-              noProduksi: newProd.noProduksi,
-            ),
+            builder: (_) =>
+                GilinganProductionInputScreen(noProduksi: newProd.noProduksi),
           ),
         );
       },
@@ -1395,27 +1391,38 @@ class _GilinganProductionInputScreenState
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(10),
-            border: Border(left: BorderSide(color: Colors.grey.shade300, width: 4)),
+            border: Border(
+              left: BorderSide(color: Colors.grey.shade300, width: 4),
+            ),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(children: [
-            _skeletonBox(w: 72, h: 20, r: 20),
-            const SizedBox(width: 16),
-            _skeletonBox(w: 140, h: 14, r: 4),
-            const SizedBox(width: 10),
-            _skeletonBox(w: 100, h: 14, r: 4),
-            const Spacer(),
-            _skeletonBox(w: 64, h: 24, r: 6),
-            const SizedBox(width: 6),
-            _skeletonBox(w: 64, h: 24, r: 6),
-          ]),
+          child: Row(
+            children: [
+              _skeletonBox(w: 72, h: 20, r: 20),
+              const SizedBox(width: 16),
+              _skeletonBox(w: 140, h: 14, r: 4),
+              const SizedBox(width: 10),
+              _skeletonBox(w: 100, h: 14, r: 4),
+              const Spacer(),
+              _skeletonBox(w: 64, h: 24, r: 6),
+              const SizedBox(width: 6),
+              _skeletonBox(w: 64, h: 24, r: 6),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _skeletonBox({required double w, required double h, double r = 4}) =>
-      Container(width: w, height: h, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(r)));
+      Container(
+        width: w,
+        height: h,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(r),
+        ),
+      );
 
   // ── Build ──────────────────────────────────────────────────────────────────
 
@@ -1500,6 +1507,11 @@ class _GilinganProductionInputScreenState
                     },
                     onGanti: locked ? null : _openSplitDialog,
                     onRiwayat: _openTimelineDialog,
+                    showGantiRiwayat:
+                        _header?.tglProduksi != null &&
+                        _header!.tglProduksi!.year == DateTime.now().year &&
+                        _header!.tglProduksi!.month == DateTime.now().month &&
+                        _header!.tglProduksi!.day == DateTime.now().day,
                     produksiStatus: _header?.produksiStatus,
                     onComplete: (_header?.isComplete == true)
                         ? null
@@ -1540,10 +1552,16 @@ class _GilinganProductionInputScreenState
                                 outputs: outputs,
                                 isLoading: outputLoading,
                                 error: outputErr,
-                                outputJenisId: _header?.outputJenisId ??
-                                    (outputs.isNotEmpty ? outputs.first.idJenis : null),
-                                namaJenis: _header?.outputJenisNama ??
-                                    (outputs.isNotEmpty ? outputs.first.namaJenis : null),
+                                outputJenisId:
+                                    _header?.outputJenisId ??
+                                    (outputs.isNotEmpty
+                                        ? outputs.first.idJenis
+                                        : null),
+                                namaJenis:
+                                    _header?.outputJenisNama ??
+                                    (outputs.isNotEmpty
+                                        ? outputs.first.namaJenis
+                                        : null),
                               ),
                             ),
                           ],

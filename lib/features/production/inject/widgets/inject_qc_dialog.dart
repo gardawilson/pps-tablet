@@ -55,6 +55,9 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
   final Map<String, DateTime> _bucketEndTimes = {};
   // Waktu window QC bucket ini terbuka (endDt + _kQcInputOpenDelay).
   final Map<String, DateTime> _bucketOpensAt = {};
+  // Waktu window bucket ini tertutup — diisi langsung dari server
+  // (InjectQcBucket.closesAt) saat tersedia; lihat _closesAtFor.
+  final Map<String, DateTime> _bucketClosesAt = {};
   final Map<String, InjectQcItem?> _submitted = {};
   bool _isLoadingHistory = true;
   int? _counterCurrent;
@@ -88,12 +91,20 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
   // berjalan sebenarnya mulai KEMARIN, bukan hari ini — kalau anchor selalu
   // dipaksa "hari ini", startDt-nya jadi 23:00 nanti malam (di masa depan)
   // dan semua bucket terlihat "Terkunci" padahal harusnya sudah terbuka.
-  static DateTime _resolveAnchor(String hourStart, String hourEnd) {
+  static DateTime _resolveAnchor(
+    String hourStart,
+    String hourEnd,
+    DateTime? knownDate,
+  ) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final startMin = _parseMinutes(hourStart);
     final endMin = _parseMinutes(hourEnd);
-    if (startMin == null || endMin == null) return today;
+    if (startMin == null || endMin == null) {
+      return knownDate != null
+          ? DateTime(knownDate.year, knownDate.month, knownDate.day)
+          : today;
+    }
     var duration = endMin - startMin;
     if (duration <= 0) duration += 24 * 60;
     for (final anchor in [today, today.subtract(const Duration(days: 1))]) {
@@ -102,6 +113,14 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
       if (!now.isBefore(startDt) && now.isBefore(windowEnd)) {
         return anchor;
       }
+    }
+    // Shift ini tidak sedang berjalan sekarang relatif ke hari ini/kemarin —
+    // biasanya produksi tanggal lampau yang belum ditutup. Pakai tanggal
+    // produksi asli dari data supaya bucket dihitung di tanggal yang benar
+    // dan jatuh ke status "Terlewat", bukan "Terkunci" seolah baru akan
+    // dibuka hari ini.
+    if (knownDate != null) {
+      return DateTime(knownDate.year, knownDate.month, knownDate.day);
     }
     return today;
   }
@@ -177,6 +196,10 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
   // terbuka. Bucket terakhir tidak punya bucket berikutnya, jadi ditutup
   // 1 jam setelah terbuka — durasi yang sama dengan window bucket lain.
   DateTime? _closesAtFor(String label) {
+    final fromServer = _bucketClosesAt[label];
+    if (fromServer != null) return fromServer;
+    // Fallback (endpoint gagal, buckets dihitung lokal): closesAt bucket ini
+    // = opensAt bucket berikutnya, atau +1 jam untuk bucket terakhir.
     final idx = _bucketLabels.indexOf(label);
     if (idx == -1) return null;
     if (idx + 1 < _bucketLabels.length) {
@@ -219,16 +242,36 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
       }
       final detail = await _repo.fetchQcDetail(widget.noProduksi);
       if (!mounted) return;
-      // tglProduksi dari server hanya dipakai untuk tampilan (chip tanggal
-      // di header) — tidak reliable untuk hitungan jam buka/tutup bucket
-      // (format tanggalnya kadang bukan UTC asli walau diberi akhiran "Z").
-      // Anchor bucket selalu dihitung dari jam device (_resolveAnchor)
-      // supaya konsisten dengan waktu nyata di tablet, termasuk saat shift
-      // melewati tengah malam.
       _tglProduksi = detail.header.tglProduksi ?? widget.tglProduksi;
-      final anchor = _resolveAnchor(widget.hourStart, widget.hourEnd);
-      _bucketLabels = _computeBuckets(widget.hourStart, widget.hourEnd, anchor);
-      _populateBucketTimes(widget.hourStart, anchor);
+
+      if (detail.buckets.isNotEmpty) {
+        // Jalur utama: window jam sudah dihitung backend dari tglProduksi +
+        // hourStart/hourEnd produksi asli (lihat buildQcBuckets di
+        // inject-production-service.js) — tidak ada lagi tebak-tebak hari
+        // di sisi device, jadi data lampau yang jam-of-day-nya kebetulan
+        // mirip shift hari ini tidak lagi salah dikira "baru mau dibuka".
+        _bucketLabels = detail.buckets.map((b) => b.label).toList();
+        for (final b in detail.buckets) {
+          _bucketOpensAt[b.label] = b.opensAt;
+          _bucketClosesAt[b.label] = b.closesAt;
+        }
+      } else {
+        // Fallback (mis. backend lama belum mengirim buckets): hitung lokal,
+        // tapi selalu percaya tglProduksi asli sebagai anchor — tidak
+        // menebak "hari ini/kemarin" dari jam device.
+        final anchor = _resolveAnchor(
+          widget.hourStart,
+          widget.hourEnd,
+          _tglProduksi,
+        );
+        _bucketLabels = _computeBuckets(
+          widget.hourStart,
+          widget.hourEnd,
+          anchor,
+        );
+        _populateBucketTimes(widget.hourStart, anchor);
+      }
+
       final map = <String, InjectQcItem?>{};
       for (final label in _bucketLabels) {
         final bucketHour = label.split(' - ').first.trim();
@@ -238,8 +281,14 @@ class _InjectQcDialogState extends State<InjectQcDialog> {
       }
       setState(() => _submitted.addAll(map));
     } catch (_) {
-      // Fallback: tetap tampilkan bucket dari jam device bila endpoint gagal.
-      final anchor = _resolveAnchor(widget.hourStart, widget.hourEnd);
+      // Fallback: tetap tampilkan bucket dari jam device bila endpoint gagal
+      // total (fetchQcDetail throw, tidak ada buckets sama sekali). Selalu
+      // percaya tglProduksi asli dari caller sebagai anchor.
+      final anchor = _resolveAnchor(
+        widget.hourStart,
+        widget.hourEnd,
+        widget.tglProduksi,
+      );
       _bucketLabels = _computeBuckets(widget.hourStart, widget.hourEnd, anchor);
       _populateBucketTimes(widget.hourStart, anchor);
     } finally {

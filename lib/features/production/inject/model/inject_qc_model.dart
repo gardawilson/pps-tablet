@@ -83,20 +83,68 @@ class InjectQcHeader {
   }
 }
 
+/// Satu window jam QC (mis. "13:00 - 14:00"), dihitung backend dari
+/// tglProduksi + hourStart/hourEnd produksi asli — bukan ditebak dari jam
+/// device seperti versi lama. `opensAt`/`closesAt` dikirim sebagai string
+/// naive tanpa offset/"Z" (mis. "2026-07-27T14:00:00") supaya `DateTime.parse`
+/// membacanya apa adanya sebagai local time, tanpa konversi timezone —
+/// kebenaran "sekarang" tetap dari jam device, backend hanya menentukan
+/// tanggal & jam kalender yang benar untuk tiap bucket (menghindari
+/// ketidakcocokan timezone server vs tablet).
+class InjectQcBucket {
+  final String label;
+  final String hourStart;
+  final String hourEnd;
+  final DateTime opensAt;
+  final DateTime closesAt;
+
+  const InjectQcBucket({
+    required this.label,
+    required this.hourStart,
+    required this.hourEnd,
+    required this.opensAt,
+    required this.closesAt,
+  });
+
+  static InjectQcBucket? fromJson(Map<String, dynamic> j) {
+    final opensAt = DateTime.tryParse(j['opensAt']?.toString() ?? '');
+    final closesAt = DateTime.tryParse(j['closesAt']?.toString() ?? '');
+    if (opensAt == null || closesAt == null) return null;
+    return InjectQcBucket(
+      label: j['label']?.toString() ?? '',
+      hourStart: j['hourStart']?.toString() ?? '',
+      hourEnd: j['hourEnd']?.toString() ?? '',
+      opensAt: opensAt,
+      closesAt: closesAt,
+    );
+  }
+}
+
 class InjectQcDetail {
   final InjectQcHeader header;
   final List<InjectQcItem> items;
+  final List<InjectQcBucket> buckets;
 
-  const InjectQcDetail({required this.header, required this.items});
+  const InjectQcDetail({
+    required this.header,
+    required this.items,
+    this.buckets = const [],
+  });
 
   factory InjectQcDetail.fromJson(Map<String, dynamic> j) {
     final headerJson = j['header'] as Map<String, dynamic>? ?? {};
     final itemsJson = j['items'] as List<dynamic>? ?? [];
+    final bucketsJson = j['buckets'] as List<dynamic>? ?? [];
     return InjectQcDetail(
       header: InjectQcHeader.fromJson(headerJson),
       items: itemsJson
           .whereType<Map>()
           .map((e) => InjectQcItem.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+      buckets: bucketsJson
+          .whereType<Map>()
+          .map((e) => InjectQcBucket.fromJson(Map<String, dynamic>.from(e)))
+          .whereType<InjectQcBucket>()
           .toList(),
     );
   }

@@ -353,7 +353,7 @@ class _GilinganProductionMesinScreenState
                               gridDelegate:
                                   SliverGridDelegateWithFixedCrossAxisCount(
                                     crossAxisCount: cols,
-                                    mainAxisExtent: 110,
+                                    mainAxisExtent: 130,
                                     crossAxisSpacing: 10,
                                     mainAxisSpacing: 10,
                                   ),

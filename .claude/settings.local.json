@@ -7,7 +7,8 @@
       "Bash(cp /tmp/broker_input_trimmed.dart \"d:/frontend/pps_tablet/lib/features/production/broker/view/broker_production_input_screen.dart\")"
     ],
     "additionalDirectories": [
-      "\\tmp"
+      "\\tmp",
+      "D:\\backend\\pps_backend"
     ]
   }
 }

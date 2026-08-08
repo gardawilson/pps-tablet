@@ -58,8 +58,7 @@ class MixerProductionFormDialog extends StatefulWidget {
       _MixerProductionFormDialogState();
 }
 
-class _MixerProductionFormDialogState
-    extends State<MixerProductionFormDialog> {
+class _MixerProductionFormDialogState extends State<MixerProductionFormDialog> {
   final _formKey = GlobalKey<FormState>();
 
   // Controllers
@@ -82,6 +81,10 @@ class _MixerProductionFormDialogState
   TimeOfDay? _endTime;
 
   bool get isEdit => widget.header != null;
+
+  // Dibuka langsung dari mesin card (bukan backdate, bukan edit) → shift &
+  // jam sudah di-prefill dari shift aktif, jadi tidak boleh diubah manual.
+  bool get _lockShiftAndHours => !widget.isBackdateInput && !isEdit;
 
   static const String _kind = 'mixer';
   static const int _idBagianMixer = 5;
@@ -115,7 +118,11 @@ class _MixerProductionFormDialogState
     final h = widget.header;
     if (h != null) {
       if (h.idRegu != null) {
-        _selectedRegu = MstRegu(idRegu: h.idRegu!, idBagian: _idBagianMixer, namaRegu: h.namaRegu ?? '');
+        _selectedRegu = MstRegu(
+          idRegu: h.idRegu!,
+          idBagian: _idBagianMixer,
+          namaRegu: h.namaRegu ?? '',
+        );
       }
       if (h.idOperators.isNotEmpty) {
         final names = h.namaOperator.split(',').map((s) => s.trim()).toList();
@@ -158,8 +165,10 @@ class _MixerProductionFormDialogState
     if (picked == null || !mounted) return;
     setState(() {
       _selectedDate = picked;
-      dateCreatedCtrl.text =
-          DateFormat('EEEE, dd MMM yyyy', 'id_ID').format(picked);
+      dateCreatedCtrl.text = DateFormat(
+        'EEEE, dd MMM yyyy',
+        'id_ID',
+      ).format(picked);
     });
     if (_selectedShift != null) await _fetchShiftHour(_selectedShift!);
     await _checkOverlap();
@@ -169,15 +178,18 @@ class _MixerProductionFormDialogState
     final tanggal = DateFormat('yyyy-MM-dd').format(_selectedDate);
     final base = ApiConstants.baseUrl.replaceFirst(RegExp(r'/*$'), '');
     final url = Uri.parse(
-        '$base/api/mst/shift/hour?tanggal=$tanggal&shift=$shift');
+      '$base/api/mst/mixer/shift/hour?tanggal=$tanggal&shift=$shift',
+    );
     try {
       final token = await TokenStorage.getToken();
       final res = await http
-          .get(url,
-              headers: {
-                'Authorization': 'Bearer $token',
-                'Accept': 'application/json'
-              })
+          .get(
+            url,
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Accept': 'application/json',
+            },
+          )
           .timeout(const Duration(seconds: 10));
       if (res.statusCode != 200 || !mounted) return;
       final body =
@@ -242,7 +254,8 @@ class _MixerProductionFormDialogState
     if (ovm.hasOverlap) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Tidak bisa simpan, ada overlap jam di mesin ini')),
+          content: Text('Tidak bisa simpan, ada overlap jam di mesin ini'),
+        ),
       );
       return;
     }
@@ -251,13 +264,13 @@ class _MixerProductionFormDialogState
 
     final mesinId = _selectedMesin?.idMesin ?? widget.header?.idMesin;
     if (mesinId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Mesin wajib dipilih')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Mesin wajib dipilih')));
       return;
     }
 
-    final idOperatorList =
-        _selectedOperators.map((o) => o.idOperator).toList();
+    final idOperatorList = _selectedOperators.map((o) => o.idOperator).toList();
     if (idOperatorList.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Minimal 1 operator wajib dipilih')),
@@ -266,8 +279,9 @@ class _MixerProductionFormDialogState
     }
 
     if (_selectedShift == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Shift wajib dipilih')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Shift wajib dipilih')));
       return;
     }
 
@@ -344,10 +358,8 @@ class _MixerProductionFormDialogState
       final errMsg = prodVm.saveError ?? 'Gagal menyimpan data produksi';
       await showDialog<void>(
         context: context,
-        builder: (_) => ErrorStatusDialog(
-          title: 'Gagal Menyimpan',
-          message: errMsg,
-        ),
+        builder: (_) =>
+            ErrorStatusDialog(title: 'Gagal Menyimpan', message: errMsg),
       );
     }
   }
@@ -360,16 +372,18 @@ class _MixerProductionFormDialogState
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
-            create: (_) => OverlapViewModel(repository: OverlapRepository())),
-        ChangeNotifierProvider(create: (_) => MixerTypeViewModel(repository: MixerTypeRepository())),
+          create: (_) => OverlapViewModel(repository: OverlapRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => MixerTypeViewModel(repository: MixerTypeRepository()),
+        ),
       ],
       child: Dialog(
         backgroundColor: Colors.white,
         insetPadding: isLandscape
             ? const EdgeInsets.symmetric(horizontal: 72, vertical: 12)
             : const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: ConstrainedBox(
           constraints: BoxConstraints(
             maxWidth: isLandscape ? 680 : 620,
@@ -403,8 +417,7 @@ class _MixerProductionFormDialogState
 
   Widget _buildForm() {
     final vm = context.watch<OverlapViewModel>();
-    final dur =
-        durationBetweenHHmmWrap(hourStartCtrl.text, hourEndCtrl.text);
+    final dur = durationBetweenHHmmWrap(hourStartCtrl.text, hourEndCtrl.text);
     final startFilled = hourStartCtrl.text.trim().isNotEmpty;
     final endFilled = hourEndCtrl.text.trim().isNotEmpty;
     final hasDurationError = startFilled && endFilled && dur == null;
@@ -412,7 +425,8 @@ class _MixerProductionFormDialogState
     final overlapMsg =
         vm.overlapMessage ?? 'Jam ini bentrok dengan dokumen lain';
 
-    final mesinName = _selectedMesin?.namaMesin ??
+    final mesinName =
+        _selectedMesin?.namaMesin ??
         widget.header?.namaMesin ??
         widget.initialMesin?.namaMesin ??
         (isEdit ? 'Edit Produksi' : 'Tambah Produksi');
@@ -430,16 +444,12 @@ class _MixerProductionFormDialogState
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: isEdit
-                      ? Colors.orange.shade50
-                      : Colors.teal.shade50,
+                  color: isEdit ? Colors.orange.shade50 : Colors.teal.shade50,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   isEdit ? Icons.edit : Icons.add,
-                  color: isEdit
-                      ? Colors.orange.shade700
-                      : Colors.teal.shade700,
+                  color: isEdit ? Colors.orange.shade700 : Colors.teal.shade700,
                   size: 20,
                 ),
               ),
@@ -460,7 +470,9 @@ class _MixerProductionFormDialogState
                 Text(
                   DateFormat('dd MMM yyyy', 'id_ID').format(_selectedDate),
                   style: const TextStyle(
-                      fontSize: 12, color: Color(0xFF6B7280)),
+                    fontSize: 12,
+                    color: Color(0xFF6B7280),
+                  ),
                 ),
               if (widget.isBackdateInput) ...[
                 const SizedBox(width: 16),
@@ -474,17 +486,20 @@ class _MixerProductionFormDialogState
                       labelText: 'Tanggal',
                       hintText: 'Pilih tanggal',
                       prefixIcon: const Icon(
-                          Icons.calendar_today_outlined,
-                          size: 20),
+                        Icons.calendar_today_outlined,
+                        size: 20,
+                      ),
                       border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                     ),
-                    validator: (v) => (v == null || v.isEmpty)
-                        ? 'Wajib pilih tanggal'
-                        : null,
+                    validator: (v) =>
+                        (v == null || v.isEmpty) ? 'Wajib pilih tanggal' : null,
                   ),
                 ),
               ],
@@ -501,14 +516,14 @@ class _MixerProductionFormDialogState
                 width: 190,
                 child: ShiftDropdown(
                   preselectId: widget.header?.shift ?? widget.initialShift,
+                  enabled: !_lockShiftAndHours,
                   onChangedId: (id) {
                     setState(() => _selectedShift = id);
                     if (id != null && widget.isBackdateInput) {
                       _fetchShiftHour(id);
                     }
                   },
-                  validator: (v) =>
-                      v == null ? 'Wajib pilih shift' : null,
+                  validator: (v) => v == null ? 'Wajib pilih shift' : null,
                   autovalidateMode: AutovalidateMode.onUserInteraction,
                 ),
               ),
@@ -519,9 +534,12 @@ class _MixerProductionFormDialogState
                   controller: hourStartCtrl,
                   label: 'Jam Mulai',
                   hintText: 'HH:mm',
+                  enabled: !_lockShiftAndHours,
                   onPick: () async {
-                    final picked =
-                        await pickTime24h(context, initial: _startTime);
+                    final picked = await pickTime24h(
+                      context,
+                      initial: _startTime,
+                    );
                     if (picked != null) {
                       setState(() {
                         _startTime = picked;
@@ -534,9 +552,10 @@ class _MixerProductionFormDialogState
                     final s = parseHHmm(hourStartCtrl.text);
                     if (s == null) return 'Wajib isi (HH:mm)';
                     final diff = durationBetweenHHmmWrap(
-                        hourStartCtrl.text, hourEndCtrl.text);
-                    if (diff == null &&
-                        parseHHmm(hourEndCtrl.text) != null) {
+                      hourStartCtrl.text,
+                      hourEndCtrl.text,
+                    );
+                    if (diff == null && parseHHmm(hourEndCtrl.text) != null) {
                       return 'Durasi 0';
                     }
                     return null;
@@ -550,9 +569,12 @@ class _MixerProductionFormDialogState
                   controller: hourEndCtrl,
                   label: 'Jam Selesai',
                   hintText: 'HH:mm',
+                  enabled: !_lockShiftAndHours,
                   onPick: () async {
-                    final picked = await pickTime24h(context,
-                        initial: _endTime ?? _startTime);
+                    final picked = await pickTime24h(
+                      context,
+                      initial: _endTime ?? _startTime,
+                    );
                     if (picked != null) {
                       setState(() {
                         _endTime = picked;
@@ -567,7 +589,9 @@ class _MixerProductionFormDialogState
                     final s = parseHHmm(hourStartCtrl.text);
                     if (s != null) {
                       final diff = durationBetweenHHmmWrap(
-                          hourStartCtrl.text, hourEndCtrl.text);
+                        hourStartCtrl.text,
+                        hourEndCtrl.text,
+                      );
                       if (diff == null) return 'Durasi 0';
                     }
                     return null;
@@ -621,7 +645,9 @@ class _MixerProductionFormDialogState
                   fontSize: 14,
                   labelFontSize: 14,
                   contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                 ),
               ),
             ],
@@ -662,16 +688,15 @@ class _MixerProductionFormDialogState
         ElevatedButton(
           onPressed: (hasOverlap || isSaving) ? null : _submit,
           style: ElevatedButton.styleFrom(
-            backgroundColor:
-                isEdit ? const Color(0xFFF57C00) : const Color(0xFF00897B),
+            backgroundColor: isEdit
+                ? const Color(0xFFF57C00)
+                : const Color(0xFF00897B),
             foregroundColor: Colors.white,
-            padding:
-                const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
           ),
           child: Text(
             isSaving ? 'MENYIMPAN...' : 'SIMPAN',
-            style:
-                const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
           ),
         ),
       ],

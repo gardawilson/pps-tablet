@@ -746,13 +746,22 @@ class _GilinganProductionInputScreenState
             ),
             children: groups.entries.map((entry) {
               final hasPartial = entry.value.any((x) => x.isPartialRow);
+              // Selalu tampilkan noBroker (nomor label asli), bukan
+              // noBrokerPartial — grouping key (entry.key) tetap pakai
+              // noBrokerPartial untuk item partial supaya matching/delete
+              // temp item tidak berubah.
+              final displaySubtitle = entry.value.isNotEmpty
+                  ? ((entry.value.first.noBroker ?? '').trim().isNotEmpty
+                        ? entry.value.first.noBroker!.trim()
+                        : entry.key)
+                  : entry.key;
               return ProductionInputGroupTile(
                 title:
                     (entry.value.isNotEmpty
                         ? entry.value.first.namaJenis
                         : '-') ??
                     '-',
-                headerSubtitle: entry.key,
+                headerSubtitle: displaySubtitle,
                 tileMetrics: [
                   (Icons.inventory_2_outlined, '${entry.value.length} sak'),
                   (
@@ -963,13 +972,21 @@ class _GilinganProductionInputScreenState
             ),
             children: groups.entries.map((entry) {
               final hasPartial = entry.value.any((x) => x.isPartialRow);
+              // Selalu tampilkan noReject (nomor label asli), bukan
+              // noRejectPartial — grouping key (entry.key) tetap dipakai
+              // untuk matching/delete temp item.
+              final displaySubtitle = entry.value.isNotEmpty
+                  ? ((entry.value.first.noReject ?? '').trim().isNotEmpty
+                        ? entry.value.first.noReject!.trim()
+                        : entry.key)
+                  : entry.key;
               return ProductionInputGroupTile(
                 title:
                     (entry.value.isNotEmpty
                         ? entry.value.first.namaJenis
                         : '-') ??
                     '-',
-                headerSubtitle: entry.key,
+                headerSubtitle: displaySubtitle,
                 tileMetrics: [
                   (Icons.inventory_2_outlined, '${entry.value.length} item'),
                   (

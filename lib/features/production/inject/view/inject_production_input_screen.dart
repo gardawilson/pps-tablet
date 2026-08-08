@@ -1395,13 +1395,23 @@ class _InjectProductionInputScreenState
               ),
               children: fwipGroups.entries.map((entry) {
                 final hasPartial = entry.value.any((x) => x.isPartialRow);
+                // Selalu tampilkan noFurnitureWIP (nomor label asli), bukan
+                // noFurnitureWIPPartial — grouping key (entry.key) tetap
+                // dipakai untuk matching/delete temp item.
+                final displaySubtitle = entry.value.isNotEmpty
+                    ? ((entry.value.first.noFurnitureWIP ?? '')
+                              .trim()
+                              .isNotEmpty
+                          ? entry.value.first.noFurnitureWIP!.trim()
+                          : entry.key)
+                    : entry.key;
                 return ProductionInputGroupTile(
                   title:
                       (entry.value.isNotEmpty
                           ? entry.value.first.namaJenis
                           : '-') ??
                       '-',
-                  headerSubtitle: entry.key,
+                  headerSubtitle: displaySubtitle,
                   tileMetrics: [
                     (
                       Icons.inventory_2_outlined,

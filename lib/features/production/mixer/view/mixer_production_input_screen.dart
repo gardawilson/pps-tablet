@@ -1079,13 +1079,21 @@ class _MixerProductionInputScreenState
                 ),
                 children: bbGroups.entries.map((entry) {
                   final hasPartial = entry.value.any((x) => x.isPartialRow);
+                  // Selalu tampilkan noBahanBaku[-noPallet] (nomor label
+                  // asli), bukan noBBPartial — grouping key (entry.key)
+                  // tetap dipakai untuk matching/delete temp item.
+                  final displaySubtitle = hasPartial
+                      ? _bbPairLabel(
+                          entry.value.firstWhere((x) => x.isPartialRow),
+                        )
+                      : entry.key;
                   return ProductionInputGroupTile(
                     title:
                         (entry.value.isNotEmpty
                             ? entry.value.first.namaJenis
                             : '-') ??
                         '-',
-                    headerSubtitle: entry.key,
+                    headerSubtitle: displaySubtitle,
                     tileMetrics: [
                       (Icons.inventory_2_outlined, '${entry.value.length} sak'),
                       (
@@ -1166,13 +1174,21 @@ class _MixerProductionInputScreenState
                   final firstPartial = hasPartial
                       ? entry.value.firstWhere((x) => x.isPartialRow)
                       : null;
+                  // Selalu tampilkan noBroker (nomor label asli), bukan
+                  // noBrokerPartial — grouping key (entry.key) tetap
+                  // dipakai untuk matching/delete temp item.
+                  final displaySubtitle = entry.value.isNotEmpty
+                      ? ((entry.value.first.noBroker ?? '').trim().isNotEmpty
+                            ? entry.value.first.noBroker!.trim()
+                            : entry.key)
+                      : entry.key;
                   return ProductionInputGroupTile(
                     title:
                         (entry.value.isNotEmpty
                             ? entry.value.first.namaJenis
                             : '-') ??
                         '-',
-                    headerSubtitle: entry.key,
+                    headerSubtitle: displaySubtitle,
                     tileMetrics: [
                       (Icons.inventory_2_outlined, '${entry.value.length} sak'),
                       (
@@ -1324,13 +1340,23 @@ class _MixerProductionInputScreenState
                 ),
                 children: gilinganGroups.entries.map((entry) {
                   final hasPartial = entry.value.any((x) => x.isPartialRow);
+                  // Selalu tampilkan noGilingan (nomor label asli), bukan
+                  // noGilinganPartial — grouping key (entry.key) tetap
+                  // dipakai untuk matching/delete temp item.
+                  final displaySubtitle = entry.value.isNotEmpty
+                      ? ((entry.value.first.noGilingan ?? '')
+                                .trim()
+                                .isNotEmpty
+                            ? entry.value.first.noGilingan!.trim()
+                            : entry.key)
+                      : entry.key;
                   return ProductionInputGroupTile(
                     title:
                         (entry.value.isNotEmpty
                             ? entry.value.first.namaJenis
                             : '-') ??
                         '-',
-                    headerSubtitle: entry.key,
+                    headerSubtitle: displaySubtitle,
                     tileMetrics: [
                       (
                         Icons.scale_outlined,
@@ -1422,13 +1448,21 @@ class _MixerProductionInputScreenState
                   final firstPartial = hasPartial
                       ? entry.value.firstWhere((x) => x.isPartialRow)
                       : null;
+                  // Selalu tampilkan noMixer (nomor label asli), bukan
+                  // noMixerPartial — grouping key (entry.key) tetap dipakai
+                  // untuk matching/delete temp item.
+                  final displaySubtitle = entry.value.isNotEmpty
+                      ? ((entry.value.first.noMixer ?? '').trim().isNotEmpty
+                            ? entry.value.first.noMixer!.trim()
+                            : entry.key)
+                      : entry.key;
                   return ProductionInputGroupTile(
                     title:
                         (entry.value.isNotEmpty
                             ? entry.value.first.namaJenis
                             : '-') ??
                         '-',
-                    headerSubtitle: entry.key,
+                    headerSubtitle: displaySubtitle,
                     tileMetrics: [
                       (Icons.inventory_2_outlined, '${entry.value.length} sak'),
                       (

@@ -763,13 +763,21 @@ class _CrusherProductionInputScreenState
               ),
               children: bbGroups.entries.map((entry) {
                 final hasPartial = entry.value.any((x) => x.isPartialRow);
+                // Selalu tampilkan noBahanBaku[-noPallet] (nomor label asli),
+                // bukan noBBPartial — grouping key (entry.key) tetap dipakai
+                // untuk matching/delete temp item.
+                final displaySubtitle = hasPartial
+                    ? _bbPairLabel(
+                        entry.value.firstWhere((x) => x.isPartialRow),
+                      )
+                    : entry.key;
                 return ProductionInputGroupTile(
                   title:
                       (entry.value.isNotEmpty
                           ? entry.value.first.namaJenis
                           : '-') ??
                       '-',
-                  headerSubtitle: entry.key,
+                  headerSubtitle: displaySubtitle,
                   tileMetrics: [
                     (Icons.inventory_2_outlined, '${entry.value.length} sak'),
                     (

@@ -226,7 +226,7 @@ class _MixerProductionMesinScreenState
       bagian: mesin.bagian,
       enable: true,
     );
-    final defaultShift = await ShiftRepository.fetchCurrentShift();
+    final defaultShift = await ShiftRepository.fetchMixerCurrentShift();
     if (!mounted) return;
     final editVm = MixerProductionViewModel();
     try {

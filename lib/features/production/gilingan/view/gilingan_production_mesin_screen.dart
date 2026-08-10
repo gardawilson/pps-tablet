@@ -189,7 +189,7 @@ class _GilinganProductionMesinScreenState
       enable: true,
     );
 
-    final defaultShift = await ShiftRepository.fetchCurrentShift();
+    final defaultShift = await ShiftRepository.fetchGilinganCurrentShift();
     if (!mounted) return;
 
     final created = await showDialog<GilinganProduction>(

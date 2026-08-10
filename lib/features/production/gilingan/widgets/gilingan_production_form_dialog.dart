@@ -143,7 +143,7 @@ class _GilinganProductionFormDialogState
     final tanggal = DateFormat('yyyy-MM-dd').format(_selectedDate);
     final base = ApiConstants.baseUrl.replaceFirst(RegExp(r'/*$'), '');
     final url = Uri.parse(
-      '$base/api/mst/shift/hour?tanggal=$tanggal&shift=$shift',
+      '$base/api/mst/gilingan/shift/hour?tanggal=$tanggal&shift=$shift',
     );
     try {
       final token = await TokenStorage.getToken();

@@ -225,7 +225,7 @@ class _InjectProductionFormDialogState
     final tanggal = DateFormat('yyyy-MM-dd').format(_selectedDate);
     final base = ApiConstants.baseUrl.replaceFirst(RegExp(r'/*$'), '');
     final url = Uri.parse(
-      '$base/api/mst/shift/hour?tanggal=$tanggal&shift=$shift',
+      '$base/api/mst/inject/shift/hour?tanggal=$tanggal&shift=$shift',
     );
     try {
       final token = await TokenStorage.getToken();
@@ -466,10 +466,8 @@ class _InjectProductionFormDialogState
       final errMsg = prodVm.saveError ?? 'Gagal menyimpan data produksi';
       await showDialog<void>(
         context: context,
-        builder: (_) => ErrorStatusDialog(
-          title: 'Gagal Menyimpan',
-          message: errMsg,
-        ),
+        builder: (_) =>
+            ErrorStatusDialog(title: 'Gagal Menyimpan', message: errMsg),
       );
     }
   }

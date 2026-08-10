@@ -155,7 +155,7 @@ class _InjectProductionMesinScreenState
     bool isBackdateInput = false,
   }) async {
     if (!mounted) return;
-    final defaultShift = await ShiftRepository.fetchCurrentShift();
+    final defaultShift = await ShiftRepository.fetchInjectCurrentShift();
     if (!mounted) return;
     final mstMesin = MstMesin(
       idMesin: mesin.idMesin,

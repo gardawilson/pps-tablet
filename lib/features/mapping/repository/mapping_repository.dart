@@ -24,7 +24,10 @@ class MappingRepository {
   }
 
   Future<List<MappingLokasi>> fetchLokasiByBlok(String blok) async {
-    final body = await api.getJson('/api/mapping/lokasi', query: {'blok': blok});
+    final body = await api.getJson(
+      '/api/mapping/lokasi',
+      query: {'blok': blok},
+    );
     final data = body['data'];
 
     if (data is! List) {
@@ -56,8 +59,10 @@ class MappingRepository {
   }
 
   Future<List<MasterJenis>> fetchJenis(int idKategori) async {
-    final body = await api.getJson('/api/master-jenis',
-        query: {'idKategori': idKategori.toString()});
+    final body = await api.getJson(
+      '/api/master-jenis',
+      query: {'idKategori': idKategori.toString()},
+    );
     final data = body['data'];
     if (data is! List) throw Exception('Format data jenis tidak sesuai');
     return data
@@ -65,10 +70,7 @@ class MappingRepository {
         .toList();
   }
 
-  Future<void> createLokasi(
-    String blok,
-    Map<String, dynamic> payload,
-  ) async {
+  Future<void> createLokasi(String blok, Map<String, dynamic> payload) async {
     await api.postJson('/api/mapping/lokasi/$blok', body: payload);
   }
 
@@ -101,6 +103,24 @@ class MappingRepository {
       totalData: (body['totalData'] as num?)?.toInt() ?? items.length,
       totalQty: items.fold(0, (s, e) => s + e.qty),
       totalBerat: items.fold(0.0, (s, e) => s + (e.berat ?? 0)),
+    );
+  }
+
+  Future<MappingLabelHistoryResult> fetchLabelHistory(String labelCode) async {
+    final body = await api.getJson(
+      '/api/label/history-lokasi/${Uri.encodeComponent(labelCode)}',
+    );
+
+    final raw = body['history'];
+    if (raw is! List) throw Exception('Format data riwayat label tidak sesuai');
+
+    return MappingLabelHistoryResult(
+      labelCode: (body['labelCode'] ?? labelCode).toString(),
+      history: raw
+          .map(
+            (e) => MappingLabelHistoryItem.fromJson(e as Map<String, dynamic>),
+          )
+          .toList(),
     );
   }
 }

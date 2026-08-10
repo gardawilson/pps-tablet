@@ -44,6 +44,42 @@ class MappingLabelItem {
   }
 }
 
+class MappingLabelHistoryItem {
+  final DateTime? eventTime;
+  final String actorUsername;
+  final String beforeBlok;
+  final int? beforeIdLokasi;
+  final String afterBlok;
+  final int? afterIdLokasi;
+
+  MappingLabelHistoryItem({
+    required this.eventTime,
+    required this.actorUsername,
+    required this.beforeBlok,
+    required this.beforeIdLokasi,
+    required this.afterBlok,
+    required this.afterIdLokasi,
+  });
+
+  factory MappingLabelHistoryItem.fromJson(Map<String, dynamic> json) {
+    return MappingLabelHistoryItem(
+      eventTime: DateTime.tryParse((json['eventTime'] ?? '').toString()),
+      actorUsername: (json['actorUsername'] ?? '').toString(),
+      beforeBlok: (json['beforeBlok'] ?? '').toString(),
+      beforeIdLokasi: (json['beforeIdLokasi'] as num?)?.toInt(),
+      afterBlok: (json['afterBlok'] ?? '').toString(),
+      afterIdLokasi: (json['afterIdLokasi'] as num?)?.toInt(),
+    );
+  }
+}
+
+class MappingLabelHistoryResult {
+  final String labelCode;
+  final List<MappingLabelHistoryItem> history;
+
+  MappingLabelHistoryResult({required this.labelCode, required this.history});
+}
+
 class MappingLabelResult {
   final List<MappingLabelItem> data;
   final int totalData;

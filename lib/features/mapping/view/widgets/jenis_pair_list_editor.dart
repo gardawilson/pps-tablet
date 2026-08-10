@@ -13,9 +13,9 @@ class JenisPairValue {
   const JenisPairValue({required this.kategori, required this.jenis});
 
   Map<String, dynamic> toJson() => {
-        'IdKategori': kategori.idKategori,
-        'IdJenis': jenis.idJenis,
-      };
+    'IdKategori': kategori.idKategori,
+    'IdJenis': jenis.idJenis,
+  };
 }
 
 class _CategoryEntry {
@@ -25,9 +25,9 @@ class _CategoryEntry {
   bool loadingJenis;
 
   _CategoryEntry({this.kategori})
-      : jenisOptions = [],
-        selectedJenisIds = {},
-        loadingJenis = false;
+    : jenisOptions = [],
+      selectedJenisIds = {},
+      loadingJenis = false;
 }
 
 /// Editor untuk daftar kategori, tiap kategori bisa memilih banyak jenis
@@ -86,8 +86,9 @@ class JenisPairListEditorState extends State<JenisPairListEditor> {
 
       for (final entryList in grouped.values) {
         final idKategori = entryList.first.idKategori;
-        final kategori =
-            list.where((k) => k.idKategori == idKategori).firstOrNull;
+        final kategori = list
+            .where((k) => k.idKategori == idKategori)
+            .firstOrNull;
         if (kategori == null) continue;
         final entry = _CategoryEntry(kategori: kategori);
         _entries.add(entry);
@@ -116,8 +117,9 @@ class JenisPairListEditorState extends State<JenisPairListEditor> {
       entry.selectedJenisIds = {};
     });
     try {
-      final list =
-          await widget.repository.fetchJenis(entry.kategori!.idKategori);
+      final list = await widget.repository.fetchJenis(
+        entry.kategori!.idKategori,
+      );
       setState(() {
         entry.jenisOptions = list;
         entry.loadingJenis = false;
@@ -173,8 +175,7 @@ class JenisPairListEditorState extends State<JenisPairListEditor> {
   Widget _buildKategoriDropdown(_CategoryEntry entry) {
     return InputDecorator(
       decoration: InputDecoration(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
@@ -187,14 +188,16 @@ class JenisPairListEditorState extends State<JenisPairListEditor> {
           isExpanded: true,
           hint: const Text('Pilih kategori', style: TextStyle(fontSize: 13)),
           items: _kategoriList
-              .map((item) => DropdownMenuItem<MasterKategori>(
-                    value: item,
-                    child: Text(
-                      item.namaKategori,
-                      style: const TextStyle(fontSize: 13),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ))
+              .map(
+                (item) => DropdownMenuItem<MasterKategori>(
+                  value: item,
+                  child: Text(
+                    item.namaKategori,
+                    style: const TextStyle(fontSize: 13),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              )
               .toList(),
           onChanged: (val) async {
             setState(() => entry.kategori = val);
@@ -220,14 +223,18 @@ class JenisPairListEditorState extends State<JenisPairListEditor> {
           final filtered = query.isEmpty
               ? entry.jenisOptions
               : entry.jenisOptions
-                  .where((j) =>
-                      j.namaJenis.toLowerCase().contains(query.toLowerCase()))
-                  .toList();
+                    .where(
+                      (j) => j.namaJenis.toLowerCase().contains(
+                        query.toLowerCase(),
+                      ),
+                    )
+                    .toList();
 
           return AlertDialog(
             scrollable: true,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             title: Text(
               'Pilih Jenis${entry.kategori != null ? ' — ${entry.kategori!.namaKategori}' : ''}',
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
@@ -239,8 +246,10 @@ class JenisPairListEditorState extends State<JenisPairListEditor> {
                       padding: const EdgeInsets.symmetric(vertical: 20),
                       child: Text(
                         'Tidak ada jenis untuk kategori ini',
-                        style:
-                            TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade500,
+                        ),
                       ),
                     )
                   : Column(
@@ -255,28 +264,102 @@ class JenisPairListEditorState extends State<JenisPairListEditor> {
                             isDense: true,
                             hintText: 'Cari jenis...',
                             hintStyle: const TextStyle(fontSize: 13),
-                            prefixIcon: const Icon(Icons.search_rounded, size: 18),
+                            prefixIcon: const Icon(
+                              Icons.search_rounded,
+                              size: 18,
+                            ),
                             suffixIcon: query.isEmpty
                                 ? null
                                 : IconButton(
-                                    icon: const Icon(Icons.close_rounded, size: 16),
+                                    icon: const Icon(
+                                      Icons.close_rounded,
+                                      size: 16,
+                                    ),
                                     onPressed: () {
                                       searchCtrl.clear();
                                       setSt(() => query = '');
                                     },
                                   ),
                             contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 8),
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
                             border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8)),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide:
-                                  const BorderSide(color: _primary, width: 2),
+                              borderSide: const BorderSide(
+                                color: _primary,
+                                width: 2,
+                              ),
                             ),
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${tempSelected.length} dipilih',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: filtered.isEmpty
+                                  ? null
+                                  : () => setSt(() {
+                                      tempSelected.addAll(
+                                        filtered.map((j) => j.idJenis),
+                                      );
+                                    }),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              icon: const Icon(
+                                Icons.done_all_rounded,
+                                size: 15,
+                              ),
+                              label: const Text(
+                                'Pilih Semua',
+                                style: TextStyle(fontSize: 11),
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: filtered.isEmpty
+                                  ? null
+                                  : () => setSt(() {
+                                      tempSelected.removeWhere(
+                                        (id) => filtered.any(
+                                          (j) => j.idJenis == id,
+                                        ),
+                                      );
+                                    }),
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.red.shade400,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              icon: const Icon(
+                                Icons.remove_done_rounded,
+                                size: 15,
+                              ),
+                              label: const Text(
+                                'Hapus Semua',
+                                style: TextStyle(fontSize: 11),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
                         SizedBox(
                           width: double.maxFinite,
                           height: 280,
@@ -285,8 +368,9 @@ class JenisPairListEditorState extends State<JenisPairListEditor> {
                                   child: Text(
                                     'Jenis tidak ditemukan',
                                     style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey.shade500),
+                                      fontSize: 12,
+                                      color: Colors.grey.shade500,
+                                    ),
                                   ),
                                 )
                               : ListView(
@@ -303,15 +387,17 @@ class JenisPairListEditorState extends State<JenisPairListEditor> {
                                           jenis.namaJenis,
                                           style: const TextStyle(fontSize: 13),
                                         ),
-                                        value: tempSelected
-                                            .contains(jenis.idJenis),
+                                        value: tempSelected.contains(
+                                          jenis.idJenis,
+                                        ),
                                         onChanged: (checked) {
                                           setSt(() {
                                             if (checked ?? false) {
                                               tempSelected.add(jenis.idJenis);
                                             } else {
-                                              tempSelected
-                                                  .remove(jenis.idJenis);
+                                              tempSelected.remove(
+                                                jenis.idJenis,
+                                              );
                                             }
                                           });
                                         },
@@ -368,8 +454,10 @@ class JenisPairListEditorState extends State<JenisPairListEditor> {
       borderRadius: BorderRadius.circular(8),
       child: InputDecorator(
         decoration: InputDecoration(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 8,
+          ),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
@@ -388,32 +476,30 @@ class JenisPairListEditorState extends State<JenisPairListEditor> {
                 style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
               )
             : selectedJenis.isEmpty
-                ? Text(
-                    'Pilih jenis...',
-                    style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
-                  )
-                : Wrap(
-                    spacing: 4,
-                    runSpacing: 4,
-                    children: [
-                      for (final jenis in selectedJenis)
-                        Chip(
-                          label: Text(
-                            jenis.namaJenis,
-                            style: const TextStyle(fontSize: 11),
-                          ),
-                          labelStyle: const TextStyle(color: _primary),
-                          backgroundColor: _primary.withValues(alpha: 0.10),
-                          visualDensity: VisualDensity.compact,
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          padding: const EdgeInsets.symmetric(horizontal: 2),
-                          deleteIcon: const Icon(Icons.close, size: 14),
-                          onDeleted: () =>
-                              _toggleJenis(entry, jenis, false),
-                        ),
-                    ],
-                  ),
+            ? Text(
+                'Pilih jenis...',
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+              )
+            : Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: [
+                  for (final jenis in selectedJenis)
+                    Chip(
+                      label: Text(
+                        jenis.namaJenis,
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                      labelStyle: const TextStyle(color: _primary),
+                      backgroundColor: _primary.withValues(alpha: 0.10),
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      deleteIcon: const Icon(Icons.close, size: 14),
+                      onDeleted: () => _toggleJenis(entry, jenis, false),
+                    ),
+                ],
+              ),
       ),
     );
   }
@@ -465,8 +551,7 @@ class JenisPairListEditorState extends State<JenisPairListEditor> {
               onTap: _addEntry,
               borderRadius: BorderRadius.circular(6),
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: _primary.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(6),

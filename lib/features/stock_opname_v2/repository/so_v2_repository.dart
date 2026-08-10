@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import '../../../core/network/api_client.dart';
 import '../model/so_v2_blok_page.dart';
@@ -155,5 +156,13 @@ class SoV2Repository {
     final data = body['data'] as Map<String, dynamic>?;
     if (data == null) throw Exception('Response tidak mengandung data');
     return SoV2ScanSummary.fromJson(data);
+  }
+
+  /// Unduh laporan PDF (rangkuman total/per-jenis/per-blok/per-user scan)
+  /// untuk satu sesi stock opname — di-generate server-side (Puppeteer).
+  Future<Uint8List> fetchLaporanPdf(String stockOpnameNo) {
+    return _api.getPdfBytesForPath(
+      '/api/stock-opname-v2/transaksi/$stockOpnameNo/laporan/pdf',
+    );
   }
 }

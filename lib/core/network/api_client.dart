@@ -229,6 +229,15 @@ class ApiClient {
     return _decodeJsonBody(resp);
   }
 
+  /// Sama seperti [getPdfBytes], tapi menerima path relatif (di-resolve
+  /// lewat [_buildUri]) alih-alih [Uri] absolut yang harus dirakit caller.
+  Future<Uint8List> getPdfBytesForPath(
+    String path, {
+    Map<String, dynamic>? query,
+  }) {
+    return getPdfBytes(_buildUri(path, query));
+  }
+
   /// Download PDF dengan auth header. Validasi signature %PDF.
   Future<Uint8List> getPdfBytes(Uri uri) async {
     final headers = await _headers();

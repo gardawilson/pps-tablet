@@ -22,6 +22,7 @@ import '../view_model/so_v2_socket_manager.dart';
 import '../utils/so_v2_number_format.dart';
 import '../widgets/so_v2_complete_summary_dialog.dart';
 import '../widgets/so_v2_label_group_tile.dart';
+import '../widgets/so_v2_laporan_pdf_viewer_screen.dart';
 import '../widgets/so_v2_scan_summary_dialog.dart';
 import '../widgets/so_v2_worker_picker_dialog.dart';
 
@@ -64,6 +65,7 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
   final _searchCtl = TextEditingController();
   bool _completing = false;
   bool _loadingScanSummary = false;
+  bool _loadingLaporan = false;
   bool _searchOpen = false;
   final Set<int> _busyLocationIds = {};
   final Set<String> _busyLabelNos = {};
@@ -369,6 +371,31 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
     }
   }
 
+  Future<void> _printLaporan() async {
+    if (_loadingLaporan) return;
+    setState(() => _loadingLaporan = true);
+    try {
+      final bytes = await _repo.fetchLaporanPdf(widget.stockOpnameNo);
+      if (!mounted) return;
+      await SoV2LaporanPdfViewerScreen.push(
+        context: context,
+        title: 'Laporan ${widget.stockOpnameNo}',
+        pdfBytes: bytes,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final message = e is ApiException
+          ? e.friendlyMessage
+          : 'Gagal memuat laporan PDF';
+      await DialogService.instance.showError(
+        title: 'Gagal Memuat Laporan',
+        message: message,
+      );
+    } finally {
+      if (mounted) setState(() => _loadingLaporan = false);
+    }
+  }
+
   void _toggleSearch(SoV2LabelListViewModel vm) {
     setState(() {
       _searchOpen = !_searchOpen;
@@ -566,6 +593,64 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                             ),
                           ),
                         ),
+                      // Laporan cetak baru relevan setelah stock opname
+                      // ditandai selesai (isi laporan berupa ringkasan
+                      // hasil akhir/selisih, bukan progres real-time) —
+                      // sembunyikan tombolnya selama sesi masih berjalan.
+                      if (vm.isComplete) ...[
+                        const SizedBox(height: 6),
+                        SizedBox(
+                          width: double.infinity,
+                          child: Material(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(20),
+                            child: InkWell(
+                              onTap: _loadingLaporan ? null : _printLaporan,
+                              borderRadius: BorderRadius.circular(20),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 7,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (_loadingLaporan)
+                                      SizedBox(
+                                        width: 13,
+                                        height: 13,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      )
+                                    else
+                                      Icon(
+                                        Icons.picture_as_pdf_rounded,
+                                        size: 15,
+                                        color: Colors.grey.shade700,
+                                      ),
+                                    const SizedBox(width: 6),
+                                    Flexible(
+                                      child: Text(
+                                        'Cetak Laporan',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.grey.shade700,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

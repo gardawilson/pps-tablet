@@ -17,8 +17,8 @@ import '../repository/inject_production_repository.dart';
 import 'cetakan_warna_material_picker.dart';
 import 'counter_picker_dialog.dart';
 
-class InjectSplitTimeDialog extends StatefulWidget {
-  const InjectSplitTimeDialog({
+class InjectSplitTimeDialogV3 extends StatefulWidget {
+  const InjectSplitTimeDialogV3({
     super.key,
     required this.idMesin,
     required this.tglProduksi,
@@ -52,10 +52,10 @@ class InjectSplitTimeDialog extends StatefulWidget {
   final String? lastBucketHourStart;
 
   @override
-  State<InjectSplitTimeDialog> createState() => _InjectSplitTimeDialogState();
+  State<InjectSplitTimeDialogV3> createState() => _InjectSplitTimeDialogV3State();
 }
 
-class _InjectSplitTimeDialogState extends State<InjectSplitTimeDialog> {
+class _InjectSplitTimeDialogV3State extends State<InjectSplitTimeDialogV3> {
   final _hourCtrl = TextEditingController();
   final _pcsCtrl = TextEditingController();
   final _beratCtrl = TextEditingController();

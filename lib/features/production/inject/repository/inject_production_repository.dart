@@ -686,41 +686,6 @@ class InjectProductionRepository {
   }
 
   /* =============================
-   * COMPLETE APPROVAL
-   * ============================= */
-
-  /// GET /api/production/inject/complete-requests/pending
-  Future<List<String>> fetchPendingCompleteRequests() async {
-    try {
-      final body = await api.getJson(
-        '/api/production/inject/complete-requests/pending',
-      );
-      final data = body['data'] as List<dynamic>? ?? [];
-      return data
-          .map((e) => e is Map ? (e['NoProduksi']?.toString() ?? '') : '')
-          .where((s) => s.isNotEmpty)
-          .toList();
-    } on ApiException {
-      return [];
-    }
-  }
-
-  /// PATCH /api/production/inject/:noProduksi/complete/approve
-  Future<void> approveComplete(String noProduksi) async {
-    final encoded = Uri.encodeComponent(noProduksi.trim());
-    try {
-      await api.patchJson(
-        '/api/production/inject/$encoded/complete/approve',
-      );
-    } on ApiException catch (e) {
-      final parsed = _tryDecodeMap(e.responseBody);
-      final msg = (parsed['message'] as String?) ??
-          'Gagal menyetujui penyelesaian (HTTP ${e.statusCode})';
-      throw Exception(msg);
-    }
-  }
-
-  /* =============================
    * Helpers
    * ============================= */
 

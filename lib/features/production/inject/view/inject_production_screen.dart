@@ -12,6 +12,7 @@ import '../../../cetakan/repository/cetakan_repository.dart';
 import '../../../cetakan/view_model/cetakan_view_model.dart';
 import '../../../furniture_material/repository/furniture_material_lookup_repository.dart';
 import '../../../furniture_material/view_model/furniture_material_lookup_view_model.dart';
+import '../../../shift/repository/shift_repository.dart';
 import '../../../warna/repository/warna_repository.dart';
 import '../../../warna/view_model/warna_view_model.dart';
 
@@ -156,6 +157,8 @@ class _InjectProductionScreenState extends State<InjectProductionScreen> {
   }
 
   Future<void> _openCreateDialog(BuildContext ctx) async {
+    final defaultShift = await ShiftRepository.fetchInjectCurrentShift();
+    if (!mounted || !ctx.mounted) return;
     final created = await showDialog<InjectProduction>(
       context: ctx,
       barrierDismissible: false,
@@ -176,7 +179,12 @@ class _InjectProductionScreenState extends State<InjectProductionScreen> {
             ),
           ),
         ],
-        child: const InjectProductionFormDialog(),
+        child: InjectProductionFormDialog(
+          initialDate: ShiftRepository.effectiveDateForShift(defaultShift),
+          initialShift: defaultShift?.shift,
+          initialHourStart: defaultShift?.hourStart,
+          initialHourEnd: defaultShift?.hourEnd,
+        ),
       ),
     );
     if (!mounted || !ctx.mounted) return;

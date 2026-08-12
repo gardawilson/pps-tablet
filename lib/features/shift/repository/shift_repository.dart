@@ -11,6 +11,37 @@ typedef ActiveShift = ({int shift, String hourStart, String hourEnd});
 class ShiftRepository {
   static const _timeout = Duration(seconds: 8);
 
+  /// Tanggal efektif produksi untuk [shift] yang sedang berjalan sekarang.
+  /// Untuk shift overnight (mis. 23:00-07:00) yang masih berada di jam
+  /// dini hari (mis. jam 03:00), tanggal kalender perangkat sudah maju ke
+  /// hari berikutnya padahal shift tersebut secara logika masih milik hari
+  /// sebelumnya (hari saat shift itu mulai). Tanpa penyesuaian ini, dialog
+  /// "Buat Produksi Baru" akan default ke tanggal hari ini alih-alih
+  /// tanggal awal shift, sehingga bisa membuat produksi ganda salah tanggal.
+  static DateTime effectiveDateForShift(ActiveShift? shift) {
+    final now = DateTime.now();
+    if (shift == null) return now;
+    int? toMinutes(String hhmm) {
+      final parts = hhmm.split(':');
+      if (parts.length < 2) return null;
+      final h = int.tryParse(parts[0]);
+      final m = int.tryParse(parts[1]);
+      if (h == null || m == null) return null;
+      return h * 60 + m;
+    }
+
+    final startMin = toMinutes(shift.hourStart);
+    final endMin = toMinutes(shift.hourEnd);
+    if (startMin == null || endMin == null) return now;
+
+    final isOvernight = startMin > endMin;
+    final nowMin = now.hour * 60 + now.minute;
+    final isTailOfOvernightShift = isOvernight && nowMin < endMin;
+    return isTailOfOvernightShift
+        ? DateTime(now.year, now.month, now.day - 1)
+        : DateTime(now.year, now.month, now.day);
+  }
+
   static Future<ActiveShift?> fetchCurrentShift() async {
     try {
       final base = ApiConstants.baseUrl.replaceFirst(RegExp(r'/*$'), '');

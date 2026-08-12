@@ -28,7 +28,7 @@ import '../widgets/inject_shift_timeline_dialog.dart';
 import '../widgets/counter_picker_dialog.dart';
 import '../widgets/inject_lookup_label_dialog.dart';
 import '../widgets/inject_lookup_label_partial_dialog.dart';
-import '../widgets/inject_split_time_dialog.dart';
+import '../widgets/inject_split_time_dialog_v3.dart';
 import '../widgets/inject_terminate_dialog.dart';
 import '../../../../features/reject_type/model/reject_type_model.dart';
 import '../../../../features/reject_type/view_model/reject_type_view_model.dart';
@@ -944,7 +944,7 @@ class _InjectProductionInputScreenState
     final result = await showDialog<InjectBatchSubmitResult>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => InjectSplitTimeDialog(
+      builder: (_) => InjectSplitTimeDialogV3(
         idMesin: h.idMesin,
         tglProduksi: h.tglProduksi!,
         currentHourEnd: h.hourEnd,

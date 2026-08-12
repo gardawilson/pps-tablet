@@ -13,6 +13,7 @@ import '../../shared/widgets/add_cabinet_material_dialog.dart';
 import '../../shared/widgets/confirm_save_temp_dialog.dart';
 import '../../shared/widgets/save_button_with_badge.dart';
 import '../../shared/widgets/unsaved_temp_warning_dialog.dart';
+import '../model/inject_batch_model.dart' show InjectBatchSubmitResult;
 import '../model/inject_output_model.dart';
 import '../model/inject_production_inputs_model.dart';
 import '../model/inject_formula_model.dart';
@@ -29,7 +30,7 @@ import '../../../label/reject/repository/reject_repository.dart';
 import '../../../../core/network/endpoints.dart';
 import '../../../../core/network/api_client.dart';
 import '../widgets/inject_sak_picker_dialog.dart';
-import '../widgets/inject_split_time_dialog.dart';
+import '../widgets/inject_split_time_dialog_v1.dart';
 import '../../../label/packing/repository/packing_repository.dart';
 
 // ── Colour palette ─────────────────────────────────────────────────────────────
@@ -274,10 +275,10 @@ class _InjectProductionInputScreenState
     );
     if (!mounted || mode == null) return;
 
-    final result = await showDialog<bool>(
+    final result = await showDialog<InjectBatchSubmitResult>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => InjectSplitTimeDialog(
+      builder: (_) => InjectSplitTimeDialogV1(
         idMesin: h.idMesin,
         tglProduksi: h.tglProduksi!,
         currentHourEnd: h.hourEnd,
@@ -293,7 +294,7 @@ class _InjectProductionInputScreenState
       ),
     );
     if (!mounted) return;
-    if (result == true) {
+    if (result != null) {
       _showSnack('✅ Produksi berhasil diganti', backgroundColor: Colors.green);
       if (mounted) Navigator.of(context).pop();
     }

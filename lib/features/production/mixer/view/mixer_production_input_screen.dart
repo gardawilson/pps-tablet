@@ -1344,9 +1344,7 @@ class _MixerProductionInputScreenState
                   // noGilinganPartial — grouping key (entry.key) tetap
                   // dipakai untuk matching/delete temp item.
                   final displaySubtitle = entry.value.isNotEmpty
-                      ? ((entry.value.first.noGilingan ?? '')
-                                .trim()
-                                .isNotEmpty
+                      ? ((entry.value.first.noGilingan ?? '').trim().isNotEmpty
                             ? entry.value.first.noGilingan!.trim()
                             : entry.key)
                       : entry.key;

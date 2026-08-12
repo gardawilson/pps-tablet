@@ -33,7 +33,6 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
   // Approval actions — muncul saat CompleteRequestStatus == 'PENDING'
   final VoidCallback? onApprove;
   final VoidCallback? onReject;
-  final String? pendingApprovalInfo;
   final VoidCallback? onRiwayat;
   final VoidCallback? onRefresh;
   final List<Widget>? trailingActions;
@@ -65,7 +64,6 @@ class ProductionWorkspaceToolbar extends StatelessWidget {
     this.completePendingReason,
     this.onApprove,
     this.onReject,
-    this.pendingApprovalInfo,
     this.onRiwayat,
     this.onRefresh,
     this.trailingActions,

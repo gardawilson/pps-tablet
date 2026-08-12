@@ -172,7 +172,7 @@ class _InjectProductionMesinScreenState
           value: vm,
           child: InjectProductionFormDialog(
             initialMesin: mstMesin,
-            initialDate: DateTime.now(),
+            initialDate: ShiftRepository.effectiveDateForShift(defaultShift),
             initialShift: defaultShift?.shift,
             initialHourStart: defaultShift?.hourStart,
             initialHourEnd: defaultShift?.hourEnd,

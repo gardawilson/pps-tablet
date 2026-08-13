@@ -163,6 +163,11 @@ class _HomeSidebarState extends State<HomeSidebar> {
           route: '/shell/retur-v2',
         ),
         _SubItem(
+          title: 'Retur v3',
+          icon: Icons.assignment_return_rounded,
+          route: '/shell/retur-v3',
+        ),
+        _SubItem(
           title: 'BJ Jual',
           icon: Icons.sell_outlined,
           route: '/shell/bj-jual',

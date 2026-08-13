@@ -34,6 +34,7 @@ import 'package:pps_tablet/features/production/mixer/view/mixer_production_mesin
 import 'package:pps_tablet/features/production/packing/view/packing_production_mesin_screen.dart';
 import 'package:pps_tablet/features/production/return/view/return_production_screen.dart';
 import 'package:pps_tablet/features/retur_v2/view/retur_v2_screen.dart';
+import 'package:pps_tablet/features/retur_v3/view/retur_v3_list_screen.dart';
 import 'package:pps_tablet/features/trade_in/view/trade_in_screen.dart';
 import 'package:pps_tablet/features/production/selection/view/production_selection_screen.dart';
 import 'package:pps_tablet/features/production/sortir_reject/view/sortir_reject_production_screen.dart';
@@ -510,6 +511,8 @@ class _AppShellState extends State<AppShell> {
         return ReturnProductionScreen();
       case '/shell/retur-v2':
         return const ReturV2Screen();
+      case '/shell/retur-v3':
+        return const ReturV3ListScreen();
       case '/shell/trade-in':
         return const TradeInScreen();
       case '/stockopname':

@@ -1161,8 +1161,7 @@ class _BsV2OutputTile extends StatelessWidget {
                     jumlahSak: out.jumlahSak,
                     saks: out.saks
                         .map(
-                          (s) =>
-                              BsV2LabelSak(noSak: s.noSak, berat: s.berat),
+                          (s) => BsV2LabelSak(noSak: s.noSak, berat: s.berat),
                         )
                         .toList(),
                   ),

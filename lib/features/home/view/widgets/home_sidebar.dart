@@ -222,6 +222,18 @@ class _HomeSidebarState extends State<HomeSidebar> {
       icon: Icons.map_outlined,
       route: '/shell/mapping',
     ),
+    _MenuItem(
+      title: 'Good Transfer',
+      subtitle: 'Transfer label antar warehouse',
+      icon: Icons.local_shipping_outlined,
+      route: '/shell/good-transfer',
+    ),
+    _MenuItem(
+      title: 'In Transit',
+      subtitle: 'Validasi penerimaan transfer',
+      icon: Icons.move_to_inbox_outlined,
+      route: '/shell/in-transit',
+    ),
   ];
 
   void _navigateTo(String route, String title, {String? parentTitle}) {

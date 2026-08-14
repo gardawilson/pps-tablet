@@ -42,6 +42,7 @@ import 'package:pps_tablet/features/production/spanner/view/spanner_production_s
 import 'package:pps_tablet/features/production/washing/view/washing_production_mesin_screen.dart';
 import 'package:pps_tablet/features/report/view/report_list_screen.dart';
 import 'package:pps_tablet/features/sortir_reject_v2/view/sr_v2_list_screen.dart';
+import 'package:pps_tablet/features/stock/view/stock_selection_screen.dart';
 import 'package:pps_tablet/features/stock_opname/view/stock_opname_list_screen.dart';
 import 'package:pps_tablet/features/stock_opname_v2/view/so_v2_kategori_list_screen.dart';
 import 'package:provider/provider.dart';
@@ -518,6 +519,8 @@ class _AppShellState extends State<AppShell> {
         return const BsV2ListScreen();
       case '/shell/sortir-reject':
         return const SrV2ListScreen();
+      case '/shell/stock':
+        return const StockSelectionScreen();
       case '/shell/stock-opname-v2':
         return const SoV2KategoriListScreen();
       case '/shell/bj-jual':

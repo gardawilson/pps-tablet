@@ -5,6 +5,9 @@ class BrokerStokItem implements StokItemData {
   final int idBroker;
   @override
   final String nama;
+
+  /// Jumlah label (NoBroker) yang masih punya sisa sak.
+  final int labelSisa;
   @override
   final int sakSisa;
   @override
@@ -17,6 +20,7 @@ class BrokerStokItem implements StokItemData {
   const BrokerStokItem({
     required this.idBroker,
     required this.nama,
+    required this.labelSisa,
     required this.sakSisa,
     required this.beratSisa,
     this.dateCreateTertua,
@@ -25,6 +29,7 @@ class BrokerStokItem implements StokItemData {
   factory BrokerStokItem.fromJson(Map<String, dynamic> j) => BrokerStokItem(
     idBroker: pickI(j, ['IdBroker', 'idBroker', 'id_broker']) ?? 0,
     nama: pickS(j, ['Nama', 'nama']) ?? '',
+    labelSisa: pickI(j, ['LabelSisa', 'labelSisa', 'label_sisa']) ?? 0,
     sakSisa: pickI(j, ['SakSisa', 'sakSisa', 'sak_sisa']) ?? 0,
     beratSisa: pickD(j, ['BeratSisa', 'beratSisa', 'berat_sisa']) ?? 0,
     dateCreateTertua: pickDT(j, [

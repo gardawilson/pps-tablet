@@ -80,6 +80,11 @@ class _HomeSidebarState extends State<HomeSidebar> {
           icon: Icons.cancel_outlined,
           route: '/label/reject',
         ),
+        _SubItem(
+          title: 'Stock',
+          icon: Icons.assessment_outlined,
+          route: '/shell/stock',
+        ),
       ],
     ),
   ];

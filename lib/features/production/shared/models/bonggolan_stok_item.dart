@@ -5,6 +5,9 @@ class BonggolanStokItem implements StokItemData {
   final int idBonggolan;
   @override
   final String nama;
+
+  /// Jumlah label (NoBonggolan) yang masih punya sisa berat.
+  final int labelSisa;
   @override
   final double beratSisa;
 
@@ -15,6 +18,7 @@ class BonggolanStokItem implements StokItemData {
   const BonggolanStokItem({
     required this.idBonggolan,
     required this.nama,
+    required this.labelSisa,
     required this.beratSisa,
     this.dateCreateTertua,
   });
@@ -27,6 +31,7 @@ class BonggolanStokItem implements StokItemData {
       BonggolanStokItem(
         idBonggolan: pickI(j, ['IdBonggolan', 'idBonggolan']) ?? 0,
         nama: pickS(j, ['NamaBonggolan', 'namaBonggolan', 'Nama', 'nama']) ?? '',
+        labelSisa: pickI(j, ['LabelSisa', 'labelSisa']) ?? 0,
         beratSisa: pickD(j, ['BeratSisa', 'beratSisa']) ?? 0,
         dateCreateTertua: pickDT(j, ['DateCreateTertua', 'dateCreateTertua']),
       );

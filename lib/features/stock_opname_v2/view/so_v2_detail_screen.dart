@@ -978,7 +978,7 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
             color: selected
                 ? baseColor.withValues(alpha: 0.05)
                 : (complete
-                      ? _kSuccessBg
+                      ? const Color(0xFF0A7349).withValues(alpha: 0.06)
                       : (lokasi.isUnknown ? _kWarningBg : null)),
             border: Border(
               left: BorderSide(
@@ -1335,6 +1335,15 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                                         ),
                                       ),
                                     ),
+                                    if (vm.totalRecords > 0 &&
+                                        vm.totalScanned >= vm.totalRecords) ...[
+                                      const SizedBox(width: 6),
+                                      const Icon(
+                                        Icons.check_circle_rounded,
+                                        size: 16,
+                                        color: Color(0xFF0A7349),
+                                      ),
+                                    ],
                                   ],
                                 ),
                         ),
@@ -1366,6 +1375,11 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
                             child: _HeaderStat(
                               label: 'LABEL',
                               value: '${vm.totalScanned}/${vm.totalRecords}',
+                              valueColor:
+                                  vm.totalRecords > 0 &&
+                                      vm.totalScanned >= vm.totalRecords
+                                  ? const Color(0xFF0A7349)
+                                  : null,
                             ),
                           ),
                           Container(
@@ -1461,8 +1475,13 @@ class _SoV2DetailScreenState extends State<SoV2DetailScreen> {
 class _HeaderStat extends StatelessWidget {
   final String label;
   final String value;
+  final Color? valueColor;
 
-  const _HeaderStat({required this.label, required this.value});
+  const _HeaderStat({
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1483,10 +1502,10 @@ class _HeaderStat extends StatelessWidget {
           value,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF1A1D23),
+            color: valueColor ?? const Color(0xFF1A1D23),
           ),
         ),
       ],

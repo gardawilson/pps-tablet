@@ -429,6 +429,53 @@ class PdfPrintService {
     }
   }
 
+  /// Variant [previewFromUrl] yang menerima PDF bytes yang sudah digenerate
+  /// secara lokal (mis. via `package:pdf`) alih-alih mengunduh dari backend.
+  /// Dipakai oleh fitur yang belum punya endpoint PDF sendiri di server —
+  /// alur in-app viewer + pilih printer + Bluetooth print tetap sama persis
+  /// seperti [previewFromUrl].
+  Future<void> previewFromBytes({
+    required BuildContext context,
+    required Uint8List pdfBytes,
+    String? title,
+    VoidCallback? onPrinted,
+  }) async {
+    if (!context.mounted) return;
+
+    final outcome = await PdfViewerScreen.push(
+      context: context,
+      title: title ?? 'Label',
+      pdfBytes: pdfBytes,
+    );
+
+    if (outcome == null || !context.mounted) return;
+
+    _showPrintingSnack(context, outcome.printerName);
+
+    final btService = BtPrintService(
+      baseUrl: baseUrl,
+      defaultSystem: defaultSystem,
+    );
+
+    String? errorMsg;
+    final ok = await btService.printBytes(
+      pdfBytes: pdfBytes,
+      mac: outcome.mac,
+      onStatus: (_) {},
+      onError: (e) => errorMsg = e,
+    );
+
+    if (!context.mounted) return;
+    if (ok) {
+      onPrinted?.call();
+      _showPrintSuccessSnack(context, outcome.printerName);
+      final printBy = await DevicePrinterService.getLoggedUsername();
+      DevicePrinterService.logPrint(printerId: outcome.mac, printBy: printBy);
+    } else {
+      _showPrintErrorSnack(context, errorMsg ?? 'Print gagal. Coba lagi.');
+    }
+  }
+
   /// Core function untuk direct print
   Future<bool> _directPrintPdf({
     required Uint8List pdfBytes,

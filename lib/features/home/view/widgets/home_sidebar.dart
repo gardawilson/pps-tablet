@@ -84,11 +84,30 @@ class _HomeSidebarState extends State<HomeSidebar> {
     ),
   ];
 
+  static List<_MenuItem> get _bahanPendukungItems => <_MenuItem>[
+    _MenuItem(
+      title: 'Penerimaan Bahan Pendukung',
+      subtitle: 'Input penerimaan bahan pendukung',
+      icon: Icons.move_to_inbox_outlined,
+      route: '/shell/penerimaan-bahan-pendukung',
+    ),
+  ];
+
   static List<_MenuGroup> get _divisiGroups => <_MenuGroup>[
     _MenuGroup(
       title: 'Washing & Broker',
       icon: Icons.water_outlined,
       children: [
+        _SubItem(
+          title: 'PBB Pakai',
+          icon: Icons.move_to_inbox_outlined,
+          route: '/shell/penerimaan-bahan-baku-pakai',
+        ),
+        _SubItem(
+          title: 'PBB Proses',
+          icon: Icons.move_to_inbox_outlined,
+          route: '/shell/penerimaan-bahan-baku-proses',
+        ),
         _SubItem(
           title: 'Proses Washing',
           icon: Icons.local_laundry_service_outlined,
@@ -157,6 +176,11 @@ class _HomeSidebarState extends State<HomeSidebar> {
       title: 'Warehouse',
       icon: Icons.warehouse_outlined,
       children: [
+        _SubItem(
+          title: 'Penerimaan Barang Dagang',
+          icon: Icons.move_to_inbox_outlined,
+          route: '/shell/penerimaan-barang-dagang',
+        ),
         _SubItem(
           title: 'Retur',
           icon: Icons.assignment_return_outlined,
@@ -289,6 +313,9 @@ class _HomeSidebarState extends State<HomeSidebar> {
                       _buildSectionHeader('Label'),
                       for (int i = 0; i < _labelGroups.length; i++)
                         _buildGroup(i, _labelGroups),
+                      _buildSectionHeader('Bahan Pendukung'),
+                      for (final item in _bahanPendukungItems)
+                        _buildFlatItem(item),
                       _buildSectionHeader('Proses Produksi'),
                       for (int i = 0; i < _divisiGroups.length; i++)
                         _buildGroup(i, _divisiGroups),

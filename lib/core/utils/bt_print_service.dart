@@ -225,6 +225,76 @@ class BtPrintService {
     }
   }
 
+  /// Print langsung dari PDF bytes yang sudah tersedia di memori (mis. hasil
+  /// generate lokal dengan `package:pdf`, tanpa endpoint backend). Sama
+  /// dengan [printLabelFromUrl] tapi melewati langkah download.
+  Future<bool> printBytes({
+    required Uint8List pdfBytes,
+    required String mac,
+    Function(String)? onStatus,
+    Function(String)? onError,
+  }) async {
+    try {
+      final granted = await ensurePermissions();
+      if (!granted) {
+        onError?.call(
+          'Permission Bluetooth ditolak.\n'
+          'Buka Settings > Izin Aplikasi > lalu aktifkan "Perangkat Terdekat".',
+        );
+        return false;
+      }
+
+      onStatus?.call('Memproses PDF...');
+      final escBytes = await _pdfToEscPos(pdfBytes);
+      debugPrint('🖨️ ESC/POS bytes: ${escBytes.length}');
+
+      onStatus?.call('Mengecek Bluetooth...');
+      final btOn = await PrintBluetoothThermal.bluetoothEnabled;
+      if (!btOn) {
+        onError?.call('Bluetooth tidak aktif. Aktifkan Bluetooth lalu coba lagi.');
+        return false;
+      }
+
+      debugPrint('🔄 Disconnect sesi BT sebelumnya (unconditional)...');
+      await PrintBluetoothThermal.disconnect;
+      await Future.delayed(const Duration(milliseconds: 2500));
+
+      onStatus?.call('Menghubungkan ke printer...');
+      bool connected = await PrintBluetoothThermal.connect(macPrinterAddress: mac);
+      if (!connected) {
+        debugPrint('⚠️ Connect pertama gagal, coba lagi setelah 2s...');
+        await Future.delayed(const Duration(milliseconds: 2000));
+        connected = await PrintBluetoothThermal.connect(macPrinterAddress: mac);
+      }
+      if (!connected) {
+        onError?.call(
+          'Gagal terhubung ke printer.\n'
+          'Pastikan:\n'
+          '• Bluetooth aktif\n'
+          '• Printer menyala & dalam jangkauan\n'
+          '• Printer sudah di-pair di Settings Android\n'
+          '• MAC: $mac',
+        );
+        return false;
+      }
+
+      onStatus?.call('Mencetak...');
+      final ok = await PrintBluetoothThermal.writeBytes(escBytes);
+      debugPrint('🖨️ Write bytes result: $ok');
+
+      if (ok) {
+        onStatus?.call('✅ Berhasil dicetak!');
+        return true;
+      } else {
+        onError?.call('Gagal mengirim data ke printer.');
+        return false;
+      }
+    } catch (e) {
+      onError?.call('Error: $e');
+      return false;
+    }
+  }
+
   Future<bool> printLabel({
     required String reportName,
     required Map<String, String> query,

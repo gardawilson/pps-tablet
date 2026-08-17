@@ -8,7 +8,12 @@ import '../repository/bahan_baku_repository.dart';
 class BahanBakuViewModel extends ChangeNotifier {
   final BahanBakuRepository repository;
 
-  BahanBakuViewModel({required this.repository});
+  /// Opsional — filter prefix NoBahanBaku (mis. "A." / "AB.") dipakai modul
+  /// Penerimaan Bahan Baku untuk membatasi VM ini ke satu kategori saja.
+  /// Null/kosong = tanpa filter (perilaku layar Label Bahan Baku asli).
+  final String? prefix;
+
+  BahanBakuViewModel({required this.repository, this.prefix});
 
   // === HEADER STATE ===
   List<BahanBakuHeader> items = [];
@@ -91,6 +96,7 @@ class BahanBakuViewModel extends ChangeNotifier {
         limit: 20,
         search: _search,
         includeUsed: includeUsed,
+        prefix: prefix,
       );
 
       items = result['items'] as List<BahanBakuHeader>;
@@ -121,6 +127,7 @@ class BahanBakuViewModel extends ChangeNotifier {
         limit: 20,
         search: _search,
         includeUsed: includeUsed,
+        prefix: prefix,
       );
 
       final moreItems = result['items'] as List<BahanBakuHeader>;

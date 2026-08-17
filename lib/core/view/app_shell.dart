@@ -5,6 +5,7 @@ import 'package:pps_tablet/core/services/user_session_storage.dart';
 import 'package:pps_tablet/core/view_model/label_print_lock_socket_manager.dart';
 import 'package:pps_tablet/core/view_model/permission_view_model.dart';
 import 'package:pps_tablet/features/audit/view/audit_screen.dart';
+import 'package:pps_tablet/features/bahan_pendukung/penerimaan/view/penerimaan_bahan_pendukung_screen.dart';
 import 'package:pps_tablet/features/bj_jual/view/bj_jual_screen.dart';
 import 'package:pps_tablet/features/bongkar_susun_v2/view/bs_v2_list_screen.dart';
 import 'package:pps_tablet/features/home/view/home_screen.dart';
@@ -32,6 +33,8 @@ import 'package:pps_tablet/features/production/inject/view/inject_production_scr
 import 'package:pps_tablet/features/production/key_fitting/view/key_fitting_production_mesin_screen.dart';
 import 'package:pps_tablet/features/production/mixer/view/mixer_production_mesin_screen.dart';
 import 'package:pps_tablet/features/production/packing/view/packing_production_mesin_screen.dart';
+import 'package:pps_tablet/features/production/penerimaan_bahan_baku/model/penerimaan_kategori.dart';
+import 'package:pps_tablet/features/production/penerimaan_bahan_baku/view/penerimaan_bahan_baku_screen.dart';
 import 'package:pps_tablet/features/production/return/view/return_production_screen.dart';
 import 'package:pps_tablet/features/retur_v2/view/retur_v2_screen.dart';
 import 'package:pps_tablet/features/trade_in/view/trade_in_screen.dart';
@@ -44,6 +47,7 @@ import 'package:pps_tablet/features/report/view/report_list_screen.dart';
 import 'package:pps_tablet/features/sortir_reject_v2/view/sr_v2_list_screen.dart';
 import 'package:pps_tablet/features/stock_opname/view/stock_opname_list_screen.dart';
 import 'package:pps_tablet/features/stock_opname_v2/view/so_v2_kategori_list_screen.dart';
+import 'package:pps_tablet/features/warehouse/penerimaan_barang_dagang/view/penerimaan_barang_dagang_screen.dart';
 import 'package:provider/provider.dart';
 
 class BreadcrumbSegment {
@@ -485,6 +489,14 @@ class _AppShellState extends State<AppShell> {
         return const GilinganProductionMesinScreen();
       case '/production/mixer':
         return const MixerProductionMesinScreen();
+      case '/shell/penerimaan-bahan-pendukung':
+        return const PenerimaanBahanPendukungScreen();
+      case '/shell/penerimaan-barang-dagang':
+        return const PenerimaanBarangDagangScreen();
+      case '/shell/penerimaan-bahan-baku-pakai':
+        return const PenerimaanBahanBakuScreen(kategori: PenerimaanKategori.pakai);
+      case '/shell/penerimaan-bahan-baku-proses':
+        return const PenerimaanBahanBakuScreen(kategori: PenerimaanKategori.proses);
       case '/shell/hot-stamp':
         return const HotStampProductionMesinScreen();
       case '/production/hot-stamp':

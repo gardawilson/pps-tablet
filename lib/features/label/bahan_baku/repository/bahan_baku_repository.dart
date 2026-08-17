@@ -11,12 +11,17 @@ class BahanBakuRepository {
 
   BahanBakuRepository({required this.api});
 
-  /// Ambil daftar bahan baku header dengan pagination & search
+  /// Ambil daftar bahan baku header dengan pagination & search.
+  /// [prefix] opsional — filter berdasarkan prefix NoBahanBaku (mis. "A."
+  /// untuk kategori Proses, "AB." untuk kategori Pakai — lihat
+  /// dbo.MstKategori.PrefixLabel di backend), dipakai modul Penerimaan
+  /// Bahan Baku untuk memisahkan tampilan per kategori.
   Future<Map<String, dynamic>> fetchHeaders({
     int page = 1,
     int limit = 20,
     String search = '',
     bool includeUsed = false,
+    String? prefix,
   }) async {
     final body = await api.getJson(
       '/api/labels/bahan-baku',
@@ -25,6 +30,7 @@ class BahanBakuRepository {
         'limit': limit,
         'search': search,
         if (includeUsed) 'includeUsed': 'true',
+        if (prefix != null && prefix.isNotEmpty) 'prefix': prefix,
       },
     );
 

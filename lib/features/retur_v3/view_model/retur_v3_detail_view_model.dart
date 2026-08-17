@@ -1,0 +1,327 @@
+import 'package:flutter/foundation.dart';
+
+import '../../../core/network/api_error.dart';
+import '../model/retur_v3_header.dart';
+import '../model/retur_v3_item.dart';
+import '../model/retur_v3_output.dart';
+import '../model/retur_v3_turnover.dart';
+import '../repository/retur_v3_repository.dart';
+
+class ReturV3DetailViewModel extends ChangeNotifier {
+  final String noRetur;
+  final ReturV3Repository repository;
+
+  ReturV3DetailViewModel({required this.noRetur, ReturV3Repository? repository})
+    : repository = repository ?? ReturV3Repository();
+
+  bool isLoading = false;
+  String? error;
+
+  ReturV3Header? header;
+  List<ReturV3Item> items = [];
+  List<ReturV3Turnover> turnover = [];
+  List<ReturV3Output> outputs = [];
+
+  // Per-action busy/error state so the UI can show inline spinners without
+  // blocking the whole screen.
+  bool isSavingItem = false;
+  String? itemError;
+
+  bool isDeciding = false;
+  String? decisionError;
+
+  final Set<int> generatingItemIds = {};
+  String? generateError;
+
+  bool isFlagging = false;
+  String? flagError;
+
+  // ── Derived ──────────────────────────────────────────────────────────
+
+  ReturV3Turnover? turnoverFor(int idItem) {
+    for (final t in turnover) {
+      if (t.idItem == idItem) return t;
+    }
+    return null;
+  }
+
+  bool get allItemsFulfilled {
+    if (items.isEmpty) return false;
+    for (final item in items) {
+      final t = turnoverFor(item.idItem);
+      if (t == null || !t.isFulfilled) return false;
+    }
+    return true;
+  }
+
+  bool get canFlagKirim =>
+      header != null &&
+      header!.isDiganti &&
+      !header!.flagKirim &&
+      allItemsFulfilled;
+
+  // ── Load ─────────────────────────────────────────────────────────────
+
+  Future<void> load() async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final res = await repository.fetchDetail(noRetur);
+      header = res['header'] as ReturV3Header;
+      items = res['items'] as List<ReturV3Item>;
+      turnover = res['turnover'] as List<ReturV3Turnover>;
+      outputs = res['outputs'] as List<ReturV3Output>;
+
+      // Kalau detail belum menyertakan turnover/outputs (opsional di
+      // kontrak), ambil terpisah sesuai status.
+      if (header != null) {
+        if (header!.isDiganti && turnover.isEmpty) {
+          await _loadTurnover();
+        }
+        if (header!.isTidakDiganti && outputs.isEmpty) {
+          await _loadOutputs();
+        }
+      }
+    } catch (e) {
+      error = apiErrorMessage(e);
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _loadTurnover() async {
+    try {
+      turnover = await repository.fetchTurnover(noRetur);
+    } catch (_) {
+      // biarkan silent — halaman detail tetap tampil dengan progress kosong
+    }
+  }
+
+  Future<void> _loadOutputs() async {
+    try {
+      outputs = await repository.fetchOutputs(noRetur);
+    } catch (_) {
+      // biarkan silent
+    }
+  }
+
+  Future<void> refreshOutputs() async {
+    await _loadOutputs();
+    notifyListeners();
+  }
+
+  Future<void> refreshTurnover() async {
+    await _loadTurnover();
+    notifyListeners();
+  }
+
+  // ── Items (PENDING) ─────────────────────────────────────────────────
+
+  Future<bool> addItem({
+    required String kodeKategori,
+    required int idJenis,
+    required int pcs,
+    required String kategoriInput,
+  }) async {
+    isSavingItem = true;
+    itemError = null;
+    notifyListeners();
+    try {
+      final newItems = await repository.addItems(noRetur, [
+        {
+          'kodeKategori': kodeKategori,
+          'idJenis': idJenis,
+          'pcs': pcs,
+          'kategoriInput': kategoriInput,
+        },
+      ]);
+      items = [...items, ...newItems];
+      return true;
+    } catch (e) {
+      itemError = apiErrorMessage(e);
+      return false;
+    } finally {
+      isSavingItem = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> updateItem(
+    int idItem, {
+    String? kodeKategori,
+    int? idJenis,
+    int? pcs,
+    String? kategoriInput,
+  }) async {
+    isSavingItem = true;
+    itemError = null;
+    notifyListeners();
+    try {
+      final updated = await repository.updateItem(
+        noRetur,
+        idItem,
+        kodeKategori: kodeKategori,
+        idJenis: idJenis,
+        pcs: pcs,
+        kategoriInput: kategoriInput,
+      );
+      items = items
+          .map((it) => it.idItem == idItem ? updated : it)
+          .toList();
+      return true;
+    } catch (e) {
+      itemError = apiErrorMessage(e);
+      return false;
+    } finally {
+      isSavingItem = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> removeItem(int idItem) async {
+    itemError = null;
+    try {
+      await repository.deleteItem(noRetur, idItem);
+      items = items.where((it) => it.idItem != idItem).toList();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      itemError = apiErrorMessage(e);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ── Decision ─────────────────────────────────────────────────────────
+
+  Future<bool> decide(String decision) async {
+    isDeciding = true;
+    decisionError = null;
+    notifyListeners();
+    try {
+      header = await repository.decide(noRetur, decision);
+      if (header!.isDiganti) {
+        await _loadTurnover();
+      } else if (header!.isTidakDiganti) {
+        await _loadOutputs();
+      }
+      return true;
+    } catch (e) {
+      decisionError = apiErrorMessage(e);
+      return false;
+    } finally {
+      isDeciding = false;
+      notifyListeners();
+    }
+  }
+
+  // ── Generate label (TIDAK_DIGANTI) ──────────────────────────────────
+
+  Future<bool> generateLabelForItem(
+    int idItem, {
+    double? berat,
+    int? idReject,
+  }) async {
+    generatingItemIds.add(idItem);
+    generateError = null;
+    notifyListeners();
+    try {
+      final data = await repository.generateLabel(
+        noRetur,
+        idItem,
+        berat: berat,
+        idReject: idReject,
+      );
+      final labelCode = (data['labelCode'] ?? data['LabelCode'])?.toString();
+      if (labelCode != null && labelCode.isNotEmpty) {
+        items = items
+            .map(
+              (it) => it.idItem == idItem
+                  ? ReturV3Item(
+                      idItem: it.idItem,
+                      kodeKategori: it.kodeKategori,
+                      idJenis: it.idJenis,
+                      namaJenis: it.namaJenis,
+                      pcs: it.pcs,
+                      kategoriInput: it.kategoriInput,
+                      berat: berat ?? it.berat,
+                      idReject: idReject ?? it.idReject,
+                      generatedLabelCode: labelCode,
+                    )
+                  : it,
+            )
+            .toList();
+      }
+      await _loadOutputs();
+      return true;
+    } catch (e) {
+      generateError = apiErrorMessage(e);
+      return false;
+    } finally {
+      generatingItemIds.remove(idItem);
+      notifyListeners();
+    }
+  }
+
+  // ── Scan / turnover (DIGANTI) ───────────────────────────────────────
+
+  /// Dipakai sebagai `onLookup` untuk `ScanLabelDialog`: return `null` kalau
+  /// sukses (dialog auto-close), atau pesan error untuk ditampilkan inline.
+  Future<String?> scan(int idItem, String labelCode) async {
+    try {
+      await repository.scan(noRetur, idItem, labelCode);
+      await _loadTurnover();
+      notifyListeners();
+      return null;
+    } catch (e) {
+      return apiErrorMessage(e);
+    }
+  }
+
+  /// Scan auto-detect — satu tombol scan untuk semua item: backend yang
+  /// menentukan item mana yang cocok berdasarkan kategori+jenis label.
+  /// Sama kontraknya dengan `scan()`: `null` = sukses, String = pesan error.
+  Future<String?> scanAuto(String labelCode) async {
+    try {
+      await repository.scanAuto(noRetur, labelCode);
+      await _loadTurnover();
+      notifyListeners();
+      return null;
+    } catch (e) {
+      return apiErrorMessage(e);
+    }
+  }
+
+  Future<bool> undoScan(int idItem, int idTurnover) async {
+    try {
+      await repository.undoScan(noRetur, idItem, idTurnover);
+      await _loadTurnover();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      decisionError = apiErrorMessage(e);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ── Flag kirim ───────────────────────────────────────────────────────
+
+  Future<bool> flagKirim() async {
+    isFlagging = true;
+    flagError = null;
+    notifyListeners();
+    try {
+      header = await repository.flagKirim(noRetur);
+      return true;
+    } catch (e) {
+      flagError = apiErrorMessage(e);
+      return false;
+    } finally {
+      isFlagging = false;
+      notifyListeners();
+    }
+  }
+}

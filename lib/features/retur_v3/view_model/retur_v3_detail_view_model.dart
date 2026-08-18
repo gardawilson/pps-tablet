@@ -45,6 +45,16 @@ class ReturV3DetailViewModel extends ChangeNotifier {
     return null;
   }
 
+  /// Langkah 1 (Generate Label) dianggap selesai bukan cuma kalau semua
+  /// item sudah punya label yang digenerate, tapi label-labelnya juga
+  /// sudah dicetak minimal 1x (`HasBeenPrinted > 0`) — generate saja belum
+  /// cukup untuk lanjut ke langkah 2 (Progress Turnover).
+  bool get step1Complete =>
+      items.isNotEmpty &&
+      items.every((it) => it.hasGeneratedLabel) &&
+      outputs.isNotEmpty &&
+      outputs.every((o) => o.hasBeenPrinted);
+
   bool get allItemsFulfilled {
     if (items.isEmpty) return false;
     for (final item in items) {
@@ -74,12 +84,15 @@ class ReturV3DetailViewModel extends ChangeNotifier {
       outputs = res['outputs'] as List<ReturV3Output>;
 
       // Kalau detail belum menyertakan turnover/outputs (opsional di
-      // kontrak), ambil terpisah sesuai status.
+      // kontrak), ambil terpisah sesuai status. Outputs (label yang sudah
+      // digenerate) relevan untuk DIGANTI juga sekarang (langkah 1 alur
+      // DIGANTI = generate label, sama seperti TIDAK_DIGANTI) — bukan cuma
+      // TIDAK_DIGANTI seperti sebelum ada alur 2-langkah.
       if (header != null) {
         if (header!.isDiganti && turnover.isEmpty) {
           await _loadTurnover();
         }
-        if (header!.isTidakDiganti && outputs.isEmpty) {
+        if (!header!.isPending && outputs.isEmpty) {
           await _loadOutputs();
         }
       }
@@ -204,6 +217,7 @@ class ReturV3DetailViewModel extends ChangeNotifier {
       header = await repository.decide(noRetur, decision);
       if (header!.isDiganti) {
         await _loadTurnover();
+        await _loadOutputs();
       } else if (header!.isTidakDiganti) {
         await _loadOutputs();
       }

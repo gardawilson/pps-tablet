@@ -6,9 +6,15 @@ class ReturV3Kategori {
 }
 
 /// Input kategori pilihan user saat menambah item — 'BAGUS' | 'REJECT'.
+/// Nilai mentah ('BAGUS'/'REJECT') dikirim apa adanya ke backend — cuma
+/// label yang ditampilkan ke user yang beda ("Rusak" bukan "Reject"),
+/// makanya ada [displayLabel] terpisah dari nilai enum-nya.
 class ReturV3KategoriInput {
   static const bagus = 'BAGUS';
   static const reject = 'REJECT';
+
+  static String displayLabel(String kategoriInput) =>
+      kategoriInput.toUpperCase() == reject ? 'Rusak' : 'Bagus';
 }
 
 class ReturV3Item {

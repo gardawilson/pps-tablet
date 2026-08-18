@@ -225,7 +225,7 @@ class _ReturV3ItemInputDialogState extends State<ReturV3ItemInputDialog> {
       children: [
         Expanded(
           child: _ToggleChip(
-            label: 'BAGUS',
+            label: 'Bagus',
             color: Colors.green,
             selected: _kategoriInput == ReturV3KategoriInput.bagus,
             onTap: () =>
@@ -235,7 +235,7 @@ class _ReturV3ItemInputDialogState extends State<ReturV3ItemInputDialog> {
         const SizedBox(width: 8),
         Expanded(
           child: _ToggleChip(
-            label: 'REJECT',
+            label: 'Rusak',
             color: Colors.red,
             selected: _kategoriInput == ReturV3KategoriInput.reject,
             onTap: () =>

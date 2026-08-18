@@ -7,6 +7,7 @@ import '../../../core/network/api_error.dart';
 import '../../pembeli/model/pembeli_model.dart';
 import '../../pembeli/widgets/pembeli_dropdown.dart';
 import '../model/retur_v3_header.dart';
+import '../model/retur_v3_item.dart';
 import '../repository/retur_v3_repository.dart';
 import 'retur_v3_item_input_dialog.dart';
 
@@ -459,7 +460,7 @@ class _ReturV3HeaderFormDialogState extends State<ReturV3HeaderFormDialog> {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          it.kategoriInput,
+                          ReturV3KategoriInput.displayLabel(it.kategoriInput),
                           style: TextStyle(
                             fontSize: 10.5,
                             fontWeight: FontWeight.w700,

@@ -39,6 +39,11 @@ const _kStockProsesList = <_StockProsesDef>[
     icon: Icons.scatter_plot_outlined,
   ),
   _StockProsesDef(
+    key: StockProsesKey.gilingan,
+    title: 'Gilingan',
+    icon: Icons.settings_outlined,
+  ),
+  _StockProsesDef(
     key: StockProsesKey.mixer,
     title: 'Mixer',
     icon: Icons.blender_outlined,
@@ -47,6 +52,11 @@ const _kStockProsesList = <_StockProsesDef>[
     key: StockProsesKey.furnitureWip,
     title: 'Furniture WIP',
     icon: Icons.chair_outlined,
+  ),
+  _StockProsesDef(
+    key: StockProsesKey.barangJadi,
+    title: 'Barang Jadi',
+    icon: Icons.inventory_outlined,
   ),
   _StockProsesDef(
     key: StockProsesKey.reject,
@@ -100,64 +110,36 @@ class _StockSelectionScreenState extends State<StockSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final cols = (constraints.maxWidth / 160).floor().clamp(2, 6);
+          return GridView.builder(
+            padding: const EdgeInsets.all(12),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: cols,
+              mainAxisExtent: 140,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
             ),
-            alignment: Alignment.centerLeft,
-            child: const Text(
-              'Stok per Proses',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF1F2937),
-              ),
-            ),
-          ),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final cols = (constraints.maxWidth / 160).floor().clamp(2, 6);
-                return GridView.builder(
-                  padding: const EdgeInsets.all(12),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: cols,
-                    mainAxisExtent: 140,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                  ),
-                  itemCount: _kStockProsesList.length,
-                  itemBuilder: (context, index) {
-                    final def = _kStockProsesList[index];
-                    return StockProsesCard(
-                      title: def.title,
-                      icon: def.icon,
-                      totals: _totals[def.key],
-                      isLoading:
-                          !_totals.containsKey(def.key) &&
-                          !_failed.contains(def.key),
-                      hasError: _failed.contains(def.key),
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => StockDetailScreen(
-                            prosesKey: def.key,
-                            title: def.title,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
+            itemCount: _kStockProsesList.length,
+            itemBuilder: (context, index) {
+              final def = _kStockProsesList[index];
+              return StockProsesCard(
+                title: def.title,
+                icon: def.icon,
+                totals: _totals[def.key],
+                isLoading:
+                    !_totals.containsKey(def.key) && !_failed.contains(def.key),
+                hasError: _failed.contains(def.key),
+                onTap: () => showDialog<void>(
+                  context: context,
+                  builder: (_) =>
+                      StockDetailScreen(prosesKey: def.key, title: def.title),
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }

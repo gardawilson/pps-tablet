@@ -1,12 +1,14 @@
 import '../../../../core/utils/model_helpers.dart';
 import 'stok_item_data.dart';
 
-class CrusherStokItem implements StokItemData {
-  final int idCrusher;
+/// Sisa stok gilingan per jenis — Gilingan adalah tabel flat (satu baris =
+/// satu label, seperti Crusher/Bonggolan/Reject), net dari GilinganPartial.
+class GilinganStokItem implements StokItemData {
+  final int idGilingan;
   @override
   final String nama;
 
-  /// Jumlah label (NoCrusher) yang masih punya sisa berat.
+  /// Jumlah label (NoGilingan) yang masih punya sisa berat.
   final int labelSisa;
   @override
   final double beratSisa;
@@ -15,21 +17,21 @@ class CrusherStokItem implements StokItemData {
   /// stok kosong.
   final DateTime? dateCreateTertua;
 
-  const CrusherStokItem({
-    required this.idCrusher,
+  const GilinganStokItem({
+    required this.idGilingan,
     required this.nama,
     required this.labelSisa,
     required this.beratSisa,
     this.dateCreateTertua,
   });
 
-  /// Stok crusher tidak dihitung per sak, hanya berat.
+  /// Stok gilingan tidak dihitung per sak, hanya berat.
   @override
   int get sakSisa => 0;
 
-  factory CrusherStokItem.fromJson(Map<String, dynamic> j) => CrusherStokItem(
-    idCrusher: pickI(j, ['IdCrusher', 'idCrusher']) ?? 0,
-    nama: pickS(j, ['NamaCrusher', 'namaCrusher', 'Nama', 'nama']) ?? '',
+  factory GilinganStokItem.fromJson(Map<String, dynamic> j) => GilinganStokItem(
+    idGilingan: pickI(j, ['IdGilingan', 'idGilingan']) ?? 0,
+    nama: pickS(j, ['NamaGilingan', 'namaGilingan', 'Nama', 'nama']) ?? '',
     labelSisa: pickI(j, ['LabelSisa', 'labelSisa']) ?? 0,
     beratSisa: pickD(j, ['BeratSisa', 'beratSisa']) ?? 0,
     dateCreateTertua: pickDT(j, ['DateCreateTertua', 'dateCreateTertua']),

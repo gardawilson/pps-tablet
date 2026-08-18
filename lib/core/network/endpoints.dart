@@ -299,4 +299,24 @@ class ApiConstants {
     final host = Uri.parse(baseUrl).host;
     return 'http://$host:7500/api/mst-bonggolan/$idBonggolan/label';
   }
+
+  static String get mstGilinganStok {
+    final host = Uri.parse(baseUrl).host;
+    return 'http://$host:7500/api/mst-gilingan/stok';
+  }
+
+  static String mstGilinganStokLabel(int idGilingan) {
+    final host = Uri.parse(baseUrl).host;
+    return 'http://$host:7500/api/mst-gilingan/$idGilingan/label';
+  }
+
+  static String get mstBarangJadiStok {
+    final host = Uri.parse(baseUrl).host;
+    return 'http://$host:7500/api/mst-barang-jadi/stok';
+  }
+
+  static String mstBarangJadiStokLabel(int idBJ) {
+    final host = Uri.parse(baseUrl).host;
+    return 'http://$host:7500/api/mst-barang-jadi/$idBJ/label';
+  }
 }

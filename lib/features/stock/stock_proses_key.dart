@@ -1,0 +1,16 @@
+/// Proses yang punya sumber data stok tersendiri — dipakai bersama oleh
+/// [StockSelectionScreen], [StockDetailScreen], dan `stock_totals.dart`.
+/// Semua sudah punya repository/model di `lib/features/production/shared/`
+/// — tidak ada endpoint baru.
+enum StockProsesKey {
+  washing,
+  broker,
+  crusher,
+  bonggolan,
+  gilingan,
+  mixer,
+  furnitureWip,
+  barangJadi,
+  reject,
+  bahanBaku,
+}

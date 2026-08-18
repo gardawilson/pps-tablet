@@ -13,7 +13,6 @@ import '../../../core/view_model/permission_view_model.dart';
 import '../../label/furniture_wip/repository/furniture_wip_repository.dart';
 import '../../label/packing/repository/packing_repository.dart';
 import '../../label/reject/repository/reject_repository.dart';
-import '../model/retur_v3_header.dart';
 import '../model/retur_v3_item.dart';
 import '../model/retur_v3_output.dart';
 import '../model/retur_v3_turnover.dart';
@@ -66,13 +65,18 @@ Future<int?> _markAsPrinted(ReturV3Output o) {
 }
 
 /// Detail 1 nomor Retur v3 — tampilan berubah menurut `statusRetur`:
-/// PENDING (input item + keputusan PIC), TIDAK_DIGANTI (generate + cetak
-/// label), DIGANTI (scan turnover + flag kirim). Permission gating pakai
-/// kode `retur:create`, `retur:update` —
-/// nama kode ini adalah tebakan konseptual mengikuti pola
-/// `perm.can('feature:action')` yang dipakai fitur lain (lihat
-/// `return_production_action_bar.dart`); sesuaikan kalau backend memakai
-/// nama kode permission yang berbeda.
+/// PENDING (tampilan item + keputusan), DIGANTI (generate label lalu scan
+/// turnover), TIDAK_DIGANTI (generate label). Permission dipisah per role:
+/// - `retur:decide` — Sales, HANYA untuk tombol DIGANTI/TIDAK_DIGANTI. Sales
+///   tidak pernah memicu generate label sama sekali, bahkan tidak sebagai
+///   efek samping dari aksi decide — dua action ini sengaja dipisah total.
+/// - `retur:create`/`retur:update`/`retur:delete` — Admin (buat data retur,
+///   edit header, scan turnover, flag kirim, DAN generate label).
+///
+/// Generate label adalah tombol manual eksplisit ("Generate Label" per
+/// item di `_TidakDigantiSection`) yang cuma tampil/aktif untuk pemegang
+/// `retur:update` — user lain (mis. Sales) cuma melihat status "Menunggu",
+/// tidak ada aksi otomatis apapun yang terpicu di sesi mereka.
 class ReturV3DetailScreen extends StatefulWidget {
   final String noRetur;
 
@@ -272,27 +276,13 @@ class _ReturV3DetailScreenState extends State<ReturV3DetailScreen> {
       );
       return;
     }
-    if (decision == 'TIDAK_DIGANTI') {
-      await _autoGenerateAllLabels();
-    }
+    // Generate label sengaja BUKAN bagian dari aksi decide — retur:decide
+    // (Sales) cuma untuk menentukan keputusan. Generate label adalah aksi
+    // terpisah, tombolnya sendiri, khusus retur:update (Admin) — lihat
+    // _generateLabel(), dipanggil dari tombol "Generate Label" per item.
   }
 
-  // ── Generate label (TIDAK_DIGANTI) ──────────────────────────────────
-
-  /// Dipanggil otomatis begitu keputusan "Tidak Diganti" ditetapkan —
-  /// men-generate label untuk semua item yang belum punya label sekaligus,
-  /// jadi PIC tidak perlu klik "Generate Label" satu-satu lagi. Item BAGUS
-  /// langsung digenerate; item REJECT tetap perlu isi berat + jenis reject
-  /// lewat dialog (diminta berurutan, satu per satu). Tombol "Generate
-  /// Label" per item tetap ada sebagai fallback kalau ada yang gagal/batal
-  /// di sini (generate-label di backend idempotent, aman dipanggil ulang).
-  Future<void> _autoGenerateAllLabels() async {
-    final pending = _vm.items.where((it) => !it.hasGeneratedLabel).toList();
-    for (final item in pending) {
-      if (!mounted) return;
-      await _generateLabel(item);
-    }
-  }
+  // ── Generate label (aksi manual terpisah, khusus Admin/retur:update) ──
 
   Future<void> _generateLabel(ReturV3Item item) async {
     double? berat;
@@ -399,12 +389,31 @@ class _ReturV3DetailScreenState extends State<ReturV3DetailScreen> {
               vm.header?.isTidakDiganti == true && vm.outputs.isNotEmpty;
           final isDiganti = vm.header?.isDiganti == true;
           final alreadyFlagged = vm.header?.flagKirim == true;
+          // Langkah 1 (generate label + label-nya sudah dicetak minimal 1x,
+          // lihat ReturV3DetailViewModel.step1Complete) harus selesai dulu
+          // sebelum langkah 2 (scan turnover) bisa diakses — sinkron dengan
+          // section-nya yang sekarang beneran dikunci
+          // (_LockedStepPlaceholder), bukan cuma FAB-nya saja yang tampil
+          // duluan padahal section-nya masih locked.
           // Selama status DIGANTI: FAB scan tampil sampai semua item
           // terpenuhi, lalu otomatis berganti jadi FAB "Flag Kirim" (kalau
           // sudah pernah di-flag, tidak ada FAB lagi — sudah selesai).
           final showFlagKirimFab =
-              isDiganti && !alreadyFlagged && vm.canFlagKirim && canFlag;
-          final showScanFab = isDiganti && !alreadyFlagged && !vm.canFlagKirim;
+              isDiganti &&
+              vm.step1Complete &&
+              !alreadyFlagged &&
+              vm.canFlagKirim &&
+              canFlag;
+          // Scan turnover juga wewenang Admin (retur:update) — sebelumnya
+          // FAB ini tidak digate sama sekali, cuma "aman" karena endpoint
+          // backend-nya sendiri sudah cek permission; sekarang digate juga
+          // di UI supaya konsisten dengan FAB Flag Kirim.
+          final showScanFab =
+              isDiganti &&
+              vm.step1Complete &&
+              !alreadyFlagged &&
+              !vm.canFlagKirim &&
+              canFlag;
           return Scaffold(
             backgroundColor: _kSurface,
             floatingActionButton: showPrintFab
@@ -455,10 +464,17 @@ class _ReturV3DetailScreenState extends State<ReturV3DetailScreen> {
       return ListView(
         children: [
           const SizedBox(height: 80),
-          Icon(Icons.error_outline_rounded, size: 40, color: Colors.red.shade300),
+          Icon(
+            Icons.error_outline_rounded,
+            size: 40,
+            color: Colors.red.shade300,
+          ),
           const SizedBox(height: 12),
           Center(
-            child: Text(vm.error!, style: TextStyle(color: Colors.red.shade700)),
+            child: Text(
+              vm.error!,
+              style: TextStyle(color: Colors.red.shade700),
+            ),
           ),
         ],
       );
@@ -470,128 +486,65 @@ class _ReturV3DetailScreenState extends State<ReturV3DetailScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _HeaderCard(header: header),
-        const SizedBox(height: 16),
-        if (header.isPending) _PendingSection(vm: vm, screen: this),
-        if (header.isTidakDiganti) _TidakDigantiSection(vm: vm, screen: this),
-        if (header.isDiganti) _DigantiSection(vm: vm, screen: this),
-      ],
-    );
-  }
-}
-
-// ── Header summary card ─────────────────────────────────────────────────
-
-class _HeaderCard extends StatelessWidget {
-  final ReturV3Header header;
-
-  const _HeaderCard({required this.header});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _kBorder),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  header.noRetur,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: _kText,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '${header.tanggalText} · ${header.namaPembeli ?? '-'}',
-                  style: const TextStyle(fontSize: 13, color: _kMuted),
-                ),
-                if (header.keterangan != null &&
-                    header.keterangan!.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    header.keterangan!,
-                    style: const TextStyle(fontSize: 12.5, color: _kMuted),
-                  ),
-                ],
-              ],
+        // Cukup judul simpel penanda "ini section detail" — info lengkap
+        // (no.retur/tanggal/pembeli/status) sudah jelas dari kartu yang
+        // dipilih di panel kiri, tidak perlu diulang jadi card besar lagi.
+        const Padding(
+          padding: EdgeInsets.only(bottom: 12),
+          child: Text(
+            'Detail Retur',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: _kText,
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              _StatusBadge(status: header.statusRetur),
-              if (header.flagKirim) ...[
-                const SizedBox(height: 6),
-                Row(
-                  children: const [
-                    Icon(Icons.local_shipping_rounded, size: 14, color: _kSuccess),
-                    SizedBox(width: 4),
-                    Text(
-                      'Sudah dikirim',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: _kSuccess,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  final String status;
-
-  const _StatusBadge({required this.status});
-
-  @override
-  Widget build(BuildContext context) {
-    MaterialColor color;
-    String label;
-    switch (status.toUpperCase()) {
-      case 'DIGANTI':
-        color = Colors.blue;
-        label = 'Diganti';
-        break;
-      case 'TIDAK_DIGANTI':
-        color = Colors.orange;
-        label = 'Tidak Diganti';
-        break;
-      default:
-        color = Colors.grey;
-        label = 'Pending';
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          color: color.shade700,
         ),
-      ),
+        if (header.isPending) _PendingSection(vm: vm, screen: this),
+        // TIDAK_DIGANTI: cuma 1 langkah (generate label), tidak perlu badge
+        // nomor. DIGANTI: 2 langkah berurutan — generate label per item
+        // dulu (barang yang kembali tetap harus diklasifikasi jadi stok
+        // nyata), baru turnover (scan pengganti) — makanya reuse section
+        // yang sama dengan TIDAK_DIGANTI, diberi label "Langkah 1".
+        if (header.isTidakDiganti) _TidakDigantiSection(vm: vm, screen: this),
+        if (header.isDiganti) ...[
+          _TidakDigantiSection(vm: vm, screen: this, stepNumber: 1),
+          const SizedBox(height: 16),
+          // Step-by-step: langkah 2 & 3 dikunci (tampil placeholder abu-abu,
+          // bukan isinya) sampai langkah sebelumnya benar-benar selesai —
+          // bukan cuma nomor urut kosmetik, tapi alur yang beneran gated.
+          // Langkah 1 baru dianggap selesai kalau semua label sudah
+          // digenerate DAN sudah dicetak minimal 1x (vm.step1Complete),
+          // bukan cuma digenerate saja.
+          if (vm.step1Complete) ...[
+            _DigantiSection(vm: vm, screen: this, stepNumber: 2),
+            const SizedBox(height: 16),
+            if (vm.allItemsFulfilled)
+              _KirimSection(vm: vm, stepNumber: 3)
+            else
+              const _LockedStepPlaceholder(
+                stepNumber: 3,
+                title: 'Pengiriman',
+                message:
+                    'Selesaikan penggantian item di langkah 2 dulu untuk lanjut ke langkah ini.',
+              ),
+          ] else ...[
+            const _LockedStepPlaceholder(
+              stepNumber: 2,
+              title: 'Penggantian Item',
+              message:
+                  'Selesaikan generate & cetak label di langkah 1 dulu untuk lanjut ke langkah ini.',
+            ),
+            const SizedBox(height: 16),
+            const _LockedStepPlaceholder(
+              stepNumber: 3,
+              title: 'Pengiriman',
+              message:
+                  'Selesaikan generate & cetak label di langkah 1, lalu penggantian item di langkah 2.',
+            ),
+          ],
+        ],
+      ],
     );
   }
 }
@@ -606,9 +559,9 @@ class _PendingSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final canDecide = context.watch<PermissionViewModel>().can(
-      'retur:update',
-    );
+    // Keputusan diganti/tidak-diganti adalah wewenang Sales (retur:decide),
+    // terpisah dari retur:update yang dipegang Admin (create/edit/scan/kirim).
+    final canDecide = context.watch<PermissionViewModel>().can('retur:decide');
 
     return Container(
       decoration: BoxDecoration(
@@ -648,42 +601,94 @@ class _PendingSection extends StatelessWidget {
               physics: const NeverScrollableScrollPhysics(),
               padding: EdgeInsets.zero,
               itemCount: vm.items.length,
-              separatorBuilder: (_, __) => const Divider(height: 1, color: _kBorder),
+              separatorBuilder: (_, __) =>
+                  const Divider(height: 1, color: _kBorder),
               itemBuilder: (context, i) => _PendingItemRow(item: vm.items[i]),
             ),
-          if (vm.items.isNotEmpty && canDecide) ...[
+          if (vm.items.isNotEmpty) ...[
             const Divider(height: 1, color: _kBorder),
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: vm.isDeciding
-                          ? null
-                          : () => screen._decide('TIDAK_DIGANTI'),
-                      icon: const Icon(Icons.block, size: 16),
-                      label: const Text('Tidak Diganti'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.orange.shade800,
-                        side: BorderSide(color: Colors.orange.shade300),
+            if (canDecide)
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: vm.isDeciding
+                            ? null
+                            : () => screen._decide('TIDAK_DIGANTI'),
+                        icon: const Icon(Icons.block, size: 16),
+                        label: const Text('Tidak Diganti'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.orange.shade800,
+                          side: BorderSide(color: Colors.orange.shade300),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed:
-                          vm.isDeciding ? null : () => screen._decide('DIGANTI'),
-                      icon: const Icon(Icons.autorenew, size: 16),
-                      label: const Text('Diganti'),
-                      style: FilledButton.styleFrom(backgroundColor: _kPrimary),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: vm.isDeciding
+                            ? null
+                            : () => screen._decide('DIGANTI'),
+                        icon: const Icon(Icons.autorenew, size: 16),
+                        label: const Text('Diganti'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _kPrimary,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+              )
+            else
+              // Tidak punya retur:decide (bukan Sales) — jangan tampil
+              // kosong begitu saja, tunjukkan bahwa ini memang sedang
+              // menunggu keputusan pihak lain, bukan macet/error.
+              const Padding(
+                padding: EdgeInsets.all(14),
+                child: _AwaitingApprovalBanner(),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Banner "menunggu persetujuan" — tampil di section PENDING untuk user
+/// yang tidak punya `retur:decide` (mis. Admin), supaya jelas kalau retur
+/// ini memang sedang menunggu keputusan Sales, bukan layar yang macet.
+class _AwaitingApprovalBanner extends StatelessWidget {
+  const _AwaitingApprovalBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.orange.shade200),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.hourglass_top_rounded,
+            size: 18,
+            color: Colors.orange.shade700,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Menunggu persetujuan — keputusan Diganti / Tidak Diganti.',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: Colors.orange.shade800,
               ),
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -736,11 +741,13 @@ class _PendingItemRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
-              item.kategoriInput,
+              ReturV3KategoriInput.displayLabel(item.kategoriInput),
               style: TextStyle(
                 fontSize: 10.5,
                 fontWeight: FontWeight.w700,
-                color: item.isReject ? Colors.red.shade700 : Colors.green.shade700,
+                color: item.isReject
+                    ? Colors.red.shade700
+                    : Colors.green.shade700,
               ),
             ),
           ),
@@ -796,11 +803,13 @@ class _ItemTile extends StatelessWidget {
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
-              item.kategoriInput,
+              ReturV3KategoriInput.displayLabel(item.kategoriInput),
               style: TextStyle(
                 fontSize: 10.5,
                 fontWeight: FontWeight.w700,
-                color: item.isReject ? Colors.red.shade700 : Colors.green.shade700,
+                color: item.isReject
+                    ? Colors.red.shade700
+                    : Colors.green.shade700,
               ),
             ),
           ),
@@ -813,14 +822,36 @@ class _ItemTile extends StatelessWidget {
 
 // ── TIDAK_DIGANTI section ───────────────────────────────────────────────
 
-class _TidakDigantiSection extends StatelessWidget {
+class _TidakDigantiSection extends StatefulWidget {
   final ReturV3DetailViewModel vm;
   final _ReturV3DetailScreenState screen;
+  final int? stepNumber;
 
-  const _TidakDigantiSection({required this.vm, required this.screen});
+  const _TidakDigantiSection({
+    required this.vm,
+    required this.screen,
+    this.stepNumber,
+  });
+
+  @override
+  State<_TidakDigantiSection> createState() => _TidakDigantiSectionState();
+}
+
+class _TidakDigantiSectionState extends State<_TidakDigantiSection> {
+  // null = ikut vm.step1Complete otomatis (collapse begitu semua item
+  // selesai digenerate+dicetak); begitu user tap header sekali, pilihan
+  // manual mereka menang sampai layar ini dibuang (ganti retur lain).
+  bool? _expandedOverride;
+
+  bool get _expanded => _expandedOverride ?? !widget.vm.step1Complete;
+
+  void _toggle() => setState(() => _expandedOverride = !_expanded);
 
   @override
   Widget build(BuildContext context) {
+    final vm = widget.vm;
+    final screen = widget.screen;
+    final complete = vm.step1Complete;
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -831,90 +862,304 @@ class _TidakDigantiSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(14, 12, 14, 12),
-            child: Text(
-              'Generate Label per Item',
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w700,
-                color: _kText,
+          InkWell(
+            onTap: _toggle,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+              child: Row(
+                children: [
+                  if (widget.stepNumber != null) ...[
+                    _StepBadge(number: widget.stepNumber!, complete: complete),
+                    const SizedBox(width: 8),
+                  ],
+                  const Expanded(
+                    child: Text(
+                      'Generate Label',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: _kText,
+                      ),
+                    ),
+                  ),
+                  if (vm.outputs.isNotEmpty)
+                    IconButton(
+                      onPressed: screen._openPrintDialog,
+                      tooltip: 'Cetak label',
+                      icon: const Icon(
+                        Icons.print_rounded,
+                        size: 19,
+                        color: _kPrimary,
+                      ),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  Icon(
+                    _expanded
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
+                    size: 20,
+                    color: Colors.grey.shade400,
+                  ),
+                ],
               ),
             ),
           ),
-          const Divider(height: 1, color: _kBorder),
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            padding: EdgeInsets.zero,
-            itemCount: vm.items.length,
-            separatorBuilder: (_, __) => const Divider(height: 1, color: _kBorder),
-            itemBuilder: (context, i) {
-              final item = vm.items[i];
-              final generating = vm.generatingItemIds.contains(item.idItem);
-              return _ItemTile(
-                item: item,
-                trailing: item.hasGeneratedLabel
-                    ? Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        margin: const EdgeInsets.only(left: 8),
-                        decoration: BoxDecoration(
-                          color: _kSuccess.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          item.generatedLabelCode!,
-                          style: const TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w700,
-                            color: _kSuccess,
-                          ),
-                        ),
-                      )
-                    : Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: SizedBox(
-                          height: 32,
-                          child: FilledButton(
-                            onPressed: generating
-                                ? null
-                                : () => screen._generateLabel(item),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: _kPrimary,
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              textStyle: const TextStyle(fontSize: 11.5),
-                            ),
-                            child: generating
-                                ? const SizedBox(
-                                    width: 14,
-                                    height: 14,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Text('Generate Label'),
-                          ),
-                        ),
-                      ),
-              );
-            },
-          ),
-          if (vm.outputs.isNotEmpty) ...[
+          if (_expanded) ...[
             const Divider(height: 1, color: _kBorder),
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Text(
-                '${vm.outputs.length} label sudah dibuat · '
-                '${vm.outputs.where((o) => o.hasBeenPrinted).length} dicetak',
-                style: const TextStyle(fontSize: 12, color: _kMuted),
-              ),
+            Builder(
+              builder: (context) {
+                // Generate label khusus Admin (retur:update) — user lain
+                // (mis. Sales yang baru saja decide) cuma lihat status
+                // "Menunggu", tidak ada tombol yang bisa mereka pencet.
+                final canGenerate = context.watch<PermissionViewModel>().can(
+                  'retur:update',
+                );
+                return ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: EdgeInsets.zero,
+                  itemCount: vm.items.length,
+                  separatorBuilder: (_, __) =>
+                      const Divider(height: 1, color: _kBorder),
+                  itemBuilder: (context, i) {
+                    final item = vm.items[i];
+                    final generating = vm.generatingItemIds.contains(
+                      item.idItem,
+                    );
+                    final output = item.hasGeneratedLabel
+                        ? vm.outputs.cast<ReturV3Output?>().firstWhere(
+                            (o) => o?.labelCode == item.generatedLabelCode,
+                            orElse: () => null,
+                          )
+                        : null;
+                    return _ItemTile(
+                      item: item,
+                      trailing: item.hasGeneratedLabel
+                          ? Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  margin: const EdgeInsets.only(left: 8),
+                                  decoration: BoxDecoration(
+                                    color: _kSuccess.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    item.generatedLabelCode!,
+                                    style: const TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: _kSuccess,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                _PrintCountBadge(
+                                  count: output?.printCount ?? 0,
+                                ),
+                              ],
+                            )
+                          : Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: !canGenerate
+                                  ? Text(
+                                      'Menunggu',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontStyle: FontStyle.italic,
+                                        color: Colors.grey.shade400,
+                                      ),
+                                    )
+                                  : SizedBox(
+                                      height: 32,
+                                      child: FilledButton(
+                                        onPressed: generating
+                                            ? null
+                                            : () => screen._generateLabel(item),
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: _kPrimary,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                          ),
+                                          textStyle: const TextStyle(
+                                            fontSize: 11.5,
+                                          ),
+                                        ),
+                                        child: generating
+                                            ? const SizedBox(
+                                                width: 14,
+                                                height: 14,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      color: Colors.white,
+                                                    ),
+                                              )
+                                            : const Text('Generate Label'),
+                                      ),
+                                    ),
+                            ),
+                    );
+                  },
+                );
+              },
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Badge kecil ikon printer + berapa kali label item ini sudah dicetak —
+/// dulunya cuma total ringkasan di bawah section, sekarang per-item.
+class _PrintCountBadge extends StatelessWidget {
+  final int count;
+
+  const _PrintCountBadge({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final printed = count > 0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: printed
+            ? _kPrimary.withValues(alpha: 0.1)
+            : Colors.grey.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.print_rounded,
+            size: 12,
+            color: printed ? _kPrimary : Colors.grey.shade400,
+          ),
+          const SizedBox(width: 3),
+          Text(
+            '${count}x',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: printed ? _kPrimary : Colors.grey.shade400,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Card placeholder untuk langkah DIGANTI yang belum bisa diakses karena
+/// langkah sebelumnya belum selesai — badge nomornya abu-abu (bukan biru
+/// seperti langkah aktif) + ikon gembok, supaya jelas ini bukan section
+/// kosong biasa tapi memang "terkunci" sampai gilirannya.
+class _LockedStepPlaceholder extends StatelessWidget {
+  final int stepNumber;
+  final String title;
+  final String message;
+
+  const _LockedStepPlaceholder({
+    required this.stepNumber,
+    required this.title,
+    required this.message,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _kBorder),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          Container(
+            width: 22,
+            height: 22,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              '$stepNumber',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Icon(
+            Icons.lock_outline_rounded,
+            size: 16,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  message,
+                  style: TextStyle(fontSize: 11.5, color: Colors.grey.shade500),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Badge bulat kecil bernomor — dipakai untuk menandai urutan langkah pada
+/// alur DIGANTI (1 = generate label, 2 = penggantian item, 3 = pengiriman).
+/// Tidak dipakai sama sekali pada TIDAK_DIGANTI karena cuma ada 1 langkah
+/// di sana. Warnanya berubah jadi hijau begitu langkah itu selesai — bukan
+/// ikon centang terpisah, angkanya sendiri yang jadi penanda status.
+class _StepBadge extends StatelessWidget {
+  final int number;
+  final bool complete;
+
+  const _StepBadge({required this.number, this.complete = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 22,
+      height: 22,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: complete ? _kSuccess : _kPrimary,
+        shape: BoxShape.circle,
+      ),
+      child: Text(
+        '$number',
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          color: Colors.white,
+        ),
       ),
     );
   }
@@ -925,8 +1170,13 @@ class _TidakDigantiSection extends StatelessWidget {
 class _DigantiSection extends StatelessWidget {
   final ReturV3DetailViewModel vm;
   final _ReturV3DetailScreenState screen;
+  final int? stepNumber;
 
-  const _DigantiSection({required this.vm, required this.screen});
+  const _DigantiSection({
+    required this.vm,
+    required this.screen,
+    this.stepNumber,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -942,15 +1192,26 @@ class _DigantiSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(14, 12, 14, 12),
-            child: Text(
-              'Progress Turnover per Item',
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w700,
-                color: _kText,
-              ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            child: Row(
+              children: [
+                if (stepNumber != null) ...[
+                  _StepBadge(
+                    number: stepNumber!,
+                    complete: vm.allItemsFulfilled,
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                const Text(
+                  'Penggantian Item',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: _kText,
+                  ),
+                ),
+              ],
             ),
           ),
           const Divider(height: 1, color: _kBorder),
@@ -959,7 +1220,8 @@ class _DigantiSection extends StatelessWidget {
             physics: const NeverScrollableScrollPhysics(),
             padding: EdgeInsets.zero,
             itemCount: vm.items.length,
-            separatorBuilder: (_, __) => const Divider(height: 1, color: _kBorder),
+            separatorBuilder: (_, __) =>
+                const Divider(height: 1, color: _kBorder),
             itemBuilder: (context, i) {
               final item = vm.items[i];
               final t = vm.turnoverFor(item.idItem);
@@ -970,6 +1232,52 @@ class _DigantiSection extends StatelessWidget {
                 onUndoScan: (idTurnover) => screen._undoScan(item, idTurnover),
               );
             },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Langkah 3 alur DIGANTI — status/indikator flag kirim, terpisah dari
+/// card progress turnover supaya alurnya kelihatan jelas 3 langkah
+/// berurutan: generate label → progress turnover → dikirim.
+class _KirimSection extends StatelessWidget {
+  final ReturV3DetailViewModel vm;
+  final int stepNumber;
+
+  const _KirimSection({required this.vm, required this.stepNumber});
+
+  @override
+  Widget build(BuildContext context) {
+    final flagKirim = vm.header?.flagKirim == true;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _kBorder),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            child: Row(
+              children: [
+                _StepBadge(number: stepNumber, complete: flagKirim),
+                const SizedBox(width: 8),
+                const Text(
+                  'Pengiriman',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: _kText,
+                  ),
+                ),
+              ],
+            ),
           ),
           const Divider(height: 1, color: _kBorder),
           Padding(
@@ -1154,12 +1462,17 @@ class _PrintPickerDialogState extends State<_PrintPickerDialog> {
                   const Expanded(
                     child: Text(
                       'Pilih Label untuk Dicetak',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
                   TextButton(
                     onPressed: _toggleAll,
-                    child: Text(_allSelected ? 'Batalkan Semua' : 'Pilih Semua'),
+                    child: Text(
+                      _allSelected ? 'Batalkan Semua' : 'Pilih Semua',
+                    ),
                   ),
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),

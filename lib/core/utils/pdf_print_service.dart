@@ -9,9 +9,23 @@ import 'package:http/http.dart' as http;
 import 'dart:async';
 import '../../common/widgets/loading_dialog.dart';
 import '../../common/widgets/pdf_viewer_screen.dart';
+import '../services/dialog_service.dart';
 import '../services/token_storage.dart';
 import 'bt_print_service.dart';
 import 'device_printer_service.dart';
+
+/// Dilempar saat fetch satu PDF label gagal — bawa statusCode & url supaya
+/// pesan errornya bisa disesuaikan (mis. 403 = permission, 404 = tidak
+/// ditemukan) alih-alih pesan generik "HTTP xxx" yang membingungkan user.
+class _PdfFetchException implements Exception {
+  final int statusCode;
+  final Uri url;
+
+  const _PdfFetchException({required this.statusCode, required this.url});
+
+  @override
+  String toString() => 'Gagal ambil PDF label (HTTP $statusCode) — $url';
+}
 
 class PdfPrintService {
   /// URL default Crystal Report server. Ganti di sini jika server pindah.
@@ -292,11 +306,15 @@ class PdfPrintService {
               'Authorization': 'Bearer $token',
           };
           final futures = pdfUrls.map((url) async {
+            debugPrint('📥 Mengunduh PDF label: $url');
             final resp = await client
                 .get(url, headers: headers)
                 .timeout(const Duration(seconds: 30));
+            debugPrint(
+              '📥 Respons PDF $url → status ${resp.statusCode}, ${resp.bodyBytes.length} bytes',
+            );
             if (resp.statusCode != 200 || resp.bodyBytes.isEmpty) {
-              throw Exception('HTTP ${resp.statusCode} — ${url.path}');
+              throw _PdfFetchException(statusCode: resp.statusCode, url: url);
             }
             return resp.bodyBytes;
           });
@@ -304,7 +322,27 @@ class PdfPrintService {
           return _mergePdfs(allBytes);
         },
       );
-    } catch (_) {
+    } catch (e, st) {
+      // Sebelumnya error di sini ditelan diam-diam (cuma SnackBar dari
+      // _withLoading yang gampang tidak kelihatan kalau ScaffoldMessenger
+      // tidak ketemu dari context yang dipakai) — sekarang selalu di-log ke
+      // console DAN ditampilkan lewat ErrorStatusDialog level app
+      // (DialogService, dipasang di overlay root — tidak bergantung context
+      // lokal sama sekali) supaya tidak mungkin kelewat.
+      debugPrint('❌ previewMultipleFromUrls gagal: $e\n$st');
+      String title = 'Gagal Menyiapkan Label';
+      String message = '$e';
+      if (e is _PdfFetchException && e.statusCode == 403) {
+        title = 'Tidak Punya Izin';
+        message =
+            'Akun kamu tidak punya izin untuk mencetak label ini. '
+            'Minta admin tambahkan permission yang sesuai kategori label '
+            '(barang jadi/reject/furniture WIP), lalu login ulang.';
+      } else if (e is _PdfFetchException && e.statusCode == 404) {
+        title = 'Label Tidak Ditemukan';
+        message = 'Label ${e.url} tidak ditemukan di server.';
+      }
+      await DialogService.instance.showError(title: title, message: message);
       return;
     }
 

@@ -709,18 +709,25 @@ class _StatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     MaterialColor color;
     String label;
+    IconData icon;
     switch (status.toUpperCase()) {
       case 'DIGANTI':
         color = Colors.blue;
         label = 'Diganti';
+        // Ikon sama persis dengan tombol keputusan "Diganti" di layar
+        // detail, supaya user langsung asosiasikan badge ini dengan aksi
+        // yang menghasilkannya.
+        icon = Icons.autorenew_rounded;
         break;
       case 'TIDAK_DIGANTI':
         color = Colors.orange;
         label = 'Tidak Diganti';
+        icon = Icons.block_rounded;
         break;
       default:
-        color = Colors.grey;
+        color = Colors.amber;
         label = 'Pending';
+        icon = Icons.hourglass_top_rounded;
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -728,13 +735,20 @@ class _StatusChip extends StatelessWidget {
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: color.shade700,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: color.shade700),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: color.shade700,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -104,14 +104,9 @@ class _HomeSidebarState extends State<HomeSidebar> {
       icon: Icons.water_outlined,
       children: [
         _SubItem(
-          title: 'PBB Pakai',
+          title: 'Penerimaan Bahan Baku',
           icon: Icons.move_to_inbox_outlined,
-          route: '/shell/penerimaan-bahan-baku-pakai',
-        ),
-        _SubItem(
-          title: 'PBB Proses',
-          icon: Icons.move_to_inbox_outlined,
-          route: '/shell/penerimaan-bahan-baku-proses',
+          route: '/shell/penerimaan-bahan-baku',
         ),
         _SubItem(
           title: 'Proses Washing',
@@ -202,9 +197,24 @@ class _HomeSidebarState extends State<HomeSidebar> {
           route: '/shell/bj-jual',
         ),
         _SubItem(
+          title: 'Penjualan',
+          icon: Icons.point_of_sale_outlined,
+          route: '/shell/penjualan',
+        ),
+        _SubItem(
           title: 'Trade-In',
           icon: Icons.swap_horiz_outlined,
           route: '/shell/trade-in',
+        ),
+        _SubItem(
+          title: 'Good Transfer',
+          icon: Icons.local_shipping_outlined,
+          route: '/shell/good-transfer',
+        ),
+        _SubItem(
+          title: 'In Transit',
+          icon: Icons.move_to_inbox_outlined,
+          route: '/shell/in-transit',
         ),
       ],
     ),
@@ -255,18 +265,6 @@ class _HomeSidebarState extends State<HomeSidebar> {
       subtitle: 'Monitoring lokasi label',
       icon: Icons.map_outlined,
       route: '/shell/mapping',
-    ),
-    _MenuItem(
-      title: 'Good Transfer',
-      subtitle: 'Transfer label antar warehouse',
-      icon: Icons.local_shipping_outlined,
-      route: '/shell/good-transfer',
-    ),
-    _MenuItem(
-      title: 'In Transit',
-      subtitle: 'Validasi penerimaan transfer',
-      icon: Icons.move_to_inbox_outlined,
-      route: '/shell/in-transit',
     ),
   ];
 

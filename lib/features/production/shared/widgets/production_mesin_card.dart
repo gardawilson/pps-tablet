@@ -14,6 +14,7 @@ class MesinCardData {
 
   final String? shiftTimeText;
   final String? namaRegu;
+  final String? namaOperators;
   final String? outputJenisNama;
   final String? namaCetakan;
   final String? namaWarna;
@@ -26,6 +27,7 @@ class MesinCardData {
     this.machineStatus,
     this.shiftTimeText,
     this.namaRegu,
+    this.namaOperators,
     this.outputJenisNama,
     this.namaCetakan,
     this.namaWarna,
@@ -146,6 +148,14 @@ class ProductionMesinCard extends StatelessWidget {
                   ProductionSmallInfoRow(
                     icon: Icons.groups_outlined,
                     text: data.namaRegu!,
+                  ),
+                ],
+                if ((data.namaOperators ?? '').trim().isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  ProductionSmallInfoRow(
+                    icon: Icons.person_outline,
+                    text: data.namaOperators!.trim(),
+                    maxLines: 2,
                   ),
                 ],
                 if ((data.namaCetakan ?? '').trim().isNotEmpty) ...[

@@ -6,6 +6,8 @@
 // HourEnd, format yang sama dengan produksi (mis. WashingProduction) — yang
 // menghasilkan satu NoBahanBaku (label bahan baku) dengan satu atau lebih
 // pallet.
+import 'dart:convert';
+
 import 'package:intl/intl.dart';
 
 class PenerimaanBahanBaku {
@@ -13,6 +15,8 @@ class PenerimaanBahanBaku {
   final DateTime? tglPenerimaan;
   final int idTim;
   final String namaTim;
+  final List<int> idOperators;
+  final String? namaOperators;
   final int idSupplier;
   final String namaSupplier;
   final String? noPlat;
@@ -31,6 +35,8 @@ class PenerimaanBahanBaku {
     required this.tglPenerimaan,
     required this.idTim,
     required this.namaTim,
+    this.idOperators = const [],
+    this.namaOperators,
     required this.idSupplier,
     required this.namaSupplier,
     this.noPlat,
@@ -75,12 +81,27 @@ class PenerimaanBahanBaku {
     return null;
   }
 
+  static List<int> _asIntList(dynamic v) {
+    if (v == null) return const [];
+    final raw = v is String ? v : v.toString();
+    if (raw.trim().isEmpty || raw.trim() == '[]') return const [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        return decoded.map((e) => _asInt(e)).toList();
+      }
+    } catch (_) {}
+    return const [];
+  }
+
   factory PenerimaanBahanBaku.fromJson(Map<String, dynamic> j) {
     return PenerimaanBahanBaku(
       noPenerimaan: _asString(j['NoPenerimaan']),
       tglPenerimaan: _asDateTime(j['TglPenerimaan']),
       idTim: _asInt(j['IdTim']),
       namaTim: _asString(j['NamaTim']),
+      idOperators: _asIntList(j['IdOperators']),
+      namaOperators: j['NamaOperators']?.toString(),
       idSupplier: _asInt(j['IdSupplier']),
       namaSupplier: _asString(j['NamaSupplier']),
       noPlat: j['NoPlat']?.toString(),
@@ -115,6 +136,7 @@ class PenerimaanBahanBakuOutput {
   final int noPallet;
   final int noSak;
   final int? idJenisPlastik;
+  final String? namaJenisPlastik;
   final double berat;
 
   const PenerimaanBahanBakuOutput({
@@ -122,6 +144,7 @@ class PenerimaanBahanBakuOutput {
     required this.noPallet,
     required this.noSak,
     this.idJenisPlastik,
+    this.namaJenisPlastik,
     required this.berat,
   });
 
@@ -143,34 +166,80 @@ class PenerimaanBahanBakuOutput {
       noPallet: toInt(j['NoPallet']),
       noSak: toInt(j['NoSak']),
       idJenisPlastik: j['IdJenisPlastik'] != null ? toInt(j['IdJenisPlastik']) : null,
+      namaJenisPlastik: j['NamaJenisPlastik']?.toString(),
       berat: toDouble(j['Berat']),
     );
   }
 }
 
+/// Satu "batch" (NoBahanBaku) di bawah sebuah NoPenerimaan — satu batch =
+/// satu panggilan `addPallets()` = satu section (Bahan Baku Pakai ATAU
+/// Proses) dengan Supplier/No Plat sendiri. Satu NoPenerimaan bisa punya
+/// lebih dari satu batch (satu per section yang diisi).
+class PenerimaanBahanBakuBatch {
+  final String noBahanBaku;
+  final int idSupplier;
+  final String namaSupplier;
+  final String? noPlat;
+
+  const PenerimaanBahanBakuBatch({
+    required this.noBahanBaku,
+    required this.idSupplier,
+    required this.namaSupplier,
+    this.noPlat,
+  });
+
+  factory PenerimaanBahanBakuBatch.fromJson(Map<String, dynamic> j) {
+    int toInt(dynamic v) {
+      if (v == null) return 0;
+      if (v is num) return v.toInt();
+      return int.tryParse(v.toString()) ?? 0;
+    }
+
+    return PenerimaanBahanBakuBatch(
+      noBahanBaku: j['NoBahanBaku']?.toString() ?? '',
+      idSupplier: toInt(j['IdSupplier']),
+      namaSupplier: j['NamaSupplier']?.toString() ?? '',
+      noPlat: j['NoPlat']?.toString(),
+    );
+  }
+}
+
 /// Detail lengkap satu transaksi penerimaan (GET /:noPenerimaan) — header +
-/// seluruh output (pallet/sak) yang dihasilkan.
+/// batch (Supplier/No Plat per section) + seluruh output (pallet/sak) yang
+/// dihasilkan.
 class PenerimaanBahanBakuDetail {
   final PenerimaanBahanBaku header;
+  final List<PenerimaanBahanBakuBatch> batches;
   final List<PenerimaanBahanBakuOutput> outputs;
 
-  const PenerimaanBahanBakuDetail({required this.header, required this.outputs});
+  const PenerimaanBahanBakuDetail({
+    required this.header,
+    required this.batches,
+    required this.outputs,
+  });
 
   factory PenerimaanBahanBakuDetail.fromJson(Map<String, dynamic> j) {
+    final batchesRaw = (j['batches'] as List?) ?? [];
     final outputsRaw = (j['outputs'] as List?) ?? [];
     return PenerimaanBahanBakuDetail(
       header: PenerimaanBahanBaku.fromJson(j),
+      batches: batchesRaw
+          .map((e) => PenerimaanBahanBakuBatch.fromJson(e as Map<String, dynamic>))
+          .toList(),
       outputs: outputsRaw
           .map((e) => PenerimaanBahanBakuOutput.fromJson(e as Map<String, dynamic>))
           .toList(),
     );
   }
 
-  /// Group outputs by NoPallet untuk ditampilkan per pallet.
-  Map<int, List<PenerimaanBahanBakuOutput>> get outputsByPallet {
-    final map = <int, List<PenerimaanBahanBakuOutput>>{};
+  /// Group outputs by NoBahanBaku (batch), lalu by NoPallet di dalamnya —
+  /// dipakai untuk render 1 section per batch di layar detail.
+  Map<String, Map<int, List<PenerimaanBahanBakuOutput>>> get outputsByBatchAndPallet {
+    final map = <String, Map<int, List<PenerimaanBahanBakuOutput>>>{};
     for (final o in outputs) {
-      map.putIfAbsent(o.noPallet, () => []).add(o);
+      final byPallet = map.putIfAbsent(o.noBahanBaku, () => {});
+      byPallet.putIfAbsent(o.noPallet, () => []).add(o);
     }
     return map;
   }

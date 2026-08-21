@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../common/widgets/scan_label_dialog.dart';
+import '../../../common/widgets/success_status_dialog.dart' show StatusAction;
+import '../../../common/widgets/warning_status_dialog.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/endpoints.dart';
 import '../../../core/network/label_print_lock_api.dart';
@@ -19,6 +21,7 @@ import '../model/retur_v3_turnover.dart';
 import '../repository/retur_v3_repository.dart';
 import '../view_model/retur_v3_detail_view_model.dart';
 import '../widgets/retur_v3_reject_generate_dialog.dart';
+import '../widgets/retur_v3_target_input_dialog.dart';
 
 const _kPrimary = Color(0xFF1E6FD9);
 const _kSurface = Color(0xFFF3F5F8);
@@ -87,10 +90,18 @@ class ReturV3DetailScreen extends StatefulWidget {
   /// "perpindahan halaman" yang perlu direfleksikan di breadcrumb).
   final bool embedded;
 
+  /// Dipanggil setelah aksi yang mengubah data yang juga tampil di badge
+  /// kartu daftar master (keputusan diganti/tidak-diganti, flag kirim) —
+  /// supaya panel kiri (`ReturV3ListScreen`) bisa refresh badge-nya tanpa
+  /// user harus reload manual, karena detail & list di sini pakai view
+  /// model terpisah (lihat layout master-detail di `retur_v3_list_screen`).
+  final VoidCallback? onHeaderChanged;
+
   const ReturV3DetailScreen({
     super.key,
     required this.noRetur,
     this.embedded = false,
+    this.onHeaderChanged,
   });
 
   @override
@@ -184,10 +195,16 @@ class _ReturV3DetailScreenState extends State<ReturV3DetailScreen> {
     }
 
     final printedCodes = <String>{};
+    // Ditunggu (bukan .ignore()) sebelum refreshOutputs() di bawah — kalau
+    // fire-and-forget, refreshOutputs() bisa balapan lebih dulu dan narik
+    // data lama dari server (HasBeenPrinted/printCount belum ke-update),
+    // makanya section 2 (Penggantian Item) kelihatan masih terkunci sampai
+    // layar di-refresh manual.
+    final pendingMarks = <Future<void>>[];
     final callbacks = entries.map((entry) {
       return () {
             printedCodes.add(entry.labelCode);
-            () async {
+            final markFuture = () async {
               var needsIncrement = false;
               var needsRelease = false;
               try {
@@ -209,7 +226,8 @@ class _ReturV3DetailScreenState extends State<ReturV3DetailScreen> {
                   needsReleaseLock: needsRelease,
                 );
               }
-            }().ignore();
+            }();
+            pendingMarks.add(markFuture);
           }
           as VoidCallback;
     }).toList();
@@ -238,6 +256,10 @@ class _ReturV3DetailScreenState extends State<ReturV3DetailScreen> {
           }().ignore();
         }
       }
+      // Setiap future di pendingMarks sudah punya try/catch sendiri (jatuh
+      // ke sync queue kalau gagal), jadi Future.wait ini tidak akan
+      // melempar — aman ditunggu sebelum refresh.
+      await Future.wait(pendingMarks);
       if (mounted) _vm.refreshOutputs();
     }
   }
@@ -280,6 +302,7 @@ class _ReturV3DetailScreenState extends State<ReturV3DetailScreen> {
     // (Sales) cuma untuk menentukan keputusan. Generate label adalah aksi
     // terpisah, tombolnya sendiri, khusus retur:update (Admin) — lihat
     // _generateLabel(), dipanggil dari tombol "Generate Label" per item.
+    widget.onHeaderChanged?.call();
   }
 
   // ── Generate label (aksi manual terpisah, khusus Admin/retur:update) ──
@@ -331,8 +354,8 @@ class _ReturV3DetailScreenState extends State<ReturV3DetailScreen> {
     );
   }
 
-  Future<void> _undoScan(ReturV3Item item, int idTurnover) async {
-    final ok = await _vm.undoScan(item.idItem, idTurnover);
+  Future<void> _undoScan(int idTurnover) async {
+    final ok = await _vm.undoScan(idTurnover);
     if (!mounted || ok) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -342,38 +365,77 @@ class _ReturV3DetailScreenState extends State<ReturV3DetailScreen> {
     );
   }
 
-  Future<void> _flagKirim() async {
+  // ── Target pengganti (DIGANTI, sebelum scan) ────────────────────────
+
+  Future<void> _addTurnoverTarget(ReturV3Item item) async {
+    final result = await showDialog<ReturV3TargetInput>(
+      context: context,
+      builder: (_) => const ReturV3TargetInputDialog(),
+    );
+    if (result == null) return;
+    final ok = await _vm.addTurnoverTarget(
+      item.idItem,
+      kodeKategori: result.kodeKategori,
+      idJenis: result.idJenis,
+      pcs: result.pcs,
+    );
+    if (!mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_vm.targetError ?? 'Gagal menambah target'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _removeTurnoverTarget(int idTarget) async {
+    final ok = await _vm.removeTurnoverTarget(idTarget);
+    if (!mounted || ok) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(_vm.targetError ?? 'Gagal menghapus target'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  Future<void> _complete() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Flag Kirim'),
-        content: const Text(
-          'Tandai retur ini sudah dikirim? Aksi ini tidak dapat dibatalkan.',
-        ),
+      barrierDismissible: false,
+      builder: (dialogContext) => WarningStatusDialog(
+        title: 'Kirim Retur Ini?',
+        message:
+            'Aksi ini akan otomatis men-generate data surat jalan ke ERP '
+            'Ascend. Aksi ini tidak dapat dibatalkan.',
         actions: [
-          TextButton(
+          StatusAction(
+            label: 'Batal',
+            isPrimary: false,
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Batal'),
           ),
-          FilledButton(
+          StatusAction(
+            label: 'Ya, Kirim',
             onPressed: () => Navigator.pop(dialogContext, true),
-            style: FilledButton.styleFrom(backgroundColor: _kSuccess),
-            child: const Text('Ya, Kirim'),
           ),
         ],
       ),
     );
     if (confirmed != true) return;
-    final ok = await _vm.flagKirim();
+    final ok = await _vm.markComplete();
     if (!mounted) return;
     if (!ok) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_vm.flagError ?? 'Gagal flag kirim'),
+          content: Text(_vm.completeError ?? 'Gagal mengirim retur'),
           backgroundColor: Colors.red,
         ),
       );
+      return;
     }
+    widget.onHeaderChanged?.call();
   }
 
   @override
@@ -388,7 +450,7 @@ class _ReturV3DetailScreenState extends State<ReturV3DetailScreen> {
           final showPrintFab =
               vm.header?.isTidakDiganti == true && vm.outputs.isNotEmpty;
           final isDiganti = vm.header?.isDiganti == true;
-          final alreadyFlagged = vm.header?.flagKirim == true;
+          final alreadyComplete = vm.header?.isComplete == true;
           // Langkah 1 (generate label + label-nya sudah dicetak minimal 1x,
           // lihat ReturV3DetailViewModel.step1Complete) harus selesai dulu
           // sebelum langkah 2 (scan turnover) bisa diakses — sinkron dengan
@@ -396,23 +458,28 @@ class _ReturV3DetailScreenState extends State<ReturV3DetailScreen> {
           // (_LockedStepPlaceholder), bukan cuma FAB-nya saja yang tampil
           // duluan padahal section-nya masih locked.
           // Selama status DIGANTI: FAB scan tampil sampai semua item
-          // terpenuhi, lalu otomatis berganti jadi FAB "Flag Kirim" (kalau
-          // sudah pernah di-flag, tidak ada FAB lagi — sudah selesai).
-          final showFlagKirimFab =
+          // terpenuhi, lalu otomatis berganti jadi FAB "Kirim" (kalau
+          // retur sudah ditandai complete, tidak ada FAB lagi — sudah
+          // selesai).
+          final showCompleteFab =
               isDiganti &&
               vm.step1Complete &&
-              !alreadyFlagged &&
-              vm.canFlagKirim &&
+              !alreadyComplete &&
+              vm.canComplete &&
               canFlag;
           // Scan turnover juga wewenang Admin (retur:update) — sebelumnya
           // FAB ini tidak digate sama sekali, cuma "aman" karena endpoint
           // backend-nya sendiri sudah cek permission; sekarang digate juga
-          // di UI supaya konsisten dengan FAB Flag Kirim.
+          // di UI supaya konsisten dengan FAB Kirim. Tambahan:
+          // vm.allTargetsDefined — setiap item harus sudah ditentukan target
+          // penggantinya dulu sebelum scan bisa mulai (target bukan lagi
+          // otomatis diturunkan dari item aslinya).
           final showScanFab =
               isDiganti &&
               vm.step1Complete &&
-              !alreadyFlagged &&
-              !vm.canFlagKirim &&
+              vm.allTargetsDefined &&
+              !alreadyComplete &&
+              !vm.canComplete &&
               canFlag;
           return Scaffold(
             backgroundColor: _kSurface,
@@ -423,12 +490,12 @@ class _ReturV3DetailScreenState extends State<ReturV3DetailScreen> {
                     foregroundColor: Colors.white,
                     child: const Icon(Icons.print_rounded),
                   )
-                : showFlagKirimFab
+                : showCompleteFab
                 ? FloatingActionButton.extended(
-                    onPressed: vm.isFlagging ? null : _flagKirim,
+                    onPressed: vm.isCompleting ? null : _complete,
                     backgroundColor: _kSuccess,
                     foregroundColor: Colors.white,
-                    icon: vm.isFlagging
+                    icon: vm.isCompleting
                         ? const SizedBox(
                             width: 16,
                             height: 16,
@@ -438,7 +505,7 @@ class _ReturV3DetailScreenState extends State<ReturV3DetailScreen> {
                             ),
                           )
                         : const Icon(Icons.local_shipping_rounded),
-                    label: const Text('Flag Kirim'),
+                    label: const Text('Kirim'),
                   )
                 : showScanFab
                 ? FloatingActionButton.extended(
@@ -603,7 +670,8 @@ class _PendingSection extends StatelessWidget {
               itemCount: vm.items.length,
               separatorBuilder: (_, __) =>
                   const Divider(height: 1, color: _kBorder),
-              itemBuilder: (context, i) => _PendingItemRow(item: vm.items[i]),
+              itemBuilder: (context, i) =>
+                  _PendingItemRow(number: i + 1, item: vm.items[i]),
             ),
           if (vm.items.isNotEmpty) ...[
             const Divider(height: 1, color: _kBorder),
@@ -701,16 +769,29 @@ class _AwaitingApprovalBanner extends StatelessWidget {
 /// hanya bisa diisi lewat form pembuatan retur — section ini read-only,
 /// tidak ada tombol tambah/hapus.
 class _PendingItemRow extends StatelessWidget {
+  final int number;
   final ReturV3Item item;
 
-  const _PendingItemRow({required this.item});
+  const _PendingItemRow({required this.number, required this.item});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          SizedBox(
+            width: 20,
+            child: Text(
+              '$number.',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: _kMuted,
+              ),
+            ),
+          ),
           Expanded(
             child: Text(
               item.namaJenis ?? 'Jenis #${item.idJenis}',
@@ -719,7 +800,6 @@ class _PendingItemRow extends StatelessWidget {
                 fontWeight: FontWeight.w600,
                 color: _kText,
               ),
-              overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(width: 10),
@@ -762,17 +842,30 @@ class _PendingItemRow extends StatelessWidget {
 /// tanpa badge kategori BJ/FWIP), ditambah slot `trailing` untuk tombol
 /// generate label / chip kode label yang sudah dibuat.
 class _ItemTile extends StatelessWidget {
+  final int number;
   final ReturV3Item item;
   final Widget? trailing;
 
-  const _ItemTile({required this.item, this.trailing});
+  const _ItemTile({required this.number, required this.item, this.trailing});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          SizedBox(
+            width: 20,
+            child: Text(
+              '$number.',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: _kMuted,
+              ),
+            ),
+          ),
           Expanded(
             child: Text(
               item.namaJenis ?? 'Jenis #${item.idJenis}',
@@ -781,7 +874,6 @@ class _ItemTile extends StatelessWidget {
                 fontWeight: FontWeight.w600,
                 color: _kText,
               ),
-              overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(width: 10),
@@ -933,6 +1025,7 @@ class _TidakDigantiSectionState extends State<_TidakDigantiSection> {
                           )
                         : null;
                     return _ItemTile(
+                      number: i + 1,
                       item: item,
                       trailing: item.hasGeneratedLabel
                           ? Row(
@@ -1180,7 +1273,12 @@ class _DigantiSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final flagKirim = vm.header?.flagKirim == true;
+    final isComplete = vm.header?.isComplete == true;
+    // Tambah target pengganti (item + pcs) adalah bagian dari keputusan
+    // penggantian, jadi wewenangnya sama dengan retur:decide (Sales) —
+    // bukan retur:update (Admin). User tanpa retur:decide cuma bisa
+    // melihat daftar target, tidak bisa menambah.
+    final canDecide = context.watch<PermissionViewModel>().can('retur:decide');
 
     return Container(
       decoration: BoxDecoration(
@@ -1215,21 +1313,41 @@ class _DigantiSection extends StatelessWidget {
             ),
           ),
           const Divider(height: 1, color: _kBorder),
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            padding: EdgeInsets.zero,
-            itemCount: vm.items.length,
-            separatorBuilder: (_, __) =>
-                const Divider(height: 1, color: _kBorder),
-            itemBuilder: (context, i) {
-              final item = vm.items[i];
-              final t = vm.turnoverFor(item.idItem);
-              return _TurnoverTile(
-                item: item,
-                turnover: t,
-                flagKirim: flagKirim,
-                onUndoScan: (idTurnover) => screen._undoScan(item, idTurnover),
+          Builder(
+            builder: (context) {
+              // Nomor urut jalan terus lintas item (1, 2, 3, ...) mengikuti
+              // urutan kartu target yang tampil, bukan index item retur —
+              // satu item bisa punya lebih dari satu target pengganti, jadi
+              // kalau dipatok ke index item, semua targetnya akan menampilkan
+              // nomor yang sama.
+              var nextNumber = 1;
+              final startNumbers = <int>[];
+              for (final item in vm.items) {
+                startNumbers.add(nextNumber);
+                nextNumber += vm.turnoverFor(item.idItem)?.targets.length ?? 0;
+              }
+
+              return ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: EdgeInsets.zero,
+                itemCount: vm.items.length,
+                separatorBuilder: (_, __) =>
+                    const Divider(height: 1, color: _kBorder),
+                itemBuilder: (context, i) {
+                  final item = vm.items[i];
+                  final t = vm.turnoverFor(item.idItem);
+                  return _TurnoverItemBlock(
+                    startNumber: startNumbers[i],
+                    item: item,
+                    turnover: t,
+                    isComplete: isComplete,
+                    canAddTarget: canDecide,
+                    onAddTarget: () => screen._addTurnoverTarget(item),
+                    onRemoveTarget: screen._removeTurnoverTarget,
+                    onUndoScan: screen._undoScan,
+                  );
+                },
               );
             },
           ),
@@ -1250,7 +1368,7 @@ class _KirimSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final flagKirim = vm.header?.flagKirim == true;
+    final isComplete = vm.header?.isComplete == true;
 
     return Container(
       decoration: BoxDecoration(
@@ -1266,7 +1384,7 @@ class _KirimSection extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
             child: Row(
               children: [
-                _StepBadge(number: stepNumber, complete: flagKirim),
+                _StepBadge(number: stepNumber, complete: isComplete),
                 const SizedBox(width: 8),
                 const Text(
                   'Pengiriman',
@@ -1285,26 +1403,26 @@ class _KirimSection extends StatelessWidget {
             child: Row(
               children: [
                 Icon(
-                  flagKirim
+                  isComplete
                       ? Icons.local_shipping_rounded
-                      : vm.canFlagKirim
+                      : vm.canComplete
                       ? Icons.check_circle_rounded
                       : Icons.qr_code_scanner_rounded,
                   size: 16,
-                  color: flagKirim || vm.canFlagKirim ? _kSuccess : _kMuted,
+                  color: isComplete || vm.canComplete ? _kSuccess : _kMuted,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    flagKirim
+                    isComplete
                         ? 'Sudah dikirim.'
-                        : vm.canFlagKirim
-                        ? 'Semua item terpenuhi — tekan tombol Flag Kirim di kanan bawah.'
+                        : vm.canComplete
+                        ? 'Semua item terpenuhi — tekan tombol Kirim di kanan bawah.'
                         : 'Scan label lewat tombol Scan di kanan bawah sampai semua item terpenuhi.',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: flagKirim || vm.canFlagKirim ? _kSuccess : _kMuted,
+                      color: isComplete || vm.canComplete ? _kSuccess : _kMuted,
                     ),
                   ),
                 ),
@@ -1317,28 +1435,115 @@ class _KirimSection extends StatelessWidget {
   }
 }
 
-class _TurnoverTile extends StatelessWidget {
+/// Blok per item retur: info barang yang KEMBALI (asal), lalu daftar target
+/// pengganti yang akan DIKIRIM (bisa lebih dari satu, kategori/jenis bebas
+/// beda dari asalnya) — masing-masing dengan progress scan-nya sendiri.
+class _TurnoverItemBlock extends StatelessWidget {
+  final int startNumber;
   final ReturV3Item item;
   final ReturV3Turnover? turnover;
-  final bool flagKirim;
+  final bool isComplete;
+  final bool canAddTarget;
+  final VoidCallback onAddTarget;
+  final ValueChanged<int> onRemoveTarget;
   final ValueChanged<int> onUndoScan;
 
-  const _TurnoverTile({
+  const _TurnoverItemBlock({
+    required this.startNumber,
     required this.item,
     required this.turnover,
-    required this.flagKirim,
+    required this.isComplete,
+    required this.canAddTarget,
+    required this.onAddTarget,
+    required this.onRemoveTarget,
     required this.onUndoScan,
   });
 
   @override
   Widget build(BuildContext context) {
-    final scanned = turnover?.scannedPcs ?? 0;
-    final target = turnover?.targetPcs ?? item.pcs;
-    final fulfilled = turnover?.isFulfilled ?? false;
-    final progress = target > 0 ? (scanned / target).clamp(0.0, 1.0) : 0.0;
+    final targets = turnover?.targets ?? const [];
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (!isComplete && canAddTarget)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton.icon(
+                  onPressed: onAddTarget,
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('Tambah', style: TextStyle(fontSize: 12)),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ],
+            ),
+          if (targets.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 4),
+              child: Text(
+                'Belum ada target pengganti',
+                style: TextStyle(fontSize: 12, color: _kMuted),
+              ),
+            )
+          else
+            ...targets.asMap().entries.map(
+              (entry) => Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: _TurnoverTargetTile(
+                  number: startNumber + entry.key,
+                  target: entry.value,
+                  isComplete: isComplete,
+                  canRemoveTarget: canAddTarget,
+                  onRemove: () => onRemoveTarget(entry.value.idTarget),
+                  onUndoScan: onUndoScan,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TurnoverTargetTile extends StatelessWidget {
+  final int number;
+  final ReturV3TurnoverTarget target;
+  final bool isComplete;
+  final bool canRemoveTarget;
+  final VoidCallback onRemove;
+  final ValueChanged<int> onUndoScan;
+
+  const _TurnoverTargetTile({
+    required this.number,
+    required this.target,
+    required this.isComplete,
+    required this.canRemoveTarget,
+    required this.onRemove,
+    required this.onUndoScan,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scanned = target.scannedPcs;
+    final targetPcs = target.targetPcs;
+    final fulfilled = target.isFulfilled;
+    final canRemove = !isComplete && target.scans.isEmpty && canRemoveTarget;
+    final progress = targetPcs > 0
+        ? (scanned / targetPcs).clamp(0.0, 1.0)
+        : 0.0;
+
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: _kSurface,
+        borderRadius: BorderRadius.circular(8),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1346,25 +1551,36 @@ class _TurnoverTile extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  item.namaJenis ?? 'Jenis #${item.idJenis}',
+                  '$number. ${target.namaJenis ?? 'Jenis #${target.idJenis}'}',
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w600,
                     color: _kText,
                   ),
                 ),
               ),
               Text(
-                '$scanned/$target pcs',
+                '$scanned/$targetPcs pcs',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11.5,
                   fontWeight: FontWeight.w700,
                   color: fulfilled ? _kSuccess : _kMuted,
                 ),
               ),
               if (fulfilled) ...[
                 const SizedBox(width: 6),
-                Icon(Icons.check_circle_rounded, size: 16, color: _kSuccess),
+                Icon(Icons.check_circle_rounded, size: 15, color: _kSuccess),
+              ],
+              if (canRemove) ...[
+                const SizedBox(width: 4),
+                InkWell(
+                  onTap: onRemove,
+                  borderRadius: BorderRadius.circular(12),
+                  child: const Padding(
+                    padding: EdgeInsets.all(2),
+                    child: Icon(Icons.close_rounded, size: 15, color: _kMuted),
+                  ),
+                ),
               ],
             ],
           ),
@@ -1378,19 +1594,19 @@ class _TurnoverTile extends StatelessWidget {
               color: fulfilled ? _kSuccess : _kPrimary,
             ),
           ),
-          if (turnover != null && turnover!.scans.isNotEmpty) ...[
+          if (target.scans.isNotEmpty) ...[
             const SizedBox(height: 8),
             Wrap(
               spacing: 6,
               runSpacing: 6,
-              children: turnover!.scans
+              children: target.scans
                   .map(
                     (s) => Chip(
                       label: Text(
                         '${s.labelCode} (${s.pcs})',
                         style: const TextStyle(fontSize: 10.5),
                       ),
-                      onDeleted: flagKirim
+                      onDeleted: isComplete
                           ? null
                           : () => onUndoScan(s.idTurnover),
                       deleteIconColor: Colors.red.shade400,

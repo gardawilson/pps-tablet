@@ -229,24 +229,61 @@ class ReturV3Repository {
         .toList();
   }
 
-  // ── Turnover / scan (DIGANTI) ───────────────────────────────────────
+  // ── Turnover targets (DIGANTI) ──────────────────────────────────────
 
-  Future<Map<String, dynamic>> scan(
+  /// Target pengganti (kategori/jenis/pcs) yang akan dikirim untuk sebuah
+  /// item retur — 1 item retur bisa punya beberapa target sekaligus.
+  Future<List<ReturV3TurnoverTarget>> addTurnoverTargets(
     String noRetur,
     int idItem,
-    String labelCode,
+    List<Map<String, dynamic>> targets,
   ) async {
     final body = await _api.postJson(
-      '$_base/${Uri.encodeComponent(noRetur)}/items/$idItem/scan',
-      body: {'labelCode': labelCode},
+      '$_base/${Uri.encodeComponent(noRetur)}/items/$idItem/targets',
+      body: {'targets': targets},
     );
     final data = body['data'] as Map<String, dynamic>?;
-    return data ?? const {};
+    final rawTargets = (data?['targets'] ?? []) as List? ?? const [];
+    return rawTargets
+        .whereType<Map>()
+        .map(
+          (e) =>
+              ReturV3TurnoverTarget.fromJson(Map<String, dynamic>.from(e)),
+        )
+        .toList();
   }
 
-  /// Scan auto-detect: server yang menentukan item mana yang cocok
+  Future<ReturV3TurnoverTarget> updateTurnoverTarget(
+    String noRetur,
+    int idTarget, {
+    String? kodeKategori,
+    int? idJenis,
+    int? pcs,
+  }) async {
+    final body = await _api.putJson(
+      '$_base/${Uri.encodeComponent(noRetur)}/targets/$idTarget',
+      body: {
+        if (kodeKategori != null) 'kodeKategori': kodeKategori,
+        if (idJenis != null) 'idJenis': idJenis,
+        if (pcs != null) 'pcs': pcs,
+      },
+    );
+    final data = body['data'] as Map<String, dynamic>?;
+    if (data == null) throw Exception('Response tidak mengandung data');
+    return ReturV3TurnoverTarget.fromJson(data);
+  }
+
+  Future<void> deleteTurnoverTarget(String noRetur, int idTarget) async {
+    await _api.deleteJson(
+      '$_base/${Uri.encodeComponent(noRetur)}/targets/$idTarget',
+    );
+  }
+
+  // ── Turnover / scan (DIGANTI) ───────────────────────────────────────
+
+  /// Scan auto-detect: server yang menentukan target mana yang cocok
   /// berdasarkan kategori+jenis label yang discan, jadi tidak perlu kirim
-  /// idItem — satu tombol scan untuk semua item pada retur ini.
+  /// idTarget — satu tombol scan untuk semua target pada retur ini.
   Future<Map<String, dynamic>> scanAuto(String noRetur, String labelCode) async {
     final body = await _api.postJson(
       '$_base/${Uri.encodeComponent(noRetur)}/scan',
@@ -256,9 +293,9 @@ class ReturV3Repository {
     return data ?? const {};
   }
 
-  Future<void> undoScan(String noRetur, int idItem, int idTurnover) async {
+  Future<void> undoScan(String noRetur, int idTurnover) async {
     await _api.deleteJson(
-      '$_base/${Uri.encodeComponent(noRetur)}/items/$idItem/scan/$idTurnover',
+      '$_base/${Uri.encodeComponent(noRetur)}/turnover/$idTurnover',
     );
   }
 
@@ -273,11 +310,11 @@ class ReturV3Repository {
         .toList();
   }
 
-  // ── Flag kirim ───────────────────────────────────────────────────────
+  // ── Selesaikan retur (mark complete) ────────────────────────────────
 
-  Future<ReturV3Header> flagKirim(String noRetur) async {
+  Future<ReturV3Header> markComplete(String noRetur) async {
     final body = await _api.patchJson(
-      '$_base/${Uri.encodeComponent(noRetur)}/flag-kirim',
+      '$_base/${Uri.encodeComponent(noRetur)}/complete',
     );
     final data = body['data'] as Map<String, dynamic>?;
     if (data == null) throw Exception('Response tidak mengandung data');

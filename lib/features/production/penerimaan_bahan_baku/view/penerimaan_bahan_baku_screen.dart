@@ -7,6 +7,7 @@ import '../../../../common/widgets/success_status_dialog.dart';
 import '../../../../core/network/api_client.dart';
 import '../../shared/models/bahan_baku_proses_label.dart';
 import '../../shared/models/stok_bahan_baku_item.dart';
+import '../../shared/repository/stok_bahan_baku_pakai_repository.dart';
 import '../../shared/repository/stok_bahan_baku_repository.dart';
 import '../../shared/widgets/mesin_section_header.dart';
 import '../../shared/widgets/production_mesin_card.dart';
@@ -16,13 +17,12 @@ import '../../shared/widgets/production_riwayat_header.dart';
 import '../../shared/widgets/sidebar_tab_switcher.dart';
 import '../../shared/widgets/stok_item_section.dart';
 import '../model/penerimaan_bahan_baku_model.dart';
-import '../model/penerimaan_kategori.dart';
 import '../model/tim_penerimaan_bahan_baku_model.dart';
 import '../repository/penerimaan_bahan_baku_repository.dart';
 import '../widgets/penerimaan_bahan_baku_delete_dialog.dart';
-import 'penerimaan_bahan_baku_create_screen.dart';
-import 'penerimaan_bahan_baku_detail_screen.dart';
-import 'penerimaan_bahan_baku_label_screen.dart';
+import '../widgets/penerimaan_bahan_baku_header_form_dialog.dart';
+import 'penerimaan_bahan_baku_input_screen.dart';
+import 'penerimaan_bahan_baku_label_list_screen.dart';
 
 /// Layar utama modul Penerimaan Bahan Baku — 1:1 mengikuti pola
 /// `WashingProductionMesinScreen`: grid status tim (analog mesin) + panel
@@ -30,27 +30,35 @@ import 'penerimaan_bahan_baku_label_screen.dart';
 /// sudah punya `NoPenerimaan` untuk HARI INI (lihat
 /// `TimPenerimaanInfo.isActive`, sumbernya endpoint
 /// `GET /api/penerimaan-bahan-baku/tim-status`, analog
-/// `GET /api/mst-mesin/washing`). Tap tim nonaktif → buat penerimaan baru
-/// (Tim, Shift, Jam, Supplier, No Plat + pallet/sak, format sama seperti
-/// header produksi washing). Tap tim aktif / baris riwayat → detail
-/// transaksi hari itu.
+/// `GET /api/mst-mesin/washing`). Tap tim nonaktif → dialog header ringkas
+/// (Tanggal, Shift, Jam, Regu/Operator — atribut yang melekat pada tim) →
+/// screen input penuh (create label) untuk pallet/sak + Supplier/No Plat per
+/// section — HANYA dipakai sekali saat header baru pertama dibuat. Tap tim
+/// AKTIF / baris riwayat → `PenerimaanBahanBakuLabelListScreen`, list label
+/// (NoBahanBaku + NoPallet) yang sudah dibuat untuk NoPenerimaan itu — tidak
+/// lagi masuk ke screen generate label.
+///
+/// Menu "PBB Pakai" & "PBB Proses" sudah digabung menjadi satu screen ini;
+/// kategori (Bahan Baku Pakai / Bahan Baku Proses) kini dipilih di level
+/// section pada form create (lihat `PenerimaanBahanBakuCreateDialog`) dan di
+/// level chip pada tab Stok Item, bukan lagi di level screen/menu.
 class PenerimaanBahanBakuScreen extends StatefulWidget {
-  final PenerimaanKategori kategori;
-
-  const PenerimaanBahanBakuScreen({super.key, required this.kategori});
+  const PenerimaanBahanBakuScreen({super.key});
 
   @override
   State<PenerimaanBahanBakuScreen> createState() =>
       _PenerimaanBahanBakuScreenState();
 }
 
-class _PenerimaanBahanBakuScreenState
-    extends State<PenerimaanBahanBakuScreen> {
+class _PenerimaanBahanBakuScreenState extends State<PenerimaanBahanBakuScreen> {
   late final PenerimaanBahanBakuRepository _repo;
-  final _stokRepo = StokBahanBakuRepository();
+  final _stokProsesRepo = StokBahanBakuRepository();
+  final _stokPakaiRepo = StokBahanBakuPakaiRepository();
   final _stokSectionController = StokItemSectionController();
 
-  Future<List<TimPenerimaanInfo>> _timFuture = Future.value(<TimPenerimaanInfo>[]);
+  Future<List<TimPenerimaanInfo>> _timFuture = Future.value(
+    <TimPenerimaanInfo>[],
+  );
 
   final List<PenerimaanBahanBaku> _items = [];
   bool _isLoading = false;
@@ -103,11 +111,7 @@ class _PenerimaanBahanBakuScreenState
       _hasMore = true;
     });
     try {
-      final res = await _repo.fetchAll(
-        page: 1,
-        pageSize: _pageSize,
-        kodeKategori: widget.kategori.kodeKategori,
-      );
+      final res = await _repo.fetchAll(page: 1, pageSize: _pageSize);
       if (!mounted) return;
       var newItems = res['items'] as List<PenerimaanBahanBaku>;
       if (_filterIdTim != null) {
@@ -129,11 +133,7 @@ class _PenerimaanBahanBakuScreenState
     setState(() => _isFetchingMore = true);
     try {
       final nextPage = _page + 1;
-      final res = await _repo.fetchAll(
-        page: nextPage,
-        pageSize: _pageSize,
-        kodeKategori: widget.kategori.kodeKategori,
-      );
+      final res = await _repo.fetchAll(page: nextPage, pageSize: _pageSize);
       if (!mounted) return;
       var newItems = res['items'] as List<PenerimaanBahanBaku>;
       if (_filterIdTim != null) {
@@ -171,6 +171,7 @@ class _PenerimaanBahanBakuScreenState
       namaMesin: tim.namaTim,
       isActive: tim.isActive,
       shiftTimeText: shiftTimeText,
+      namaOperators: tim.namaOperators,
     );
   }
 
@@ -198,30 +199,42 @@ class _PenerimaanBahanBakuScreenState
         );
         return;
       }
-      final noPenerimaan = await Navigator.of(context).push<String>(
+      final headerResult = await showDialog<PenerimaanBahanBakuHeaderResult>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => PenerimaanBahanBakuCreateDialog(tim: tim),
+      );
+      if (!mounted) return;
+      if (headerResult == null) return;
+
+      // Header sudah dibuat di database begitu dialog di atas sukses
+      // (fase 1) — refresh grid tim supaya kartu ini langsung berubah
+      // status "aktif" walau user belum sempat menambah pallet apapun.
+      _refreshAll();
+
+      await Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => PenerimaanBahanBakuCreateScreen(
-            tim: tim,
-            kategori: widget.kategori,
-          ),
+          builder: (_) =>
+              PenerimaanBahanBakuInputScreen(tim: tim, header: headerResult),
         ),
       );
       if (!mounted) return;
-      if (noPenerimaan != null) {
-        await Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => PenerimaanBahanBakuDetailScreen(noPenerimaan: noPenerimaan),
-          ),
-        );
-        if (!mounted) return;
-      }
       _refreshAll();
       return;
     }
 
+    // Tim aktif (sudah punya header hari ini) → buka list label yang
+    // sudah dibuat untuk NoPenerimaan itu (bukan screen generate label
+    // lagi). Layar input (create label) hanya dipakai sekali di atas,
+    // begitu header baru pertama kali dibuat.
+    await _openLabelList(tim.noPenerimaan!);
+  }
+
+  Future<void> _openLabelList(String noPenerimaan) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => PenerimaanBahanBakuDetailScreen(noPenerimaan: tim.noPenerimaan!),
+        builder: (_) =>
+            PenerimaanBahanBakuLabelListScreen(noPenerimaan: noPenerimaan),
       ),
     );
     if (!mounted) return;
@@ -229,11 +242,7 @@ class _PenerimaanBahanBakuScreenState
   }
 
   Future<void> _onRowTap(PenerimaanBahanBaku row) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => PenerimaanBahanBakuDetailScreen(noPenerimaan: row.noPenerimaan),
-      ),
-    );
+    await _openLabelList(row.noPenerimaan);
   }
 
   Future<void> _onRowDelete(PenerimaanBahanBaku row) async {
@@ -277,27 +286,11 @@ class _PenerimaanBahanBakuScreenState
     );
   }
 
-  void _openLabelScreen() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => PenerimaanBahanBakuLabelScreen(kategori: widget.kategori),
-      ),
-    );
-  }
-
   // ── Build ────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'fab_pbb_label_${widget.kategori.kodeKategori}',
-        onPressed: _openLabelScreen,
-        backgroundColor: const Color(0xFF0277BD),
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.print_outlined),
-        label: const Text('Cetak Label'),
-      ),
       body: LayoutBuilder(
         builder: (_, c) => Stack(
           children: [
@@ -310,13 +303,16 @@ class _PenerimaanBahanBakuScreenState
                     future: _timFuture,
                     builder: (context, snapshot) {
                       final allTim = snapshot.data ?? [];
-                      final activeCount = allTim.where((m) => m.isActive).length;
+                      final activeCount = allTim
+                          .where((m) => m.isActive)
+                          .length;
                       final inactiveCount = allTim.length - activeCount;
                       return MesinSectionHeader(
-                        title: widget.kategori.title,
+                        title: 'Penerimaan Bahan Baku',
                         activeCount: activeCount,
                         inactiveCount: inactiveCount,
-                        isLoading: snapshot.connectionState == ConnectionState.waiting,
+                        isLoading:
+                            snapshot.connectionState == ConnectionState.waiting,
                       );
                     },
                   ),
@@ -324,8 +320,11 @@ class _PenerimaanBahanBakuScreenState
                     child: FutureBuilder<List<TimPenerimaanInfo>>(
                       future: _timFuture,
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(child: CircularProgressIndicator());
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
                         }
                         if (snapshot.hasError) {
                           return Center(
@@ -334,7 +333,10 @@ class _PenerimaanBahanBakuScreenState
                               child: Text(
                                 'Gagal memuat tim\n${snapshot.error}',
                                 textAlign: TextAlign.center,
-                                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF64748B),
+                                ),
                               ),
                             ),
                           );
@@ -350,15 +352,18 @@ class _PenerimaanBahanBakuScreenState
                         }
                         return LayoutBuilder(
                           builder: (context, constraints) {
-                            final cols = (constraints.maxWidth / 150).floor().clamp(2, 6);
+                            final cols = (constraints.maxWidth / 150)
+                                .floor()
+                                .clamp(2, 6);
                             return GridView.builder(
                               padding: const EdgeInsets.all(12),
-                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: cols,
-                                mainAxisExtent: 110,
-                                crossAxisSpacing: 10,
-                                mainAxisSpacing: 10,
-                              ),
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: cols,
+                                    mainAxisExtent: 110,
+                                    crossAxisSpacing: 10,
+                                    mainAxisSpacing: 10,
+                                  ),
                               itemCount: allTim.length,
                               itemBuilder: (context, index) {
                                 final tim = allTim[index];
@@ -402,7 +407,9 @@ class _PenerimaanBahanBakuScreenState
                       onSelected: (i) => setState(() => _sidebarTab = i),
                     ),
                     Expanded(
-                      child: _sidebarTab == 0 ? _buildRiwayatContent() : _buildStokItemContent(),
+                      child: _sidebarTab == 0
+                          ? _buildRiwayatContent()
+                          : _buildStokItemContent(),
                     ),
                   ],
                 ),
@@ -419,9 +426,16 @@ class _PenerimaanBahanBakuScreenState
       controller: _stokSectionController,
       sources: [
         TypedStokItemSource<StokBahanBakuItem, BahanBakuProsesLabel>(
+          label: 'Bahan Baku Pakai',
+          fetchStok: _stokPakaiRepo.fetchStok,
+          fetchLabel: (item) => _stokPakaiRepo.fetchLabel(item.idBB),
+          showSakColumn: false,
+          oldestDateOf: (item) => item.dateCreateTertua,
+        ),
+        TypedStokItemSource<StokBahanBakuItem, BahanBakuProsesLabel>(
           label: 'Bahan Baku Proses',
-          fetchStok: _stokRepo.fetchStok,
-          fetchLabel: (item) => _stokRepo.fetchLabel(item.idBB),
+          fetchStok: _stokProsesRepo.fetchStok,
+          fetchLabel: (item) => _stokProsesRepo.fetchLabel(item.idBB),
           showSakColumn: false,
           oldestDateOf: (item) => item.dateCreateTertua,
         ),
@@ -439,7 +453,10 @@ class _PenerimaanBahanBakuScreenState
             return ProductionRiwayatHeader(
               showTitle: false,
               mesinList: (snapshot.data ?? [])
-                  .map((t) => MesinFilterItem(idMesin: t.idTim, namaMesin: t.namaTim))
+                  .map(
+                    (t) =>
+                        MesinFilterItem(idMesin: t.idTim, namaMesin: t.namaTim),
+                  )
                   .toList(),
               selectedIdMesin: _filterIdTim,
               onFilterChanged: (id) {
@@ -462,7 +479,9 @@ class _PenerimaanBahanBakuScreenState
               onTap: _onRowTap,
               onEdit: (row) async {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Edit belum didukung untuk data penerimaan')),
+                  const SnackBar(
+                    content: Text('Edit belum didukung untuk data penerimaan'),
+                  ),
                 );
               },
               onDelete: _onRowDelete,

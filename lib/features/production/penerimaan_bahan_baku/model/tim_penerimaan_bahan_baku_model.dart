@@ -15,6 +15,7 @@ class TimPenerimaanInfo {
   final int? shift;
   final String? hourStart; // "HH:mm"
   final String? hourEnd; // "HH:mm"
+  final String? namaOperators;
 
   bool get isActive => noPenerimaan != null && noPenerimaan!.isNotEmpty;
 
@@ -27,6 +28,7 @@ class TimPenerimaanInfo {
     this.shift,
     this.hourStart,
     this.hourEnd,
+    this.namaOperators,
   });
 
   static String? _s(dynamic v) {
@@ -78,6 +80,7 @@ class TimPenerimaanInfo {
       shift: j['Shift'] != null ? _i(j['Shift']) : null,
       hourStart: _time(j['HourStart']),
       hourEnd: _time(j['HourEnd']),
+      namaOperators: _s(j['NamaOperators']),
     );
   }
 }

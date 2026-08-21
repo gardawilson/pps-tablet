@@ -33,8 +33,8 @@ class ReturV3DetailViewModel extends ChangeNotifier {
   final Set<int> generatingItemIds = {};
   String? generateError;
 
-  bool isFlagging = false;
-  String? flagError;
+  bool isCompleting = false;
+  String? completeError;
 
   // ── Derived ──────────────────────────────────────────────────────────
 
@@ -55,6 +55,18 @@ class ReturV3DetailViewModel extends ChangeNotifier {
       outputs.isNotEmpty &&
       outputs.every((o) => o.hasBeenPrinted);
 
+  /// Setiap item retur harus punya minimal 1 target pengganti sebelum scan
+  /// bisa dimulai — target bukan lagi otomatis diturunkan dari item itu
+  /// sendiri (barang pengganti bisa beda kategori/jenis dari yang kembali).
+  bool get allTargetsDefined {
+    if (items.isEmpty) return false;
+    for (final item in items) {
+      final t = turnoverFor(item.idItem);
+      if (t == null || !t.hasTargets) return false;
+    }
+    return true;
+  }
+
   bool get allItemsFulfilled {
     if (items.isEmpty) return false;
     for (final item in items) {
@@ -64,10 +76,10 @@ class ReturV3DetailViewModel extends ChangeNotifier {
     return true;
   }
 
-  bool get canFlagKirim =>
+  bool get canComplete =>
       header != null &&
       header!.isDiganti &&
-      !header!.flagKirim &&
+      !header!.isComplete &&
       allItemsFulfilled;
 
   // ── Load ─────────────────────────────────────────────────────────────
@@ -279,24 +291,54 @@ class ReturV3DetailViewModel extends ChangeNotifier {
     }
   }
 
-  // ── Scan / turnover (DIGANTI) ───────────────────────────────────────
+  // ── Turnover targets (DIGANTI) ──────────────────────────────────────
 
-  /// Dipakai sebagai `onLookup` untuk `ScanLabelDialog`: return `null` kalau
-  /// sukses (dialog auto-close), atau pesan error untuk ditampilkan inline.
-  Future<String?> scan(int idItem, String labelCode) async {
+  bool isSavingTarget = false;
+  String? targetError;
+
+  Future<bool> addTurnoverTarget(
+    int idItem, {
+    required String kodeKategori,
+    required int idJenis,
+    required int pcs,
+  }) async {
+    isSavingTarget = true;
+    targetError = null;
+    notifyListeners();
     try {
-      await repository.scan(noRetur, idItem, labelCode);
+      await repository.addTurnoverTargets(noRetur, idItem, [
+        {'kodeKategori': kodeKategori, 'idJenis': idJenis, 'pcs': pcs},
+      ]);
       await _loadTurnover();
-      notifyListeners();
-      return null;
+      return true;
     } catch (e) {
-      return apiErrorMessage(e);
+      targetError = apiErrorMessage(e);
+      return false;
+    } finally {
+      isSavingTarget = false;
+      notifyListeners();
     }
   }
 
-  /// Scan auto-detect — satu tombol scan untuk semua item: backend yang
-  /// menentukan item mana yang cocok berdasarkan kategori+jenis label.
-  /// Sama kontraknya dengan `scan()`: `null` = sukses, String = pesan error.
+  Future<bool> removeTurnoverTarget(int idTarget) async {
+    targetError = null;
+    try {
+      await repository.deleteTurnoverTarget(noRetur, idTarget);
+      await _loadTurnover();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      targetError = apiErrorMessage(e);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ── Scan / turnover (DIGANTI) ───────────────────────────────────────
+
+  /// Scan auto-detect — satu tombol scan untuk semua target: backend yang
+  /// menentukan target mana yang cocok berdasarkan kategori+jenis label.
+  /// `null` = sukses, String = pesan error untuk ditampilkan inline.
   Future<String?> scanAuto(String labelCode) async {
     try {
       await repository.scanAuto(noRetur, labelCode);
@@ -308,9 +350,9 @@ class ReturV3DetailViewModel extends ChangeNotifier {
     }
   }
 
-  Future<bool> undoScan(int idItem, int idTurnover) async {
+  Future<bool> undoScan(int idTurnover) async {
     try {
-      await repository.undoScan(noRetur, idItem, idTurnover);
+      await repository.undoScan(noRetur, idTurnover);
       await _loadTurnover();
       notifyListeners();
       return true;
@@ -321,20 +363,20 @@ class ReturV3DetailViewModel extends ChangeNotifier {
     }
   }
 
-  // ── Flag kirim ───────────────────────────────────────────────────────
+  // ── Selesaikan retur (mark complete) ────────────────────────────────
 
-  Future<bool> flagKirim() async {
-    isFlagging = true;
-    flagError = null;
+  Future<bool> markComplete() async {
+    isCompleting = true;
+    completeError = null;
     notifyListeners();
     try {
-      header = await repository.flagKirim(noRetur);
+      header = await repository.markComplete(noRetur);
       return true;
     } catch (e) {
-      flagError = apiErrorMessage(e);
+      completeError = apiErrorMessage(e);
       return false;
     } finally {
-      isFlagging = false;
+      isCompleting = false;
       notifyListeners();
     }
   }

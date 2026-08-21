@@ -2,17 +2,23 @@
 //
 // Endpoint backend (D:\backend\pps_backend\src\modules\production\
 // penerimaan-bahan-baku), mounted di /api/penerimaan-bahan-baku:
-//   GET    /api/penerimaan-bahan-baku/tim-status   — status tim (analog
-//                                                     GET /api/mst-mesin/washing)
-//   GET    /api/penerimaan-bahan-baku              — riwayat (paginated)
+//   GET    /api/penerimaan-bahan-baku/tim-status        — status tim (analog
+//                                                          GET /api/mst-mesin/washing)
+//   GET    /api/penerimaan-bahan-baku                    — riwayat (paginated)
 //   GET    /api/penerimaan-bahan-baku/:noPenerimaan
-//   POST   /api/penerimaan-bahan-baku               — create atomic
+//   POST   /api/penerimaan-bahan-baku                    — fase 1: create header
+//   POST   /api/penerimaan-bahan-baku/:noPenerimaan/pallets — fase 2: add pallets
 //   DELETE /api/penerimaan-bahan-baku/:noPenerimaan
+//
+// Alur create 2 fase, meniru washing production: dialog header (Tanggal/
+// Shift/Jam) langsung hit createHeader() begitu SIMPAN ditekan → dapat
+// NoPenerimaan → baru di screen input, addPallets() dipanggil per section
+// (Bahan Baku Pakai/Proses) untuk NoPenerimaan yang sama.
 import '../../../../core/network/api_client.dart';
 import '../model/penerimaan_bahan_baku_model.dart';
 import '../model/tim_penerimaan_bahan_baku_model.dart';
 
-/// Satu pallet + sak-sak-nya, dikirim sebagai bagian dari payload create.
+/// Satu pallet + sak-sak-nya, dikirim sebagai bagian dari payload addPallets.
 class PenerimaanPalletInput {
   final int idJenisPlastik;
   final int? idWarehouse;
@@ -42,6 +48,31 @@ class PenerimaanSakInput {
   const PenerimaanSakInput({required this.noSak, required this.berat});
 
   Map<String, dynamic> toJson() => {'noSak': noSak, 'berat': berat};
+}
+
+/// Header yang baru dibuat lewat [PenerimaanBahanBakuRepository.createHeader]
+/// — hasil fase 1 (POST /api/penerimaan-bahan-baku), sebelum pallet apapun
+/// ditambahkan.
+class PenerimaanBahanBakuHeaderResult {
+  final String noPenerimaan;
+  final DateTime tanggal;
+  final int idTim;
+  final int shift;
+  final String hourStart;
+  final String hourEnd;
+  final List<int> idOperators;
+  final String namaOperators;
+
+  const PenerimaanBahanBakuHeaderResult({
+    required this.noPenerimaan,
+    required this.tanggal,
+    required this.idTim,
+    required this.shift,
+    required this.hourStart,
+    required this.hourEnd,
+    required this.idOperators,
+    required this.namaOperators,
+  });
 }
 
 class PenerimaanBahanBakuRepository {
@@ -106,41 +137,75 @@ class PenerimaanBahanBakuRepository {
   }
 
   // ==========================================
-  //  CREATE (atomic: header + semua pallet + semua sak)
+  //  FASE 1: CREATE HEADER
   //  POST /api/penerimaan-bahan-baku
   // ==========================================
-  Future<String> create({
+  Future<PenerimaanBahanBakuHeaderResult> createHeader({
     required DateTime tglPenerimaan,
     required int idTim,
-    required int idSupplier,
-    String? noPlat,
     required int shift,
     required String hourStart,
     required String hourEnd,
-    required String kodeKategori, // KodeKategori dari dbo.MstKategori
-    required List<PenerimaanPalletInput> pallets,
+    required List<int> idOperators,
+    required String namaOperators,
   }) async {
     final body = await api.postJson(
       '/api/penerimaan-bahan-baku',
       body: {
         'tglPenerimaan': _dateOnly(tglPenerimaan),
         'idTim': idTim,
-        'idSupplier': idSupplier,
-        if (noPlat != null && noPlat.trim().isNotEmpty) 'noPlat': noPlat.trim(),
         'shift': shift,
         'hourStart': _normalizeTime(hourStart),
         'hourEnd': _normalizeTime(hourEnd),
-        'kodeKategori': kodeKategori,
-        'pallets': pallets.map((p) => p.toJson()).toList(),
+        'idOperators': idOperators,
       },
     );
 
     final data = body['data'] as Map<String, dynamic>?;
     final noPenerimaan = data?['noPenerimaan']?.toString();
     if (noPenerimaan == null) {
-      throw Exception('Response create penerimaan tidak valid');
+      throw Exception('Response create header penerimaan tidak valid');
     }
-    return noPenerimaan;
+    return PenerimaanBahanBakuHeaderResult(
+      noPenerimaan: noPenerimaan,
+      tanggal: tglPenerimaan,
+      idTim: idTim,
+      shift: shift,
+      hourStart: hourStart,
+      hourEnd: hourEnd,
+      idOperators: idOperators,
+      namaOperators: namaOperators,
+    );
+  }
+
+  // ==========================================
+  //  FASE 2: ADD PALLETS ke header yang sudah ada
+  //  POST /api/penerimaan-bahan-baku/:noPenerimaan/pallets
+  //  Boleh dipanggil >1x per NoPenerimaan (1x per section Pakai/Proses).
+  // ==========================================
+  Future<String> addPallets({
+    required String noPenerimaan,
+    required int idSupplier,
+    String? noPlat,
+    required String kodeKategori,
+    required List<PenerimaanPalletInput> pallets,
+  }) async {
+    final body = await api.postJson(
+      '/api/penerimaan-bahan-baku/$noPenerimaan/pallets',
+      body: {
+        'idSupplier': idSupplier,
+        if (noPlat != null && noPlat.trim().isNotEmpty) 'noPlat': noPlat.trim(),
+        'kodeKategori': kodeKategori,
+        'pallets': pallets.map((p) => p.toJson()).toList(),
+      },
+    );
+
+    final data = body['data'] as Map<String, dynamic>?;
+    final noBahanBaku = data?['noBahanBaku']?.toString();
+    if (noBahanBaku == null) {
+      throw Exception('Response add pallets penerimaan tidak valid');
+    }
+    return noBahanBaku;
   }
 
   Future<void> delete(String noPenerimaan) async {

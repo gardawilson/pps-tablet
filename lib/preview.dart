@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'common/widgets/error_status_dialog.dart';
 import 'common/widgets/scan_label_dialog.dart';
 import 'common/widgets/success_status_dialog.dart';
+import 'common/widgets/warning_status_dialog.dart';
 
 void main() {
   runApp(const _PreviewApp());
@@ -130,6 +131,33 @@ class _PreviewHome extends StatelessWidget {
                 ),
               ),
               _PreviewTile(
+                label: 'Success — Partial Berhasil Dibuat (Penjualan)',
+                color: Colors.green,
+                icon: Icons.check_circle_outline,
+                onTap: () => showDialog(
+                  context: context,
+                  builder: (ctx) => SuccessStatusDialog(
+                    title: 'Partial Berhasil Dibuat',
+                    message:
+                        'Label BB.0000040135 berhasil dipecah (partial) untuk '
+                        'memenuhi turnover Penjualan ini. Pcs pada label fisiknya '
+                        'sekarang berkurang, jadi label perlu dicetak ulang supaya '
+                        'pcs yang tertera sesuai. Cetak sekarang?',
+                    actions: [
+                      StatusAction(
+                        label: 'Nanti',
+                        isPrimary: false,
+                        onPressed: () => Navigator.pop(ctx, false),
+                      ),
+                      StatusAction(
+                        label: 'Cetak Sekarang',
+                        onPressed: () => Navigator.pop(ctx, true),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              _PreviewTile(
                 label: 'Error — gagal submit',
                 color: Colors.redAccent,
                 icon: Icons.error_outline,
@@ -154,6 +182,45 @@ class _PreviewHome extends StatelessWidget {
                         'Koneksi ke server terputus saat menyimpan transaksi. '
                         'Pastikan perangkat terhubung ke jaringan dan coba ulangi. '
                         'Jika masalah berlanjut, hubungi administrator.',
+                  ),
+                ),
+              ),
+              _PreviewTile(
+                label: 'Warning — default (1 tombol)',
+                color: Colors.orange,
+                icon: Icons.warning_amber_rounded,
+                onTap: () => showDialog(
+                  context: context,
+                  builder: (_) => const WarningStatusDialog(
+                    title: 'Perhatian',
+                    message: 'Tindakan ini akan mempengaruhi data terkait.',
+                  ),
+                ),
+              ),
+              _PreviewTile(
+                label: 'Warning — Pcs Label Melebihi Kebutuhan (Penjualan)',
+                color: Colors.orange,
+                icon: Icons.warning_amber_rounded,
+                onTap: () => showDialog(
+                  context: context,
+                  builder: (ctx) => WarningStatusDialog(
+                    title: 'Pcs Label Melebihi Kebutuhan',
+                    message:
+                        'Label BB.0000040135 berisi 10 pcs, sedangkan sisa kebutuhan '
+                        'item ini hanya 1 pcs. Pecah (partial) label ini menjadi 1 pcs '
+                        'agar bisa dipakai untuk BJJual K.0000032646? Sisa 9 pcs tetap '
+                        'tersedia di label asal untuk dipakai kebutuhan lain.',
+                    actions: [
+                      StatusAction(
+                        label: 'Batal',
+                        isPrimary: false,
+                        onPressed: () => Navigator.pop(ctx, false),
+                      ),
+                      StatusAction(
+                        label: 'Ya, Pecah 1 pcs',
+                        onPressed: () => Navigator.pop(ctx, true),
+                      ),
+                    ],
                   ),
                 ),
               ),

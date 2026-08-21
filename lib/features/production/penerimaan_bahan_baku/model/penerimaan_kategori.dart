@@ -37,4 +37,17 @@ class PenerimaanKategori {
     title: 'Penerimaan Bahan Baku Pakai',
     prefixLabel: 'AB.',
   );
+
+  /// Tebak kategori dari prefix sebuah NoBahanBaku (mis. "AB.0000000001" →
+  /// [pakai], "A.0000000001" → [proses]) — dipakai di layar detail untuk
+  /// memberi label per-batch tanpa perlu backend mengirim KodeKategori
+  /// sebagai kolom tersendiri (lihat komentar di
+  /// `PenerimaanBahanBakuRepository`: kategori 1:1 dengan prefix NoBahanBaku).
+  static PenerimaanKategori? fromNoBahanBaku(String? noBahanBaku) {
+    final code = noBahanBaku?.trim() ?? '';
+    if (code.isEmpty) return null;
+    if (code.startsWith(pakai.prefixLabel)) return pakai;
+    if (code.startsWith(proses.prefixLabel)) return proses;
+    return null;
+  }
 }

@@ -12,7 +12,7 @@ class ReturV3Header {
 
   /// 'PENDING' | 'DIGANTI' | 'TIDAK_DIGANTI'
   final String statusRetur;
-  final bool flagKirim;
+  final bool isComplete;
   final String? decisionBy;
   final DateTime? decisionAt;
   final DateTime? dateCreate;
@@ -31,7 +31,7 @@ class ReturV3Header {
     this.namaPembeli,
     this.keterangan,
     this.statusRetur = 'PENDING',
-    this.flagKirim = false,
+    this.isComplete = false,
     this.decisionBy,
     this.decisionAt,
     this.dateCreate,
@@ -100,7 +100,7 @@ class ReturV3Header {
           : _s(
               _pick(j, ['statusRetur', 'StatusRetur', 'status', 'Status']),
             ).toUpperCase(),
-      flagKirim: _bool(_pick(j, ['flagKirim', 'FlagKirim'])),
+      isComplete: _bool(_pick(j, ['isComplete', 'IsComplete'])),
       decisionBy: _pick(j, ['decisionBy', 'DecisionBy'])?.toString(),
       decisionAt: _dt(_pick(j, ['decisionAt', 'DecisionAt'])),
       dateCreate: _dt(_pick(j, ['dateCreate', 'DateCreate'])),
@@ -120,7 +120,7 @@ class ReturV3Header {
 
   ReturV3Header copyWith({
     String? statusRetur,
-    bool? flagKirim,
+    bool? isComplete,
     String? keterangan,
     DateTime? tanggal,
     int? idPembeli,
@@ -133,7 +133,7 @@ class ReturV3Header {
       namaPembeli: namaPembeli ?? this.namaPembeli,
       keterangan: keterangan ?? this.keterangan,
       statusRetur: statusRetur ?? this.statusRetur,
-      flagKirim: flagKirim ?? this.flagKirim,
+      isComplete: isComplete ?? this.isComplete,
       decisionBy: decisionBy,
       decisionAt: decisionAt,
       dateCreate: dateCreate,

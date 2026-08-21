@@ -91,6 +91,7 @@ class _ReturV3ListScreenState extends State<ReturV3ListScreen> {
                       key: ValueKey(_selectedNoRetur),
                       noRetur: _selectedNoRetur!,
                       embedded: true,
+                      onHeaderChanged: _listVm.refresh,
                     ),
             ),
           ],
@@ -365,24 +366,43 @@ class _FilterDialogState extends State<_FilterDialog> {
     _dateTo = widget.initialDateTo;
   }
 
-  String _fmt(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+  static final DateTime _minDate = DateTime(DateTime.now().year - 5);
+  static final DateTime _maxDate = DateTime(DateTime.now().year + 1);
 
-  Future<void> _pickRange() async {
-    final now = DateTime.now();
-    final picked = await showDateRangePicker(
+  // Dua field independen ("Dari" / "Sampai"), masing-masing pakai stock
+  // showDatePicker (dialog calendar compact bawaan Material, bukan
+  // showDateRangePicker yang tampil fullscreen di layar tablet ini) — pola
+  // ini yang dipakai app-app profesional (Booking.com, Google Flights, dst)
+  // untuk date-range field: dua kotak terpisah, bukan satu range picker.
+  Future<void> _pickFrom() async {
+    final picked = await showDatePicker(
       context: context,
-      firstDate: DateTime(now.year - 5),
-      lastDate: DateTime(now.year + 1),
-      initialDateRange: _dateFrom != null && _dateTo != null
-          ? DateTimeRange(start: _dateFrom!, end: _dateTo!)
-          : null,
+      initialDate: _dateFrom ?? DateTime.now(),
+      firstDate: _minDate,
+      lastDate: _dateTo ?? _maxDate,
       locale: const Locale('id', 'ID'),
+      helpText: 'Tanggal Dari',
     );
     if (picked == null) return;
     setState(() {
-      _dateFrom = picked.start;
-      _dateTo = picked.end;
+      _dateFrom = picked;
+      if (_dateTo != null && _dateTo!.isBefore(picked)) _dateTo = picked;
+    });
+  }
+
+  Future<void> _pickTo() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dateTo ?? _dateFrom ?? DateTime.now(),
+      firstDate: _dateFrom ?? _minDate,
+      lastDate: _maxDate,
+      locale: const Locale('id', 'ID'),
+      helpText: 'Tanggal Sampai',
+    );
+    if (picked == null) return;
+    setState(() {
+      _dateTo = picked;
+      if (_dateFrom != null && _dateFrom!.isAfter(picked)) _dateFrom = picked;
     });
   }
 
@@ -454,38 +474,32 @@ class _FilterDialogState extends State<_FilterDialog> {
             ),
             const SizedBox(height: 8),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _pickRange,
-                    icon: Icon(
-                      Icons.date_range_rounded,
-                      size: 15,
-                      color: dateActive ? _kPrimary : Colors.grey.shade600,
-                    ),
-                    label: Text(
-                      dateActive
-                          ? '${_fmt(_dateFrom!)} - ${_fmt(_dateTo!)}'
-                          : 'Pilih rentang tanggal',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: dateActive
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        color: dateActive ? _kPrimary : Colors.grey.shade700,
-                      ),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      side: BorderSide(
-                        color: dateActive ? _kPrimary : _kBorder,
-                      ),
-                      alignment: Alignment.centerLeft,
-                    ),
+                  child: _DateFieldBox(
+                    label: 'Dari',
+                    value: _dateFrom,
+                    onTap: _pickFrom,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 16,
+                    color: Colors.grey.shade400,
+                  ),
+                ),
+                Expanded(
+                  child: _DateFieldBox(
+                    label: 'Sampai',
+                    value: _dateTo,
+                    onTap: _pickTo,
                   ),
                 ),
                 if (dateActive) ...[
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 4),
                   IconButton(
                     icon: const Icon(Icons.close_rounded, size: 16),
                     color: Colors.grey.shade500,
@@ -526,6 +540,76 @@ class _FilterDialogState extends State<_FilterDialog> {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                     child: const Text('TERAPKAN'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Kotak field tanggal ala app profesional (Booking.com, Google Flights):
+/// label kecil di atas + nilai (atau placeholder) di bawah, dalam satu
+/// kotak bordered yang bisa di-tap — bukan tombol icon+text biasa.
+class _DateFieldBox extends StatelessWidget {
+  final String label;
+  final DateTime? value;
+  final VoidCallback onTap;
+
+  const _DateFieldBox({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final filled = value != null;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: filled ? _kPrimary.withValues(alpha: 0.04) : _kSurface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: filled ? _kPrimary : _kBorder),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w600,
+                color: filled ? _kPrimary : Colors.grey.shade500,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Row(
+              children: [
+                Icon(
+                  Icons.calendar_today_rounded,
+                  size: 13,
+                  color: filled ? _kPrimary : Colors.grey.shade400,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    filled ? formatDateToShortId(value) : 'Pilih tanggal',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: filled ? FontWeight.w700 : FontWeight.w500,
+                      color: filled
+                          ? const Color(0xFF1A1D23)
+                          : Colors.grey.shade500,
+                    ),
                   ),
                 ),
               ],
@@ -664,21 +748,21 @@ class _ReturCard extends StatelessWidget {
                   ),
                   const Spacer(),
                   Icon(
-                    header.flagKirim
+                    header.isComplete
                         ? Icons.local_shipping_rounded
                         : Icons.local_shipping_outlined,
                     size: 15,
-                    color: header.flagKirim
+                    color: header.isComplete
                         ? Colors.green.shade600
                         : Colors.grey.shade400,
                   ),
                   const SizedBox(width: 3),
                   Text(
-                    header.flagKirim ? 'Terkirim' : 'Belum kirim',
+                    header.isComplete ? 'Terkirim' : 'Belum kirim',
                     style: TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w600,
-                      color: header.flagKirim
+                      color: header.isComplete
                           ? Colors.green.shade700
                           : Colors.grey.shade500,
                     ),

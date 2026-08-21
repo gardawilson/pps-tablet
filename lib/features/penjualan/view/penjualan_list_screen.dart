@@ -1,0 +1,823 @@
+import 'package:flutter/material.dart';
+import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
+import 'package:provider/provider.dart';
+
+import '../../../core/utils/date_formatter.dart';
+import '../model/penjualan_header_model.dart';
+import '../repository/penjualan_repository.dart';
+import '../view_model/penjualan_list_view_model.dart';
+import 'penjualan_detail_screen.dart';
+
+const _kPrimary = Color(0xFF1E6FD9);
+const _kSurface = Color(0xFFF8F9FB);
+const _kBorder = Color(0xFFE2E6EA);
+const _kSelectedBg = Color(0xFFE9F2FF);
+
+/// Layout master-detail untuk tablet landscape: daftar BJJual belum complete
+/// di panel kiri (kartu, bukan tabel) dan detail nomor BJJual yang dipilih
+/// tampil langsung di panel kanan (tanpa berpindah layar) — meniru pola
+/// `retur_v3_list_screen.dart`.
+class PenjualanListScreen extends StatefulWidget {
+  const PenjualanListScreen({super.key});
+
+  @override
+  State<PenjualanListScreen> createState() => _PenjualanListScreenState();
+}
+
+class _PenjualanListScreenState extends State<PenjualanListScreen> {
+  late final PenjualanListViewModel _listVm;
+  final TextEditingController _searchCtl = TextEditingController();
+  String? _selectedNoBJJual;
+
+  @override
+  void initState() {
+    super.initState();
+    _listVm = PenjualanListViewModel(repository: PenjualanRepository());
+  }
+
+  @override
+  void dispose() {
+    _searchCtl.dispose();
+    _listVm.dispose();
+    super.dispose();
+  }
+
+  void _select(PenjualanHeader header) {
+    setState(() => _selectedNoBJJual = header.noBJJual);
+  }
+
+  /// Header yang baru saja complete (via scan terakhir) otomatis hilang
+  /// dari daftar "belum complete" — refresh list & lepas seleksi supaya
+  /// panel kanan tidak menampilkan detail untuk header yang sudah tidak
+  /// relevan lagi di panel kiri. Cuma lepas seleksi kalau filter status
+  /// saat ini memang menyembunyikan header yang sudah complete (filter
+  /// 'complete'/'all' tetap menampilkannya, jadi seleksi dipertahankan).
+  ///
+  /// Tanpa notifikasi eksplisit, hilangnya kartu dari daftar terasa rancu
+  /// (seolah datanya hilang, bukan karena sukses complete) — jadi begitu
+  /// deselect terjadi karena complete, tunjukkan SnackBar konfirmasi lewat
+  /// Scaffold di layar ini (bukan Scaffold internal detail panel, supaya
+  /// tetap tampil walau detail panel-nya sendiri langsung dilepas).
+  void _onHeaderCompleted() {
+    final shouldDeselect = _listVm.status == 'incomplete';
+    final completedNo = _selectedNoBJJual;
+    _listVm.refresh();
+    if (shouldDeselect) {
+      setState(() => _selectedNoBJJual = null);
+      if (completedNo != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Penjualan $completedNo complete — semua item turnover terpenuhi.',
+            ),
+            backgroundColor: Colors.green.shade700,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider<PenjualanListViewModel>.value(
+      value: _listVm,
+      child: Scaffold(
+        backgroundColor: _kSurface,
+        body: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              width: 400,
+              child: _MasterListPanel(
+                searchCtl: _searchCtl,
+                selectedNoBJJual: _selectedNoBJJual,
+                onSelect: _select,
+              ),
+            ),
+            Container(width: 1, color: _kBorder),
+            Expanded(
+              child: _selectedNoBJJual == null
+                  ? const _EmptyDetailPlaceholder()
+                  : PenjualanDetailScreen(
+                      key: ValueKey(_selectedNoBJJual),
+                      noBJJual: _selectedNoBJJual!,
+                      embedded: true,
+                      onCompleted: _onHeaderCompleted,
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Panel kiri: search + filter + daftar kartu ──────────────────────────
+
+class _MasterListPanel extends StatelessWidget {
+  final TextEditingController searchCtl;
+  final String? selectedNoBJJual;
+  final ValueChanged<PenjualanHeader> onSelect;
+
+  const _MasterListPanel({
+    required this.searchCtl,
+    required this.selectedNoBJJual,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = context.watch<PenjualanListViewModel>();
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _SearchAndFilterBar(
+            controller: searchCtl,
+            onChanged: vm.setSearchDebounced,
+            onClear: () {
+              searchCtl.clear();
+              vm.clearSearch();
+            },
+            hasActiveFilter: vm.hasActiveFilter,
+            onOpenFilter: () => _openFilterDialog(context, vm),
+          ),
+          const Divider(height: 1, color: _kBorder),
+          Expanded(
+            child: PagingListener<int, PenjualanHeader>(
+              controller: vm.pagingController,
+              builder: (context, state, fetchNextPage) {
+                return RefreshIndicator(
+                  onRefresh: () async => vm.pagingController.refresh(),
+                  child: PagedListView<int, PenjualanHeader>(
+                    state: state,
+                    fetchNextPage: fetchNextPage,
+                    padding: const EdgeInsets.fromLTRB(10, 10, 10, 16),
+                    builderDelegate: PagedChildBuilderDelegate<PenjualanHeader>(
+                      itemBuilder: (context, item, index) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _PenjualanCard(
+                          header: item,
+                          selected: item.noBJJual == selectedNoBJJual,
+                          onTap: () => onSelect(item),
+                        ),
+                      ),
+                      firstPageProgressIndicatorBuilder: (_) => const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(24),
+                          child: CircularProgressIndicator(),
+                        ),
+                      ),
+                      newPageProgressIndicatorBuilder: (_) => const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                      firstPageErrorIndicatorBuilder: (_) => const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Text('Terjadi kesalahan memuat data.'),
+                        ),
+                      ),
+                      noItemsFoundIndicatorBuilder: (_) => const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Text('Tidak ada data Penjualan.'),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+const _kStatusFilters = <String, String>{
+  'incomplete': 'Belum Complete',
+  'complete': 'Complete',
+  'all': 'Semua',
+};
+
+/// Buka dialog filter status + rentang tanggal dan terapkan hasilnya
+/// sekaligus lewat `PenjualanListViewModel.applyFilters`.
+Future<void> _openFilterDialog(
+  BuildContext context,
+  PenjualanListViewModel vm,
+) async {
+  final result = await showDialog<_FilterResult>(
+    context: context,
+    builder: (_) => _FilterDialog(
+      initialStatus: vm.status,
+      initialDateFrom: vm.dateFrom,
+      initialDateTo: vm.dateTo,
+    ),
+  );
+  if (result == null) return;
+  vm.applyFilters(
+    status: result.status,
+    dateFrom: result.dateFrom,
+    dateTo: result.dateTo,
+  );
+}
+
+class _SearchAndFilterBar extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+  final bool hasActiveFilter;
+  final VoidCallback onOpenFilter;
+
+  const _SearchAndFilterBar({
+    required this.controller,
+    required this.onChanged,
+    required this.onClear,
+    required this.hasActiveFilter,
+    required this.onOpenFilter,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: controller,
+              onChanged: onChanged,
+              style: const TextStyle(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Cari no. BJJual / pembeli...',
+                hintStyle: TextStyle(fontSize: 14, color: Colors.grey.shade400),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  size: 18,
+                  color: Colors.grey.shade400,
+                ),
+                suffixIcon: controller.text.isNotEmpty
+                    ? IconButton(
+                        icon: Icon(
+                          Icons.close_rounded,
+                          size: 16,
+                          color: Colors.grey.shade500,
+                        ),
+                        onPressed: onClear,
+                      )
+                    : null,
+                filled: true,
+                fillColor: _kSurface,
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: _kBorder),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: _kPrimary, width: 1.5),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 11,
+                ),
+                isDense: true,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  color: hasActiveFilter
+                      ? _kPrimary.withValues(alpha: 0.1)
+                      : _kSurface,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: hasActiveFilter ? _kPrimary : _kBorder,
+                  ),
+                ),
+                child: IconButton(
+                  onPressed: onOpenFilter,
+                  tooltip: 'Filter',
+                  icon: Icon(
+                    Icons.tune_rounded,
+                    size: 19,
+                    color: hasActiveFilter ? _kPrimary : Colors.grey.shade600,
+                  ),
+                ),
+              ),
+              if (hasActiveFilter)
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: _kPrimary,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterResult {
+  final String? status;
+  final DateTime? dateFrom;
+  final DateTime? dateTo;
+
+  const _FilterResult({this.status, this.dateFrom, this.dateTo});
+}
+
+/// Dialog filter gabungan: status Penjualan + rentang tanggal dalam satu
+/// tempat, dengan aksi "Reset" dan "Terapkan".
+class _FilterDialog extends StatefulWidget {
+  final String? initialStatus;
+  final DateTime? initialDateFrom;
+  final DateTime? initialDateTo;
+
+  const _FilterDialog({
+    required this.initialStatus,
+    required this.initialDateFrom,
+    required this.initialDateTo,
+  });
+
+  @override
+  State<_FilterDialog> createState() => _FilterDialogState();
+}
+
+class _FilterDialogState extends State<_FilterDialog> {
+  String? _status;
+  DateTime? _dateFrom;
+  DateTime? _dateTo;
+
+  @override
+  void initState() {
+    super.initState();
+    _status = widget.initialStatus;
+    _dateFrom = widget.initialDateFrom;
+    _dateTo = widget.initialDateTo;
+  }
+
+  static final DateTime _minDate = DateTime(DateTime.now().year - 5);
+  static final DateTime _maxDate = DateTime(DateTime.now().year + 1);
+
+  // Dua field independen ("Dari" / "Sampai"), masing-masing pakai stock
+  // showDatePicker (dialog calendar compact bawaan Material, bukan
+  // showDateRangePicker yang tampil fullscreen di layar tablet ini) — pola
+  // ini yang dipakai app-app profesional (Booking.com, Google Flights, dst)
+  // untuk date-range field: dua kotak terpisah, bukan satu range picker.
+  Future<void> _pickFrom() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dateFrom ?? DateTime.now(),
+      firstDate: _minDate,
+      lastDate: _dateTo ?? _maxDate,
+      locale: const Locale('id', 'ID'),
+      helpText: 'Tanggal Dari',
+    );
+    if (picked == null) return;
+    setState(() {
+      _dateFrom = picked;
+      if (_dateTo != null && _dateTo!.isBefore(picked)) _dateTo = picked;
+    });
+  }
+
+  Future<void> _pickTo() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dateTo ?? _dateFrom ?? DateTime.now(),
+      firstDate: _dateFrom ?? _minDate,
+      lastDate: _maxDate,
+      locale: const Locale('id', 'ID'),
+      helpText: 'Tanggal Sampai',
+    );
+    if (picked == null) return;
+    setState(() {
+      _dateTo = picked;
+      if (_dateFrom != null && _dateFrom!.isAfter(picked)) _dateFrom = picked;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dateActive = _dateFrom != null && _dateTo != null;
+
+    return Dialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 420),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Filter Penjualan',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Status',
+              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: _kStatusFilters.entries.map((e) {
+                final selected = (_status ?? 'incomplete') == e.key;
+                return ChoiceChip(
+                  label: Text(e.value, style: const TextStyle(fontSize: 12)),
+                  selected: selected,
+                  onSelected: (sel) =>
+                      setState(() => _status = sel ? e.key : null),
+                  selectedColor: _kPrimary.withValues(alpha: 0.15),
+                  labelStyle: TextStyle(
+                    color: selected ? _kPrimary : Colors.grey.shade700,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              'Tanggal',
+              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: _DateFieldBox(
+                    label: 'Dari',
+                    value: _dateFrom,
+                    onTap: _pickFrom,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 16,
+                    color: Colors.grey.shade400,
+                  ),
+                ),
+                Expanded(
+                  child: _DateFieldBox(
+                    label: 'Sampai',
+                    value: _dateTo,
+                    onTap: _pickTo,
+                  ),
+                ),
+                if (dateActive) ...[
+                  const SizedBox(width: 4),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 16),
+                    color: Colors.grey.shade500,
+                    tooltip: 'Hapus filter tanggal',
+                    onPressed: () => setState(() {
+                      _dateFrom = null;
+                      _dateTo = null;
+                    }),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () =>
+                        Navigator.pop(context, const _FilterResult()),
+                    child: const Text('RESET'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(
+                      context,
+                      _FilterResult(
+                        status: _status,
+                        dateFrom: _dateFrom,
+                        dateTo: _dateTo,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _kPrimary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: const Text('TERAPKAN'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Kotak field tanggal ala app profesional (Booking.com, Google Flights):
+/// label kecil di atas + nilai (atau placeholder) di bawah, dalam satu
+/// kotak bordered yang bisa di-tap — bukan tombol icon+text biasa.
+class _DateFieldBox extends StatelessWidget {
+  final String label;
+  final DateTime? value;
+  final VoidCallback onTap;
+
+  const _DateFieldBox({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final filled = value != null;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: filled ? _kPrimary.withValues(alpha: 0.04) : _kSurface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: filled ? _kPrimary : _kBorder),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w600,
+                color: filled ? _kPrimary : Colors.grey.shade500,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Row(
+              children: [
+                Icon(
+                  Icons.calendar_today_rounded,
+                  size: 13,
+                  color: filled ? _kPrimary : Colors.grey.shade400,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    filled ? formatDateToShortId(value) : 'Pilih tanggal',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: filled ? FontWeight.w700 : FontWeight.w500,
+                      color: filled
+                          ? const Color(0xFF1A1D23)
+                          : Colors.grey.shade500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Kartu Penjualan (item daftar) ────────────────────────────────────────
+
+class _PenjualanCard extends StatelessWidget {
+  final PenjualanHeader header;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _PenjualanCard({
+    required this.header,
+    required this.selected,
+    required this.onTap,
+  });
+
+  String get _percentLabel {
+    if (header.totalLines <= 0) return '-';
+    final pct = (header.completedLines / header.totalLines * 100).clamp(0, 100);
+    return '${pct.round()}%';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: selected ? _kSelectedBg : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected ? _kPrimary : _kBorder,
+            width: selected ? 1.4 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    header.noBJJual,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w800,
+                      color: selected
+                          ? const Color(0xFF0C66E4)
+                          : const Color(0xFF1A1D23),
+                      letterSpacing: -0.2,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: (header.isComplete ? Colors.green : Colors.orange)
+                        .withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        header.isComplete
+                            ? Icons.check_circle_rounded
+                            : Icons.hourglass_top_rounded,
+                        size: 11,
+                        color: header.isComplete
+                            ? Colors.green.shade700
+                            : Colors.orange.shade700,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        header.isComplete ? 'Complete' : 'Belum Complete',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: header.isComplete
+                              ? Colors.green.shade700
+                              : Colors.orange.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(
+                  Icons.person_outline,
+                  size: 13,
+                  color: Colors.grey.shade500,
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    header.namaPembeli.isNotEmpty
+                        ? header.namaPembeli
+                        : 'Pembeli #${header.idPembeli}',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF374151),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 3),
+            Row(
+              children: [
+                Icon(
+                  Icons.calendar_today_outlined,
+                  size: 12,
+                  color: Colors.grey.shade500,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  formatDateToShortId(header.tanggal),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
+              ],
+            ),
+            if ((header.remark ?? '').isNotEmpty) ...[
+              const SizedBox(height: 3),
+              Text(
+                header.remark!,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                  color: Colors.grey.shade500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+            const Divider(height: 16, color: _kBorder),
+            Row(
+              children: [
+                const Icon(
+                  Icons.checklist_rounded,
+                  size: 13,
+                  color: Color(0xFF6B7280),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Turnover ${header.completedLines}/${header.totalLines} ($_percentLabel)',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF374151),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Panel kanan: placeholder saat belum ada yang dipilih ────────────────
+
+class _EmptyDetailPlaceholder extends StatelessWidget {
+  const _EmptyDetailPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: _kSurface,
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.point_of_sale_outlined,
+            size: 48,
+            color: Colors.grey.shade300,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Pilih Penjualan dari daftar di sebelah kiri',
+            style: TextStyle(fontSize: 13.5, color: Colors.grey.shade500),
+          ),
+        ],
+      ),
+    );
+  }
+}
